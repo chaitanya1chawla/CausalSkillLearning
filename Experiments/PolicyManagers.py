@@ -893,7 +893,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.total_loss.backward()
 		self.optimizer.step()
 
-	def rollout_visuals(self, i, latent_z=None, return_traj=False):
+	def rollout_visuals(self, i, latent_z=None, return_traj=False, start_state=None):
 
 		# Initialize states and latent_z, etc. 
 		# For t in range(number timesteps):
@@ -903,7 +903,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		self.state_dim = 2
 		self.rollout_timesteps = 5
-		start_state = torch.zeros((self.state_dim))
+		if start_state is not None:
+			start_state = torch.tensor(start_state).to(device).float()
+		else: 
+			start_state = torch.zeros((self.state_dim))
 
 		if self.args.discrete_z:
 			# Assuming 4 discrete subpolicies, just set subpolicy input to 1 at the latent_z index == i. 
@@ -1097,13 +1100,15 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		for i in range(self.N):
 
 			# (1) Encoder trajectory. 
-			latent_z, _, _ = self.run_iteration(0, i, return_z=True, and_train=False)
+			latent_z, sample_traj, _ = self.run_iteration(0, i, return_z=True, and_train=False)
+			# Get start state from the sample_traj.
+			start_state = sample_traj[0]
 
 			# Copy z. 
 			self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())
 
 			# (2) Now rollout policy.
-			self.trajectory_set[i] = self.rollout_visuals(i, latent_z=latent_z, return_traj=True)
+			self.trajectory_set[i] = self.rollout_visuals(i, latent_z=latent_z, return_traj=True, start_state=start_state)
 
 			# # (3) Plot trajectory.
 			# traj_image = self.visualize_trajectory(rollout_traj)
