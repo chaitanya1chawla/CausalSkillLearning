@@ -53,14 +53,24 @@ class Logger(object):
     
     def __init__(self, log_dir):
         """Create a summary writer logging to log_dir."""
-        # Switching to TF 2.2 implementation.
+
+        # Switching to Tensorflow 2 syntax. 
         self.writer = tf.summary.create_file_writer(log_dir)
+
+        # Tensorflow 1 syntax (for logging purposes):
         # self.writer = tf.summary.FileWriter(log_dir)
 
     def scalar_summary(self, tag, value, step):
         """Log a scalar variable."""
-        summary = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
-        self.writer.add_summary(summary, step)
+
+        # Tensorflow 1 syntax (for logging purposes):
+        # summary = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
+        # self.writer.add_summary(summary, step)
+
+        # Switching to Tensorflow 2 syntax. 
+        # Adding scalar summar to file writer.
+        with self.writer.as_default():
+            tf.summary.scalar(tag, value, step=step)
 
     def gif_summary(self, tag, images, step):
         """Log a list of TXHXWX3 images."""
