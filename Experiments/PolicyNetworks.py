@@ -153,7 +153,12 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		format_input = input.view((input.shape[0], self.batch_size, self.input_size))
 
 		hidden = None
-		format_action_seq = torch.from_numpy(action_sequence).to(device).float().view(action_sequence.shape[0],1,self.output_size)
+
+		if torch.is_tensor(action_sequence):
+			format_action_seq = action_sequence
+		else:
+			format_action_seq = torch.from_numpy(action_sequence).to(device).float().view(action_sequence.shape[0],1,self.output_size)
+			
 		lstm_outputs, hidden = self.lstm(format_input)
 
 		# Predict Gaussian means and variances. 
