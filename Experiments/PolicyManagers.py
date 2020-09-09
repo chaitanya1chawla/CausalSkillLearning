@@ -4220,7 +4220,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Now evaluate likelihood of actions under the source decoder.
 		cycle_reconstructed_loglikelihood, _ = source_policy_manager.policy_network.forward(dictionary['source_subpolicy_inputs_crossdomain'], original_action_sequence)
 		# Reweight the cycle reconstructed likelihood to construct the loss.
-		self.cycle_reconstruction_loss = -self.args.cycle_reconstruction_loss_weight*cycle_reconstruction_loss.mean()
+		self.cycle_reconstruction_loss = -self.args.cycle_reconstruction_loss_weight*cycle_reconstructed_loglikelihood.mean()
 
 		####################################
 		# Now that individual losses are computed, compute total loss, compute gradients, and then step.
