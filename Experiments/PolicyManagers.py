@@ -3554,7 +3554,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		if trajectory_segment is not None:
 
-			embed()
 			############# (1) #############
 			# Encode trajectory segment into latent z. 		
 			latent_z, encoder_loglikelihood, encoder_entropy, kl_divergence = policy_manager.encoder_network.forward(torch_traj_seg, policy_manager.epsilon)
@@ -3572,7 +3571,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				subpolicy_inputs[:,2*policy_manager.state_dim:-1] = latent_z_seq
 
 				# Now get "sample_action_seq" for forward function. 
-				sample_action_seq = subpolicy_inputs[:,policy_manager.state_dim:2*policy_manager.state_dim].clone()
+				sample_action_seq = subpolicy_inputs[:,policy_manager.state_dim:2*policy_manager.state_dim+1].clone()
 
 			else:
 				_, subpolicy_inputs, sample_action_seq = policy_manager.assemble_inputs(trajectory_segment, latent_z_seq, latent_b, sample_action_seq)
