@@ -4218,7 +4218,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		original_action_sequence = dictionary['source_subpolicy_inputs_original'][:,source_policy_manager.state_dim:2*source_policy_manager.state_dim]
 
 		# Now evaluate likelihood of actions under the source decoder.
-		cycle_reconstructed_loglikelihood, _ = source_policy_manager.forward(dictionary['source_subpolicy_inputs_crossdomain'], original_action_sequence)
+		cycle_reconstructed_loglikelihood, _ = source_policy_manager.policy_network.forward(dictionary['source_subpolicy_inputs_crossdomain'], original_action_sequence)
 		# Reweight the cycle reconstructed likelihood to construct the loss.
 		self.cycle_reconstruction_loss = -self.args.cycle_reconstruction_loss_weight*cycle_reconstruction_loss.mean()
 
