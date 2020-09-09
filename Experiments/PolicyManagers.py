@@ -4148,7 +4148,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 
 		return differentiable_trajectory, subpolicy_inputs
 
-	def update_networks(self, dictionary, source_policy_manager):
+	def update_networks(self, domain, dictionary, source_policy_manager):
 
 		# Here are the objectives we have to be considering. 
 		# 	1) Reconstruction of inputs under single domain encoding / decoding. 
@@ -4320,16 +4320,11 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		source_trajectory_rollout, dictionary['source_subpolicy_inputs_crossdomain'] = self.cross_domain_decoding(domain, source_policy_manager, dictionary['target_latent_z'], start_state=dictionary['source_subpolicy_inputs_original'][0,:source_policy_manager.state_dim].detach().cpu().numpy())
 
 		####################################
-		# (4) Feed source and target latent z's to z_discriminator.
+		# (4) Feed source and target latent z's to z_discriminator, \ 
+		# and compute all losses, reweight, and take gradient steps.
 		####################################
 
-		self.compute_discriminator_losses(domain, dictionary['source_latent_z'])
-
-		####################################
-		# (5) Compute all losses, reweight, and take gradient steps.
-		####################################
-
-		self.update_networks(dictionary, source_policy_manager)
+		self.update_networks(domain, dictionary, source_policy_manager)
 
 		# viz_dict = {'domain': domain, 'discriminator_probs': discriminator_prob.squeeze(0).squeeze(0)[domain].detach().cpu().numpy()}			
 		# self.update_plots(counter, viz_dict)
