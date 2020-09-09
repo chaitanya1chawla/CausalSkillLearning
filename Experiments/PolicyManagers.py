@@ -4317,7 +4317,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Can use the original start state, or also use the reverse trick for start state. Try both maybe.
 		####################################
 
-		source_trajectory_rollout, dictionary['source_subpolicy_inputs_crossdomain'] = self.cross_domain_decoding(domain, source_policy_manager, dictionary['target_latent_z'], start_state=dictionary['source_subpolicy_inputs'][0,:self.state_dim].detach().cpu().numpy())
+		source_trajectory_rollout, dictionary['source_subpolicy_inputs_crossdomain'] = self.cross_domain_decoding(domain, source_policy_manager, dictionary['target_latent_z'], start_state=dictionary['source_subpolicy_inputs_original'][0,:self.state_dim].detach().cpu().numpy())
 
 		####################################
 		# (4) Feed source and target latent z's to z_discriminator.
