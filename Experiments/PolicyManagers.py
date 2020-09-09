@@ -3540,16 +3540,21 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			i = np.random.randint(0, len(policy_manager.dataset))
 
 		if trajectory_input is not None: 
-
 			# Grab trajectory segment from tuple. 
-			torch_traj_seg = trajectory_input['target_trajectory_rollout']
-			
+			# torch_traj_seg = trajectory_input['target_trajectory_rollout']
+			torch_traj_seg = trajectory_input['target_subpolicy_inputs'][:,:2*policy_manager.state_dim].clone()
+
+			# JUst setting this so next if statement evaluates to true.
+			trajectory_segment = True
+
 		else: 
 			trajectory_segment, sample_action_seq, sample_traj = policy_manager.get_trajectory_segment(i)
 			# Torchify trajectory segment.
 			torch_traj_seg = torch.tensor(trajectory_segment).to(device).float()
 
 		if trajectory_segment is not None:
+
+			embed()
 			############# (1) #############
 			# Encode trajectory segment into latent z. 		
 			latent_z, encoder_loglikelihood, encoder_entropy, kl_divergence = policy_manager.encoder_network.forward(torch_traj_seg, policy_manager.epsilon)
@@ -3564,10 +3569,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 				# Now assigned trajectory_input['target_subpolicy_inputs'].clone() to SubPolicy_inputs, and then replace the latent z's.
 				subpolicy_inputs = trajectory_input['target_subpolicy_inputs'].clone()
-				subpolicy_inputs[:,2*self.state_dim:-1] = latent_z_seq
+				subpolicy_inputs[:,2*policy_manager.state_dim:-1] = latent_z_seq
 
 				# Now get "sample_action_seq" for forward function. 
-				sample_action_seq = subpolicy_inputs[:,self.state_dim:2*self.state_dim].clone()
+				sample_action_seq = subpolicy_inputs[:,policy_manager.state_dim:2*policy_manager.state_dim].clone()
 
 			else:
 				_, subpolicy_inputs, sample_action_seq = policy_manager.assemble_inputs(trajectory_segment, latent_z_seq, latent_b, sample_action_seq)
@@ -4066,10 +4071,11 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 
 		# Don't actually need the target_latent_z, unless we're doing differentiable nearest neighbor transfer. 
 		# Now get the corresponding trajectory. 
+
 		trajectory = trajectory_set[target_latent_z_index]
 
 		# Finally, pick up first state. 
-		start_state = trajectory[0]
+		start_state = trajectory[0,0,0]
 
 		return start_state
 
