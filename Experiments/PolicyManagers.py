@@ -3568,10 +3568,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 				# Now assigned trajectory_input['target_subpolicy_inputs'].clone() to SubPolicy_inputs, and then replace the latent z's.
 				subpolicy_inputs = trajectory_input['target_subpolicy_inputs'].clone()
-				subpolicy_inputs[:,2*policy_manager.state_dim:-1] = latent_z_seq
+
+				subpolicy_inputs[:,2*policy_manager.state_dim:] = latent_z_seq
 
 				# Now get "sample_action_seq" for forward function. 
-				sample_action_seq = subpolicy_inputs[:,policy_manager.state_dim:2*policy_manager.state_dim+1].clone()
+				sample_action_seq = subpolicy_inputs[:,policy_manager.state_dim:2*policy_manager.state_dim].clone()
 
 			else:
 				_, subpolicy_inputs, sample_action_seq = policy_manager.assemble_inputs(trajectory_segment, latent_z_seq, latent_b, sample_action_seq)
