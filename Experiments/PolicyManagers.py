@@ -4173,7 +4173,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Compute VAE loss on the current domain as negative log likelihood likelihood plus weighted KL.  
 		self.likelihood_loss = -dictionary['source_loglikelihood'].mean()
 		self.encoder_KL = dictionary['source_kl_divergence'].mean()
-		self.reconstruction_loss = self.source_likelihood_loss + self.args.kl_weight*self.source_encoder_KL
+		self.reconstruction_loss = self.likelihood_loss + self.args.kl_weight*self.encoder_KL
 
 		####################################
 		# (2) Compute discriminability losses.
@@ -4195,7 +4195,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Get z discriminator logprobabilities.
 		z_discriminator_logprob, z_discriminator_prob = self.discriminator_network(dictionary['source_latent_z'])
 		# Compute discriminability loss. Remember, this is not used for training the discriminator, but rather the encoders.
-		self.discriminability_loss = self.negative_log_likelihood_loss_function(z_discriminator_logprob.squeeze(1), torch.tensor(1-domain).to(device).long().view(1,))
+		self.discriminability_loss = self.negative_log_likelihood_loss_function(z_discriminator_logprob.squeeze(1), torch.tensor(1-domain).to(device).long().view(1,)).mean()
 
 		###### Block that computes discriminability losses assuming we are using trjaectory discriminators. ######
 
@@ -4262,7 +4262,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		viz_dict['discriminator_probs'] = self.z_discriminator_detach_prob
 
 		# Call super update plots.
-		super().update_plots()
+		super().update_plots(counter, viz_dict)
 
 		# Now add the new scalars specific to cycle consistency training. 
 		self.tf_logger.scalar_summary('Cycle Consistency LogLikelihood', self.cycle_reconstructed_loglikelihood.detach().mean(), counter)
