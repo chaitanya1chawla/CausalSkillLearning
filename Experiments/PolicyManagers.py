@@ -3597,8 +3597,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.tf_logger.scalar_summary('Policy LogLikelihood', self.likelihood_loss.detach(), counter)
 		self.tf_logger.scalar_summary('Discriminability Loss', self.discriminability_loss.detach(), counter)
 		self.tf_logger.scalar_summary('Encoder KL', self.encoder_KL.detach(), counter)
-		self.tf_logger.scalar_summary('VAE Loss', self.VAE_loss.detach(), counter)
-		self.tf_logger.scalar_summary('Total VAE Loss', self.total_VAE_loss.detach(), counter)
+		self.tf_logger.scalar_summary('VAE Loss', self.reconstruction_loss.detach(), counter)
+		self.tf_logger.scalar_summary('Total Loss', self.total_VAE_loss.detach(), counter)
 		self.tf_logger.scalar_summary('Domain', viz_dict['domain'], counter)
 
 		# Plot discriminator values after we've started training it. 
@@ -3833,7 +3833,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Compute VAE loss on the current domain as likelihood plus weighted KL.  
 		self.likelihood_loss = -policy_loglikelihood.mean()
 		self.encoder_KL = encoder_KL.mean()
-		self.VAE_loss = self.likelihood_loss + self.args.kl_weight*self.encoder_KL
+		self.reconstruction_loss = self.likelihood_loss + self.args.kl_weight*self.encoder_KL
 
 		# Compute discriminability loss for encoder (implicitly ignores decoder).
 		# Pretend the label was the opposite of what it is, and train the encoder to make the discriminator think this was what was true. 
@@ -3841,7 +3841,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		self.discriminability_loss = self.negative_log_likelihood_loss_function(discriminator_loglikelihood.squeeze(1), torch.tensor(1-domain).to(device).long().view(1,)).mean()
 		# Total encoder loss: 
-		self.total_VAE_loss = self.vae_loss_weight*self.VAE_loss + self.discriminability_loss_weight*self.discriminability_loss	
+		self.total_VAE_loss = self.vae_loss_weight*self.reconstruction_loss + self.discriminability_loss_weight*self.discriminability_loss	
 
 		if not(self.skip_vae):
 			# Go backward through the generator (encoder / decoder), and take a step. 
@@ -4148,7 +4148,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 
 		return differentiable_trajectory, subpolicy_inputs
 
-	def update_networks(self, domain, dictionary, source_policy_manager):
+	def update_networks(self, dictionary, source_policy_manager):
 
 		# Here are the objectives we have to be considering. 
 		# 	1) Reconstruction of inputs under single domain encoding / decoding. 
@@ -4161,6 +4161,8 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# First update encoder decoder networks. Don't train discriminator.
 		####################################
 
+		domain = dictionary['domain']
+
 		# Zero gradients.
 		self.optimizer.zero_grad()		
 
@@ -4169,9 +4171,9 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		####################################
 
 		# Compute VAE loss on the current domain as negative log likelihood likelihood plus weighted KL.  
-		self.source_likelihood_loss = -dictionary['source_loglikelihood'].mean()
-		self.source_encoder_KL = dictionary['source_kl_divergence'].mean()
-		self.source_reconstruction_loss = self.source_likelihood_loss + self.args.kl_weight*self.source_encoder_KL
+		self.likelihood_loss = -dictionary['source_loglikelihood'].mean()
+		self.encoder_KL = dictionary['source_kl_divergence'].mean()
+		self.reconstruction_loss = self.source_likelihood_loss + self.args.kl_weight*self.source_encoder_KL
 
 		####################################
 		# (2) Compute discriminability losses.
@@ -4193,7 +4195,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Get z discriminator logprobabilities.
 		z_discriminator_logprob, z_discriminator_prob = self.discriminator_network(dictionary['source_latent_z'])
 		# Compute discriminability loss. Remember, this is not used for training the discriminator, but rather the encoders.
-		self.z_discriminability_loss = self.negative_log_likelihood_loss_function(z_discriminator_logprob.squeeze(1), torch.tensor(1-domain).to(device).long().view(1,))
+		self.discriminability_loss = self.negative_log_likelihood_loss_function(z_discriminator_logprob.squeeze(1), torch.tensor(1-domain).to(device).long().view(1,))
 
 		###### Block that computes discriminability losses assuming we are using trjaectory discriminators. ######
 
@@ -4218,16 +4220,16 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		original_action_sequence = dictionary['source_subpolicy_inputs_original'][:,source_policy_manager.state_dim:2*source_policy_manager.state_dim]
 
 		# Now evaluate likelihood of actions under the source decoder.
-		cycle_reconstructed_loglikelihood, _ = source_policy_manager.policy_network.forward(dictionary['source_subpolicy_inputs_crossdomain'], original_action_sequence)
+		self.cycle_reconstructed_loglikelihood, _ = source_policy_manager.policy_network.forward(dictionary['source_subpolicy_inputs_crossdomain'], original_action_sequence)
 		# Reweight the cycle reconstructed likelihood to construct the loss.
-		self.cycle_reconstruction_loss = -self.args.cycle_reconstruction_loss_weight*cycle_reconstructed_loglikelihood.mean()
+		self.cycle_reconstruction_loss = -self.args.cycle_reconstruction_loss_weight*self.cycle_reconstructed_loglikelihood.mean()
 
 		####################################
 		# Now that individual losses are computed, compute total loss, compute gradients, and then step.
 		####################################
 
 		# First combine losses.
-		self.total_VAE_loss = self.source_reconstruction_loss + self.z_discriminability_loss + self.cycle_reconstruction_loss
+		self.total_VAE_loss = self.reconstruction_loss + self.discriminability_loss + self.cycle_reconstruction_loss
 
 		# If we are in a encoder / decoder training phase, compute gradients and step.  
 		if not(self.skip_vae):
@@ -4244,15 +4246,27 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Detach the latent z that is fed to the discriminator, and then compute discriminator loss.
 		# If we tried to zero grad the discriminator and then use NLL loss on it again, Pytorch would cry about going backward through a part of the graph that we already \ 
 		# went backward through. Instead, just pass things through the discriminator again, but this time detaching latent_z. 
-		z_discriminator_detach_logprob, z_discriminator_detach_prob = self.discriminator_network(dictionary['source_latent_z'].detach())
+		z_discriminator_detach_logprob, self.z_discriminator_detach_prob = self.discriminator_network(dictionary['source_latent_z'].detach())
 
 		# Compute discriminator loss for discriminator. 
-		self.z_discriminator_loss = self.negative_log_likelihood_loss_function(z_discriminator_detach_logprob.squeeze(1), torch.tensor(domain).to(device).long().view(1,))		
+		self.discriminator_loss = self.negative_log_likelihood_loss_function(z_discriminator_detach_logprob.squeeze(1), torch.tensor(domain).to(device).long().view(1,))		
 		
 		if not(self.skip_discriminator):
 			# Now go backward and take a step.
-			self.z_discriminator_loss.backward()
+			self.discriminator_loss.backward()
 			self.discriminator_optimizer.step()
+
+	def update_plots(self, counter, viz_dict):
+
+		# Rename things so that update plots does its job. 
+		viz_dict['discriminator_probs'] = self.z_discriminator_detach_prob
+
+		# Call super update plots.
+		super().update_plots()
+
+		# Now add the new scalars specific to cycle consistency training. 
+		self.tf_logger.scalar_summary('Cycle Consistency LogLikelihood', self.cycle_reconstructed_loglikelihood.detach().mean(), counter)
+		self.tf_logger.scalar_summary('Cycle Consistency Loss', self.cycle_reconstruction_loss.detach().mean(), counter)
 
 	def run_iteration(self, counter, i):
 
@@ -4292,7 +4306,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# (1) Select which domain to use as source domain (also supervision of z discriminator for this iteration). 
 		####################################
 
-		domain, source_policy_manager, target_policy_manager = self.get_source_target_domain_managers()
+		dictionary['domain'], source_policy_manager, target_policy_manager = self.get_source_target_domain_managers()
 
 		####################################
 		# (2) & (3 a) Get source trajectory (segment) and encode into latent z. Decode using source decoder, to get loglikelihood for reconstruction objectve. 
@@ -4304,7 +4318,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# (3 b) Cross domain decoding. 
 		####################################
 		
-		target_dict['target_trajectory_rollout'], target_dict['target_subpolicy_inputs'] = self.cross_domain_decoding(domain, target_policy_manager, dictionary['source_latent_z'])
+		target_dict['target_trajectory_rollout'], target_dict['target_subpolicy_inputs'] = self.cross_domain_decoding(dictionary['domain'], target_policy_manager, dictionary['source_latent_z'])
 
 		####################################
 		# (3 c) Cross domain encoding of target_trajectory_rollout into target latent_z. 
@@ -4317,18 +4331,18 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Can use the original start state, or also use the reverse trick for start state. Try both maybe.
 		####################################
 
-		source_trajectory_rollout, dictionary['source_subpolicy_inputs_crossdomain'] = self.cross_domain_decoding(domain, source_policy_manager, dictionary['target_latent_z'], start_state=dictionary['source_subpolicy_inputs_original'][0,:source_policy_manager.state_dim].detach().cpu().numpy())
+		source_trajectory_rollout, dictionary['source_subpolicy_inputs_crossdomain'] = self.cross_domain_decoding(dictionary['domain'], source_policy_manager, dictionary['target_latent_z'], start_state=dictionary['source_subpolicy_inputs_original'][0,:source_policy_manager.state_dim].detach().cpu().numpy())
 
 		####################################
-		# (4) Feed source and target latent z's to z_discriminator, \ 
+		# (4) and (5) Feed source and target latent z's to z_discriminator, \ 
 		# and compute all losses, reweight, and take gradient steps.
 		####################################
 
-		self.update_networks(domain, dictionary, source_policy_manager)
+		self.update_networks(dictionary, source_policy_manager)
+
+		####################################
+		# (6) Update plots and logs. 
+		####################################
 
 		# viz_dict = {'domain': domain, 'discriminator_probs': discriminator_prob.squeeze(0).squeeze(0)[domain].detach().cpu().numpy()}			
-		# self.update_plots(counter, viz_dict)
-
-		# Encode decode function: First encodes, takes trajectory segment, and outputs latent z. The latent z is then provided to decoder (along with initial state), and then we get SOURCE domain subpolicy inputs. 
-		# Cross domain decoding function: Takes encoded latent z (and start state), and then rolls out with target decoder. Function returns, target trajectory, action sequence, and TARGET domain subpolicy inputs. 
-
+		self.update_plots(counter, dictionary)
