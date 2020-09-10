@@ -3623,6 +3623,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.tf_logger.image_summary("TSNE Target Embedding", [tsne_target_embedding], counter)
 			self.tf_logger.image_summary("TSNE Combined Embeddings", [tsne_combined_embeddings], counter)			
 
+
 			# Plot source, target, and shared embeddings via PCA. 
 			pca_source_embedding, pca_target_embedding, pca_combined_embeddings, pca_combined_traj_embeddings = self.get_embeddings(projection='pca')
 
