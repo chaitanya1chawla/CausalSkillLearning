@@ -13,6 +13,7 @@ try:
     from StringIO import StringIO  # Python 2.7
 except ImportError:
     from io import BytesIO         # Python 3.x
+from PIL import Image
 
 import tempfile
 import moviepy.editor as mpy
@@ -68,7 +69,7 @@ class Logger(object):
         # self.writer.add_summary(summary, step)
 
         # Switching to Tensorflow 2 syntax. 
-        # Adding scalar summar to file writer.
+        # Adding scalar summar to file writer.  
         with self.writer.as_default():
             tf.summary.scalar(tag, value, step=step)
 
@@ -86,28 +87,41 @@ class Logger(object):
         summary = tf.Summary(value=img_summaries)
         self.writer.add_summary(summary, step)
 
+    # def image_summary(self, tag, images, step):
+    #     """Log a list of images."""
+
+    #     img_summaries = []
+    #     for i, img in enumerate(images):
+    #         # Write the image to a string
+    #         try:
+    #             s = StringIO()
+    #         except:
+    #             s = BytesIO()
+
+    #         # Switching to PIL Image fromarray instead. 
+    #         scipy.misc.toimage(img).save(s, format="png")
+    #         # Image.fromarray(img).save(s, format="png")
+
+    #         # Create an Image object
+    #         img_sum = tf.Summary.Image(encoded_image_string=s.getvalue(),
+    #                                    height=img.shape[0],
+    #                                    width=img.shape[1])
+    #         # Create a Summary value
+    #         img_summaries.append(tf.Summary.Value(tag='%s/%d' % (tag, i), image=img_sum))
+
+    #     # Create and write Summary
+    #     summary = tf.Summary(value=img_summaries)
+    #     self.writer.add_summary(summary, step)
+
     def image_summary(self, tag, images, step):
         """Log a list of images."""
 
         img_summaries = []
         for i, img in enumerate(images):
-            # Write the image to a string
-            try:
-                s = StringIO()
-            except:
-                s = BytesIO()
-            scipy.misc.toimage(img).save(s, format="png")
 
-            # Create an Image object
-            img_sum = tf.Summary.Image(encoded_image_string=s.getvalue(),
-                                       height=img.shape[0],
-                                       width=img.shape[1])
-            # Create a Summary value
-            img_summaries.append(tf.Summary.Value(tag='%s/%d' % (tag, i), image=img_sum))
+            with self.writer.as_default():
+                tf.summary.image(tag, img, step=step)
 
-        # Create and write Summary
-        summary = tf.Summary(value=img_summaries)
-        self.writer.add_summary(summary, step)
 
     def histo_summary(self, tag, values, step, bins=1000):
         """Log a histogram of the tensor of values."""

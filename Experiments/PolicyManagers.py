@@ -3594,17 +3594,17 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 	def update_plots(self, counter, viz_dict):
 
 		# VAE Losses. 
-		self.tf_logger.scalar_summary('Policy LogLikelihood', self.likelihood_loss, counter)
-		self.tf_logger.scalar_summary('Discriminability Loss', self.discriminability_loss, counter)
-		self.tf_logger.scalar_summary('Encoder KL', self.encoder_KL, counter)
-		self.tf_logger.scalar_summary('VAE Loss', self.VAE_loss, counter)
-		self.tf_logger.scalar_summary('Total VAE Loss', self.total_VAE_loss, counter)
+		self.tf_logger.scalar_summary('Policy LogLikelihood', self.likelihood_loss.detach(), counter)
+		self.tf_logger.scalar_summary('Discriminability Loss', self.discriminability_loss.detach(), counter)
+		self.tf_logger.scalar_summary('Encoder KL', self.encoder_KL.detach(), counter)
+		self.tf_logger.scalar_summary('VAE Loss', self.VAE_loss.detach(), counter)
+		self.tf_logger.scalar_summary('Total VAE Loss', self.total_VAE_loss.detach(), counter)
 		self.tf_logger.scalar_summary('Domain', viz_dict['domain'], counter)
 
 		# Plot discriminator values after we've started training it. 
 		if self.training_phase>1:
 			# Discriminator Loss. 
-			self.tf_logger.scalar_summary('Discriminator Loss', self.discriminator_loss, counter)
+			self.tf_logger.scalar_summary('Discriminator Loss', self.discriminator_loss.detach(), counter)
 			# Compute discriminator prob of right action for logging. 
 			self.tf_logger.scalar_summary('Discriminator Probability', viz_dict['discriminator_probs'], counter)
 		
@@ -3838,8 +3838,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Pretend the label was the opposite of what it is, and train the encoder to make the discriminator think this was what was true. 
 		# I.e. train encoder to make discriminator maximize likelihood of wrong label.
 
-		self.discriminability_loss = self.negative_log_likelihood_loss_function(discriminator_loglikelihood.squeeze(1), torch.tensor(1-domain).to(device).long().view(1,))
-
+		self.discriminability_loss = self.negative_log_likelihood_loss_function(discriminator_loglikelihood.squeeze(1), torch.tensor(1-domain).to(device).long().view(1,)).mean()
 		# Total encoder loss: 
 		self.total_VAE_loss = self.vae_loss_weight*self.VAE_loss + self.discriminability_loss_weight*self.discriminability_loss	
 
