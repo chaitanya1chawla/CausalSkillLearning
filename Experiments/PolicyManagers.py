@@ -3998,19 +3998,6 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 
 		self.neighbor_obj_set = False
 
-	# Don't actually need to define these functions since they perform same steps as super functions.
-	# def create_networks(self):
-
-	# 	super().create_networks()
-
-	# 	# Must also create two discriminator networks; one for source --> target --> source, one for target --> source --> target. 
-	# 	# Remember, since these discriminator networks are operating on the trajectory space, we have to 
-	# 	# make them LSTM networks, rather than MLPs. 
-
-	# 	# # We have the encoder network class that's perfect for this. Output size is 2. 
-	# 	# self.source_discriminator = EncoderNetwork(self.source_manager.input_size, self.hidden_size, self.output_size).to(device)
-	# 	# self.target_discriminator = EncoderNetwork(self.source_manager.input_size, self.hidden_size, self.output_size).to(device)
-
 	def create_training_ops(self):
 
 		# Call super training ops. 
@@ -4023,32 +4010,6 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Instead of using the individuals policy manager optimizers, use one single optimizer. 
 		self.parameter_list = self.source_manager.parameter_list + self.target_manager.parameter_list
 		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate)
-
-	# def save_all_models(self, suffix):
-
-	# 	# Call super save model. 
-	# 	super().save_all_models(suffix)
-
-	# 	# Now save the individual source / target discriminators. 
-	# 	self.save_object['Source_Discriminator_Network'] = self.source_discriminator_network.state_dict()
-	# 	self.save_object['Target_Discriminator_Network'] = self.target_discriminator_network.state_dict()
-
-	# 	# Overwrite the save from super. 
-	# 	torch.save(self.save_object,os.path.join(self.savedir,"Model_"+suffix))
-
-	# def load_all_models(self, path):
-
-	# 	# Call super load. 
-	# 	super().load_all_models(path)
-
-	# 	# Now load the individual source and target discriminators. 
-	# 	self.source_discriminator.load_state_dict(self.load_object['Source_Discriminator_Network'])
-	# 	self.target_discriminator.load_state_dict(self.load_object['Target_Discriminator_Network'])
-
-	# A bunch of functions should just be directly usable:
-	# get_domain_manager, get_trajectory_segment_tuple, encode_decode_trajectory, update_plots, get_transform, 
-	# transform_zs, get_embeddings, plot_embeddings, get_trajectory_visuals, evaluate_correspondence_metrics, 
-	# evaluate, automatic_evaluation
 
 	def get_start_state(self, domain, source_latent_z):
 
