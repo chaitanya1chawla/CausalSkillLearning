@@ -4212,7 +4212,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		z_discriminator_detach_logprob, self.z_discriminator_detach_prob = self.discriminator_network(dictionary['source_latent_z'].detach())
 
 		# Compute discriminator loss for discriminator. 
-		self.discriminator_loss = self.negative_log_likelihood_loss_function(z_discriminator_detach_logprob.squeeze(1), torch.tensor(domain).to(device).long().view(1,))		
+		self.discriminator_loss = self.negative_log_likelihood_loss_function(z_discriminator_detach_logprob.squeeze(1), torch.tensor(domain).to(device).long().view(1,)).mean()
 		
 		if not(self.skip_discriminator):
 			# Now go backward and take a step.
