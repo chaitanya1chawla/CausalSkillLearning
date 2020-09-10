@@ -119,7 +119,7 @@ class Logger(object):
         img_summaries = []
         for i, img in enumerate(images):
 
-            img = np.expand_dims(img.transpose([2,1,0]),0)
+            img = np.expand_dims(img.transpose([1,2,0]),0)
             # img = np.expand_dims(img,0)
             with self.writer.as_default():
                 tf.summary.image(tag, img, step=step)     
