@@ -3860,7 +3860,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		discriminator_logprob, discriminator_prob = self.discriminator_network(latent_z.detach())
 
 		# Compute discriminator loss for discriminator. 
-		self.discriminator_loss = self.negative_log_likelihood_loss_function(discriminator_logprob.squeeze(1), torch.tensor(domain).to(device).long().view(1,))		
+		self.discriminator_loss = self.negative_log_likelihood_loss_function(discriminator_logprob.squeeze(1), torch.tensor(domain).to(device).long().view(1,)).mean()
 		
 		if not(self.skip_discriminator):
 			# Now go backward and take a step.
