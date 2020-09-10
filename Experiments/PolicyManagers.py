@@ -3965,6 +3965,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		del self.source_neighbors_object
 		del self.target_neighbors_object
 
+		self.neighbor_obj_set = False
+
 	def evaluate(self, model=None):
 
 		# Evaluating Transfer - we just want embeddings of both source and target; so run evaluate of both source and target policy managers. 		
