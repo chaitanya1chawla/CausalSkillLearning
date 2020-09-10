@@ -23,7 +23,7 @@ import numpy as np
 
 from tensorflow.python.framework import constant_op 
 from tensorflow.python.ops import summary_op_util
-
+from IPython import embed
 
 def py_encode_gif(im_thwc, tag, fps=4):
     """
@@ -119,9 +119,10 @@ class Logger(object):
         img_summaries = []
         for i, img in enumerate(images):
 
+            img = np.expand_dims(img.transpose([2,1,0]),0)
+            # img = np.expand_dims(img,0)
             with self.writer.as_default():
-                tf.summary.image(tag, img, step=step)
-
+                tf.summary.image(tag, img, step=step)     
 
     def histo_summary(self, tag, values, step, bins=1000):
         """Log a histogram of the tensor of values."""
