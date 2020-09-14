@@ -33,7 +33,8 @@ class MIME_Dataset(Dataset):
 	Class implementing instance of dataset class for MIME data. 
 	'''
 	def __init__(self, split='all'):
-		self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
+		# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
+		self.dataset_directory = '/home/tanmay/Research/Data/MIME'
 		self.ds_freq = 20
 
 		# Default: /checkpoint/tanmayshankar/MIME/
