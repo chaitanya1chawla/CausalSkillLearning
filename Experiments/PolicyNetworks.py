@@ -1351,14 +1351,14 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 	def forward(self, input, epsilon=0.001, z_sample_to_evaluate=None):
 		# This epsilon passed as an argument is just so that the signature of this function is the same as what's provided to the discrete encoder network.
 
-		# Input format must be: Sequence_Length x 1 x Input_Size. 
+		# Input format must be: Sequence_Length x Batch_Size x Input_Size. 
 		# Assuming input is a numpy array.
 		format_input = input.view((input.shape[0], self.batch_size, self.input_size))
 		
 		# Instead of iterating over time and passing each timestep's input to the LSTM, we can now just pass the entire input sequence.
 		outputs, hidden = self.lstm(format_input)
 
-		concatenated_outputs = torch.cat([outputs[0,:,self.hidden_size:],outputs[-1,:,:self.hidden_size]],dim=-1).view((1,1,-1))
+		concatenated_outputs = torch.cat([outputs[0,:,self.hidden_size:],outputs[-1,:,:self.hidden_size]],dim=-1).view((1,self.batch_size,-1))
 
 		# Predict Gaussian means and variances. 
 		# if self.args.mean_nonlinearity:
