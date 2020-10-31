@@ -975,6 +975,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# Encode trajectory segment into latent z. 		
 			latent_z, encoder_loglikelihood, encoder_entropy, kl_divergence = self.encoder_network.forward(torch_traj_seg, self.epsilon)
 
+			embed()
+
 			########## (2) & (3) ##########
 			# Feed latent z and trajectory segment into policy network and evaluate likelihood. 
 			latent_z_seq, latent_b = self.construct_dummy_latents(latent_z)
