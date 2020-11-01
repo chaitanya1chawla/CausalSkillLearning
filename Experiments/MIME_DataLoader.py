@@ -123,10 +123,17 @@ class MIME_NewDataset(Dataset):
 		self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
 
 		# Load the entire set of trajectories. 
-		self.data_list = np.load(os.path.join(self.dataset_directory, "Data_List.npy"),allow_pickle=True)
+		self.original_data_list = np.load(os.path.join(self.dataset_directory, "Data_List.npy"),allow_pickle=True)
+		self.original_dataset_length = len(self.original_data_list)
+
+		# Now only selecting valid datapoints.
+		self.data_list = []
+		for i in range(self.original_dataset_length):
+			if self.original_data_list[i]['is_valid']:
+				self.data_list.append(self.original_data_list[i])
 
 		self.dataset_length = len(self.data_list)
-	
+
 	def __len__(self):
 		# Return length of file list. 
 		return self.dataset_length
