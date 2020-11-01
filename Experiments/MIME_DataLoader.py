@@ -120,7 +120,8 @@ class MIME_Dataset(Dataset):
 class MIME_NewDataset(Dataset):
 
 	def __init__(self, split='all'):
-		self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
+		# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
+		self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
 
 		# Load the entire set of trajectories. 
 		self.original_data_list = np.load(os.path.join(self.dataset_directory, "Data_List.npy"),allow_pickle=True)
