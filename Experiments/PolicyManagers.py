@@ -469,7 +469,8 @@ class PolicyManager_BaseClass():
 		# Create figure and axis objects.
 		# matplotlib.rcParams['figure.figsize'] = [50, 50]
 		matplotlib.rcParams['figure.figsize'] = [20, 20]
-		zoom_factor = 0.4
+		# zoom_factor = 0.4
+		zoom_factor = 0.15
 		fig, ax = plt.subplots()
 
 		# number_samples = 400
