@@ -1339,16 +1339,17 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			
 			# Create subpolicy inputs tensor. 
 			# subpolicy_inputs = torch.zeros((len(input_trajectory),self.input_size+self.latent_z_dimensionality)).to(device)
-			embed()
 			
-			subpolicy_inputs = torch.zeros((len(input_trajectory), self.args.batch_size, self.input_size+self.latent_z_dimensionality)).to(device)
+			input_trajectory = input_trajectory.transpose((1,0,2))
+
+			subpolicy_inputs = torch.zeros((input_trajectory.shape[0], self.args.batch_size, self.input_size+self.latent_z_dimensionality)).to(device)
 
 			# Now copy over trajectory. 
 			# subpolicy_inputs[:,:self.input_size] = torch.tensor(input_trajectory).view(len(input_trajectory),self.input_size).to(device).float()         
-			subpolicy_inputs[:,:,:self.input_size] = torch.tensor(input_trajectory).view(len(input_trajectory),self.args.batch_size,self.input_size).to(device).float()
+			subpolicy_inputs[:,:,:self.input_size] = torch.tensor(input_trajectory).view(input_trajectory.shape[0],self.args.batch_size,self.input_size).to(device).float()
 
 			# Now copy over latent z's. 
-			subpolicy_inputs[range(len(input_trajectory)),:,self.input_size:] = latent_z_indices
+			subpolicy_inputs[range(input_trajectory.shape[0]),:,self.input_size:] = latent_z_indices
 
 			# # Concatenated action sequence for policy network's forward / logprobabilities function. 
 			# padded_action_seq = np.concatenate([np.zeros((1,self.output_size)),sample_action_seq],axis=0)
