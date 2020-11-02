@@ -1353,7 +1353,6 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			# # Concatenated action sequence for policy network's forward / logprobabilities function. 
 			# padded_action_seq = np.concatenate([np.zeros((1,self.output_size)),sample_action_seq],axis=0)
 			# View time first and batch second for downstream LSTM.
-			sample_action_seq = sample_action_seq.transpose((1,0,2))
 			padded_action_seq = np.concatenate([sample_action_seq,np.zeros((1,self.args.batch_size,self.output_size))],axis=0)
 
 			return None, subpolicy_inputs, padded_action_seq
