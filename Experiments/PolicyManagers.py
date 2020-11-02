@@ -222,7 +222,7 @@ class PolicyManager_BaseClass():
 		# Note: If the initial command loads a model, ignore that. 
 
 		command_args = self.args._get_kwargs()			
-		base_command = 'python Master.py --train=0 --model={0}'.format("Experiment_Logs/{0}/saved_models/Model_epoch{1}".format(self.args.name, e))
+		base_command = 'python Master.py --train=0 --model={0} --batch_size=1'.format("Experiment_Logs/{0}/saved_models/Model_epoch{1}".format(self.args.name, e))
 
 		if self.args.data=='Mocap':
 			base_command = './xvfb-run-safe ' + base_command
@@ -230,7 +230,7 @@ class PolicyManager_BaseClass():
 		# For every argument in the command arguments, add it to the base command with the value used, unless it's train or model. 
 		for ar in command_args:
 			# Skip model and train, because we need to set these manually.
-			if ar[0]=='model' or ar[0]=='train':
+			if ar[0]=='model' or ar[0]=='train' or ar[0]=='batch_size':
 				pass
 			# Add the rest
 			else:				
