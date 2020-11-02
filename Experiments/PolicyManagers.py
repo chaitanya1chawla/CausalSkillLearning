@@ -974,14 +974,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		if trajectory_segment is not None:
 			############# (1) #############
-			torch_traj_seg = torch.tensor(trajectory_segment).to(device).float()
+			torch_traj_seg = torch.tensor(trajectory_segment).to(device).float().permute((1,0,2))
 			# Encode trajectory segment into latent z. 		
 
-			embed()
-
 			latent_z, encoder_loglikelihood, encoder_entropy, kl_divergence = self.encoder_network.forward(torch_traj_seg, self.epsilon)
-
-			
 
 			########## (2) & (3) ##########
 			# Feed latent z and trajectory segment into policy network and evaluate likelihood. 
