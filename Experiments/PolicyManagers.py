@@ -1161,7 +1161,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		
 	def get_trajectory_segment(self, i):
 	
-    	if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
+		if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
 
 			# Sample trajectory segment from dataset. 
 			sample_traj, sample_action_seq = self.dataset[i:i+self.args.batch_size]
