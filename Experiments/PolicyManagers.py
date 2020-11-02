@@ -1193,10 +1193,10 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 				self.current_traj_len = np.random.choice([12,13,14,15,16],p=[0.1,0.2,0.4,0.2,0.1])
 			else:
 				self.current_traj_len = self.traj_length            
-                        
-            batch_trajectory = np.zeros((self.args.batch_size, self.current_traj_len, self.state_size))
+            
+			batch_trajectory = np.zeros((self.args.batch_size, self.current_traj_len, self.state_size))
 
-            for x in range(self.args.batch_size):
+			for x in range(self.args.batch_size):
                 
                 # Select the trajectory for each instance in the batch. 
                 traj = data_element[x]['demo']
