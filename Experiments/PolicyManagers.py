@@ -430,7 +430,8 @@ class PolicyManager_BaseClass():
 			html_file.write('<body>')
 			html_file.write('<p> Model: {0}</p>'.format(self.args.name))
 
-			html_file.write(animation_object.to_html5_video())
+			# html_file.write(animation_object.to_html5_video())
+			html_file.write(animation_object.to_jshtml())
 			# print(animation_object.to_html5_video(), file=html_file)
 
 			html_file.write('</body>')
