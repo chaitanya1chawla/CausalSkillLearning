@@ -706,6 +706,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.tf_logger.scalar_summary('SubPolicy Entropy', torch.mean(subpolicy_entropy), counter)
 
 		if counter%self.args.display_freq==0:
+			if self.args.batch_size>1:
+				# Just select one trajectory from batch.
+				sample_traj = sample_traj[:,0]
 			self.tf_logger.image_summary("GT Trajectory",self.visualize_trajectory(sample_traj), counter)
 
 	def assemble_inputs(self, input_trajectory, latent_z_indices, latent_b, sample_action_seq):
@@ -966,15 +969,15 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		############# (0) #############
 		# Sample trajectory segment from dataset. 			
 		if self.args.traj_segments:			
-			trajectory_segment, sample_action_seq, sample_traj  = self.get_trajectory_segment(i)
+			state_action_trajectory, sample_action_seq, sample_traj  = self.get_trajectory_segment(i)
 		else:
 			sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj = self.collect_inputs(i)				
-			# Calling it trajectory segment, but it's not actually a trajectory segment here.
-			trajectory_segment = concatenated_traj
+			state_action_trajectory = concatenated_traj
 
-		if trajectory_segment is not None:
+		if state_action_trajectory is not None:
+			
 			############# (1) #############
-			torch_traj_seg = torch.tensor(trajectory_segment).to(device).float()
+			torch_traj_seg = torch.tensor(state_action_trajectory).to(device).float()
 			# Encode trajectory segment into latent z. 		
 
 			latent_z, encoder_loglikelihood, encoder_entropy, kl_divergence = self.encoder_network.forward(torch_traj_seg, self.epsilon)
@@ -983,11 +986,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# Feed latent z and trajectory segment into policy network and evaluate likelihood. 
 			latent_z_seq, latent_b = self.construct_dummy_latents(latent_z)
 
-			_, subpolicy_inputs, sample_action_seq = self.assemble_inputs(trajectory_segment, latent_z_seq, latent_b, sample_action_seq)
+			_, subpolicy_inputs, sample_action_seq = self.assemble_inputs(state_action_trajectory, latent_z_seq, latent_b, sample_action_seq)
 
 			# Policy net doesn't use the decay epislon. (Because we never sample from it in training, only rollouts.)
 			loglikelihoods, _ = self.policy_network.forward(subpolicy_inputs, sample_action_seq)
-			embed()
 			loglikelihood = loglikelihoods[:-1].mean()
 			 
 			if self.args.debug:
@@ -998,29 +1000,22 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# Update parameters. 
 			if self.args.train and and_train:
 
-				# If we are regularizing: 
-				# 	(1) Sample another z. 
-				# 	(2) Construct inputs and such.
-				# 	(3) Compute distances, and feed to update_policies.
-				regularization_kl = None
-				z_distance = None
-
+				# Update parameters based on likelihood, subpolicy inputs, and kl divergence.
 				self.update_policies_reparam(loglikelihood, subpolicy_inputs, kl_divergence)
 
 				# Update Plots. 
-				self.update_plots(counter, loglikelihood, trajectory_segment)
+				self.update_plots(counter, loglikelihood, state_action_trajectory)
 
 				if return_z: 
 					return latent_z, sample_traj, sample_action_seq
 
 			else:
-
 				if return_z: 
 					return latent_z, sample_traj, sample_action_seq
-				else:
-					np.set_printoptions(suppress=True,precision=2)
-					print("###################", i)
-					print("Policy loglikelihood:", loglikelihood)
+				# else:
+				# 	np.set_printoptions(suppress=True,precision=2)
+				# 	print("###################", i)
+				# 	print("Policy loglikelihood:", loglikelihood)
 			
 			print("#########################################")	
 		else: 
