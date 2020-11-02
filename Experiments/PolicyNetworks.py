@@ -1321,7 +1321,7 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		self.hidden_size = hidden_size
 		self.output_size = output_size
 		self.num_layers = 5
-		self.batch_size = batch_size
+		self.batch_size = self.args.batch_size
 
 		# Define a bidirectional LSTM now.
 		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers, bidirectional=True)
