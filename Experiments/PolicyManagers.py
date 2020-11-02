@@ -161,6 +161,15 @@ class PolicyManager_BaseClass():
 
 			return trajectory, action_sequence, concatenated_traj, old_concatenated_traj
 
+	def shuffle(self, extent):
+
+		# Replaces np.random.shuffle(self.index_list) with block based shuffling.
+		index_range = np.arange(0,extent)
+		blocks = [index_range[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
+		np.random.shuffle(blocks)
+		# Shuffled index list is just a flattening of blocks.
+		self.index_list = [b for bs in blocks for b in bs]
+
 	def train(self, model=None):
 
 		if model:
@@ -177,8 +186,6 @@ class PolicyManager_BaseClass():
 			if e%self.args.save_freq==0:
 				self.save_all_models("epoch{0}".format(e))
 
-			np.random.shuffle(self.index_list)
-
 			if self.args.debug:
 				print("Embedding in Outer Train Function.")
 				embed()
@@ -191,13 +198,16 @@ class PolicyManager_BaseClass():
 			else:
 				extent = len(self.dataset)-self.test_set_size
 
+			# np.random.shuffle(self.index_list)
+			self.shuffle(extent)
+
 			# Modifying to make training functions handle batches. 
 			# for i in range(extent):
 			for i in range(0,extent,self.args.batch_size):
 
-				print("Epoch: ",e," Trajectory:",i, "Datapoints: ", self.index_list[i:i+self.args.batch_size])
+				print("Epoch: ",e," Trajectory:",i, "Datapoints: ", self.index_list[i])
 				# Probably need to make run iteration handle batch of current index plus batch size.				
-				self.run_iteration(counter, self.index_list[i:i+self.args.batch_size])
+				self.run_iteration(counter, self.index_list[i])
 
 				counter = counter+1
 
@@ -954,7 +964,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		if return_traj:
 			return trajectory_rollout		
 
-	def run_iteration(self, counter, indices, return_z=False, and_train=True):
+	def run_iteration(self, counter, i, return_z=False, and_train=True):
 
 		# Basic Training Algorithm: 
 		# For E epochs:
@@ -969,9 +979,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		############# (0) #############
 		# Sample trajectory segment from dataset. 			
 		if self.args.traj_segments:			
-			state_action_trajectory, sample_action_seq, sample_traj  = self.get_trajectory_segment(indices)
+			state_action_trajectory, sample_action_seq, sample_traj  = self.get_trajectory_segment(i)
 		else:
-			sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj = self.collect_inputs(indices)				
+			sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj = self.collect_inputs(i)				
 			state_action_trajectory = concatenated_traj
 
 		if state_action_trajectory is not None:
@@ -1159,8 +1169,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
 
 			# Sample trajectory segment from dataset. 
-			# sample_traj, sample_action_seq = self.dataset[i:i+self.args.batch_size]
-			sample_traj, sample_action_seq = self.dataset[indices]
+			sample_traj, sample_action_seq = self.dataset[i:i+self.args.batch_size]
 			
 			# print("Getting data points from: ",i, " to: ", i+self.args.batch_size)			
 
@@ -1180,9 +1189,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		
 		elif self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 
-			# data_element = self.dataset[i:i+self.args.batch_size]
-			embed()
-			data_element = self.dataset[indices]
+			data_element = self.dataset[i:i+self.args.batch_size]
 
 			# Must select common trajectory segment length for batch.
 			# Must select different start / end points for items of batch?
