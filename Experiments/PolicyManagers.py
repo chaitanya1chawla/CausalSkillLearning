@@ -1181,6 +1181,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		elif self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 
 			# data_element = self.dataset[i:i+self.args.batch_size]
+			embed()
 			data_element = self.dataset[indices]
 
 			# Must select common trajectory segment length for batch.
