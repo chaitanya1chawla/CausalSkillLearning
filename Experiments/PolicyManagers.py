@@ -436,7 +436,7 @@ class PolicyManager_BaseClass():
 			html_file.write('</body>')
 			html_file.write('</html>')
 
-
+		print("Saving Animation Object.")
 		animation_object.save(os.path.join(self.dir_name,'{0}_Embedding_Video.mp4'.format(self.args.name)))
 		# animation_object.save(os.path.join(self.dir_name,'{0}_Embedding_Video.mp4'.format(self.args.name)), writer='imagemagick')
 		t2 = time.time()
