@@ -954,7 +954,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		if return_traj:
 			return trajectory_rollout		
 
-	def run_iteration(self, counter, i, return_z=False, and_train=True):
+	def run_iteration(self, counter, indices, return_z=False, and_train=True):
 
 		# Basic Training Algorithm: 
 		# For E epochs:
@@ -969,9 +969,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		############# (0) #############
 		# Sample trajectory segment from dataset. 			
 		if self.args.traj_segments:			
-			state_action_trajectory, sample_action_seq, sample_traj  = self.get_trajectory_segment(i)
+			state_action_trajectory, sample_action_seq, sample_traj  = self.get_trajectory_segment(indices)
 		else:
-			sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj = self.collect_inputs(i)				
+			sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj = self.collect_inputs(indices)				
 			state_action_trajectory = concatenated_traj
 
 		if state_action_trajectory is not None:
