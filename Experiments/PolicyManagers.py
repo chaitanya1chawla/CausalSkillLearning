@@ -1158,8 +1158,8 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 	def old_concat_state_action(self, sample_traj, sample_action_seq):
 		sample_action_seq = np.concatenate([sample_action_seq, np.zeros((self.args.batch_size,1,self.output_size))],axis=1)
 		return np.concatenate([sample_traj, sample_action_seq],axis=-1)
-
-    def get_trajectory_segment(self, i):
+		
+	def get_trajectory_segment(self, i):
 	
     	if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
 
