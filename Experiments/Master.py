@@ -47,7 +47,10 @@ class Master():
 		if self.args.setting=='learntsub':
 			self.policy_manager = PolicyManager_Joint(self.args.number_policies, self.dataset, self.args)
 		elif self.args.setting=='pretrain_sub':
-			self.policy_manager = PolicyManager_Pretrain(self.args.number_policies, self.dataset, self.args)
+			if self.args.batch_size > 1:
+				self.policy_manager = PolicyManager_BatchPretrain(self.args.number_policies, self.dataset, self.args)
+			else:
+				self.policy_manager = PolicyManager_Pretrain(self.args.number_policies, self.dataset, self.args)
 		elif self.args.setting=='baselineRL':
 			self.policy_manager = PolicyManager_BaselineRL(args=self.args)
 		elif self.args.setting=='downstreamRL':
