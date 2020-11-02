@@ -467,7 +467,9 @@ class PolicyManager_BaseClass():
 	def visualize_robot_embedding(self, scaled_embedded_zs, gt=False):
 
 		# Create figure and axis objects.
-		matplotlib.rcParams['figure.figsize'] = [50, 50]
+		# matplotlib.rcParams['figure.figsize'] = [50, 50]
+		matplotlib.rcParams['figure.figsize'] = [20, 20]
+		zoom_factor = 0.4
 		fig, ax = plt.subplots()
 
 		# number_samples = 400
@@ -486,9 +488,10 @@ class PolicyManager_BaseClass():
 			# Create offset image (so that we can place it where we choose), with specific zoom. 
 
 			if gt:
-				imagebox = OffsetImage(self.gt_gif_list[i][0],zoom=0.4)
+				imagebox = OffsetImage(self.gt_gif_list[i][0],zoom=zoom_factor)
 			else:
-				imagebox = OffsetImage(self.rollout_gif_list[i][0],zoom=0.4)			
+				imagebox = OffsetImage(self.rollout_gif_list[i][0],zoom=zoom_factor)			
+
 
 			# Create an annotation box to put the offset image into. specify offset image, position, and disable bounding frame. 
 			ab = AnnotationBbox(imagebox, (scaled_embedded_zs[self.indices[i],0], scaled_embedded_zs[self.indices[i],1]), frameon=False)
@@ -500,9 +503,9 @@ class PolicyManager_BaseClass():
 			for i in range(len(self.indices)):
 				
 				if gt:
-					imagebox = OffsetImage(self.gt_gif_list[i][min(t, len(self.gt_gif_list[i])-1)],zoom=0.4)
+					imagebox = OffsetImage(self.gt_gif_list[i][min(t, len(self.gt_gif_list[i])-1)],zoom=zoom_factor)
 				else:
-					imagebox = OffsetImage(self.rollout_gif_list[i][min(t, len(self.rollout_gif_list[i])-1)],zoom=0.4)			
+					imagebox = OffsetImage(self.rollout_gif_list[i][min(t, len(self.rollout_gif_list[i])-1)],zoom=zoom_factor)			
 
 				ab = AnnotationBbox(imagebox, (scaled_embedded_zs[self.indices[i],0], scaled_embedded_zs[self.indices[i],1]), frameon=False)
 				artists.append(ax.add_artist(ab))
