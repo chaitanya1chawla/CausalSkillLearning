@@ -193,7 +193,7 @@ class PolicyManager_BaseClass():
 
 			# Modifying to make training functions handle batches. 
 			# for i in range(extent):
-			for i in range(0,extent,self.batch_size):
+			for i in range(0,extent,self.args.batch_size):
 
 				print("Epoch: ",e," Trajectory:",i, "Datapoints: ", self.index_list[i])
 				# Probably need to make run iteration handle batch of current index plus batch size.				
