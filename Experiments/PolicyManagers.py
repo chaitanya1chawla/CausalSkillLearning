@@ -1339,6 +1339,8 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			
 			# Create subpolicy inputs tensor. 
 			# subpolicy_inputs = torch.zeros((len(input_trajectory),self.input_size+self.latent_z_dimensionality)).to(device)
+			embed()
+			
 			subpolicy_inputs = torch.zeros((len(input_trajectory), self.args.batch_size, self.input_size+self.latent_z_dimensionality)).to(device)
 
 			# Now copy over trajectory. 
