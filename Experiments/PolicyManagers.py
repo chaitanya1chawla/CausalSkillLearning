@@ -974,7 +974,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		if trajectory_segment is not None:
 			############# (1) #############
-			torch_traj_seg = torch.tensor(trajectory_segment).to(device).float().permute((1,0,2))
+			torch_traj_seg = torch.tensor(trajectory_segment).to(device).float()
 			# Encode trajectory segment into latent z. 		
 
 			latent_z, encoder_loglikelihood, encoder_entropy, kl_divergence = self.encoder_network.forward(torch_traj_seg, self.epsilon)
@@ -987,6 +987,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 			# Policy net doesn't use the decay epislon. (Because we never sample from it in training, only rollouts.)
 			loglikelihoods, _ = self.policy_network.forward(subpolicy_inputs, sample_action_seq)
+
 			loglikelihood = loglikelihoods[:-1].mean()
 			 
 			if self.args.debug:
@@ -1177,7 +1178,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			# Now manage concatenated trajectory differently - {{s0,_},{s1,a0},{s2,a1},...,{sn,an-1}}.
 			concatenated_traj = self.concat_state_action(sample_traj, sample_action_seq)
 
-			return concatenated_traj, sample_action_seq, sample_traj
+			return concatenated_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), sample_traj.transpose((1,0,2))
 		
 		elif self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 
@@ -1238,7 +1239,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			# Scaling action sequence by some factor.             
 			scaled_action_sequence = self.args.action_scale_factor*action_sequence
 
-			return concatenated_traj, scaled_action_sequence, batch_trajectory
+			return concatenated_traj.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), batch_trajectory.transpose((1,0,2))
 
 	def collect_inputs(self, i, get_latents=False):
 
@@ -1340,8 +1341,6 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			# Create subpolicy inputs tensor. 
 			# subpolicy_inputs = torch.zeros((len(input_trajectory),self.input_size+self.latent_z_dimensionality)).to(device)
 			
-			input_trajectory = input_trajectory.transpose((1,0,2))
-
 			subpolicy_inputs = torch.zeros((input_trajectory.shape[0], self.args.batch_size, self.input_size+self.latent_z_dimensionality)).to(device)
 
 			# Now copy over trajectory. 
