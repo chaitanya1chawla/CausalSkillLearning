@@ -1351,11 +1351,11 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.visualizer = BaxterVisualizer()
 
 			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/MIME_Means.npy")
-				self.norm_denom_value = np.load("Statistics/MIME_Var.npy")
+				self.norm_sub_value = np.load("Statistics/MIME/MIME_Orig_Means.npy")
+				self.norm_denom_value = np.load("Statistics/MIME/MIME_Orig_Var.npy")
 			elif self.args.normalization=='minmax':
-				self.norm_sub_value = np.load("Statistics/MIME_Min.npy")
-				self.norm_denom_value = np.load("Statistics/MIME_Max.npy") - np.load("Statistics/MIME_Min.npy")
+				self.norm_sub_value = np.load("Statistics/MIME/MIME_Orig_Min.npy")
+				self.norm_denom_value = np.load("Statistics/MIME/MIME_Orig_Max.npy") - self.norm_sub_value
 
 			# Max of robot_state + object_state sizes across all Baxter environments. 			
 			self.cond_robot_state_size = 60
@@ -1371,6 +1371,13 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length
 
 			self.visualizer = SawyerVisualizer()
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/Roboturk/Roboturk_Mean.npy")
+				self.norm_denom_value = np.load("Statistics/Roboturk/Roboturk_Var.npy")
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/Roboturk/Roboturk_Min.npy")
+				self.norm_denom_value = np.load("Statistics/Roboturk/Roboturk_Max.npy") - self.norm_sub_value
 
 			# Max of robot_state + object_state sizes across all sawyer environments. 
 			# Robot size always 30. Max object state size is... 23. 
