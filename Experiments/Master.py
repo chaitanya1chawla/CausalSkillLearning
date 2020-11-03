@@ -42,7 +42,7 @@ class Master():
 		self.args = arguments 
 
 		self.dataset = return_dataset(self.args)
-		embed()
+
 		# Now define policy manager.
 		if self.args.setting=='learntsub':
 			self.policy_manager = PolicyManager_Joint(self.args.number_policies, self.dataset, self.args)
