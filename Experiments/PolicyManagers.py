@@ -565,7 +565,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.number_epochs = self.args.epochs
 
 			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/MIME/MIME_Orig_Means.npy")
+				self.norm_sub_value = np.load("Statistics/MIME/MIME_Orig_Mean.npy")
 				self.norm_denom_value = np.load("Statistics/MIME/MIME_Orig_Var.npy")
 			elif self.args.normalization=='minmax':
 				self.norm_sub_value = np.load("Statistics/MIME/MIME_Orig_Min.npy")
@@ -1351,7 +1351,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.visualizer = BaxterVisualizer()
 
 			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/MIME/MIME_Orig_Means.npy")
+				self.norm_sub_value = np.load("Statistics/MIME/MIME_Orig_Mean.npy")
 				self.norm_denom_value = np.load("Statistics/MIME/MIME_Orig_Var.npy")
 			elif self.args.normalization=='minmax':
 				self.norm_sub_value = np.load("Statistics/MIME/MIME_Orig_Min.npy")
