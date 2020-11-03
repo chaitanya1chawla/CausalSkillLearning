@@ -233,59 +233,6 @@ class Roboturk_Dataset(Dataset):
 			# Now save this file_demo_list. 
 			np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array.npy"),task_demo_array)
 
-class Roboturk_FullDataset(Roboturk_Dataset):
-	def __init__(self, args):
-		super(Roboturk_FullDataset, self).__init__(args)
-		self.environment_names = ["SawyerPickPlaceBread","SawyerPickPlaceCan","SawyerPickPlaceCereal","SawyerPickPlace","SawyerPickPlaceMilk","SawyerNutAssembly", "SawyerNutAssemblyRound","SawyerNutAssemblySquare"]
-
-	def setup(self):
-		self.files = []
-		for i in range(len(self.task_list)):
-			if i==3 or i==5:
-				self.files.append(np.load("{0}/{1}/FullDataset_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
-			else:
-				self.files.append(np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
-
-	def __getitem__(self, index):
-
-		if index>=self.total_length:
-			print("Out of bounds of dataset.")
-			return None
-
-		# Get bucket that index falls into based on num_demos array. 
-		task_index = np.searchsorted(self.cummulative_num_demos, index, side='right')-1
-		
-		# Decide task ID, and new index modulo num_demos.
-		# Subtract number of demonstrations in cumsum until then, and then 				
-		new_index = index-self.cummulative_num_demos[max(task_index,0)]		
-		data_element = self.files[task_index][new_index]
-
-		resample_length = len(data_element['demo'])//self.args.ds_freq
-		# print("Orig:", len(data_element['demo']),"New length:",resample_length)
-
-		self.kernel_bandwidth = self.args.smoothing_kernel_bandwidth
-
-		if resample_length<=1 or data_element['robot-state'].shape[0]<=1:
-			data_element['is_valid'] = False			
-		else:
-			data_element['is_valid'] = True
-
-			if self.args.smoothen: 
-				data_element['demo'] = gaussian_filter1d(data_element['demo'],self.kernel_bandwidth,axis=0,mode='nearest')
-				data_element['robot-state'] = gaussian_filter1d(data_element['robot-state'],self.kernel_bandwidth,axis=0,mode='nearest')
-				data_element['object-state'] = gaussian_filter1d(data_element['object-state'],self.kernel_bandwidth,axis=0,mode='nearest')
-				data_element['flat-state'] = gaussian_filter1d(data_element['flat-state'],self.kernel_bandwidth,axis=0,mode='nearest')
-
-			data_element['environment-name'] = self.environment_names[task_index]
-
-			if self.args.ds_freq>1:
-				data_element['demo'] = resample(data_element['demo'], resample_length)
-				data_element['robot-state'] = resample(data_element['robot-state'], resample_length)
-				data_element['object-state'] = resample(data_element['object-state'], resample_length)
-				data_element['flat-state'] = resample(data_element['flat-state'], resample_length)
-
-		return data_element
-
 	def compute_statistics(self):
 
 		self.state_size = 8
@@ -347,14 +294,67 @@ class Roboturk_FullDataset(Roboturk_Dataset):
 		vel_max_value = vel_maxs.max(axis=0)
 		vel_min_value = vel_mins.min(axis=0)
 
-		np.save("Roboturk_Full_Mean.npy", mean)
-		np.save("Roboturk_Full_Var.npy", variance)
-		np.save("Roboturk_Full_Min.npy", min_value)
-		np.save("Roboturk_Full_Max.npy", max_value)
-		np.save("Roboturk_Full_Vel_Mean.npy", vel_mean)
-		np.save("Roboturk_Full_Vel_Var.npy", vel_variance)
-		np.save("Roboturk_Full_Vel_Min.npy", vel_min_value)
-		np.save("Roboturk_Full_Vel_Max.npy", vel_max_value)
+		np.save("Roboturk_Mean.npy", mean)
+		np.save("Roboturk_Var.npy", variance)
+		np.save("Roboturk_Min.npy", min_value)
+		np.save("Roboturk_Max.npy", max_value)
+		np.save("Roboturk_Vel_Mean.npy", vel_mean)
+		np.save("Roboturk_Vel_Var.npy", vel_variance)
+		np.save("Roboturk_Vel_Min.npy", vel_min_value)
+		np.save("Roboturk_Vel_Max.npy", vel_max_value)
+
+class Roboturk_FullDataset(Roboturk_Dataset):
+	def __init__(self, args):
+		super(Roboturk_FullDataset, self).__init__(args)
+		self.environment_names = ["SawyerPickPlaceBread","SawyerPickPlaceCan","SawyerPickPlaceCereal","SawyerPickPlace","SawyerPickPlaceMilk","SawyerNutAssembly", "SawyerNutAssemblyRound","SawyerNutAssemblySquare"]
+
+	def setup(self):
+		self.files = []
+		for i in range(len(self.task_list)):
+			if i==3 or i==5:
+				self.files.append(np.load("{0}/{1}/FullDataset_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
+			else:
+				self.files.append(np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
+
+	def __getitem__(self, index):
+
+		if index>=self.total_length:
+			print("Out of bounds of dataset.")
+			return None
+
+		# Get bucket that index falls into based on num_demos array. 
+		task_index = np.searchsorted(self.cummulative_num_demos, index, side='right')-1
+		
+		# Decide task ID, and new index modulo num_demos.
+		# Subtract number of demonstrations in cumsum until then, and then 				
+		new_index = index-self.cummulative_num_demos[max(task_index,0)]		
+		data_element = self.files[task_index][new_index]
+
+		resample_length = len(data_element['demo'])//self.args.ds_freq
+		# print("Orig:", len(data_element['demo']),"New length:",resample_length)
+
+		self.kernel_bandwidth = self.args.smoothing_kernel_bandwidth
+
+		if resample_length<=1 or data_element['robot-state'].shape[0]<=1:
+			data_element['is_valid'] = False			
+		else:
+			data_element['is_valid'] = True
+
+			if self.args.smoothen: 
+				data_element['demo'] = gaussian_filter1d(data_element['demo'],self.kernel_bandwidth,axis=0,mode='nearest')
+				data_element['robot-state'] = gaussian_filter1d(data_element['robot-state'],self.kernel_bandwidth,axis=0,mode='nearest')
+				data_element['object-state'] = gaussian_filter1d(data_element['object-state'],self.kernel_bandwidth,axis=0,mode='nearest')
+				data_element['flat-state'] = gaussian_filter1d(data_element['flat-state'],self.kernel_bandwidth,axis=0,mode='nearest')
+
+			data_element['environment-name'] = self.environment_names[task_index]
+
+			if self.args.ds_freq>1:
+				data_element['demo'] = resample(data_element['demo'], resample_length)
+				data_element['robot-state'] = resample(data_element['robot-state'], resample_length)
+				data_element['object-state'] = resample(data_element['object-state'], resample_length)
+				data_element['flat-state'] = resample(data_element['flat-state'], resample_length)
+
+		return data_element
 
 class Roboturk_SegmentedDataset(Roboturk_Dataset):
 
