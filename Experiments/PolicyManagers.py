@@ -241,6 +241,7 @@ class PolicyManager_BaseClass():
 		# NOT RUNNING AUTO EVAL FOR NOW.
 		# subprocess.Popen([base_command],shell=True)
 
+	@profile
 	def visualize_robot_data(self):
 
 		self.N = 100
