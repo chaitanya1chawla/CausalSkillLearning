@@ -237,7 +237,9 @@ class PolicyManager_BaseClass():
 				base_command = base_command + ' --{0}={1}'.format(ar[0],ar[1])
 		
 		#  cluster_command = 'python cluster_run.py --partition=learnfair --name={0}_Eval --cmd=\'{1}\''.format(self.args.name, base_command)				
-		subprocess.Popen([base_command],shell=True)
+
+		# NOT RUNNING AUTO EVAL FOR NOW.
+		# subprocess.Popen([base_command],shell=True)
 
 	def visualize_robot_data(self):
 
