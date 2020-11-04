@@ -54,10 +54,10 @@ class PolicyManager_BaseClass():
 		else:
 			self.tf_logger = TFLogger.Logger()
 
-		if self.args.data=='MIME':
+		if self.args.data=='MIME' and not(self.args.no_mujoco):
 			self.visualizer = BaxterVisualizer()
 			# self.state_dim = 16
-		elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
+		elif (self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk') and not(self.args.no_mujoco):
 			self.visualizer = SawyerVisualizer()
 			# self.state_dim = 8
 		elif self.args.data=='Mocap':
@@ -209,7 +209,7 @@ class PolicyManager_BaseClass():
 				# Probably need to make run iteration handle batch of current index plus batch size.				
 				self.run_iteration(counter, self.index_list[i])
 
-				counter = counter+1
+				counter = counter+self.args.batch_size
 
 			if e%self.args.eval_freq==0:
 				self.automatic_evaluation(e)
@@ -449,14 +449,17 @@ class PolicyManager_BaseClass():
 		print("Time taken to write this embedding in HTML: ",t2-t1)
 		# print("Time taken to save the animation object: ",t3-t2)
 
-	def get_robot_embedding(self, return_tsne_object=False):
+	def get_robot_embedding(self, return_tsne_object=False, perplexity=None):
 
 		# Mean and variance normalize z.
 		mean = self.latent_z_set.mean(axis=0)
 		std = self.latent_z_set.std(axis=0)
 		normed_z = (self.latent_z_set-mean)/std
-		
-		tsne = skl_manifold.TSNE(n_components=2,random_state=0,perplexity=self.args.perplexity)
+
+		if perplexity is None:
+			perplexity = self.args.perplexity
+
+		tsne = skl_manifold.TSNE(n_components=2,random_state=0,perplexity=perplexity)
 		embedded_zs = tsne.fit_transform(normed_z)
 
 		scale_factor = 1
@@ -733,7 +736,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				# Just select one trajectory from batch.
 				sample_traj = sample_traj[:,0]
 
-			self.tf_logger.image_summary("GT Trajectory",self.visualize_trajectory(sample_traj), counter)
+			self.tf_logger.image_summary("GT Trajectory",[self.visualize_trajectory(sample_traj)], counter)
 
 			############
 			# Plotting embedding in tensorboard. 
@@ -742,13 +745,20 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# Get latent_z set. 
 			self.get_trajectory_and_latent_sets(get_visuals=False)
 
+			# Get embeddings for perplexity=5,10,30, and then plot these.
 			# Once we have latent set, get embedding and plot it. 
-			scaled_embedded_zs = self.get_robot_embedding()
+			perp5_embedded_zs = self.get_robot_embedding(perplexity=5)
+			perp10_embedded_zs = self.get_robot_embedding(perplexity=10)
+			perp30_embedded_zs = self.get_robot_embedding(perplexity=30)
 			
 			# Now plot the embedding.
-			image = self.plot_embedding(scaled_embedded_zs, title="Embedded Z Space")
+			image_perp5 = self.plot_embedding(perp5_embedded_zs, title="Embedded Z Space Perplexity 5")
+			image_perp10 = self.plot_embedding(perp10_embedded_zs, title="Embedded Z Space Perplexity 10")
+			image_perp30 = self.plot_embedding(perp30_embedded_zs, title="Embedded Z Space Perplexity 30")
 
-			self.tf_logger.image_summary("Embedded Z Space", image, counter)
+			self.tf_logger.image_summary("Embedded Z Space Perplexity 5", [image_perp5], counter)
+			self.tf_logger.image_summary("Embedded Z Space Perplexity 10", [image_perp10], counter)
+			self.tf_logger.image_summary("Embedded Z Space Perplexity 30", [image_perp30], counter)
 
 	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False):
 	
@@ -1067,7 +1077,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# Encode trajectory segment into latent z. 		
 
 			latent_z, encoder_loglikelihood, encoder_entropy, kl_divergence = self.encoder_network.forward(torch_traj_seg, self.epsilon)
-
+			
 			########## (2) & (3) ##########
 			# Feed latent z and trajectory segment into policy network and evaluate likelihood. 
 			latent_z_seq, latent_b = self.construct_dummy_latents(latent_z)
@@ -1178,22 +1188,34 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
 		self.trajectory_set = np.zeros((self.N, self.rollout_timesteps, self.state_dim))
-
+	
 		# Use the dataset to get reasonable trajectories (because without the information bottleneck / KL between N(0,1), cannot just randomly sample.)
-		for i in range(self.N):
+		for i in range(self.N//self.args.batch_size):
 
 			# (1) Encoder trajectory. 
 			latent_z, _, _ = self.run_iteration(0, i, return_z=True, and_train=False)
 
-			# Copy z. 
-			self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())
+			if self.args.batch_size>1:
 
-			if get_visuals:
-				# (2) Now rollout policy.			
-				self.trajectory_set[i] = self.rollout_visuals(i, latent_z=latent_z, return_traj=True)
+				for b in range(self.args.batch_size):
+					# Copy z. 
 
-			# # (3) Plot trajectory.
-			# traj_image = self.visualize_trajectory(rollout_traj)
+					self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+
+					# if get_visuals:
+						# (2) Now rollout policy.			
+						# self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z, return_traj=True)
+
+			else:
+				# Copy z. 
+				self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())
+
+				if get_visuals:
+					# (2) Now rollout policy.			
+					self.trajectory_set[i] = self.rollout_visuals(i, latent_z=latent_z, return_traj=True)
+
+				# # (3) Plot trajectory.
+				# traj_image = self.visualize_trajectory(rollout_traj)
 
 	def visualize_embedding_space(self, suffix=None):
 
@@ -2024,6 +2046,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 	def create_RL_environment_for_rollout(self, environment_name, state=None, task_id=None):
 
+		import robosuite
 		self.environment = robosuite.make(environment_name)
 		self.task_id_for_cond_info = task_id
 		if state is not None:
@@ -2450,6 +2473,7 @@ class PolicyManager_BaselineRL(PolicyManager_BaseClass):
 
 	def RL_setup(self):
 		# Create Mujoco environment. 
+		import robosuite
 		self.environment = robosuite.make(self.args.environment, has_renderer=False, use_camera_obs=False, reward_shaping=self.args.shaped_reward)
 		
 		# Get input and output sizes from these environments, etc. 
@@ -2880,6 +2904,7 @@ class PolicyManager_DownstreamRL(PolicyManager_BaselineRL):
 
 	def setup(self):
 		# Create Mujoco environment. 
+		import robosuite
 		self.environment = robosuite.make(self.args.environment, has_renderer=False, use_camera_obs=False, reward_shaping=self.args.shaped_reward)
 		
 		# Get input and output sizes from these environments, etc. 
@@ -3400,6 +3425,7 @@ class PolicyManager_Imitation(PolicyManager_Pretrain, PolicyManager_BaselineRL):
 		self.index_list = np.arange(0,extent)	
 
 		# Create Mujoco environment. 
+		import robosuite
 		self.environment = robosuite.make(self.args.environment, has_renderer=False, use_camera_obs=False, reward_shaping=self.args.shaped_reward)
 		
 		self.gripper_open = np.array([0.0115, -0.0115])
