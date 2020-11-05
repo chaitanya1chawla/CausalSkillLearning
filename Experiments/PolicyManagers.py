@@ -1265,6 +1265,16 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		sample_action_seq = np.concatenate([sample_action_seq, np.zeros((self.args.batch_size,1,self.output_size))],axis=1)
 		return np.concatenate([sample_traj, sample_action_seq],axis=-1)
 		
+	def get_batch_element(self, i):
+
+		# Make data_element a list of dictionaries. 
+		data_element = []
+
+		for b in range(i,i+self.args.batch_size):	
+			data_element.append(self.dataset[b])
+
+		return data_element
+
 	def get_trajectory_segment(self, i):
 	
 		if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
@@ -1290,7 +1300,10 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		
 		elif self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 
-			data_element = self.dataset[i:i+self.args.batch_size]
+			if self.args.data=='MIME' or self.args.data=='Mocap':
+				data_element = self.dataset[i:i+self.args.batch_size]
+			else:
+				data_element = self.get_batch_element(i)
 
 			# Must select common trajectory segment length for batch.
 			# Must select different start / end points for items of batch?
