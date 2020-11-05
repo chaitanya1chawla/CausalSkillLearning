@@ -458,6 +458,8 @@ class PolicyManager_BaseClass():
 
 		if perplexity is None:
 			perplexity = self.args.perplexity
+		
+		print("Perplexity: ", perplexity)
 
 		tsne = skl_manifold.TSNE(n_components=2,random_state=0,perplexity=perplexity)
 		embedded_zs = tsne.fit_transform(normed_z)
