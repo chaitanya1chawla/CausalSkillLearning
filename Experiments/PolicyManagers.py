@@ -200,9 +200,8 @@ class PolicyManager_BaseClass():
 
 			# np.random.shuffle(self.index_list)
 			self.shuffle(extent)
-
+			
 			# Modifying to make training functions handle batches. 
-			# for i in range(extent):
 			for i in range(0,extent,self.args.batch_size):
 
 				print("Epoch: ",e," Trajectory:",i, "Datapoints: ", self.index_list[i])
