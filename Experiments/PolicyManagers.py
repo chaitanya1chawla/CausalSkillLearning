@@ -198,6 +198,8 @@ class PolicyManager_BaseClass():
 			else:
 				extent = len(self.dataset)-self.test_set_size
 
+			embed()
+			
 			# np.random.shuffle(self.index_list)
 			self.shuffle(extent)
 
