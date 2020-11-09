@@ -7,3 +7,6 @@
 *.pyc
 Experiments/Experimental_Logs/*
 Experiments/Code_Runs/*
+.vscode/settings.json
+Experiments/.vscode/settings.json
+Experiments/Statistics/*
