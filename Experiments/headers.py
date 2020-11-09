@@ -36,7 +36,6 @@ import moviepy.editor as mpy
 import subprocess
 import h5py
 import time
-import robosuite
 import unittest
 import cProfile
 
@@ -46,3 +45,6 @@ from scipy.ndimage.filters import gaussian_filter1d
 from scipy.signal import find_peaks, argrelextrema
 
 from sklearn.neighbors import NearestNeighbors
+
+# Removing robosuite from headers file so that we can only import it when we have a mujoco installation.
+# import robosuite

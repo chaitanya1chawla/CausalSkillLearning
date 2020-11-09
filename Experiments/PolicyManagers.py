@@ -54,10 +54,10 @@ class PolicyManager_BaseClass():
 		else:
 			self.tf_logger = TFLogger.Logger()
 
-		if self.args.data=='MIME':
+		if self.args.data=='MIME' and not(self.args.no_mujoco):
 			self.visualizer = BaxterVisualizer()
 			# self.state_dim = 16
-		elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
+		elif (self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk') and not(self.args.no_mujoco):
 			self.visualizer = SawyerVisualizer()
 			# self.state_dim = 8
 		elif self.args.data=='Mocap':
@@ -209,7 +209,7 @@ class PolicyManager_BaseClass():
 				# Probably need to make run iteration handle batch of current index plus batch size.				
 				self.run_iteration(counter, self.index_list[i])
 
-				counter = counter+1
+				counter = counter+self.args.batch_size
 
 			if e%self.args.eval_freq==0:
 				self.automatic_evaluation(e)
@@ -241,7 +241,7 @@ class PolicyManager_BaseClass():
 		# NOT RUNNING AUTO EVAL FOR NOW.
 		# subprocess.Popen([base_command],shell=True)
 
-	@profile
+	# @profile
 	def visualize_robot_data(self):
 
 		self.N = 100
@@ -449,14 +449,19 @@ class PolicyManager_BaseClass():
 		print("Time taken to write this embedding in HTML: ",t2-t1)
 		# print("Time taken to save the animation object: ",t3-t2)
 
-	def get_robot_embedding(self, return_tsne_object=False):
+	def get_robot_embedding(self, return_tsne_object=False, perplexity=None):
 
 		# Mean and variance normalize z.
 		mean = self.latent_z_set.mean(axis=0)
 		std = self.latent_z_set.std(axis=0)
 		normed_z = (self.latent_z_set-mean)/std
+
+		if perplexity is None:
+			perplexity = self.args.perplexity
 		
-		tsne = skl_manifold.TSNE(n_components=2,random_state=0,perplexity=self.args.perplexity)
+		print("Perplexity: ", perplexity)
+
+		tsne = skl_manifold.TSNE(n_components=2,random_state=0,perplexity=perplexity)
 		embedded_zs = tsne.fit_transform(normed_z)
 
 		scale_factor = 1
@@ -484,7 +489,7 @@ class PolicyManager_BaseClass():
 		# Create a scatter plot of the embedding itself. The plot does not seem to work without this. 
 		ax.scatter(scaled_embedded_zs[:number_samples,0],scaled_embedded_zs[:number_samples,1])
 		ax.axis('off')
-		ax.set_title("Embedding of Latent Representation of our Model",fontdict={'fontsize':40})
+		ax.set_title("Embedding of Latent Representation of our Model",fontdict={'fontsize':5})
 		artists = []
 		
 		# For number of samples in TSNE / Embedding, create a Image object for each of them. 
@@ -732,7 +737,77 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			if self.args.batch_size>1:
 				# Just select one trajectory from batch.
 				sample_traj = sample_traj[:,0]
-			self.tf_logger.image_summary("GT Trajectory",self.visualize_trajectory(sample_traj), counter)
+
+			self.tf_logger.image_summary("GT Trajectory",[self.visualize_trajectory(sample_traj)], counter)
+
+			############
+			# Plotting embedding in tensorboard. 
+			############
+
+			# Get latent_z set. 
+			self.get_trajectory_and_latent_sets(get_visuals=False)
+
+			# Get embeddings for perplexity=5,10,30, and then plot these.
+			# Once we have latent set, get embedding and plot it. 
+			perp5_embedded_zs = self.get_robot_embedding(perplexity=5)
+			perp10_embedded_zs = self.get_robot_embedding(perplexity=10)
+			perp30_embedded_zs = self.get_robot_embedding(perplexity=30)
+			
+			# Now plot the embedding.
+			image_perp5 = self.plot_embedding(perp5_embedded_zs, title="Embedded Z Space Perplexity 5")
+			image_perp10 = self.plot_embedding(perp10_embedded_zs, title="Embedded Z Space Perplexity 10")
+			image_perp30 = self.plot_embedding(perp30_embedded_zs, title="Embedded Z Space Perplexity 30")
+
+			self.tf_logger.image_summary("Embedded Z Space Perplexity 5", [image_perp5], counter)
+			self.tf_logger.image_summary("Embedded Z Space Perplexity 10", [image_perp10], counter)
+			self.tf_logger.image_summary("Embedded Z Space Perplexity 30", [image_perp30], counter)
+
+	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False):
+	
+		fig = plt.figure()
+		ax = fig.gca()
+		
+		if shared:
+			colors = 0.2*np.ones((2*self.N))
+			colors[self.N:] = 0.8
+		else:
+			colors = 0.2*np.ones((self.N))
+
+		if trajectory:
+			# Create a scatter plot of the embedding.
+
+			self.source_manager.get_trajectory_and_latent_sets()
+			self.target_manager.get_trajectory_and_latent_sets()
+
+			ratio = 0.4
+			color_scaling = 15
+
+			# Assemble shared trajectory set. 
+			traj_length = len(self.source_manager.trajectory_set[0,:,0])
+			self.shared_trajectory_set = np.zeros((2*self.N, traj_length, 2))
+			
+			self.shared_trajectory_set[:self.N] = self.source_manager.trajectory_set
+			self.shared_trajectory_set[self.N:] = self.target_manager.trajectory_set
+			
+			color_range_min = 0.2*color_scaling
+			color_range_max = 0.8*color_scaling+traj_length-1
+
+			for i in range(2*self.N):
+				ax.scatter(embedded_zs[i,0]+ratio*self.shared_trajectory_set[i,:,0],embedded_zs[i,1]+ratio*self.shared_trajectory_set[i,:,1],c=colors[i]*color_scaling+range(traj_length),cmap='jet',vmin=color_range_min,vmax=color_range_max)
+
+		else:
+			# Create a scatter plot of the embedding.
+			ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors,vmin=0,vmax=1,cmap='jet')
+		
+		# Title. 
+		ax.set_title("{0}".format(title),fontdict={'fontsize':40})
+		fig.canvas.draw()
+		# Grab image.
+		width, height = fig.get_size_inches() * fig.get_dpi()
+		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)
+		image = np.transpose(image, axes=[2,0,1])
+
+		return image
 
 	def assemble_inputs(self, input_trajectory, latent_z_indices, latent_b, sample_action_seq):
 
@@ -1004,7 +1079,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# Encode trajectory segment into latent z. 		
 
 			latent_z, encoder_loglikelihood, encoder_entropy, kl_divergence = self.encoder_network.forward(torch_traj_seg, self.epsilon)
-
+			
 			########## (2) & (3) ##########
 			# Feed latent z and trajectory segment into policy network and evaluate likelihood. 
 			latent_z_seq, latent_b = self.construct_dummy_latents(latent_z)
@@ -1100,7 +1175,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# np.save(os.path.join(self.dir_name,"Mean_Trajectory_Distance_{0}.npy".format(self.args.name)),self.mean_distance)
 
 	# @profile
-	def get_trajectory_and_latent_sets(self):
+	def get_trajectory_and_latent_sets(self, get_visuals=True):
 		# For N number of random trajectories from MIME: 
 		#	# Encode trajectory using encoder into latent_z. 
 		# 	# Feed latent_z into subpolicy. 
@@ -1115,21 +1190,34 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
 		self.trajectory_set = np.zeros((self.N, self.rollout_timesteps, self.state_dim))
-
+	
 		# Use the dataset to get reasonable trajectories (because without the information bottleneck / KL between N(0,1), cannot just randomly sample.)
-		for i in range(self.N):
+		for i in range(self.N//self.args.batch_size):
 
 			# (1) Encoder trajectory. 
 			latent_z, _, _ = self.run_iteration(0, i, return_z=True, and_train=False)
 
-			# Copy z. 
-			self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())
+			if self.args.batch_size>1:
 
-			# (2) Now rollout policy.
-			self.trajectory_set[i] = self.rollout_visuals(i, latent_z=latent_z, return_traj=True)
+				for b in range(self.args.batch_size):
+					# Copy z. 
 
-			# # (3) Plot trajectory.
-			# traj_image = self.visualize_trajectory(rollout_traj)
+					self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+
+					# if get_visuals:
+						# (2) Now rollout policy.			
+						# self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z, return_traj=True)
+
+			else:
+				# Copy z. 
+				self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())
+
+				if get_visuals:
+					# (2) Now rollout policy.			
+					self.trajectory_set[i] = self.rollout_visuals(i, latent_z=latent_z, return_traj=True)
+
+				# # (3) Plot trajectory.
+				# traj_image = self.visualize_trajectory(rollout_traj)
 
 	def visualize_embedding_space(self, suffix=None):
 
@@ -1177,6 +1265,16 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		sample_action_seq = np.concatenate([sample_action_seq, np.zeros((self.args.batch_size,1,self.output_size))],axis=1)
 		return np.concatenate([sample_traj, sample_action_seq],axis=-1)
 		
+	def get_batch_element(self, i):
+
+		# Make data_element a list of dictionaries. 
+		data_element = []
+
+		for b in range(i,i+self.args.batch_size):	
+			data_element.append(self.dataset[b])
+
+		return data_element
+
 	def get_trajectory_segment(self, i):
 	
 		if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
@@ -1202,7 +1300,10 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		
 		elif self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 
-			data_element = self.dataset[i:i+self.args.batch_size]
+			if self.args.data=='MIME' or self.args.data=='Mocap':
+				data_element = self.dataset[i:i+self.args.batch_size]
+			else:
+				data_element = self.get_batch_element(i)
 
 			# Must select common trajectory segment length for batch.
 			# Must select different start / end points for items of batch?
@@ -1960,6 +2061,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 	def create_RL_environment_for_rollout(self, environment_name, state=None, task_id=None):
 
+		import robosuite
 		self.environment = robosuite.make(environment_name)
 		self.task_id_for_cond_info = task_id
 		if state is not None:
@@ -2386,6 +2488,7 @@ class PolicyManager_BaselineRL(PolicyManager_BaseClass):
 
 	def RL_setup(self):
 		# Create Mujoco environment. 
+		import robosuite
 		self.environment = robosuite.make(self.args.environment, has_renderer=False, use_camera_obs=False, reward_shaping=self.args.shaped_reward)
 		
 		# Get input and output sizes from these environments, etc. 
@@ -2816,6 +2919,7 @@ class PolicyManager_DownstreamRL(PolicyManager_BaselineRL):
 
 	def setup(self):
 		# Create Mujoco environment. 
+		import robosuite
 		self.environment = robosuite.make(self.args.environment, has_renderer=False, use_camera_obs=False, reward_shaping=self.args.shaped_reward)
 		
 		# Get input and output sizes from these environments, etc. 
@@ -3336,6 +3440,7 @@ class PolicyManager_Imitation(PolicyManager_Pretrain, PolicyManager_BaselineRL):
 		self.index_list = np.arange(0,extent)	
 
 		# Create Mujoco environment. 
+		import robosuite
 		self.environment = robosuite.make(self.args.environment, has_renderer=False, use_camera_obs=False, reward_shaping=self.args.shaped_reward)
 		
 		self.gripper_open = np.array([0.0115, -0.0115])
@@ -3920,52 +4025,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		return source_image, target_image, shared_image, toy_shared_embedding_image
 
 	# @profile
-	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False):
-	
-		fig = plt.figure()
-		ax = fig.gca()
-		
-		if shared:
-			colors = 0.2*np.ones((2*self.N))
-			colors[self.N:] = 0.8
-		else:
-			colors = 0.2*np.ones((self.N))
 
-		if trajectory:
-			# Create a scatter plot of the embedding.
-
-			self.source_manager.get_trajectory_and_latent_sets()
-			self.target_manager.get_trajectory_and_latent_sets()
-
-			ratio = 0.4
-			color_scaling = 15
-
-			# Assemble shared trajectory set. 
-			traj_length = len(self.source_manager.trajectory_set[0,:,0])
-			self.shared_trajectory_set = np.zeros((2*self.N, traj_length, 2))
-			
-			self.shared_trajectory_set[:self.N] = self.source_manager.trajectory_set
-			self.shared_trajectory_set[self.N:] = self.target_manager.trajectory_set
-			
-			color_range_min = 0.2*color_scaling
-			color_range_max = 0.8*color_scaling+traj_length-1
-
-			for i in range(2*self.N):
-				ax.scatter(embedded_zs[i,0]+ratio*self.shared_trajectory_set[i,:,0],embedded_zs[i,1]+ratio*self.shared_trajectory_set[i,:,1],c=colors[i]*color_scaling+range(traj_length),cmap='jet',vmin=color_range_min,vmax=color_range_max)
-
-		else:
-			# Create a scatter plot of the embedding.
-			ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors,vmin=0,vmax=1,cmap='jet')
-		
-		# Title. 
-		ax.set_title("{0}".format(title),fontdict={'fontsize':40})
-		fig.canvas.draw()
-		# Grab image.
-		width, height = fig.get_size_inches() * fig.get_dpi()
-		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)
-		image = np.transpose(image, axes=[2,0,1])
-
-		return image
 
 	def get_trajectory_visuals(self):
 

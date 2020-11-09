@@ -11,8 +11,6 @@ from __future__ import print_function
 from absl import flags, app
 import copy, os, imageio, scipy.misc, pdb, math, time, numpy as np
 
-import robosuite, threading
-from robosuite.wrappers import IKWrapper
 import matplotlib.pyplot as plt
 from IPython import embed
 
@@ -24,8 +22,13 @@ class SawyerVisualizer():
 
 	def __init__(self, has_display=False):
 
+		
 		# Create environment.
 		print("Do I have a display?", has_display)
+
+		import robosuite, threading
+		from robosuite.wrappers import IKWrapper
+
 		# self.base_env = robosuite.make('BaxterLift', has_renderer=has_display)
 		self.base_env = robosuite.make("SawyerViz",has_renderer=has_display)
 
@@ -89,6 +92,11 @@ class BaxterVisualizer():
 
 		# Create environment.
 		print("Do I have a display?", has_display)
+
+		
+		import robosuite, threading
+		from robosuite.wrappers import IKWrapper
+		
 		# self.base_env = robosuite.make('BaxterLift', has_renderer=has_display)
 		self.base_env = robosuite.make("BaxterViz",has_renderer=has_display)
 

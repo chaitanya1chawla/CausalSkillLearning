@@ -47,7 +47,7 @@ class Master():
 		if self.args.setting=='learntsub':
 			self.policy_manager = PolicyManager_Joint(self.args.number_policies, self.dataset, self.args)
 		elif self.args.setting=='pretrain_sub':
-			if self.args.batch_size > 1:
+			if self.args.batch_size > 1 and self.args.train: # Only setting batch manager for training.
 				self.policy_manager = PolicyManager_BatchPretrain(self.args.number_policies, self.dataset, self.args)
 			else:
 				self.policy_manager = PolicyManager_Pretrain(self.args.number_policies, self.dataset, self.args)
@@ -86,7 +86,7 @@ class Master():
 			else:
 				if self.args.setting=='pretrain_prior':
 					self.policy_manager.train(self.args.model)
-				else:
+				else:					
 					self.policy_manager.evaluate(model=self.args.model)		
 				
 		elif self.args.setting=='learntsub':
@@ -167,7 +167,7 @@ def parse_arguments():
 	parser.add_argument('--skill_length',dest='skill_length',type=int,default=5)
 	parser.add_argument('--var_skill_length',dest='var_skill_length',type=int,default=0)
 	parser.add_argument('--display_freq',dest='display_freq',type=int,default=10000)
-	parser.add_argument('--save_freq',dest='save_freq',type=int,default=1)	
+	parser.add_argument('--save_freq',dest='save_freq',type=int,default=5)	
 	parser.add_argument('--eval_freq',dest='eval_freq',type=int,default=20)	
 	parser.add_argument('--perplexity',dest='perplexity',type=float,default=30,help='Value of perplexity fed to TSNE.')
 
@@ -229,6 +229,7 @@ def parse_arguments():
 	parser.add_argument('--random_memory_burn_in',dest='random_memory_burn_in',type=int,default=1) # Whether to burn in episodes into memory randomly or not.
 	parser.add_argument('--shaped_reward',dest='shaped_reward',type=int,default=0) # Whether or not to use shaped rewards.
 	parser.add_argument('--memory_size',dest='memory_size',type=int,default=2000) # Size of replay memory. 2000 is okay, but is still kind of short sighted. 
+	parser.add_argument('--no_mujoco',dest='no_mujoco',type=int,default=0,help='Whether we have mujoco installation or not.')
 
 	# Transfer learning domains, etc. 
 	parser.add_argument('--source_domain',dest='source_domain',type=str,help='What the source domain is in transfer.')
