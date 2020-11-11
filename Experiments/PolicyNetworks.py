@@ -184,14 +184,13 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		return log_probabilities, entropy
 
 	def get_actions(self, input, greedy=False, batch_size=None):
-		format_input = input.view((input.shape[0], self.batch_size, self.input_size))
-
-		hidden = None
-		lstm_outputs, hidden = self.lstm(format_input)
-
 		if batch_size is None:
 			batch_size = self.batch_size
 
+		format_input = input.view((input.shape[0], batch_size, self.input_size))
+
+		hidden = None
+		lstm_outputs, hidden = self.lstm(format_input)
 
 		# Predict Gaussian means and variances. 
 		if self.args.mean_nonlinearity:

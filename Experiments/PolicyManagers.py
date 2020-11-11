@@ -285,48 +285,62 @@ class PolicyManager_BaseClass():
 		for i in range(self.N//self.args.batch_size):
 			
 			# (1) Encode trajectory. 
-			print("#########################################")	
-			print("Getting visuals for trajectory: ",i)
 			latent_z, sample_trajs, _ = self.run_iteration(0, i, return_z=True, and_train=False)
 
 			if self.args.batch_size>1:
-				
+
+				# Set the max length if it's less than this batch of trajectories. 
+				if sample_trajs.shape[0]>self.max_len:
+					self.max_len = sample_trajs.shape[0]
+
 				for b in range(self.args.batch_size):
+
+					print("#########################################")	
+					print("Getting visuals for trajectory: ",i*self.args.batch_size+b)
+
 					# Copy z. 
 					self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
-					if sample_trajs.shape[0]>self.max_len:
-						self.max_len = sample_trajs.shape[0]
+		
+					# Rollout each individual trajectory in this batch.
 					trajectory_rollout = self.get_robot_visuals(i*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b])
+
+					# Now append this particular sample traj and the rollout into trajectroy and rollout sets.
+					self.trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
+					self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))
+				
 			else:
+
+				print("#########################################")	
+				print("Getting visuals for trajectory: ",i)
+
 				# Copy z. 
 				self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())
 
+				trajectory_rollout = self.get_robot_visuals(i, latent_z, sample_trajs)								
 
-
-				# # (3) Plot trajectory.
-				# traj_image = self.visualize_trajectory(rollout_traj)
-
-
-		for i in range(self.N):
-
-			print("#########################################")	
-			print("Getting visuals for trajectory: ",i)
-			latent_z, sample_traj, sample_action_seq = self.run_iteration(0, i, return_z=True)
-
-			if latent_z is not None:
-				self.indices.append(i)
-
-				if len(sample_traj)>self.max_len:
-					self.max_len = len(sample_traj)
-				self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())		
-				
-				trajectory_rollout = self.get_robot_visuals(i, latent_z, sample_traj)
-				
-				# self.trajectory_set[i] = copy.deepcopy(sample_traj)
-				# self.trajectory_rollout_set[i] = copy.deepcopy(trajectory_rollout)	
-
-				self.trajectory_set.append(copy.deepcopy(sample_traj))
+				self.trajectory_set.append(copy.deepcopy(sample_trajs))
 				self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))
+
+		# for i in range(self.N):
+
+		# 	print("#########################################")	
+		# 	print("Getting visuals for trajectory: ",i)
+		# 	latent_z, sample_traj, sample_action_seq = self.run_iteration(0, i, return_z=True)
+
+		# 	if latent_z is not None:
+		# 		self.indices.append(i)
+
+		# 		if len(sample_traj)>self.max_len:
+		# 			self.max_len = len(sample_traj)
+		# 		self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())		
+				
+		# 		trajectory_rollout = self.get_robot_visuals(i, latent_z, sample_traj)
+				
+		# 		# self.trajectory_set[i] = copy.deepcopy(sample_traj)
+		# 		# self.trajectory_rollout_set[i] = copy.deepcopy(trajectory_rollout)	
+
+		# 		self.trajectory_set.append(copy.deepcopy(sample_traj))
+		# 		self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))
 
 		# Get MIME embedding for rollout and GT trajectories, with same Z embedding. 
 		embedded_z = self.get_robot_embedding()
@@ -352,7 +366,8 @@ class PolicyManager_BaseClass():
 
 		for t in range(length):
 
-			actions = self.policy_network.get_actions(subpolicy_inputs, greedy=True)
+			# Assume we always query the policy for actions with batch_size 1 here. 
+			actions = self.policy_network.get_actions(subpolicy_inputs, greedy=True, batch_size=1)
 
 			# Select last action to execute. 
 			action_to_execute = actions[-1].squeeze(1)
