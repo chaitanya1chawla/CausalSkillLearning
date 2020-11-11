@@ -282,6 +282,31 @@ class PolicyManager_BaseClass():
 
 		self.max_len = 0
 
+		for i in range(self.N//self.args.batch_size):
+			
+			# (1) Encode trajectory. 
+			print("#########################################")	
+			print("Getting visuals for trajectory: ",i)
+			latent_z, sample_trajs, _ = self.run_iteration(0, i, return_z=True, and_train=False)
+
+			if self.args.batch_size>1:
+				
+				for b in range(self.args.batch_size):
+					# Copy z. 
+					self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+					if sample_trajs.shape[0]>self.max_len:
+						self.max_len = sample_trajs.shape[0]
+					trajectory_rollout = self.get_robot_visuals(i*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b])
+			else:
+				# Copy z. 
+				self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())
+
+
+
+				# # (3) Plot trajectory.
+				# traj_image = self.visualize_trajectory(rollout_traj)
+
+
 		for i in range(self.N):
 
 			print("#########################################")	
@@ -293,7 +318,6 @@ class PolicyManager_BaseClass():
 
 				if len(sample_traj)>self.max_len:
 					self.max_len = len(sample_traj)
-
 				self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())		
 				
 				trajectory_rollout = self.get_robot_visuals(i, latent_z, sample_traj)
@@ -753,9 +777,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			perp30_embedded_zs = self.get_robot_embedding(perplexity=30)
 			
 			# Now plot the embedding.
-			image_perp5 = self.plot_embedding(perp5_embedded_zs, title="Embedded Z Space Perplexity 5")
-			image_perp10 = self.plot_embedding(perp10_embedded_zs, title="Embedded Z Space Perplexity 10")
-			image_perp30 = self.plot_embedding(perp30_embedded_zs, title="Embedded Z Space Perplexity 30")
+			image_perp5 = self.plot_embedding(perp5_embedded_zs, title="Z Space Model  Perp 5")
+			image_perp10 = self.plot_embedding(perp10_embedded_zs, title="Z Space Model Perp 10")
+			image_perp30 = self.plot_embedding(perp30_embedded_zs, title="Z Space Model Perp 30")
 
 			self.tf_logger.image_summary("Embedded Z Space Perplexity 5", [image_perp5], counter)
 			self.tf_logger.image_summary("Embedded Z Space Perplexity 10", [image_perp10], counter)
@@ -799,7 +823,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors,vmin=0,vmax=1,cmap='jet')
 		
 		# Title. 
-		ax.set_title("{0}".format(title),fontdict={'fontsize':40})
+		ax.set_title("{0}".format(title),fontdict={'fontsize':5})
 		fig.canvas.draw()
 		# Grab image.
 		width, height = fig.get_size_inches() * fig.get_dpi()
@@ -1076,7 +1100,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			############# (1) #############
 			torch_traj_seg = torch.tensor(state_action_trajectory).to(device).float()
 			# Encode trajectory segment into latent z. 		
-
+						
 			latent_z, encoder_loglikelihood, encoder_entropy, kl_divergence = self.encoder_network.forward(torch_traj_seg, self.epsilon)
 			
 			########## (2) & (3) ##########

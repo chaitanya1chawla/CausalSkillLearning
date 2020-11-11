@@ -146,14 +146,18 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 
 		self.variance_factor = 0.01
 
-	def forward(self, input, action_sequence, epsilon=0.001):
+	def forward(self, input, action_sequence, epsilon=0.001, batch_size=None):
 		# Input is the trajectory sequence of shape: Sequence_Length x 1 x Input_Size. 
 		# Here, we also need the continuous actions as input to evaluate their logprobability / probability. 		
 		# format_input = torch.tensor(input).view(input.shape[0], self.batch_size, self.input_size).float().to(device)
-		format_input = input.view((input.shape[0], self.batch_size, self.input_size))
+
+		if batch_size is None:
+			batch_size = self.batch_size
+
+		format_input = input.view((input.shape[0], batch_size, self.input_size))
 
 		hidden = None
-		format_action_seq = torch.from_numpy(action_sequence).to(device).float().view(action_sequence.shape[0],self.batch_size,self.output_size)
+		format_action_seq = torch.from_numpy(action_sequence).to(device).float().view(action_sequence.shape[0], batch_size, self.output_size)
 		# format_action_seq = torch.from_numpy(action_sequence).to(device).float().view(action_sequence.shape[0],1,self.output_size)
 		lstm_outputs, hidden = self.lstm(format_input)
 
@@ -179,11 +183,15 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 			
 		return log_probabilities, entropy
 
-	def get_actions(self, input, greedy=False):
+	def get_actions(self, input, greedy=False, batch_size=None):
 		format_input = input.view((input.shape[0], self.batch_size, self.input_size))
 
 		hidden = None
 		lstm_outputs, hidden = self.lstm(format_input)
+
+		if batch_size is None:
+			batch_size = self.batch_size
+
 
 		# Predict Gaussian means and variances. 
 		if self.args.mean_nonlinearity:

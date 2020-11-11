@@ -547,6 +547,12 @@ class Roboturk_Dataloader_Tester(unittest.TestCase):
 
 		self.assertTrue(validity and check_demo_data)
 
+class RealRoboturk_Dataset(Dataset):
+	
+	def __init__(self):
+
+		pass 
+
 if __name__ == '__main__':
 	# Run all tests defined for the dataloader.
 	unittest.main()

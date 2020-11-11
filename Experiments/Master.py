@@ -47,7 +47,7 @@ class Master():
 		if self.args.setting=='learntsub':
 			self.policy_manager = PolicyManager_Joint(self.args.number_policies, self.dataset, self.args)
 		elif self.args.setting=='pretrain_sub':
-			if self.args.batch_size > 1 and self.args.train: # Only setting batch manager for training.
+			if self.args.batch_size > 1: # Only setting batch manager for training.
 				self.policy_manager = PolicyManager_BatchPretrain(self.args.number_policies, self.dataset, self.args)
 			else:
 				self.policy_manager = PolicyManager_Pretrain(self.args.number_policies, self.dataset, self.args)
