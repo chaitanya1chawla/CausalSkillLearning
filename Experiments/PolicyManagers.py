@@ -179,7 +179,7 @@ class PolicyManager_BaseClass():
 
 		# For number of training epochs. 
 		for e in range(self.number_epochs): 
-			
+						
 			self.current_epoch_running = e
 			print("Starting Epoch: ",e)
 
@@ -756,7 +756,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		return image
 
-	def update_plots(self, counter, loglikelihood, sample_traj):
+	def update_plots(self, counter, loglikelihood, sample_traj, stat_dictionary):
 		
 		self.tf_logger.scalar_summary('Subpolicy Likelihood', loglikelihood.mean(), counter)
 		self.tf_logger.scalar_summary('Total Loss', self.total_loss.mean(), counter)
@@ -792,9 +792,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			perp30_embedded_zs = self.get_robot_embedding(perplexity=30)
 			
 			# Now plot the embedding.
-			image_perp5 = self.plot_embedding(perp5_embedded_zs, title="Z Space Model  Perp 5")
-			image_perp10 = self.plot_embedding(perp10_embedded_zs, title="Z Space Model Perp 10")
-			image_perp30 = self.plot_embedding(perp30_embedded_zs, title="Z Space Model Perp 30")
+			statistics_line = "Epoch: {0}, Count: {1}, I: {2}, Batch: {3}".format(stat_dictionary['epoch'], stat_dictionary['counter'], stat_dictionary['i'], stat_dictionary['batch_size'])
+			image_perp5 = self.plot_embedding(perp5_embedded_zs, title="Z Space {0} Perp 5".format(statistics_line))
+			image_perp10 = self.plot_embedding(perp10_embedded_zs, title="Z Space {0} Perp 10".format(statistics_line))
+			image_perp30 = self.plot_embedding(perp30_embedded_zs, title="Z Space {0} Perp 30".format(statistics_line))
 
 			self.tf_logger.image_summary("Embedded Z Space Perplexity 5", [image_perp5], counter)
 			self.tf_logger.image_summary("Embedded Z Space Perplexity 10", [image_perp10], counter)
@@ -838,7 +839,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors,vmin=0,vmax=1,cmap='jet')
 		
 		# Title. 
-		ax.set_title("{0}".format(title),fontdict={'fontsize':5})
+		ax.set_title("{0}".format(title),fontdict={'fontsize':15})
 		fig.canvas.draw()
 		# Grab image.
 		width, height = fig.get_size_inches() * fig.get_dpi()
@@ -1140,7 +1141,14 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.update_policies_reparam(loglikelihood, subpolicy_inputs, kl_divergence)
 
 				# Update Plots. 
-				self.update_plots(counter, loglikelihood, state_action_trajectory)
+
+				stats = {}
+				stats['counter'] = counter
+				stats['i'] = i
+				stats['epoch'] = self.current_epoch_running
+				stats['batch_size'] = self.args.batch_size
+
+				self.update_plots(counter, loglikelihood, state_action_trajectory, stats)
 
 				if return_z: 
 					return latent_z, sample_traj, sample_action_seq
