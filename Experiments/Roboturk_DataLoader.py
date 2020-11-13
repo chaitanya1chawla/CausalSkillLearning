@@ -549,8 +549,15 @@ class Roboturk_Dataloader_Tester(unittest.TestCase):
 
 class RealRoboturk_Dataset(Dataset):
 	
-	def __init__(self):
+	def __init__(self, args):
 
+		self.dataset_directory = '/data1/tanmayshankar/RealRoboturk
+		self.args = args
+
+		
+
+		
+		embed()
 		pass 
 
 if __name__ == '__main__':

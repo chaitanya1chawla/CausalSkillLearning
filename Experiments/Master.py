@@ -154,6 +154,7 @@ def parse_arguments():
 	parser.add_argument('--smoothen', dest='smoothen',type=int,default=0) # Whether to smoothen the original dataset. 
 	parser.add_argument('--smoothing_kernel_bandwidth', dest='smoothing_kernel_bandwidth',type=float,default=3.5) # The smoothing bandwidth that is applied to data loader trajectories. 
 
+	# Training paradigm parameters. 
 	parser.add_argument('--new_gradient',dest='new_gradient',type=int,default=1)
 	parser.add_argument('--b_prior',dest='b_prior',type=int,default=1)
 	parser.add_argument('--constrained_b_prior',dest='constrained_b_prior',type=int,default=1) # Whether to use constrained b prior var network or just normal b prior one.
@@ -166,10 +167,13 @@ def parse_arguments():
 	parser.add_argument('--traj_length',dest='traj_length',type=int,default=10)
 	parser.add_argument('--skill_length',dest='skill_length',type=int,default=5)
 	parser.add_argument('--var_skill_length',dest='var_skill_length',type=int,default=0)
+
+	# Parameters for evaluation. 
 	parser.add_argument('--display_freq',dest='display_freq',type=int,default=10000)
-	parser.add_argument('--save_freq',dest='save_freq',type=int,default=5)	
+	parser.add_argument('--save_freq',dest='save_freq',type=int,default=1)	
 	parser.add_argument('--eval_freq',dest='eval_freq',type=int,default=20)	
 	parser.add_argument('--perplexity',dest='perplexity',type=float,default=30,help='Value of perplexity fed to TSNE.')
+	parser.add_argument('--latent_set_file_path',dest='latent_set_file_path',type=str,help='File path to pre-computed latent sets to visualize.')
 
 	parser.add_argument('--entropy',dest='entropy',type=int,default=0)
 	parser.add_argument('--var_entropy',dest='var_entropy',type=int,default=0)

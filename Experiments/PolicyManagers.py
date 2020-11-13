@@ -13,6 +13,8 @@ import TFLogger, DMP, RLUtils
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
+# Making sure RSYnc works 
+
 class PolicyManager_BaseClass():
 
 	def __init__(self):
@@ -240,8 +242,7 @@ class PolicyManager_BaseClass():
 		# NOT RUNNING AUTO EVAL FOR NOW.
 		# subprocess.Popen([base_command],shell=True)
 
-	# @profile
-	def visualize_robot_data(self):
+	def visualize_robot_data(self, load_sets=False):
 
 		self.N = 100
 		self.rollout_timesteps = self.args.traj_length
@@ -259,68 +260,96 @@ class PolicyManager_BaseClass():
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
-		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
-		# These are lists because they're variable length individually.
-		self.indices = []
-		self.trajectory_set = []
-		self.trajectory_rollout_set = []		
+		if not(load_sets):
 
-		model_epoch = int(os.path.split(self.args.model)[1].lstrip("Model_epoch"))
+			self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
+			# These are lists because they're variable length individually.
+			self.indices = []
+			self.trajectory_set = []
+			self.trajectory_rollout_set = []		
 
-		self.rollout_gif_list = []
-		self.gt_gif_list = []
+			model_epoch = int(os.path.split(self.args.model)[1].lstrip("Model_epoch"))
 
-		# Create save directory:
-		upper_dir_name = os.path.join(self.args.logdir,self.args.name,"MEval")
+			self.rollout_gif_list = []
+			self.gt_gif_list = []
 
-		if not(os.path.isdir(upper_dir_name)):
-			os.mkdir(upper_dir_name)
+			# Create save directory:
+			upper_dir_name = os.path.join(self.args.logdir,self.args.name,"MEval")
 
-		self.dir_name = os.path.join(self.args.logdir,self.args.name,"MEval","m{0}".format(model_epoch))
-		if not(os.path.isdir(self.dir_name)):
-			os.mkdir(self.dir_name)
+			if not(os.path.isdir(upper_dir_name)):
+				os.mkdir(upper_dir_name)
 
-		self.max_len = 0
+			self.dir_name = os.path.join(self.args.logdir,self.args.name,"MEval","m{0}".format(model_epoch))
+			if not(os.path.isdir(self.dir_name)):
+				os.mkdir(self.dir_name)
 
-		for i in range(self.N//self.args.batch_size):
+			self.max_len = 0
+
+			for i in range(self.N//self.args.batch_size):
+				
+				# (1) Encode trajectory. 
+				latent_z, sample_trajs, _ = self.run_iteration(0, i, return_z=True, and_train=False)
+
+				if self.args.batch_size>1:
+
+					# Set the max length if it's less than this batch of trajectories. 
+					if sample_trajs.shape[0]>self.max_len:
+						self.max_len = sample_trajs.shape[0]
+
+					for b in range(self.args.batch_size):
+						
+						self.indices.append(i*self.args.batch_size+b)
+						print("#########################################")	
+						print("Getting visuals for trajectory: ",i*self.args.batch_size+b)
+
+						# Copy z. 
+						self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 			
-			# (1) Encode trajectory. 
-			latent_z, sample_trajs, _ = self.run_iteration(0, i, return_z=True, and_train=False)
+						# Rollout each individual trajectory in this batch.
+						trajectory_rollout = self.get_robot_visuals(i*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b])
 
-			if self.args.batch_size>1:
-
-				# Set the max length if it's less than this batch of trajectories. 
-				if sample_trajs.shape[0]>self.max_len:
-					self.max_len = sample_trajs.shape[0]
-
-				for b in range(self.args.batch_size):
+						# Now append this particular sample traj and the rollout into trajectroy and rollout sets.
+						self.trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
+						self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))
+					
+				else:
 
 					print("#########################################")	
-					print("Getting visuals for trajectory: ",i*self.args.batch_size+b)
+					print("Getting visuals for trajectory: ",i)
 
+					self.indices.append(i)
 					# Copy z. 
-					self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
-		
-					# Rollout each individual trajectory in this batch.
-					trajectory_rollout = self.get_robot_visuals(i*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b])
+					self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())
 
-					# Now append this particular sample traj and the rollout into trajectroy and rollout sets.
-					self.trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
-					self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))
-				
-			else:
+					trajectory_rollout = self.get_robot_visuals(i, latent_z, sample_trajs)								
 
-				print("#########################################")	
-				print("Getting visuals for trajectory: ",i)
+					self.trajectory_set.append(copy.deepcopy(sample_trajs))
+					self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))	
 
-				# Copy z. 
-				self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())
+			# Get MIME embedding for rollout and GT trajectories, with same Z embedding. 
+			embedded_z = self.get_robot_embedding()
 
-				trajectory_rollout = self.get_robot_visuals(i, latent_z, sample_trajs)								
+		else:
 
-				self.trajectory_set.append(copy.deepcopy(sample_trajs))
-				self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))
+			print("Using Precomputed Latent Set and Embedding.")
+			# Instead of computing latent sets, just load them from File path. 
+			self.load_latent_sets(self.args.latent_set_file_path)
+			
+			# Get embedded z based on what the perplexity is. 			
+			embedded_z = self.embedded_zs.item()["perp{0}".format(int(self.args.perplexity))]
+			self.max_len = 0
+			for i in range(self.N):
+				print("Visualizing Trajectory ", i, " of ",self.N)
 
+				# Set the max length if it's less than this batch of trajectories. 
+				if self.gt_trajectory_set[i].shape[0]>self.max_len:
+					self.max_len = self.gt_trajectory_set[i].shape[0]
+
+				trajectory_rollout = self.get_robot_visuals(i, self.latent_z_set[i], self.gt_trajectory_set[i])
+
+
+
+			self.indices = range(self.N)
 		# for i in range(self.N):
 
 		# 	print("#########################################")	
@@ -342,8 +371,6 @@ class PolicyManager_BaseClass():
 		# 		self.trajectory_set.append(copy.deepcopy(sample_traj))
 		# 		self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))
 
-		# Get MIME embedding for rollout and GT trajectories, with same Z embedding. 
-		embedded_z = self.get_robot_embedding()
 		gt_animation_object = self.visualize_robot_embedding(embedded_z, gt=True)
 		rollout_animation_object = self.visualize_robot_embedding(embedded_z, gt=False)
 
@@ -383,7 +410,7 @@ class PolicyManager_BaseClass():
 			input_row[0,:self.state_dim] = new_state
 			# Feed in the ORIGINAL prediction from the network as input. Not the downscaled thing. 
 			input_row[0,self.state_dim:2*self.state_dim] = actions[-1].squeeze(1)
-			input_row[0,2*self.state_dim:] = latent_z
+			input_row[0,2*self.state_dim:] = torch.tensor(latent_z).to(device).float()
 
 			subpolicy_inputs = torch.cat([subpolicy_inputs,input_row],dim=0)
 
@@ -513,12 +540,18 @@ class PolicyManager_BaseClass():
 	def visualize_robot_embedding(self, scaled_embedded_zs, gt=False):
 
 		# Create figure and axis objects.
-		# matplotlib.rcParams['figure.figsize'] = [50, 50]
-		# matplotlib.rcParams['figure.figsize'] = [20, 20]
-		matplotlib.rcParams['figure.figsize'] = [4, 4]
-		# zoom_factor = 0.4
-		# zoom_factor = 0.15
-		zoom_factor = 0.04
+		# # matplotlib.rcParams['figure.figsize'] = [50, 50]		
+		# # matplotlib.rcParams['figure.figsize'] = [20, 20]
+		# matplotlib.rcParams['figure.figsize'] = [8, 8]
+		# # matplotlib.rcParams['figure.figsize'] = [4, 4]
+		# # zoom_factor = 0.4
+		# # zoom_factor = 0.15
+		# zoom_factor = 0.04
+
+		# Good spaced out highres parameters: 
+		matplotlib.rcParams['figure.figsize'] = [40, 40]
+		zoom_factor = 0.2
+
 		fig, ax = plt.subplots()
 
 		# number_samples = 400
@@ -787,15 +820,19 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 			# Get embeddings for perplexity=5,10,30, and then plot these.
 			# Once we have latent set, get embedding and plot it. 
-			perp5_embedded_zs = self.get_robot_embedding(perplexity=5)
-			perp10_embedded_zs = self.get_robot_embedding(perplexity=10)
-			perp30_embedded_zs = self.get_robot_embedding(perplexity=30)
-			
+			self.embedded_z_dict = {}
+			self.embedded_z_dict['perp5'] = self.get_robot_embedding(perplexity=5)
+			self.embedded_z_dict['perp10'] = self.get_robot_embedding(perplexity=10)
+			self.embedded_z_dict['perp30'] = self.get_robot_embedding(perplexity=30)
+
+			# Save embedded z's and trajectory and latent sets.
+			self.save_latent_sets(stat_dictionary)
+
 			# Now plot the embedding.
 			statistics_line = "Epoch: {0}, Count: {1}, I: {2}, Batch: {3}".format(stat_dictionary['epoch'], stat_dictionary['counter'], stat_dictionary['i'], stat_dictionary['batch_size'])
-			image_perp5 = self.plot_embedding(perp5_embedded_zs, title="Z Space {0} Perp 5".format(statistics_line))
-			image_perp10 = self.plot_embedding(perp10_embedded_zs, title="Z Space {0} Perp 10".format(statistics_line))
-			image_perp30 = self.plot_embedding(perp30_embedded_zs, title="Z Space {0} Perp 30".format(statistics_line))
+			image_perp5 = self.plot_embedding(self.embedded_z_dict['perp5'], title="Z Space {0} Perp 5".format(statistics_line))
+			image_perp10 = self.plot_embedding(self.embedded_z_dict['perp10'], title="Z Space {0} Perp 10".format(statistics_line))
+			image_perp30 = self.plot_embedding(self.embedded_z_dict['perp30'], title="Z Space {0} Perp 30".format(statistics_line))
 
 			self.tf_logger.image_summary("Embedded Z Space Perplexity 5", [image_perp5], counter)
 			self.tf_logger.image_summary("Embedded Z Space Perplexity 10", [image_perp10], counter)
@@ -847,6 +884,31 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		image = np.transpose(image, axes=[2,0,1])
 
 		return image
+
+	def save_latent_sets(self, stats):
+
+		# Save latent sets, trajectory sets, and finally, the embedded z's for later visualization.
+
+		# Create save directory:
+		upper_dir_name = os.path.join(self.args.logdir,self.args.name,"LatentSetDirectory")
+
+		if not(os.path.isdir(upper_dir_name)):
+			os.mkdir(upper_dir_name)
+
+		self.dir_name = os.path.join(self.args.logdir,self.args.name,"LatentSetDirectory","E{0}_C{1}".format(stats['epoch'],stats['counter']))
+		if not(os.path.isdir(self.dir_name)):
+			os.mkdir(self.dir_name)
+
+
+		np.save(os.path.join(self.dir_name, "LatentSet.npy") , self.latent_z_set)
+		np.save(os.path.join(self.dir_name, "GT_TrajSet.npy") , self.gt_trajectory_set)
+		np.save(os.path.join(self.dir_name, "EmbeddedZSet.npy") , self.embedded_z_dict)
+
+	def load_latent_sets(self, file_path):
+		
+		self.latent_z_set = np.load(os.path.join(file_path, "LatentSet.npy"))
+		self.gt_trajectory_set = np.load(os.path.join(file_path, "GT_TrajSet.npy"), allow_pickle=True)
+		self.embedded_zs = np.load(os.path.join(file_path, "EmbeddedZSet.npy"), allow_pickle=True)
 
 	def assemble_inputs(self, input_trajectory, latent_z_indices, latent_b, sample_action_seq):
 
@@ -1203,7 +1265,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# Only running viz if we're actually pretraining.
 			if self.args.traj_segments:
 				print("Running Visualization on Robot Data.")	
-				self.visualize_robot_data()
+
+				self.visualize_robot_data(load_sets=True)
 			else:
 				# Create save directory:
 				upper_dir_name = os.path.join(self.args.logdir,self.args.name,"MEval")
@@ -1220,7 +1283,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# np.save(os.path.join(self.dir_name,"Trajectory_Distances_{0}.npy".format(self.args.name)),self.distances)
 			# np.save(os.path.join(self.dir_name,"Mean_Trajectory_Distance_{0}.npy".format(self.args.name)),self.mean_distance)
 
-	# @profile
 	def get_trajectory_and_latent_sets(self, get_visuals=True):
 		# For N number of random trajectories from MIME: 
 		#	# Encode trajectory using encoder into latent_z. 
@@ -1231,36 +1293,51 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# Set N:
 		self.N = 100
-		self.rollout_timesteps = 5
-		self.state_dim = 2
+		# self.rollout_timesteps = 5
+		# self.state_dim = 2
 
 		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
-		self.trajectory_set = np.zeros((self.N, self.rollout_timesteps, self.state_dim))
-	
+		# self.trajectory_set = np.zeros((self.N, self.rollout_timesteps, self.state_dim))
+		# self.gt_trajectory_set = np.zeros((self.N, self., self.state_dim))
+		self.trajectory_set = []
+		self.gt_trajectory_set = []
+
 		# Use the dataset to get reasonable trajectories (because without the information bottleneck / KL between N(0,1), cannot just randomly sample.)
-		for i in range(self.N//self.args.batch_size):
+		for i in range(self.N//self.args.batch_size+1):
 
 			# (1) Encoder trajectory. 
-			latent_z, _, _ = self.run_iteration(0, i, return_z=True, and_train=False)
+			latent_z, sample_trajs, _ = self.run_iteration(0, i, return_z=True, and_train=False)
 
 			if self.args.batch_size>1:
 
 				for b in range(self.args.batch_size):
+
+					if i*self.args.batch_size+b>=self.N:
+						break 
 					# Copy z. 
 
 					self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+					self.gt_trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
 
 					# if get_visuals:
 						# (2) Now rollout policy.			
 						# self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z, return_traj=True)
+						# self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z, return_traj=True))
+
+				if i*self.args.batch_size+b>=self.N:
+					break 
 
 			else:
+				if i>=self.N:
+					break 
+
 				# Copy z. 
 				self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())
+				self.gt_trajectory_set.append(copy.deepcopy(sample_trajs))
 
 				if get_visuals:
 					# (2) Now rollout policy.			
-					self.trajectory_set[i] = self.rollout_visuals(i, latent_z=latent_z, return_traj=True)
+					self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z, return_traj=True))
 
 				# # (3) Plot trajectory.
 				# traj_image = self.visualize_trajectory(rollout_traj)
@@ -4609,4 +4686,5 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 
 		# Encode decode function: First encodes, takes trajectory segment, and outputs latent z. The latent z is then provided to decoder (along with initial state), and then we get SOURCE domain subpolicy inputs. 
 		# Cross domain decoding function: Takes encoded latent z (and start state), and then rolls out with target decoder. Function returns, target trajectory, action sequence, and TARGET domain subpolicy inputs. 
+
 
