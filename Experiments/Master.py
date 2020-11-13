@@ -122,7 +122,7 @@ def parse_arguments():
 	parser = argparse.ArgumentParser(description='Learning Skills from Demonstrations')
 
 	# Setup training. 
-	parser.add_argument('--datadir', dest='datadir',type=str,default='../Data/ContData/')
+	parser.add_argument('--datadir', dest='datadir',type=str,default='../../Data/Datasets/ContData/')
 	parser.add_argument('--train',dest='train',type=int,default=0)
 	parser.add_argument('--debug',dest='debug',type=int,default=0)
 	parser.add_argument('--notes',dest='notes',type=str)

@@ -1293,13 +1293,23 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# Set N:
 		self.N = 100
-		# self.rollout_timesteps = 5
-		# self.state_dim = 2
+
 
 		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
-		# self.trajectory_set = np.zeros((self.N, self.rollout_timesteps, self.state_dim))
+		
+	
+		if self.args.setting=='transfer' or self.args.setting=='cycle_transfer':
+			# self.source_manager.rollout_timesteps = 5
+			# self.source_manager.state_dim = 2		
+			self.rollout_timesteps = 5
+			self.state_dim = 2		
+
+			self.trajectory_set = np.zeros((self.N, self.rollout_timesteps, self.state_dim))
+
+		else:
+			self.trajectory_set = []
 		# self.gt_trajectory_set = np.zeros((self.N, self., self.state_dim))
-		self.trajectory_set = []
+		
 		self.gt_trajectory_set = []
 
 		# Use the dataset to get reasonable trajectories (because without the information bottleneck / KL between N(0,1), cannot just randomly sample.)
@@ -1337,7 +1347,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				if get_visuals:
 					# (2) Now rollout policy.			
-					self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z, return_traj=True))
+					if self.args.setting=='transfer' or self.args.setting=='cycle_transfer':
+						self.trajectory_set[i] = self.rollout_visuals(i, latent_z=latent_z, return_traj=True)
+					else: 
+						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z, return_traj=True))
 
 				# # (3) Plot trajectory.
 				# traj_image = self.visualize_trajectory(rollout_traj)
@@ -3943,8 +3956,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		if trajectory_input is not None: 
 
 			# Grab trajectory segment from tuple. 
-			torch_traj_seg = trajectory_input['target_trajectory_rollout']
+			# torch_traj_seg = trajectory_input['target_trajectory_rollout']
+			# trajectory_segment = trajectory_input['target_trajectory_rollout'].clone().detach().cpu().numpy()
 			
+			torch_traj_seg = trajectory_input['differentiable_state_action_seq']
+			trajectory_segment = trajectory_input['differentiable_state_action_seq'].clone().detach().cpu().numpy()
+
 		else: 
 			trajectory_segment, sample_action_seq, sample_traj = policy_manager.get_trajectory_segment(i)
 			# Torchify trajectory segment.
@@ -3963,14 +3980,15 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Don't assemble trajectory in numpy, just take the previous subpolicy_inputs, and then clone it and replace the latent z in it.
 			if trajectory_input is not None: 
 
-				# Now assigned trajectory_input['target_subpolicy_inputs'].clone() to SubPolicy_inputs, and then replace the latent z's.
-				subpolicy_inputs = trajectory_input['target_subpolicy_inputs'].clone()
-				subpolicy_inputs[:,2*self.state_dim:-1] = latent_z_seq
+				# Now assigned trajectory_input['subpolicy_inputs'].clone() to SubPolicy_inputs, and then replace the latent z's.
+				subpolicy_inputs = trajectory_input['subpolicy_inputs'].clone()
+				subpolicy_inputs[:,2*policy_manager.state_dim:] = latent_z_seq
 
-				# Now get "sample_action_seq" for forward function. 
-				sample_action_seq = subpolicy_inputs[:,self.state_dim:2*self.state_dim].clone()
+				# Now get "sample_action_seq" for forward function. 				
+				sample_action_seq = subpolicy_inputs[:,policy_manager.state_dim:2*policy_manager.state_dim].clone()
 
 			else:
+				# This branch gets executed for plain domain adversarial training, so the changes we made above don't affect Domain adversarial training. 
 				_, subpolicy_inputs, sample_action_seq = policy_manager.assemble_inputs(trajectory_segment, latent_z_seq, latent_b, sample_action_seq)
 
 			# Policy net doesn't use the decay epislon. (Because we never sample from it in training, only rollouts.)
@@ -4147,9 +4165,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		return source_image, target_image, shared_image, toy_shared_embedding_image
 
-	# @profile
-
-
 	def get_trajectory_visuals(self):
 
 		i = np.random.randint(0,high=self.extent)
@@ -4261,6 +4276,52 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 	# Run memory profiling.
 	# @profile 
+	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False):	
+	
+		fig = plt.figure()
+		ax = fig.gca()
+		
+		if shared:
+			colors = 0.2*np.ones((2*self.N))
+			colors[self.N:] = 0.8
+		else:
+			colors = 0.2*np.ones((self.N))
+
+		if trajectory:
+			# Create a scatter plot of the embedding.
+
+			self.source_manager.get_trajectory_and_latent_sets()
+			self.target_manager.get_trajectory_and_latent_sets()
+
+			ratio = 0.4
+			color_scaling = 15
+			
+			# Assemble shared trajectory set. 
+			traj_length = len(self.source_manager.trajectory_set[0,:,0])
+			self.shared_trajectory_set = np.zeros((2*self.N, traj_length, 2))
+			
+			self.shared_trajectory_set[:self.N] = self.source_manager.trajectory_set
+			self.shared_trajectory_set[self.N:] = self.target_manager.trajectory_set
+			
+			color_range_min = 0.2*color_scaling
+			color_range_max = 0.8*color_scaling+traj_length-1
+
+			for i in range(2*self.N):
+				ax.scatter(embedded_zs[i,0]+ratio*self.shared_trajectory_set[i,:,0],embedded_zs[i,1]+ratio*self.shared_trajectory_set[i,:,1],c=colors[i]*color_scaling+range(traj_length),cmap='jet',vmin=color_range_min,vmax=color_range_max)
+
+		else:
+			# Create a scatter plot of the embedding.
+			ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors,vmin=0,vmax=1,cmap='jet')
+		
+		# Title. 
+		ax.set_title("{0}".format(title),fontdict={'fontsize':15})
+		fig.canvas.draw()
+		# Grab image.
+		width, height = fig.get_size_inches() * fig.get_dpi()
+		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)
+		image = np.transpose(image, axes=[2,0,1])
+
+		return image
 
 	def set_neighbor_objects(self, computed_sets=False):
 		if not(computed_sets):
@@ -4422,8 +4483,8 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 
 		# Don't actually need the target_latent_z, unless we're doing differentiable nearest neighbor transfer. 
 		# Now get the corresponding trajectory. 
-		trajectory = trajectory_set[target_latent_z_index]
-
+		trajectory = trajectory_set[target_latent_z_index[0,0]]
+		
 		# Finally, pick up first state. 
 		start_state = trajectory[0]
 
@@ -4493,10 +4554,13 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		if start_state is None: 
 			start_state = self.get_start_state(domain, latent_z)
 
-		# Now rollout in target domain.
-		differentiable_trajectory, differentiable_action_seq, differentiable_state_action_seq, subpolicy_inputs = self.differentiable_rollout(domain_manager, start_state, latent_z)
+		# Now rollout in target domain.		
+		cross_domain_decoding_dict = {}
+		cross_domain_decoding_dict['differentiable_trajectory'], cross_domain_decoding_dict['differentiable_action_seq'], cross_domain_decoding_dict['differentiable_state_action_seq'], cross_domain_decoding_dict['subpolicy_inputs'] = self.differentiable_rollout(domain_manager, start_state, latent_z)
+		# differentiable_trajectory, differentiable_action_seq, differentiable_state_action_seq, subpolicy_inputs = self.differentiable_rollout(domain_manager, start_state, latent_z)
 
-		return differentiable_trajectory, subpolicy_inputs
+		# return differentiable_trajectory, subpolicy_inputs
+		return cross_domain_decoding_dict
 
 	def update_networks(self, dictionary, source_policy_manager):
 
@@ -4543,7 +4607,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Get z discriminator logprobabilities.
 		z_discriminator_logprob, z_discriminator_prob = self.discriminator_network(dictionary['source_latent_z'])
 		# Compute discriminability loss. Remember, this is not used for training the discriminator, but rather the encoders.
-		self.z_discriminability_loss = self.negative_log_likelihood_loss_function(z_discriminator_logprob.squeeze(1), torch.tensor(1-domain).to(device).long().view(1,))
+		self.z_discriminability_loss = self.negative_log_likelihood_loss_function(z_discriminator_logprob.squeeze(1), torch.tensor(1-dictionary['domain']).to(device).long().view(1,))
 
 		###### Block that computes discriminability losses assuming we are using trjaectory discriminators. ######
 
@@ -4565,12 +4629,12 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# I.e. evaluate likelihood of original actions under source_decoder (i.e. source subpolicy), with the subpolicy inputs constructed from cycle-reconstruction.
 		
 		# Get the original action sequence.
-		original_action_sequence = dictionary['source_subpolicy_inputs_original'][:,self.state_dim:2*self.state_dim]
+		original_action_sequence = dictionary['source_subpolicy_inputs_original'][:,source_policy_manager.state_dim:2*source_policy_manager.state_dim]
 
 		# Now evaluate likelihood of actions under the source decoder.
-		cycle_reconstructed_loglikelihood, _ = source_policy_manager.forward(dictionary['source_subpolicy_inputs_crossdomain'], original_action_sequence)
+		cycle_reconstructed_loglikelihood, _ = source_policy_manager.policy_network.forward(dictionary['source_subpolicy_inputs_crossdomain'], original_action_sequence)
 		# Reweight the cycle reconstructed likelihood to construct the loss.
-		self.cycle_reconstruction_loss = -self.args.cycle_reconstruction_loss_weight*cycle_reconstruction_loss.mean()
+		self.cycle_reconstruction_loss = -self.args.cycle_reconstruction_loss_weight*cycle_reconstructed_loglikelihood.mean()
 
 		####################################
 		# Now that individual losses are computed, compute total loss, compute gradients, and then step.
@@ -4597,7 +4661,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		z_discriminator_detach_logprob, z_discriminator_detach_prob = self.discriminator_network(dictionary['source_latent_z'].detach())
 
 		# Compute discriminator loss for discriminator. 
-		self.z_discriminator_loss = self.negative_log_likelihood_loss_function(z_discriminator_detach_logprob.squeeze(1), torch.tensor(domain).to(device).long().view(1,))		
+		self.z_discriminator_loss = self.negative_log_likelihood_loss_function(z_discriminator_detach_logprob.squeeze(1), torch.tensor(dictionary['domain']).to(device).long().view(1,))		
 		
 		if not(self.skip_discriminator):
 			# Now go backward and take a step.
@@ -4642,7 +4706,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# (1) Select which domain to use as source domain (also supervision of z discriminator for this iteration). 
 		####################################
 
-		domain, source_policy_manager, target_policy_manager = self.get_source_target_domain_managers()
+		dictionary['domain'], source_policy_manager, target_policy_manager = self.get_source_target_domain_managers()
 
 		####################################
 		# (2) & (3 a) Get source trajectory (segment) and encode into latent z. Decode using source decoder, to get loglikelihood for reconstruction objectve. 
@@ -4654,29 +4718,31 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# (3 b) Cross domain decoding. 
 		####################################
 		
-		target_dict['target_trajectory_rollout'], target_dict['target_subpolicy_inputs'] = self.cross_domain_decoding(domain, target_policy_manager, dictionary['source_latent_z'])
+		# target_dict['target_trajectory_rollout'], target_dict['target_subpolicy_inputs'] = self.cross_domain_decoding(domain, target_policy_manager, dictionary['source_latent_z'])
+		target_cross_domain_decoding_dict = self.cross_domain_decoding(dictionary['domain'], target_policy_manager, dictionary['source_latent_z'])
 
 		####################################
 		# (3 c) Cross domain encoding of target_trajectory_rollout into target latent_z. 
 		####################################
 
-		dictionary['target_subpolicy_inputs'], dictionary['target_latent_z'], dictionary['target_loglikelihood'], dictionary['target_kl_divergence'] = self.encode_decode_trajectory(target_policy_manager, i, trajectory_input=target_dict)
+		dictionary['target_subpolicy_inputs'], dictionary['target_latent_z'], dictionary['target_loglikelihood'], dictionary['target_kl_divergence'] = self.encode_decode_trajectory(target_policy_manager, i, trajectory_input=target_cross_domain_decoding_dict)
 
 		####################################
 		# (3 d) Cross domain decoding of target_latent_z into source trajectory. 
 		# Can use the original start state, or also use the reverse trick for start state. Try both maybe.
 		####################################
 
-		source_trajectory_rollout, dictionary['source_subpolicy_inputs_crossdomain'] = self.cross_domain_decoding(domain, source_policy_manager, dictionary['target_latent_z'], start_state=dictionary['source_subpolicy_inputs'][0,:self.state_dim].detach().cpu().numpy())
+		source_cross_domain_decoding_dict = self.cross_domain_decoding(dictionary['domain'], source_policy_manager, dictionary['target_latent_z'], start_state=dictionary['source_subpolicy_inputs_original'][0,:source_policy_manager.state_dim].detach().cpu().numpy())
+		dictionary['source_subpolicy_inputs_crossdomain'] = source_cross_domain_decoding_dict['subpolicy_inputs']
+
+		# ####################################
+		# # (4) Feed source and target latent z's to z_discriminator.
+		# ####################################
+
+		# self.compute_discriminator_losses(domain, dictionary['source_latent_z'])
 
 		####################################
-		# (4) Feed source and target latent z's to z_discriminator.
-		####################################
-
-		self.compute_discriminator_losses(domain, dictionary['source_latent_z'])
-
-		####################################
-		# (5) Compute all losses, reweight, and take gradient steps.
+		# (4) Compute all losses, reweight, and take gradient steps.
 		####################################
 
 		self.update_networks(dictionary, source_policy_manager)

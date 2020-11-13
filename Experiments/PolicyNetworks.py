@@ -157,7 +157,12 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		format_input = input.view((input.shape[0], batch_size, self.input_size))
 
 		hidden = None
-		format_action_seq = torch.from_numpy(action_sequence).to(device).float().view(action_sequence.shape[0], batch_size, self.output_size)
+
+		if isinstance(action_sequence,np.ndarray):
+			format_action_seq = torch.from_numpy(action_sequence).to(device).float().view(action_sequence.shape[0], batch_size, self.output_size)
+		else:
+			format_action_seq = action_sequence.view(action_sequence.shape[0], batch_size, self.output_size)
+
 		# format_action_seq = torch.from_numpy(action_sequence).to(device).float().view(action_sequence.shape[0],1,self.output_size)
 		lstm_outputs, hidden = self.lstm(format_input)
 

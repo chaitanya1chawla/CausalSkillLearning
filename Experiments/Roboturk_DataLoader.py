@@ -551,10 +551,9 @@ class RealRoboturk_Dataset(Dataset):
 	
 	def __init__(self, args):
 
-		self.dataset_directory = '/data1/tanmayshankar/RealRoboturk
+		self.dataset_directory = '/data1/tanmayshankar/RealRoboturk'
 		self.args = args
 
-		
 
 		
 		embed()
