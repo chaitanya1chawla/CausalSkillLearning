@@ -172,6 +172,7 @@ class PolicyManager_BaseClass():
 		# Shuffled index list is just a flattening of blocks.
 		self.index_list = [b for bs in blocks for b in bs]
 
+	# @profile
 	def train(self, model=None):
 
 		if model:
@@ -215,7 +216,7 @@ class PolicyManager_BaseClass():
 			if e%self.args.eval_freq==0:
 				self.automatic_evaluation(e)
 
-		self.write_and_close()
+		# self.write_and_close()
 
 	def automatic_evaluation(self, e):
 
@@ -317,14 +318,18 @@ class PolicyManager_BaseClass():
 					print("#########################################")	
 					print("Getting visuals for trajectory: ",i)
 
-					self.indices.append(i)
-					# Copy z. 
-					self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())
+					if latent_z is not None:
+						self.indices.append(i)
 
-					trajectory_rollout = self.get_robot_visuals(i, latent_z, sample_trajs)								
+						if len(sample_trajs)>self.max_len:
+							self.max_len = len(sample_trajs)
+						# Copy z. 
+						self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())
 
-					self.trajectory_set.append(copy.deepcopy(sample_trajs))
-					self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))	
+						trajectory_rollout = self.get_robot_visuals(i, latent_z, sample_trajs)								
+
+						self.trajectory_set.append(copy.deepcopy(sample_trajs))
+						self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))	
 
 			# Get MIME embedding for rollout and GT trajectories, with same Z embedding. 
 			embedded_z = self.get_robot_embedding()
@@ -417,7 +422,8 @@ class PolicyManager_BaseClass():
 		trajectory = subpolicy_inputs[:,:self.state_dim].detach().cpu().numpy()
 		return trajectory
 
-	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False):		
+	@profile
+	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False):		
 
 		# 1) Feed Z into policy, rollout trajectory. 
 		trajectory_rollout = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=trajectory.shape[0])
@@ -435,24 +441,28 @@ class PolicyManager_BaseClass():
 			animation_object = self.dataset[i]['animation']
 
 		# 3) Run unnormalized ground truth trajectory in visualizer. 
-		ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GT.gif".format(i), return_and_save=True)
+		self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GT.gif".format(i), return_and_save=True)
 		
 		# 4) Run unnormalized rollout trajectory in visualizer. 
-		rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_Rollout.gif".format(i), return_and_save=True)
+		self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_Rollout.gif".format(i), return_and_save=True)
 		
-		self.gt_gif_list.append(copy.deepcopy(ground_truth_gif))
-		self.rollout_gif_list.append(copy.deepcopy(rollout_gif))
+		self.gt_gif_list.append(copy.deepcopy(self.ground_truth_gif))
+		self.rollout_gif_list.append(copy.deepcopy(self.rollout_gif))
+		
+		if return_numpy:
+			self.ground_truth_gif = np.array(self.ground_truth_gif)
+			self.rollout_gif = np.array(self.rollout_gif)
 
 		if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 
 			if return_image:
-				return unnorm_pred_trajectory, ground_truth_gif, rollout_gif
+					return unnorm_pred_trajectory, self.ground_truth_gif, self.rollout_gif
 			else:
 				return unnorm_pred_trajectory
 		else:
 
 			if return_image:
-				return trajectory_rollout, ground_truth_gif, rollout_gif
+				return trajectory_rollout, self.ground_truth_gif, self.rollout_gif
 			else:
 				return trajectory_rollout
 
@@ -541,16 +551,23 @@ class PolicyManager_BaseClass():
 
 		# Create figure and axis objects.
 		# # matplotlib.rcParams['figure.figsize'] = [50, 50]		
-		# # matplotlib.rcParams['figure.figsize'] = [20, 20]
-		# matplotlib.rcParams['figure.figsize'] = [8, 8]
-		# # matplotlib.rcParams['figure.figsize'] = [4, 4]
+		# matplotlib.rcParams['figure.figsize'] = [20, 20]
+		matplotlib.rcParams['figure.figsize'] = [8, 8]
+		# matplotlib.rcParams['figure.figsize'] = [4, 4]
 		# # zoom_factor = 0.4
 		# # zoom_factor = 0.15
+		zoom_factor = 0.04
+
+		# # Good low res parameters: 
+		# matplotlib.rcParams['figure.figsize'] = [8, 8]
 		# zoom_factor = 0.04
 
-		# Good spaced out highres parameters: 
+		# # # Good spaced out highres parameters: 
 		matplotlib.rcParams['figure.figsize'] = [40, 40]
-		zoom_factor = 0.2
+		# zoom_factor = 0.2
+
+		# # For dense high res:
+		zoom_factor = 0.3
 
 		fig, ax = plt.subplots()
 
@@ -1266,7 +1283,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			if self.args.traj_segments:
 				print("Running Visualization on Robot Data.")	
 
-				self.visualize_robot_data(load_sets=True)
+				# self.visualize_robot_data(load_sets=True)
+				self.visualize_robot_data(load_sets=False)
 			else:
 				# Create save directory:
 				upper_dir_name = os.path.join(self.args.logdir,self.args.name,"MEval")
@@ -3813,7 +3831,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.target_dataset_size = len(self.target_manager.dataset) - self.target_manager.test_set_size
 
 		# Now create variables that we need. 
-		self.number_epochs = 200
+		self.number_epochs = self.args.epochs
 		self.extent = max(self.source_dataset_size, self.target_dataset_size)		
 
 		# Now setup networks for these PolicyManagers. 		
@@ -4005,6 +4023,29 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		else:
 			return None, None, None, None
 
+	def free_memory(self):
+
+		# Deleting objects from get_trajectory_visuals()
+		del self.source_trajectory_image, self.source_reconstruction_image, self.target_trajectory_image, self.target_reconstruction_image
+
+		# Deleting objects from get_embeddings()
+		del self.source_image, self.target_image, self.shared_image, self.toy_shared_embedding_image
+
+		# Deleting copies of objects in update_plots.
+		del self.viz_dictionary
+
+		# Remmoving nested objects. 
+		del self.source_manager.gt_gif_list, self.source_manager.rollout_gif_list, self.target_manager.gt_gif_list, self.target_manager.rollout_gif_list
+		# Setting lists so other functions don't complain.
+		self.source_manager.gt_gif_list = [] 
+		self.source_manager.rollout_gif_list = []
+		self.target_manager.gt_gif_list = []
+		self.target_manager.rollout_gif_list = []
+
+		# Remove nested gif objects. 
+		del self.source_manager.ground_truth_gif, self.source_manager.rollout_gif, self.target_manager.ground_truth_gif, self.target_manager.rollout_gif
+
+	@profile
 	def update_plots(self, counter, viz_dict):
 
 		# VAE Losses. 
@@ -4026,49 +4067,51 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		if counter%self.args.display_freq==0:
 
 			self.gt_gif_list = []
-			self.rollout_gif_list = []
+			self.rollout_gif_list = []			
+			self.viz_dictionary = {}
 
 			# Now using both TSNE and PCA. 
 			# Plot source, target, and shared embeddings via TSNE.
-			tsne_source_embedding, tsne_target_embedding, tsne_combined_embeddings, tsne_combined_traj_embeddings = self.get_embeddings(projection='tsne')
+			# tsne_source_embedding, tsne_target_embedding, tsne_combined_embeddings, tsne_combined_traj_embeddings = self.get_embeddings(projection='tsne')
+			self.viz_dictionary['tsne_source_embedding'], self.viz_dictionary['tsne_target_embedding'], self.viz_dictionary['tsne_combined_embeddings'], self.viz_dictionary['tsne_combined_traj_embeddings'] = self.get_embeddings(projection='tsne')
 
 			# Now actually plot the images.			
-			self.tf_logger.image_summary("TSNE Source Embedding", [tsne_source_embedding], counter)
-			self.tf_logger.image_summary("TSNE Target Embedding", [tsne_target_embedding], counter)
-			self.tf_logger.image_summary("TSNE Combined Embeddings", [tsne_combined_embeddings], counter)			
+			self.tf_logger.image_summary("TSNE Source Embedding", [self.viz_dictionary['tsne_source_embedding']], counter)
+			self.tf_logger.image_summary("TSNE Target Embedding", [self.viz_dictionary['tsne_target_embedding']], counter)
+			self.tf_logger.image_summary("TSNE Combined Embeddings", [self.viz_dictionary['tsne_combined_embeddings']], counter)			
 
 			# Plot source, target, and shared embeddings via PCA. 
-			pca_source_embedding, pca_target_embedding, pca_combined_embeddings, pca_combined_traj_embeddings = self.get_embeddings(projection='pca')
+			self.viz_dictionary['pca_source_embedding'], self.viz_dictionary['pca_target_embedding'], self.viz_dictionary['pca_combined_embeddings'], self.viz_dictionary['pca_combined_traj_embeddings'] = self.get_embeddings(projection='pca')
 
 			# Now actually plot the images.			
-			self.tf_logger.image_summary("PCA Source Embedding", [pca_source_embedding], counter)
-			self.tf_logger.image_summary("PCA Target Embedding", [pca_target_embedding], counter)
-			self.tf_logger.image_summary("PCA Combined Embeddings", [pca_combined_embeddings], counter)			
+			self.tf_logger.image_summary("PCA Source Embedding", [self.viz_dictionary['pca_source_embedding']], counter)
+			self.tf_logger.image_summary("PCA Target Embedding", [self.viz_dictionary['pca_target_embedding']], counter)
+			self.tf_logger.image_summary("PCA Combined Embeddings", [self.viz_dictionary['pca_combined_embeddings']], counter)			
 
 			if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':
-				self.tf_logger.image_summary("PCA Combined Trajectory Embeddings", [pca_combined_traj_embeddings], counter)
-				self.tf_logger.image_summary("TSNE Combined Trajectory Embeddings", [tsne_combined_traj_embeddings], counter)
+				self.tf_logger.image_summary("PCA Combined Trajectory Embeddings", [self.viz_dictionary['pca_combined_traj_embeddings']], counter)
+				self.tf_logger.image_summary("TSNE Combined Trajectory Embeddings", [self.viz_dictionary['tsne_combined_traj_embeddings']], counter)
 
 			# We are also going to log Ground Truth trajectories and their reconstructions in each of the domains, to make sure our networks are learning. 		
 			# Should be able to use the policy manager's functions to do this.
-			source_trajectory, source_reconstruction, target_trajectory, target_reconstruction = self.get_trajectory_visuals()
+			self.viz_dictionary['source_trajectory'], self.viz_dictionary['source_reconstruction'], self.viz_dictionary['target_trajectory'], self.viz_dictionary['target_reconstruction'] = self.get_trajectory_visuals()
 
-			if source_trajectory is not None:
+			if self.viz_dictionary['source_trajectory'] is not None:
 				# Now actually plot the images.
 
 				if self.args.source_domain=='ContinuousNonZero':
-					self.tf_logger.image_summary("Source Trajectory", [source_trajectory], counter)
-					self.tf_logger.image_summary("Source Reconstruction", [source_reconstruction], counter)
+					self.tf_logger.image_summary("Source Trajectory", [self.viz_dictionary['source_trajectory']], counter)
+					self.tf_logger.image_summary("Source Reconstruction", [self.viz_dictionary['source_reconstruction']], counter)
 				else:
-					self.tf_logger.gif_summary("Source Trajectory", [source_trajectory], counter)
-					self.tf_logger.gif_summary("Source Reconstruction", [source_reconstruction], counter)
+					self.tf_logger.gif_summary("Source Trajectory", [self.viz_dictionary['source_trajectory']], counter)
+					self.tf_logger.gif_summary("Source Reconstruction", [self.viz_dictionary['source_reconstruction']], counter)
 
 				if self.args.target_domain=='ContinuousNonZero':
-					self.tf_logger.image_summary("Target Trajectory", [target_trajectory], counter)
-					self.tf_logger.image_summary("Target Reconstruction", [target_reconstruction], counter)
+					self.tf_logger.image_summary("Target Trajectory", [self.viz_dictionary['target_trajectory']], counter)
+					self.tf_logger.image_summary("Target Reconstruction", [self.viz_dictionary['target_reconstruction']], counter)
 				else:
-					self.tf_logger.gif_summary("Target Trajectory", [target_trajectory], counter)
-					self.tf_logger.gif_summary("Target Reconstruction", [target_reconstruction], counter)
+					self.tf_logger.gif_summary("Target Trajectory", [self.viz_dictionary['target_trajectory']], counter)
+					self.tf_logger.gif_summary("Target Reconstruction", [self.viz_dictionary['target_reconstruction']], counter)
 
 			if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':
 				# Evaluate metrics and plot them. 
@@ -4078,6 +4121,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 				self.tf_logger.scalar_summary('Source To Target Trajectory Distance', self.source_target_trajectory_distance, counter)		
 				self.tf_logger.scalar_summary('Target To Source Trajectory Distance', self.target_source_trajectory_distance, counter)
+
+			# Clean up objects consuming memory. 			
+			self.free_memory()
+		
 
 	def get_transform(self, latent_z_set, projection='tsne', shared=False):
 
@@ -4120,7 +4167,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Simply just transform according to a fit transforming_object.
 		return transforming_object.transform(latent_z_set)
 
-	# @profile
+	@profile
 	def get_embeddings(self, projection='tsne'):
 		# Function to visualize source, target, and combined embeddings: 
 
@@ -4155,16 +4202,17 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			target_embedded_zs = self.transform_zs(self.target_latent_zs, pca)
 			shared_embedded_zs = np.concatenate([source_embedded_zs, target_embedded_zs],axis=0)
 
-		source_image = self.plot_embedding(source_embedded_zs, "Source_Embedding")
-		target_image = self.plot_embedding(target_embedded_zs, "Target_Embedding")
-		shared_image = self.plot_embedding(shared_embedded_zs, "Shared_Embedding", shared=True)	
+		self.source_image = self.plot_embedding(source_embedded_zs, "Source_Embedding")
+		self.target_image = self.plot_embedding(target_embedded_zs, "Target_Embedding")
+		self.shared_image = self.plot_embedding(shared_embedded_zs, "Shared_Embedding", shared=True)	
 
 		toy_shared_embedding_image = None
 		if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':			
-			toy_shared_embedding_image = self.plot_embedding(shared_embedded_zs, "Toy_Shared_Traj_Embedding", shared=True, trajectory=True)
+			self.toy_shared_embedding_image = self.plot_embedding(shared_embedded_zs, "Toy_Shared_Traj_Embedding", shared=True, trajectory=True)
 
-		return source_image, target_image, shared_image, toy_shared_embedding_image
+		return self.source_image, self.target_image, self.shared_image, self.toy_shared_embedding_image
 
+	@profile
 	def get_trajectory_visuals(self):
 
 		i = np.random.randint(0,high=self.extent)
@@ -4174,14 +4222,15 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		if source_trajectory is not None:
 			# Reconstruct using the source domain manager. 
-			_, source_trajectory_image, source_reconstruction_image = self.source_manager.get_robot_visuals(0, source_latent_z, source_trajectory, return_image=True)		
+			_, self.source_trajectory_image, self.source_reconstruction_image = self.source_manager.get_robot_visuals(0, source_latent_z, source_trajectory, return_image=True, return_numpy=True)
 
 			# Now repeat the same for target domain - First get a trajectory, starting point, and latent z.
 			target_trajectory, target_latent_z = self.encode_decode_trajectory(self.target_manager, i, return_trajectory=True)
 			# Reconstruct using the target domain manager. 
-			_, target_trajectory_image, target_reconstruction_image = self.target_manager.get_robot_visuals(0, target_latent_z, target_trajectory, return_image=True)		
+			_, self.target_trajectory_image, self.target_reconstruction_image = self.target_manager.get_robot_visuals(0, target_latent_z, target_trajectory, return_image=True, return_numpy=True)		
 
-			return np.array(source_trajectory_image), np.array(source_reconstruction_image), np.array(target_trajectory_image), np.array(target_reconstruction_image)
+			# return np.array(self.source_trajectory_image), np.array(self.source_reconstruction_image), np.array(self.target_trajectory_image), np.array(self.target_reconstruction_image)
+			return self.source_trajectory_image, self.source_reconstruction_image, self.target_trajectory_image, self.target_reconstruction_image	
 			
 		else: 
 			return None, None, None, None
@@ -4232,7 +4281,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Now go backward and take a step.
 			self.discriminator_loss.backward()
 			self.discriminator_optimizer.step()
-
+	
 	# @profile
 	def run_iteration(self, counter, i):
 
@@ -4275,7 +4324,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.update_plots(counter, viz_dict)
 
 	# Run memory profiling.
-	# @profile 
+	@profile
 	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False):	
 	
 		fig = plt.figure()
@@ -4318,8 +4367,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		fig.canvas.draw()
 		# Grab image.
 		width, height = fig.get_size_inches() * fig.get_dpi()
-		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)
+		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)		
 		image = np.transpose(image, axes=[2,0,1])
+
+		# Clear figure from memory.
+		ax.clear()
+		fig.clear()
+		plt.close(fig)
 
 		return image
 
@@ -4334,6 +4388,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		self.neighbor_obj_set = True
 
+	# @profile
 	def evaluate_correspondence_metrics(self, computed_sets=True):
 
 		print("Evaluating correspondence metrics.")
@@ -4376,6 +4431,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# target_neighbors_object = None
 		del self.source_neighbors_object
 		del self.target_neighbors_object
+		self.neighbor_obj_set = False		
 
 	def evaluate(self, model=None):
 
@@ -4605,7 +4661,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		#	#	 This discriminator loss is what is used to actually train the discriminators.		
 
 		# Get z discriminator logprobabilities.
-		z_discriminator_logprob, z_discriminator_prob = self.discriminator_network(dictionary['source_latent_z'])
+		z_discriminator_logprob, self.z_discriminator_prob = self.discriminator_network(dictionary['source_latent_z'])
 		# Compute discriminability loss. Remember, this is not used for training the discriminator, but rather the encoders.
 		self.z_discriminability_loss = self.negative_log_likelihood_loss_function(z_discriminator_logprob.squeeze(1), torch.tensor(1-dictionary['domain']).to(device).long().view(1,))
 
@@ -4632,9 +4688,9 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		original_action_sequence = dictionary['source_subpolicy_inputs_original'][:,source_policy_manager.state_dim:2*source_policy_manager.state_dim]
 
 		# Now evaluate likelihood of actions under the source decoder.
-		cycle_reconstructed_loglikelihood, _ = source_policy_manager.policy_network.forward(dictionary['source_subpolicy_inputs_crossdomain'], original_action_sequence)
+		self.cycle_reconstructed_loglikelihood, _ = source_policy_manager.policy_network.forward(dictionary['source_subpolicy_inputs_crossdomain'], original_action_sequence)
 		# Reweight the cycle reconstructed likelihood to construct the loss.
-		self.cycle_reconstruction_loss = -self.args.cycle_reconstruction_loss_weight*cycle_reconstructed_loglikelihood.mean()
+		self.cycle_reconstruction_loss = -self.args.cycle_reconstruction_loss_weight*self.cycle_reconstructed_loglikelihood.mean()
 
 		####################################
 		# Now that individual losses are computed, compute total loss, compute gradients, and then step.
@@ -4667,6 +4723,39 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 			# Now go backward and take a step.
 			self.z_discriminator_loss.backward()
 			self.discriminator_optimizer.step()
+
+	def update_plots(self, counter, viz_dict):
+
+		# # VAE Losses. 
+		# self.tf_logger.scalar_summary('Policy LogLikelihood', self.likelihood_loss, counter)
+		# self.tf_logger.scalar_summary('Discriminability Loss', self.discriminability_loss, counter)
+		# self.tf_logger.scalar_summary('Encoder KL', self.encoder_KL, counter)
+		# self.tf_logger.scalar_summary('VAE Loss', self.VAE_loss, counter)
+		# self.tf_logger.scalar_summary('Total VAE Loss', self.total_VAE_loss, counter)
+		# self.tf_logger.scalar_summary('Domain', viz_dict['domain'], counter)
+
+		# # Plot discriminator values after we've started training it. 
+		# if self.training_phase>1:
+		# 	# Discriminator Loss. 
+		# 	self.tf_logger.scalar_summary('Discriminator Loss', self.discriminator_loss, counter)
+		# 	# Compute discriminator prob of right action for logging. 
+		# 	self.tf_logger.scalar_summary('Discriminator Probability', viz_dict['discriminator_probs'], counter)
+		
+		# Relabeling losses so that we can use the update_plots of the parent class.
+		self.likelihood_loss = self.source_likelihood_loss
+		self.encoder_KL = self.source_encoder_KL
+		self.VAE_loss = self.source_reconstruction_loss
+				
+		self.discriminability_loss = self.z_discriminability_loss
+		self.discriminator_loss = self.z_discriminator_loss
+		viz_dict['discriminator_probs'] = self.z_discriminator_prob.mean().detach().cpu().numpy()
+
+		# Using super update_plots instead of implementing from scratch. 
+		super().update_plots(counter, viz_dict)
+		
+		# Adding additional summaries based on cycle reconstruction.
+		self.tf_logger.scalar_summary('Cycle Reconstructed Loglikelihood', self.cycle_reconstructed_loglikelihood.mean(), counter)
+		self.tf_logger.scalar_summary('Cycle Reconstruction Loss', self.cycle_reconstruction_loss, counter)
 
 	def run_iteration(self, counter, i):
 
@@ -4735,20 +4824,18 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		source_cross_domain_decoding_dict = self.cross_domain_decoding(dictionary['domain'], source_policy_manager, dictionary['target_latent_z'], start_state=dictionary['source_subpolicy_inputs_original'][0,:source_policy_manager.state_dim].detach().cpu().numpy())
 		dictionary['source_subpolicy_inputs_crossdomain'] = source_cross_domain_decoding_dict['subpolicy_inputs']
 
-		# ####################################
-		# # (4) Feed source and target latent z's to z_discriminator.
-		# ####################################
-
-		# self.compute_discriminator_losses(domain, dictionary['source_latent_z'])
-
 		####################################
 		# (4) Compute all losses, reweight, and take gradient steps.
 		####################################
 
+		# Update networks.
 		self.update_networks(dictionary, source_policy_manager)
 
-		# viz_dict = {'domain': domain, 'discriminator_probs': discriminator_prob.squeeze(0).squeeze(0)[domain].detach().cpu().numpy()}			
-		# self.update_plots(counter, viz_dict)
+		####################################
+		# (5) Accumulate and plot statistics of training.
+		####################################
+		
+		self.update_plots(counter, dictionary)
 
 		# Encode decode function: First encodes, takes trajectory segment, and outputs latent z. The latent z is then provided to decoder (along with initial state), and then we get SOURCE domain subpolicy inputs. 
 		# Cross domain decoding function: Takes encoded latent z (and start state), and then rolls out with target decoder. Function returns, target trajectory, action sequence, and TARGET domain subpolicy inputs. 
