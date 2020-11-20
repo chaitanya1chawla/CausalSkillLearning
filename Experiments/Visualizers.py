@@ -332,7 +332,7 @@ class ToyDataVisualizer():
 
 		pass
 
-	@profile
+	# @profile
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None):
 
 		fig = plt.figure()		
