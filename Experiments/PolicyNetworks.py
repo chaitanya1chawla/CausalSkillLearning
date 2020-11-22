@@ -1317,11 +1317,11 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		######################################
 		# CASE 2:  If we're not over max limt, but over the typical skill time length.
 		######################################
-		condition_2 = torch.tensor((elapsed_t>=skill_time_limit).astype(int)*(elapsed_t<max_limit).astype(int)).to(device).float()		
-		# case_2_value = np.repeat(case_2_block, , )
+		condition_2 = torch.tensor((elapsed_t>=skill_time_limit).astype(int)*(elapsed_t<max_limit).astype(int)).to(device).float()
 
-		# sel_indices = np.where(elapsed_t>=skill_time_limit)[0]
-		intermediate_values = np.max([np.zeros_like(delt,dtype=int),delt.astype(int)],axis=0)
+		sel_indices = np.where(elapsed_t>=skill_time_limit)[0]
+		intermediate_values = np.min([np.ones_like(delt,dtype=int)*3,np.max([np.zeros_like(delt,dtype=int),delt.astype(int)],axis=0)],axis=0)
+
 		# Create basic building block that's going to repeat, that we use for the var_skill_length=0 case. 
 		block = np.array([[0,1]])
 		block_repeat = np.repeat(block, self.args.batch_size, axis=0)
@@ -1342,49 +1342,6 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		######################################		
 		prior_value = condition_1.unsqueeze(1)*case_1_value + condition_2.unsqueeze(1)*case_2_value + condition_3.unsqueeze(1)*case_3_value
 		
-		# # set_prior_values = self.args.var_skill_length*prob_biases[intermediate_values] + \
-		# 	# (1-self.args.var_skill_length)*block_repeat
-
-		# # set_prior_values = self.args.var_skill_length*prob_biases[intermediate_values[sel_indices]] + \
-		# # 	(1-self.args.var_skill_length)*block_repeat
-		
-		# # Copy over the set_prior_value. 
-		# prior_value[sel_indices] = torch.tensor(set_prior_values).to(device).float()
-
-		# ######################################
-		# # CASE 1: If we're over the max limit:
-		# ######################################
-		# # Make prior suggest selecting stop / next skill by a factor of 1. 
-		# prior_value[:,1] = torch.tensor((elapsed_t>=max_limit).astype(int)).to(device).float()
-		
-		# ######################################
-		# # CASE 2: If we're not over max limt, but over the typical skill time length.
-		# ######################################
-		# sel_indices = np.where(elapsed_t>=skill_time_limit)[0]
-		# intermediate_values = np.max([np.zeros_like(delt,dtype=int),delt.astype(int)],axis=0)
-		# # Create basic building block that's going to repeat, that we use for the var_skill_length=0 case. 
-		# block = np.array([[0,1]])
-		# block_repeat = np.repeat(block, sel_indices.shape[0], axis=0)
-		# # Create array that sets values based on var_skill_length cases. 
-
-		# print("Embedding in prior computation!")
-		# print("TIME: ",elapsed_t)
-		# print("Prior: ",prior_value)
-		# embed()	
-
-		# set_prior_values = self.args.var_skill_length*prob_biases[intermediate_values[sel_indices]] + \
-		# 	(1-self.args.var_skill_length)*block_repeat
-		
-		# # Copy over the set_prior_value. 
-		# prior_value[sel_indices] = torch.tensor(set_prior_values).to(device).float()
-
-		# ######################################
-		# # CASE 3: If we're not over either the max limit or the typical skill time length.
-		# ######################################
-
-		# # Make prior suggest continuing the same skill by a factor of 1. 
-		# prior_value[:,0] = torch.tensor((elapsed_t<skill_time_limit).astype(int)).to(device).float()
-					
 		# Now return prior value. 
 		return prior_value
 
@@ -1457,7 +1414,7 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 			delta_t = t-prev_time
 			
 			# Compute prior value. 
-			print("SAMPLED B: ", sampled_b[:t])
+			# print("SAMPLED B: ", sampled_b[:t])
 			prior_values[t] = self.get_prior_value(delta_t, max_limit=self.args.skill_length)
 
 			# Construct probabilities.
@@ -1524,10 +1481,11 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 				# if sampled_b[t]==0:
 					# sampled_z_index[t] = sampled_z_index[t-1]		
 
-				sampled_z_indices[t, torch.where(sampled_b[t]==1)[0]] = sampled_z_index[t-1, torch.where(sampled_b[t]==1)[0]]
+				sampled_z_index[t, torch.where(sampled_b[t]==1)[0]] = sampled_z_index[t-1, torch.where(sampled_b[t]==1)[0]]
 
-		print("Embedding in batch variational network forward.")
-		embed()
+		# print("Embedding in batch variational network forward.")
+		# embed()
+
 		# Also compute logprobabilities of the latent_z's sampled from this net. 
 		variational_z_logprobabilities = self.dists.log_prob(sampled_z_index.unsqueeze(1))
 		variational_z_probabilities = None
