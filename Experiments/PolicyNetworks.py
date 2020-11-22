@@ -1146,7 +1146,7 @@ class ContinuousVariationalPolicyNetwork_ConstrainedBPrior(ContinuousVariational
 
 	def forward(self, input, epsilon, new_z_selection=True):
 
-		# Input Format must be: Sequence_Length x 1 x Input_Size. 	
+		# Input Format must be: Sequence_Length x Batch_Size x Input_Size. 	
 		format_input = input.view((input.shape[0], self.batch_size, self.input_size))
 		hidden = None
 		outputs, hidden = self.lstm(format_input)
@@ -1172,9 +1172,12 @@ class ContinuousVariationalPolicyNetwork_ConstrainedBPrior(ContinuousVariational
 		#######################################
 		################ Set B ################
 		#######################################
-
+		
 		# Set the first b to 1, and the time b was == 1. 		
 		sampled_b = torch.zeros(input.shape[0]).to(device).int()
+		# Changing to batching.. 
+		sampled_b = torch.zeros(input.shape[0], self.args.batch_size).to(device).int()
+
 		sampled_b[0] = 1
 		prev_time = 0
 
@@ -1184,7 +1187,7 @@ class ContinuousVariationalPolicyNetwork_ConstrainedBPrior(ContinuousVariational
 			delta_t = t-prev_time
 			# Compute prior value. 
 			prior_values[t] = self.get_prior_value(delta_t, max_limit=self.args.skill_length)
-
+			
 			# Construct probabilities.
 			variational_b_probabilities[t,0,:] = self.batch_softmax_layer(variational_b_preprobabilities[t,0] + prior_values[t,0])
 			variational_b_logprobabilities[t,0,:] = self.batch_logsoftmax_layer(variational_b_preprobabilities[t,0] + prior_values[t,0])
@@ -1245,6 +1248,286 @@ class ContinuousVariationalPolicyNetwork_ConstrainedBPrior(ContinuousVariational
 				if sampled_b[t]==0:
 					sampled_z_index[t] = sampled_z_index[t-1]		
 
+		# Also compute logprobabilities of the latent_z's sampled from this net. 
+		variational_z_logprobabilities = self.dists.log_prob(sampled_z_index.unsqueeze(1))
+		variational_z_probabilities = None
+
+		# Set standard distribution for KL. 
+		standard_distribution = torch.distributions.MultivariateNormal(torch.zeros((self.output_size)).to(device),torch.eye((self.output_size)).to(device))
+		# Compute KL.
+		kl_divergence = torch.distributions.kl_divergence(self.dists, standard_distribution)
+
+		# Prior loglikelihood
+		prior_loglikelihood = standard_distribution.log_prob(sampled_z_index)
+
+		if self.args.debug:
+			print("#################################")
+			print("Embedding in Variational Network.")
+			embed()
+
+		return sampled_z_index, sampled_b, variational_b_logprobabilities.squeeze(1), \
+		 variational_z_logprobabilities, variational_b_probabilities.squeeze(1), variational_z_probabilities, kl_divergence, prior_loglikelihood
+
+class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwork_ConstrainedBPrior):
+
+	def __init__(self, input_size, hidden_size, z_dimensions, args, number_layers=4):
+		
+		super(ContinuousVariationalPolicyNetwork_Batch, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)
+	
+	def get_prior_value(self, elapsed_t, max_limit=5):
+		
+		skill_time_limit = max_limit-1
+		
+
+		if self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
+			# If allowing variable skill length, set length for this sample.				
+			if self.args.var_skill_length:
+				# Choose length of 12-16 with certain probabilities. 
+				lens = np.array([12,13,14,15,16])
+				# probabilities = np.array([0.1,0.2,0.4,0.2,0.1])
+				prob_biases = np.array([[0.8,0.],[0.4,0.],[0.,0.],[0.,0.4]])				
+
+				max_limit = 16
+				skill_time_limit = 12
+
+			else:
+				max_limit = 20
+				skill_time_limit = max_limit-1	
+
+		# Compute elapsed time - skill time limit.
+		delt = elapsed_t-skill_time_limit
+
+		# Initialize prior vlaues. 
+		prior_value = torch.zeros((self.args.batch_size,2)).to(device).float()
+		
+		# Since we're evaluating multiple conditions over the batch, don't do this with if-else structures. 
+		# Instead, set values of prior based on which of the following cases they fall into. 			
+		# print("Embedding in prior computation!")
+		# print("TIME: ",elapsed_t)
+		# print("Prior: ",prior_value)
+		# embed()	
+
+		######################################
+		# CASE 1: If we're over the max limit:
+		######################################
+		condition_1 = torch.tensor((elapsed_t>=max_limit).astype(int)).to(device).float()
+		case_1_block = np.array([[0,1]])
+		case_1_value = torch.tensor(np.repeat(case_1_block, self.args.batch_size, axis=0)).to(device).float()
+
+		######################################
+		# CASE 2:  If we're not over max limt, but over the typical skill time length.
+		######################################
+		condition_2 = torch.tensor((elapsed_t>=skill_time_limit).astype(int)*(elapsed_t<max_limit).astype(int)).to(device).float()		
+		# case_2_value = np.repeat(case_2_block, , )
+
+		# sel_indices = np.where(elapsed_t>=skill_time_limit)[0]
+		intermediate_values = np.max([np.zeros_like(delt,dtype=int),delt.astype(int)],axis=0)
+		# Create basic building block that's going to repeat, that we use for the var_skill_length=0 case. 
+		block = np.array([[0,1]])
+		block_repeat = np.repeat(block, self.args.batch_size, axis=0)
+
+		# Create array that sets values based on var_skill_length cases. 
+		case_2_value = torch.tensor((self.args.var_skill_length*prob_biases[intermediate_values]) + \
+			(1-self.args.var_skill_length)*block_repeat).to(device).float()
+
+		######################################
+		# CASE 3: If we're not over either the max limit or the typical skill time length.
+		######################################
+		condition_3 = torch.tensor((elapsed_t<skill_time_limit).astype(int)).to(device).float()
+		case_3_block = np.array([[1,0]])
+		case_3_value = torch.tensor(np.repeat(case_3_block, self.args.batch_size, axis=0)).to(device).float()
+
+		######################################
+		# Now set the prior values. 
+		######################################		
+		prior_value = condition_1.unsqueeze(1)*case_1_value + condition_2.unsqueeze(1)*case_2_value + condition_3.unsqueeze(1)*case_3_value
+		
+		# # set_prior_values = self.args.var_skill_length*prob_biases[intermediate_values] + \
+		# 	# (1-self.args.var_skill_length)*block_repeat
+
+		# # set_prior_values = self.args.var_skill_length*prob_biases[intermediate_values[sel_indices]] + \
+		# # 	(1-self.args.var_skill_length)*block_repeat
+		
+		# # Copy over the set_prior_value. 
+		# prior_value[sel_indices] = torch.tensor(set_prior_values).to(device).float()
+
+		# ######################################
+		# # CASE 1: If we're over the max limit:
+		# ######################################
+		# # Make prior suggest selecting stop / next skill by a factor of 1. 
+		# prior_value[:,1] = torch.tensor((elapsed_t>=max_limit).astype(int)).to(device).float()
+		
+		# ######################################
+		# # CASE 2: If we're not over max limt, but over the typical skill time length.
+		# ######################################
+		# sel_indices = np.where(elapsed_t>=skill_time_limit)[0]
+		# intermediate_values = np.max([np.zeros_like(delt,dtype=int),delt.astype(int)],axis=0)
+		# # Create basic building block that's going to repeat, that we use for the var_skill_length=0 case. 
+		# block = np.array([[0,1]])
+		# block_repeat = np.repeat(block, sel_indices.shape[0], axis=0)
+		# # Create array that sets values based on var_skill_length cases. 
+
+		# print("Embedding in prior computation!")
+		# print("TIME: ",elapsed_t)
+		# print("Prior: ",prior_value)
+		# embed()	
+
+		# set_prior_values = self.args.var_skill_length*prob_biases[intermediate_values[sel_indices]] + \
+		# 	(1-self.args.var_skill_length)*block_repeat
+		
+		# # Copy over the set_prior_value. 
+		# prior_value[sel_indices] = torch.tensor(set_prior_values).to(device).float()
+
+		# ######################################
+		# # CASE 3: If we're not over either the max limit or the typical skill time length.
+		# ######################################
+
+		# # Make prior suggest continuing the same skill by a factor of 1. 
+		# prior_value[:,0] = torch.tensor((elapsed_t<skill_time_limit).astype(int)).to(device).float()
+					
+		# Now return prior value. 
+		return prior_value
+
+		####################################
+		####################################
+		# Unbatched prior computation. 
+		# # If at or over hard limit.
+		# if elapsed_t>=max_limit:
+		# 	prior_value[0,1]=1.
+
+		# # If at or more than typical, less than hard limit:
+		# elif elapsed_t>=skill_time_limit:
+	
+		# 	if self.args.var_skill_length:
+		# 		prior_value[0] = torch.tensor(prob_biases[elapsed_t-skill_time_limit]).to(device).float()
+		# 	else:
+		# 		# Random
+		# 		prior_value[0,1]=0. 
+
+		# # If less than typical. 
+		# else:
+		# 	# Continue.
+		# 	prior_value[0,0]=1.
+
+		# return prior_value
+		####################################
+		####################################
+
+	def forward(self, input, epsilon, new_z_selection=True):
+
+		# Input Format must be: Sequence_Length x Batch_Size x Input_Size. 	
+		format_input = input.view((input.shape[0], self.batch_size, self.input_size))
+		hidden = None
+		outputs, hidden = self.lstm(format_input)
+
+		# Damping factor for probabilities to prevent washing out of bias. 
+		variational_b_preprobabilities = self.termination_output_layer(outputs)*self.b_probability_factor
+
+		# Predict Gaussian means and variances. 
+		if self.args.mean_nonlinearity:
+			mean_outputs = self.activation_layer(self.mean_output_layer(outputs))
+		else:
+			mean_outputs = self.mean_output_layer(outputs)
+		# Still need a softplus activation for variance because needs to be positive. 
+		variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(outputs))+self.variance_activation_bias) + epsilon
+		# This should be a SET of distributions. 
+		self.dists = torch.distributions.MultivariateNormal(mean_outputs, torch.diag_embed(variance_outputs))
+
+		# Create variables for prior and probabilities.
+		prior_values = torch.zeros_like(variational_b_preprobabilities).to(device).float()
+		variational_b_probabilities = torch.zeros_like(variational_b_preprobabilities).to(device).float()
+		variational_b_logprobabilities = torch.zeros_like(variational_b_preprobabilities).to(device).float()
+
+		#######################################
+		################ Set B ################
+		#######################################
+		
+		# Set the first b to 1, and the time b was == 1. 		
+		# sampled_b = torch.zeros(input.shape[0]).to(device).int()
+		# Changing to batching.. 
+		sampled_b = torch.zeros(input.shape[0], self.args.batch_size).to(device).int()
+		sampled_b[0] = 1
+
+		prev_time = np.zeros((self.args.batch_size))
+		# prev_time = 0
+
+		for t in range(1,input.shape[0]):
+			
+			# Compute time since the last b occurred. 			
+			delta_t = t-prev_time
+			
+			# Compute prior value. 
+			print("SAMPLED B: ", sampled_b[:t])
+			prior_values[t] = self.get_prior_value(delta_t, max_limit=self.args.skill_length)
+
+			# Construct probabilities.
+			variational_b_probabilities[t] = self.batch_softmax_layer(variational_b_preprobabilities[t] + prior_values[t])
+			variational_b_logprobabilities[t] = self.batch_logsoftmax_layer(variational_b_preprobabilities[t] + prior_values[t])
+
+			############################
+			# Batching versions of implementing hard restriction of selection of B's.
+			############################
+
+			# CASE 1: If we haven't reached the minimum skill execution time. 
+			condition_1 = torch.tensor((delta_t<self.min_skill_time).astype(int)).to(device)
+			
+			# CASE 2: If execution time is over the minimum skill execution time, but less than the maximum:
+			condition_2 = torch.tensor((delta_t>=self.min_skill_time).astype(int)*(delta_t<self.max_skill_time).astype(int)).to(device)
+			
+			# CASE 3: If we have reached the maximum skill execution time.
+			condition_3 = torch.tensor((delta_t>=self.max_skill_time).astype(int)).to(device)
+
+			sampled_b[t] = condition_1*torch.zeros(1).to(device).float() + (condition_2*self.select_epsilon_greedy_action(variational_b_probabilities[t:t+1], epsilon)).squeeze(0) + \
+				condition_3*torch.ones(1).to(device).float()
+
+			# Now if sampled_b[t] ==1, set the prev_time of that batch element to current time t. 
+			# Otherwise, let prev_time stay prev_time.
+			# Maybe a safer way to execute this: 
+			prev_time[(torch.where(sampled_b[t]==1)[0]).cpu().detach().numpy()] = t		
+
+		#######################################
+		################ Set Z ################
+		#######################################
+
+		
+		# Now set the z's. If greedy, just return the means. 
+		if epsilon==0.:
+			sampled_z_index = mean_outputs.squeeze(1)
+		# If not greedy, then reparameterize. 
+		else:
+			# Whether to use reparametrization trick to retrieve the latent_z's.
+			if self.args.train:
+				noise = torch.randn_like(variance_outputs)
+
+				# Instead of *sampling* the latent z from a distribution, construct using mu + sig * eps (random noise).
+				sampled_z_index = mean_outputs + variance_outputs*noise
+				# Ought to be able to pass gradients through this latent_z now.
+
+				sampled_z_index = sampled_z_index.squeeze(1)
+
+			# If evaluating, greedily get action.
+			else:
+				sampled_z_index = mean_outputs.squeeze(1)
+		
+		# Modify z's based on whether b was 1 or 0. This part should remain the same.		
+		if new_z_selection:
+			
+			# Set initial b to 1. 
+			sampled_b[0] = 1
+
+			# Initial z is already trivially set. 
+			for t in range(1,input.shape[0]):
+				# If b_t==0, just use previous z. 
+				# If b_t==1, sample new z. Here, we've cloned this from sampled_z's, so there's no need to do anything. 
+
+				# Replacing this block with a batch friendly version.
+				# if sampled_b[t]==0:
+					# sampled_z_index[t] = sampled_z_index[t-1]		
+
+				sampled_z_indices[t, torch.where(sampled_b[t]==1)[0]] = sampled_z_index[t-1, torch.where(sampled_b[t]==1)[0]]
+
+		print("Embedding in batch variational network forward.")
+		embed()
 		# Also compute logprobabilities of the latent_z's sampled from this net. 
 		variational_z_logprobabilities = self.dists.log_prob(sampled_z_index.unsqueeze(1))
 		variational_z_probabilities = None

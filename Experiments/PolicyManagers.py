@@ -1701,7 +1701,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		else:
 			# self.policy_network = ContinuousPolicyNetwork(self.input_size,self.hidden_size,self.output_size,self.latent_z_dimensionality, self.number_layers).to(device)
-			self.policy_network = ContinuousPolicyNetwork(self.input_size, self.hidden_size, self.output_size, self.args, self.number_layers).to(device)			
+			self.policy_network = ContinuousPolicyNetwork(self.input_size, self.hidden_size, self.output_size, self.args, self.number_layers).to(device)
 
 			if self.args.constrained_b_prior:
 				self.latent_policy = ContinuousLatentPolicyNetwork_ConstrainedBPrior(self.input_size+self.conditional_info_size, self.hidden_size, self.args, self.number_layers).to(device)
@@ -2422,7 +2422,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		############# (0) #############
 		# Get sample we're going to train on. Single sample as of now. 		
-		sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj = self.collect_inputs(i)
+		sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj = self.collect_inputs(i)			
 
 		if sample_traj is not None:
 			############# (1) #############
@@ -2565,6 +2565,129 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		if self.args.debug:
 			embed()
+
+class PolicyManager_BatchJoint(PolicyManager_Joint):
+
+	def __init__(self, number_policies=4, dataset=None, args=None):
+
+		super(PolicyManager_BatchJoint, self).__init__(number_policies, dataset, args)
+
+	def create_networks(self):
+
+		# Create instances of networks. 
+		self.policy_network = ContinuousPolicyNetwork(self.input_size, self.hidden_size, self.output_size, self.args, self.number_layers).to(device)
+		self.latent_policy = ContinuousLatentPolicyNetwork_ConstrainedBPrior(self.input_size+self.conditional_info_size, self.hidden_size, self.args, self.number_layers).to(device)
+
+		if self.args.batch_size > 1:			
+			self.variational_policy = ContinuousVariationalPolicyNetwork_Batch(self.input_size, self.hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.number_layers).to(device)
+		else:			
+			self.variational_policy = ContinuousVariationalPolicyNetwork_ConstrainedBPrior(self.input_size, self.hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.number_layers).to(device)
+
+	# Batch concatenation functions. 
+	def concat_state_action(self, sample_traj, sample_action_seq):
+		# Add blank to start of action sequence and then concatenate. 
+		sample_action_seq = np.concatenate([np.zeros((self.args.batch_size,1,self.output_size)),sample_action_seq],axis=1)
+
+		# Currently returns: 
+		# s0, s1, s2, s3, ..., sn-1, sn
+		#  _, a0, a1, a2, ..., an_1, an
+		return np.concatenate([sample_traj, sample_action_seq],axis=-1)
+
+	def old_concat_state_action(self, sample_traj, sample_action_seq):
+		sample_action_seq = np.concatenate([sample_action_seq, np.zeros((self.args.batch_size,1,self.output_size))],axis=1)
+		return np.concatenate([sample_traj, sample_action_seq],axis=-1)
+		
+	# def get_batch_element(self, i):
+
+	# 	# Make data_element a list of dictionaries. 
+	# 	data_element = []
+
+	# 	for b in range(i,i+self.args.batch_size):	
+	# 		data_element.append(self.dataset[b])
+
+	# 	return data_element
+
+	def get_batch_element(self, i):
+		# Make data_element a list of dictionaries. 
+		data_element = np.array([self.dataset[b] for b in range(i,i+self.args.batch_size)])
+		# for b in range(i,i+self.args.batch_size):	
+		# 	data_element.append(self.dataset[b])
+
+		return data_element
+
+	# Get batch full trajectory. 
+	def collect_inputs(self, i, get_latents=False):
+
+		# Toy Data
+		if self.args.data=='DeterGoal' or self.args.data=='ContinuousNonZero':
+
+			# Sample trajectory segment from dataset. 
+			sample_traj, sample_action_seq = self.dataset[i:i+self.args.batch_size]
+
+			concatenated_traj = self.concat_state_action(sample_traj, sample_action_seq)		
+			old_concatenated_traj = self.old_concat_state_action(sample_traj, sample_action_seq)
+
+			if self.args.data=='DeterGoal':
+				self.conditional_information = np.zeros((self.args.condition_size))
+				self.conditional_information[self.dataset.get_goal(i)] = 1
+				self.conditional_information[4:] = self.dataset.get_goal_position[i]
+			else:
+				self.conditional_information = np.zeros((self.args.condition_size))
+
+			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
+
+		elif self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
+                       
+			if self.args.data=='MIME' or self.args.data=='Mocap':
+				data_element = self.dataset[i:i+self.args.batch_size]
+			else:
+				data_element = self.get_batch_element(i)
+			
+			# Get trajectory lengths across batch, to be able to create masks for losses. 
+			self.batch_trajectory_lengths = np.zeros((self.args.batch_size), dtype=int)
+			for x in range(self.args.batch_size):
+				self.batch_trajectory_lengths[x] = data_element[x]['demo'].shape[0]						
+			self.max_batch_traj_length = self.batch_trajectory_lengths.max()
+
+			# Create batch object that stores trajectories. 
+			batch_trajectory = np.zeros((self.args.batch_size, self.max_batch_traj_length, self.state_size))
+			# Copy over data elements into batch_trajectory array.
+			for x in range(self.args.batch_size):
+				batch_trajectory[x,:self.batch_trajectory_lengths[x]] = data_element[x]['demo']
+			
+			# If normalization is set to some value.
+			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
+				batch_trajectory = (batch_trajectory-self.norm_sub_value)/self.norm_denom_value
+
+			# Set condiitonal information. 
+			if self.args.data=='MIME':
+				self.conditional_information = np.zeros((self.conditional_info_size))				
+			elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
+				robot_states = data_element['robot-state']
+				object_states = data_element['object-state']
+
+				self.conditional_information = np.zeros((self.conditional_info_size))
+				# Don't set this if pretraining / baseline.
+				if self.args.setting=='learntsub' or self.args.setting=='imitation':
+					self.conditional_information = np.zeros((len(trajectory),self.conditional_info_size))
+					self.conditional_information[:,:self.cond_robot_state_size] = robot_states
+					# Doing this instead of self.cond_robot_state_size: because the object_states size varies across demonstrations.
+					self.conditional_information[:,self.cond_robot_state_size:self.cond_robot_state_size+object_states.shape[-1]] = object_states	
+					# Setting task ID too.		
+					self.conditional_information[:,-self.number_tasks+data_element['task-id']] = 1.
+
+			# Compute actions.
+			action_sequence = np.diff(batch_trajectory,axis=1)
+
+			# Concatenate
+			concatenated_traj = self.concat_state_action(batch_trajectory, action_sequence)
+			old_concatenated_traj = self.old_concat_state_action(batch_trajectory, action_sequence)
+
+			# Scaling action sequence by some factor.             
+			scaled_action_sequence = self.args.action_scale_factor*action_sequence
+
+			return batch_trajectory.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))			
+			# return batch_trajectory, action_sequence, concatenated_traj, old_concatenated_traj
 
 class PolicyManager_BaselineRL(PolicyManager_BaseClass):
 
