@@ -1844,10 +1844,21 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			latent_rollout_distance = ((self.latent_trajectory_rollout-sample_traj)**2).mean()
 
 		return var_rollout_distance, latent_rollout_distance
-
+	
 	# @gpu_profile
-	def update_plots(self, counter, i, subpolicy_loglikelihood, latent_loglikelihood, subpolicy_entropy, sample_traj, latent_z_logprobability, latent_b_logprobability, kl_divergence, prior_loglikelihood):
+	def update_plots(self, counter, i, input_dictionary, variational_dict, eval_likelihood_dict):
+	
 
+		# Parse dictionaries: 
+		sample_traj = input_dictionary['sample_traj']
+		kl_divergence = variational_dict['kl_divergence']
+		prior_loglikelihood = variational_dict['prior_loglikelihood']
+		subpolicy_loglikelihood = eval_likelihood_dict['learnt_subpolicy_loglikelihood']
+		latent_loglikelihood = eval_likelihood_dict['latent_loglikelihood']
+		# subpolicy_entropy = eval_likelihood_dict['subpolicy_entropy']
+		latent_z_logprobability = eval_likelihood_dict['latent_z_logprobability']
+		latent_b_logprobability = eval_likelihood_dict['latent_b_logprobability']
+		
 		self.tf_logger.scalar_summary('Latent Policy Loss', torch.mean(self.total_latent_loss), counter)
 		self.tf_logger.scalar_summary('SubPolicy Log Likelihood', subpolicy_loglikelihood.mean(), counter)
 		self.tf_logger.scalar_summary('Latent Log Likelihood', latent_loglikelihood.mean(), counter)	
@@ -1864,7 +1875,10 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		if counter%self.args.display_freq==0:
 			# Now adding visuals for MIME, so it doesn't depend what data we use.
-			variational_rollout_image, latent_rollout_image = self.rollout_visuals(counter, i)
+			if self.args.batch_size>1:
+				variational_rollout_image, latent_rollout_image = self.rollout_visuals(counter, i, variational_dict)
+			else: 
+				variational_rollout_image, latent_rollout_image = self.rollout_visuals(counter, i)
 
 			# Compute distance metrics. 
 			var_dist, latent_dist = self.compute_evaluation_metrics(sample_traj, counter, i)
@@ -1975,7 +1989,20 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# Force encoder to use original variance for eval.
 		self.encoder_network.variance_factor = 1.
 
-	def evaluate_loglikelihoods(self, sample_traj, sample_action_seq, concatenated_traj, latent_z_indices, latent_b):
+	def evaluate_loglikelihoods(self, input_dictionary, variational_dict):
+		
+		###########################
+		# Parse dictionaries. 
+		###########################
+		sample_traj = input_dictionary['sample_traj']
+		sample_action_seq = input_dictionary['sample_action_seq']
+		concatenated_traj = input_dictionary['concatenated_traj']
+		latent_z_indices = variational_dict['latent_z_indices']
+		latent_b = variational_dict['latent_b']
+
+		###########################
+		# Initialize variables. 
+		###########################
 
 		# Initialize both loglikelihoods to 0. 
 		subpolicy_loglikelihood = 0.
@@ -2076,20 +2103,76 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				print("Embedding in the Evaluate Likelihoods Function.")
 				embed()
 
-		return None, None, None, latent_loglikelihood, \
-		 latent_b_logprobabilities, latent_z_logprobabilities, latent_b_probabilities, latent_z_probabilities, \
-		 latent_z_logprobability, latent_b_logprobability, learnt_subpolicy_loglikelihood, learnt_subpolicy_loglikelihoods, temporal_loglikelihoods
+		# return None, None, None, latent_loglikelihood, \
+		#  latent_b_logprobabilities, latent_z_logprobabilities, latent_b_probabilities, latent_z_probabilities, \
+		#  latent_z_logprobability, latent_b_logprobability, learnt_subpolicy_loglikelihood, learnt_subpolicy_loglikelihoods, temporal_loglikelihoods
 
-	def new_update_policies(self, i, sample_action_seq, subpolicy_loglikelihoods, subpolicy_entropy, latent_b, latent_z_indices,\
-		variational_z_logprobabilities, variational_b_logprobabilities, variational_z_probabilities, variational_b_probabilities, kl_divergence, \
-		latent_z_logprobabilities, latent_b_logprobabilities, latent_z_probabilities, latent_b_probabilities, \
-		learnt_subpolicy_loglikelihood, learnt_subpolicy_loglikelihoods, loglikelihood, prior_loglikelihood, latent_loglikelihood, temporal_loglikelihoods):
+		# Parse return objects into dicitonary. 
+		return_dict = {}
+		return_dict['latent_loglikelihood'] = latent_loglikelihood
+		return_dict['latent_b_logprobabilities'] = latent_b_logprobabilities
+		return_dict['latent_z_logprobabilities'] = latent_z_logprobabilities
+		return_dict['latent_b_probabilities'] = latent_b_probabilities
+		return_dict['latent_z_probabilities'] = latent_z_probabilities
+		return_dict['latent_z_logprobability'] = latent_z_logprobability
+		return_dict['latent_b_logprobability'] = latent_b_logprobability
+		return_dict['learnt_subpolicy_loglikelihood'] = learnt_subpolicy_loglikelihood
+		return_dict['learnt_subpolicy_loglikelihoods'] = learnt_subpolicy_loglikelihoods
+		return_dict['temporal_loglikelihoods'] = temporal_loglikelihoods
+
+		return return_dict
+
+	def set_batch_mask(self):
+
+		# self.set_batch_mask = torch.ones((1, self.current_traj_len))
+		# Remember, dimensions are time x batch.
+		self.set_batch_mask = torch.ones((self.current_traj_len,1))
+
+	def new_update_policies(self, i, input_dictionary, variational_dict, eval_likelihood_dict):
+
+		######################################################
+		############### Parse dictionaries. ##################
+		######################################################
+
+		sample_action_seq = input_dictionary['sample_action_seq']
+
+		latent_b = variational_dict['latent_b']
+		latent_z_indices = variational_dict['latent_z_indices']
+		variational_z_logprobabilities = variational_dict['variational_z_logprobabilities']
+		variational_b_logprobabilities = variational_dict['variational_b_logprobabilities']
+		variational_z_probabilities = variational_dict['variational_z_probabilities']
+		variational_b_probabilities = variational_dict['variational_b_probabilities']
+		kl_divergence = variational_dict['kl_divergence']
+		prior_loglikelihood = variational_dict['prior_loglikelihood']
+
+		latent_z_logprobabilities = eval_likelihood_dict['latent_z_logprobabilities']
+		latent_b_logprobabilities = eval_likelihood_dict['latent_b_logprobabilities']
+		latent_z_probabilities = eval_likelihood_dict['latent_z_probabilities']
+		latent_b_probabilities = eval_likelihood_dict['latent_b_probabilities']
+		learnt_subpolicy_loglikelihood = eval_likelihood_dict['learnt_subpolicy_loglikelihood']
+		learnt_subpolicy_loglikelihoods = eval_likelihood_dict['learnt_subpolicy_loglikelihoods']
+		latent_loglikelihood = eval_likelihood_dict['latent_loglikelihood']
+		temporal_loglikelihoods = eval_likelihood_dict['temporal_loglikelihoods']
+
+		loglikelihood = learnt_subpolicy_loglikelihood+latent_loglikelihood
+
+		######################################################
+		########### Initialize things for func, ##############
+		######################################################
 
 		# Set optimizer gradients to zero.
 		self.optimizer.zero_grad()
 
+		# Set batch mask. For batch_size = 1, this is just an array of ones the length of the trajectory. 
+		# For batch_size>1, this is an array of size B x Max length of batch size, with 1's for each batch element till that element's trajectory length. 
+		# This way the update policies function is inherited for batch joint training. Only the set mask changes. 
+		self.set_batch_mask()
+
 		# Assemble prior and KL divergence losses. 
 		# Since these are output by the variational network, and we don't really need the last z predicted by it. 
+
+		embed()
+
 		prior_loglikelihood = prior_loglikelihood[:-1]		
 		kl_divergence = kl_divergence[:-1]
 
@@ -2240,7 +2323,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		if state is not None:
 			self.environment.sim.set_state_from_flattened(state)
 
-	def rollout_variational_network(self, counter, i):
+	def rollout_variational_network(self, counter, i, variational_dict=None):
 
 		###########################################################
 		###########################################################
@@ -2261,11 +2344,23 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		############# (1) #############
 		# Sample latent variables from p(\zeta | \tau).
-		
-		latent_z_indices, latent_b, variational_b_logprobabilities, variational_z_logprobabilities,\
-		variational_b_probabilities, variational_z_probabilities, kl_divergence, prior_loglikelihood = \
-			 self.variational_policy.forward(torch.tensor(old_concatenated_traj).to(device).float(), self.epsilon, batch_size=1)
 
+		if variational_dict is None:
+			latent_z_indices, latent_b, variational_b_logprobabilities, variational_z_logprobabilities,\
+			variational_b_probabilities, variational_z_probabilities, kl_divergence, prior_loglikelihood = \
+				self.variational_policy.forward(torch.tensor(old_concatenated_traj).to(device).float(), self.epsilon, batch_size=1)
+		else:
+			# Parse dictionary to skip execution. 
+			
+
+			latent_b = variational_dict['latent_b'][:,0:1]
+			latent_z_indices = variational_dict['latent_z_indices'][:,0]
+			variational_z_logprobabilities = variational_dict['variational_z_logprobabilities'][:,0:1]
+			variational_b_logprobabilities = variational_dict['variational_b_logprobabilities'][:,0]
+			# variational_z_probabilities = variational_dict['variational_z_probabilities'][:,0]
+			variational_b_probabilities = variational_dict['variational_b_probabilities'][:,0]
+			kl_divergence = variational_dict['kl_divergence'][:,0:1]
+			prior_loglikelihood = variational_dict['prior_loglikelihood'][:,0]
 		############# (1.5) ###########
 		# Doesn't really matter what the conditional information is here... because latent policy isn't being rolled out. 
 		# We still call it becasue these assembled inputs are passed to the latnet policy rollout later.
@@ -2291,6 +2386,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# For number of rollout timesteps: 
 		for t in range(self.rollout_timesteps-1):
 			# Take a rollout step. Feed into policy, get action, step, return new input. 
+			print("Rolling out variational policy, timestep: ", t)
 
 			action_to_execute, new_state = self.take_rollout_step(subpolicy_inputs[:(t+1)].view((t+1,-1)), t)
 			state_action_tuple = torch.cat([new_state, action_to_execute],dim=1)			
@@ -2345,7 +2441,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# For number of rollout timesteps:
 		for t in range(self.rollout_timesteps-1):
-
+			print("Rolling out latent policy, timestep: ", t)
 			##########################################
 			#### CODE FOR NEW Z SELECTION ROLLOUT ####
 			##########################################
@@ -2429,8 +2525,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		return concatenated_selected_b
 
-	@gpu_profile
-	def rollout_visuals(self, counter, i, get_image=True):
+	# @gpu_profile
+	def rollout_visuals(self, counter, i, variational_dict=None, get_image=True):
 
 		# if self.args.data=='Roboturk':
 		if self.conditional_viz_env:
@@ -2445,7 +2541,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		############# (A) VARIATIONAL POLICY ROLLOUT. #############
 		###########################################################
 
-		orig_assembled_inputs, orig_subpolicy_inputs, variational_segmentation = self.rollout_variational_network(counter, i)
+		orig_assembled_inputs, orig_subpolicy_inputs, variational_segmentation = self.rollout_variational_network(counter, i, variational_dict=variational_dict)
 
 		###########################################################
 		################ (B) LATENT POLICY ROLLOUT. ###############
@@ -2471,66 +2567,63 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		else:
 			return None, None
 
-	@gpu_profile
+	# @gpu_profile
 	def run_iteration(self, counter, i, skip_iteration=False):
 
 		# With learnt discrete subpolicy: 
 
-		# For all epochs:
-		#	# For all trajectories:
-		# 		# Sample z from variational network.
-		# 		# Evalute likelihood of latent policy, and subpolicy.
-		# 		# Update policies using likelihoods.		
+		####################################	
+		# OVERALL ALGORITHM:
+		####################################
+		# (1) For all epochs:
+		# (2)	# For all trajectories:
+		# (3)		# Sample z from variational network.
+		# (4)		# Evalute likelihood of latent policy, and subpolicy.
+		# (5)		# Update policies using likelihoods.		
 
 		self.set_epoch(counter)	
 		self.iter = counter
 
-		############# (0) #############
-		# Get sample we're going to train on. Single sample as of now. 		
-		# sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj = self.collect_inputs(i)
+		####################################
+		# (1) & (2) get sample from collect inputs function. 
+		####################################
 
 		input_dictionary = {}
-		# input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], input_dictionary['concatenated_traj'], input_dictionary['old_concatenated_traj'] = self.collect_inputs(i)
+		input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], input_dictionary['concatenated_traj'], input_dictionary['old_concatenated_traj'] = self.collect_inputs(i)
+		self.batch_indices_sizes.append({'batch_size': input_dictionary['sample_traj'].shape[0], 'i': i})
 
-		self.batch_indices_sizes.append({'batch_size': sample_traj.shape[0], 'i': i})
+		if (input_dictionary['sample_traj'] is not None) and not(skip_iteration):
 
-		if (sample_traj is not None) and not(skip_iteration):
-			############# (1) #############
-			# Sample latent variables from p(\zeta | \tau).
+			####################################
+			# (3) Sample latent variables from variational network p(\zeta | \tau).
+			####################################
 			
-			latent_z_indices, latent_b, variational_b_logprobabilities, variational_z_logprobabilities,\
-			variational_b_probabilities, variational_z_probabilities, kl_divergence, prior_loglikelihood = self.variational_policy.forward(torch.tensor(old_concatenated_traj).to(device).float(), self.epsilon)
+			variational_dict = {}
+			variational_dict['latent_z_indices'], variational_dict['latent_b'], variational_dict['variational_b_logprobabilities'], variational_dict['variational_z_logprobabilities'], \
+			variational_dict['variational_b_probabilities'], variational_dict['variational_z_probabilities'], variational_dict['kl_divergence'], variational_dict['prior_loglikelihood'] = \
+				self.variational_policy.forward(torch.tensor(input_dictionary['old_concatenated_traj']).to(device).float(), self.epsilon)
 
-			########## (2) & (3) ##########
-			# Evaluate Log Likelihoods of actions and options as "Return" for Variational policy.
-			subpolicy_loglikelihoods, subpolicy_loglikelihood, subpolicy_entropy,\
-			latent_loglikelihood, latent_b_logprobabilities, latent_z_logprobabilities,\
-			 latent_b_probabilities, latent_z_probabilities, latent_z_logprobability, latent_b_logprobability, \
-			 learnt_subpolicy_loglikelihood, learnt_subpolicy_loglikelihoods, temporal_loglikelihoods = self.evaluate_loglikelihoods(sample_traj, sample_action_seq, concatenated_traj, latent_z_indices, latent_b)
+			####################################
+			# (4) Evaluate Log Likelihoods of actions and options as "Return" for Variational policy.
+			####################################
+			
+			eval_likelihood_dict = self.evaluate_loglikelihoods(input_dictionary, variational_dict)
 
 			if self.args.train:
-				if self.args.debug:
-					if self.iter%self.args.debug==0:
-						print("Embedding in Train Function.")
-						embed()
+				
+				####################################
+				# (5) Update policies. 
+				####################################
+				
+				self.new_update_policies(i, input_dictionary, variational_dict, eval_likelihood_dict)
 
-				############# (3) #############
-				# Update latent policy Pi_z with Reinforce like update using LL as return. 			
-				self.new_update_policies(i, sample_action_seq, subpolicy_loglikelihoods, subpolicy_entropy, latent_b, latent_z_indices,\
-					variational_z_logprobabilities, variational_b_logprobabilities, variational_z_probabilities, variational_b_probabilities, kl_divergence, \
-					latent_z_logprobabilities, latent_b_logprobabilities, latent_z_probabilities, latent_b_probabilities, \
-					learnt_subpolicy_loglikelihood, learnt_subpolicy_loglikelihoods, learnt_subpolicy_loglikelihood+latent_loglikelihood, \
-					prior_loglikelihood, latent_loglikelihood, temporal_loglikelihoods)
-
-				# Update Plots. 
-				# self.update_plots(counter, sample_map, loglikelihood)
+				####################################
+				# (6) Update plots and logging of stats. 
+				####################################
 
 				with torch.no_grad():
-					self.update_plots(counter, i, learnt_subpolicy_loglikelihood, latent_loglikelihood, subpolicy_entropy, 
-						sample_traj, latent_z_logprobability, latent_b_logprobability, kl_divergence, prior_loglikelihood)
-					
-				# print("Latent LogLikelihood: ", latent_loglikelihood)
-				# print("Subpolicy LogLikelihood: ", learnt_subpolicy_loglikelihood)
+					self.update_plots(counter, i, input_dictionary, variational_dict, eval_likelihood_dict)
+
 				print("#########################################")
 
 			else:
@@ -2678,6 +2771,16 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 		return data_element
 
+	def set_batch_mask(self):
+
+		# Initialize with 0's. 
+		# self.batch_mask = torch.zeros((self.args.batch_size, self.max_batch_traj_length)).to(device).float()
+		self.batch_mask = torch.zeros((self.max_batch_traj_length, self.args.batch_size)).to(device).float()
+		# Set batch mask for each batch element as ... 1's for length of that element, and 0 after. 
+		for b in range(self.args.batch_size):
+			# self.batch_mask[b, :self.batch_trajectory_lengths[b]] = 1.
+			self.batch_mask[:self.batch_trajectory_lengths[b], b] = 1.
+			
 	# Get batch full trajectory. 
 	def collect_inputs(self, i, get_latents=False):
 
@@ -2824,7 +2927,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			self.run_iteration(counter, self.index_list[i], skip_iteration=skip)
 
 		# Now run original training function.
-		# super().train(model=model)
+		super().train(model=model)
 
 class PolicyManager_BaselineRL(PolicyManager_BaseClass):
 
@@ -5136,6 +5239,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 
 		# Encode decode function: First encodes, takes trajectory segment, and outputs latent z. The latent z is then provided to decoder (along with initial state), and then we get SOURCE domain subpolicy inputs. 
 		# Cross domain decoding function: Takes encoded latent z (and start state), and then rolls out with target decoder. Function returns, target trajectory, action sequence, and TARGET domain subpolicy inputs. 
+
 
 
 

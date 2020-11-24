@@ -188,7 +188,7 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 			
 		return log_probabilities, entropy
 
-	@gpu_profile
+	# @gpu_profile
 	def get_actions(self, input, greedy=False, batch_size=None):
 		if batch_size is None:
 			batch_size = self.batch_size
@@ -1148,7 +1148,7 @@ class ContinuousVariationalPolicyNetwork_ConstrainedBPrior(ContinuousVariational
 		self.min_skill_time = 12
 		self.max_skill_time = 16
 
-	def forward(self, input, epsilon, new_z_selection=True):
+	def forward(self, input, epsilon, new_z_selection=True, batch_size=1):
 
 		# Input Format must be: Sequence_Length x Batch_Size x Input_Size. 	
 		format_input = input.view((input.shape[0], self.batch_size, self.input_size))
