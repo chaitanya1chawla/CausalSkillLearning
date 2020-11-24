@@ -177,6 +177,7 @@ def parse_arguments():
 	parser.add_argument('--eval_freq',dest='eval_freq',type=int,default=20)	
 	parser.add_argument('--perplexity',dest='perplexity',type=float,default=30,help='Value of perplexity fed to TSNE.')
 	parser.add_argument('--latent_set_file_path',dest='latent_set_file_path',type=str,help='File path to pre-computed latent sets to visualize.')
+	parser.add_argument('--viz_latent_rollout',dest='viz_latent_rollout',type=int,default=1,help='Whether to visualize latent rollout or not.')
 
 	parser.add_argument('--entropy',dest='entropy',type=int,default=0)
 	parser.add_argument('--var_entropy',dest='var_entropy',type=int,default=0)

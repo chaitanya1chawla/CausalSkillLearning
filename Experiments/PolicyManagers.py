@@ -203,7 +203,7 @@ class PolicyManager_BaseClass():
 
 			# np.random.shuffle(self.index_list)
 			self.shuffle(extent)
-			
+			self.batch_indices_sizes = []
 			# Modifying to make training functions handle batches. 
 			for i in range(0,extent,self.args.batch_size):
 
@@ -1839,10 +1839,13 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# Compute trajectory distance between:
 		var_rollout_distance = ((self.variational_trajectory_rollout-sample_traj)**2).mean()
-		latent_rollout_distance = ((self.latent_trajectory_rollout-sample_traj)**2).mean()
+		latent_rollout_distance = 0.
+		if self.args.viz_latent_rollout:
+			latent_rollout_distance = ((self.latent_trajectory_rollout-sample_traj)**2).mean()
 
 		return var_rollout_distance, latent_rollout_distance
 
+	# @gpu_profile
 	def update_plots(self, counter, i, subpolicy_loglikelihood, latent_loglikelihood, subpolicy_entropy, sample_traj, latent_z_logprobability, latent_b_logprobability, kl_divergence, prior_loglikelihood):
 
 		self.tf_logger.scalar_summary('Latent Policy Loss', torch.mean(self.total_latent_loss), counter)
@@ -1867,8 +1870,12 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			var_dist, latent_dist = self.compute_evaluation_metrics(sample_traj, counter, i)
 			self.tf_logger.scalar_summary('Variational Trajectory Distance', var_dist, counter)
 			self.tf_logger.scalar_summary('Latent Trajectory Distance', latent_dist, counter)
+			
+			if self.args.batch_size>1:
+				gt_trajectory_image = np.array(self.visualize_trajectory(sample_traj[:,0,:], i=i, suffix='GT'))
+			else:
+				gt_trajectory_image = np.array(self.visualize_trajectory(sample_traj, i=i, suffix='GT'))
 
-			gt_trajectory_image = np.array(self.visualize_trajectory(sample_traj, i=i, suffix='GT'))
 			variational_rollout_image = np.array(variational_rollout_image)
 			latent_rollout_image = np.array(latent_rollout_image)
 
@@ -1876,12 +1883,14 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				# Feeding as list of image because gif_summary.				
 				self.tf_logger.gif_summary("GT Trajectory",[gt_trajectory_image],counter)
 				self.tf_logger.gif_summary("Variational Rollout",[variational_rollout_image],counter)
-				self.tf_logger.gif_summary("Latent Rollout",[latent_rollout_image],counter)
+				if self.args.viz_latent_rollout:
+					self.tf_logger.gif_summary("Latent Rollout",[latent_rollout_image],counter)
 			else:
 				# Feeding as list of image because gif_summary.
 				self.tf_logger.image_summary("GT Trajectory",[gt_trajectory_image],counter)
 				self.tf_logger.image_summary("Variational Rollout",[variational_rollout_image],counter)
-				self.tf_logger.image_summary("Latent Rollout",[latent_rollout_image],counter)				
+				if self.args.viz_latent_rollout:
+					self.tf_logger.image_summary("Latent Rollout",[latent_rollout_image],counter)				
 
 	def assemble_inputs(self, input_trajectory, latent_z_indices, latent_b, sample_action_seq, conditional_information=None):
 
@@ -1922,8 +1931,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			assembled_inputs[:,:self.input_size] = torch.tensor(input_trajectory).view(len(input_trajectory),self.input_size).to(device).float()			
 			assembled_inputs[range(1,len(input_trajectory)),self.input_size:self.input_size+self.latent_z_dimensionality] = latent_z_copy[:-1]
 			
-			# We were writing the wrong dimension... should we be running again? :/ 
-			assembled_inputs[range(1,len(input_trajectory)),self.input_size+self.latent_z_dimensionality] = latent_b[:-1].float()	
+			# We were writing the wrong dimension... should we be running again? :/ 			
+			assembled_inputs[range(1,len(input_trajectory)),self.input_size+self.latent_z_dimensionality] = latent_b[:-1].float().squeeze(1)
 			# assembled_inputs[range(1,len(input_trajectory)),-self.conditional_info_size:] = torch.tensor(conditional_information).to(device).float()
 
 			# Instead of feeding conditional infromation only from 1'st timestep onwards, we are going to st it from the first timestep. 
@@ -2021,10 +2030,14 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			latent_z_logprobability = latent_z_temporal_logprobabilities.mean()
 
 		else:
-			# If not, we need to evaluate the latent probabilties of latent_z_indices under latent_policy. 
+			# If not, we need to evaluate the latent probabilties of latent_z_indices under latent_policy. 			
 			latent_b_logprobabilities, latent_b_probabilities, latent_distributions = self.latent_policy.forward(assembled_inputs_copy, self.epsilon)
-			# Evalute loglikelihood of latent z vectors under the latent policy's distributions. 
-			latent_z_logprobabilities = latent_distributions.log_prob(latent_z_copy.unsqueeze(1))
+			# Evalute loglikelihood of latent z vectors under the latent policy's distributions. 			
+
+			if self.args.batch_size>1:
+				latent_z_logprobabilities = latent_distributions.log_prob(latent_z_copy)
+			else:				
+				latent_z_logprobabilities = latent_distributions.log_prob(latent_z_copy.unsqueeze(1))
 
 			# Multiply logprobabilities by the latent policy ratio.
 			latent_z_temporal_logprobabilities = latent_z_logprobabilities[:-1]*self.args.latentpolicy_ratio
@@ -2036,8 +2049,11 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# = \sum_{t=1}^T \log { \phi_t(b_t)} + \log { 1[b_t==1] \eta_t(h_t|s_{1:t}) + 1[b_t==0] 1[z_t==z_{t-1}] } 
 
 		# Adding log probabilities of termination (of whether it terminated or not), till penultimate step. 
-
-		latent_b_temporal_logprobabilities = latent_b_logprobabilities[range(len(sample_traj)-1),latent_b[:-1].long()]
+		
+		if self.args.batch_size>1: 
+			latent_b_temporal_logprobabilities = latent_b_logprobabilities.take(latent_b.long())[:-1]
+		else:
+			latent_b_temporal_logprobabilities = latent_b_logprobabilities[range(len(sample_traj)-1),latent_b[:-1].long()]
 		latent_b_logprobability = latent_b_temporal_logprobabilities.mean()
 		latent_loglikelihood += latent_b_logprobability
 		latent_loglikelihood += latent_z_logprobability
@@ -2080,9 +2096,10 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		######################################################
 		############## Update latent policy. #################
 		######################################################
-		
+
 		# Remember, an NLL loss function takes <Probabilities, Sampled Value> as arguments. 
-		self.latent_b_loss = self.negative_log_likelihood_loss_function(latent_b_logprobabilities, latent_b.long())
+		self.latent_b_loss = self.negative_log_likelihood_loss_function(latent_b_logprobabilities.view(-1,2), latent_b.long().view(-1,)).view(-1,self.args.batch_size)
+		# self.latent_b_loss = self.negative_log_likelihood_loss_function(latent_b_logprobabilities, latent_b.long())		
 
 		if self.args.discrete_z:
 			self.latent_z_loss = self.negative_log_likelihood_loss_function(latent_z_logprobabilities, latent_z_indices.long())
@@ -2098,7 +2115,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		#######################################################
 
 		# MUST ALWAYS COMPUTE: # Compute cross entropies. 
-		self.variational_b_loss = self.negative_log_likelihood_loss_function(variational_b_logprobabilities[:-1], latent_b[:-1].long())
+		# self.variational_b_loss = self.negative_log_likelihood_loss_function(variational_b_logprobabilities[:-1], latent_b[:-1].long())
+		self.variational_b_loss = self.negative_log_likelihood_loss_function(variational_b_logprobabilities.view(-1,2), latent_b.long().view(-1,)).view(-1,self.args.batch_size)[:-1]
 
 		# In case of reparameterization, the variational loss that goes to REINFORCE should just be variational_b_loss.
 		self.variational_loss = self.args.var_loss_weight*self.variational_b_loss
@@ -2175,7 +2193,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 	def take_rollout_step(self, subpolicy_input, t, use_env=False):
 
 		# Feed subpolicy input into the policy. 
-		actions = self.policy_network.get_actions(subpolicy_input,greedy=True)
+		actions = self.policy_network.get_actions(subpolicy_input,greedy=True,batch_size=1)
 		
 		# Select last action to execute. 
 		action_to_execute = actions[-1].squeeze(1)
@@ -2229,17 +2247,24 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		############# (0) #############
 		# Get sample we're going to train on. Single sample as of now.
-		sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj = self.collect_inputs(i)
+		_ , sample_action_seq, concatenated_traj, old_concatenated_traj = self.collect_inputs(i)
+				
+		if self.args.batch_size>1: 
+			sample_action_seq = sample_action_seq[:,0,:]
+			concatenated_traj = concatenated_traj[:,0,:]
+			old_concatenated_traj = old_concatenated_traj[:,0,:]
 
 		if self.args.traj_length>0:
 			self.rollout_timesteps = self.args.traj_length
 		else:
-			self.rollout_timesteps = len(sample_traj)		
+			self.rollout_timesteps = len(concatenated_traj)		
 
 		############# (1) #############
 		# Sample latent variables from p(\zeta | \tau).
+		
 		latent_z_indices, latent_b, variational_b_logprobabilities, variational_z_logprobabilities,\
-		variational_b_probabilities, variational_z_probabilities, kl_divergence, prior_loglikelihood = self.variational_policy.forward(torch.tensor(old_concatenated_traj).to(device).float(), self.epsilon)
+		variational_b_probabilities, variational_z_probabilities, kl_divergence, prior_loglikelihood = \
+			 self.variational_policy.forward(torch.tensor(old_concatenated_traj).to(device).float(), self.epsilon, batch_size=1)
 
 		############# (1.5) ###########
 		# Doesn't really matter what the conditional information is here... because latent policy isn't being rolled out. 
@@ -2247,8 +2272,15 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		if self.conditional_viz_env:
 			self.set_env_conditional_info()
+				
 		# Get assembled inputs and subpolicy inputs for variational rollout.
-		orig_assembled_inputs, orig_subpolicy_inputs, padded_action_seq = self.assemble_inputs(concatenated_traj, latent_z_indices, latent_b, sample_action_seq, self.conditional_information)		
+		if self.args.batch_size > 1:
+			orig_assembled_inputs, orig_subpolicy_inputs, padded_action_seq = \
+				self.assemble_inputs(concatenated_traj[:,np.newaxis,:], latent_z_indices.unsqueeze(1), latent_b, sample_action_seq[:,np.newaxis,:], self.conditional_information, batch_size=1)
+
+		else: 
+			orig_assembled_inputs, orig_subpolicy_inputs, padded_action_seq = \
+				self.assemble_inputs(concatenated_traj, latent_z_indices, latent_b, sample_action_seq, self.conditional_information)
 
 		###########################################################
 		############# (A) VARIATIONAL POLICY ROLLOUT. #############
@@ -2259,13 +2291,20 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# For number of rollout timesteps: 
 		for t in range(self.rollout_timesteps-1):
 			# Take a rollout step. Feed into policy, get action, step, return new input. 
+
 			action_to_execute, new_state = self.take_rollout_step(subpolicy_inputs[:(t+1)].view((t+1,-1)), t)
 			state_action_tuple = torch.cat([new_state, action_to_execute],dim=1)			
 			# Overwrite the subpolicy inputs with the new state action tuple.
-			subpolicy_inputs[t+1,:self.input_size] = state_action_tuple
+			if self.args.batch_size>1:
+				subpolicy_inputs[t+1,0,:self.input_size] = state_action_tuple
+			else:
+				subpolicy_inputs[t+1,:self.input_size] = state_action_tuple
 		
 		# Get trajectory from this. 
-		self.variational_trajectory_rollout = copy.deepcopy(subpolicy_inputs[:,:self.state_dim].detach().cpu().numpy())				
+		if self.args.batch_size>1:
+			self.variational_trajectory_rollout = copy.deepcopy(subpolicy_inputs[:,:,:self.state_dim].detach().cpu().numpy())				
+		else:
+			self.variational_trajectory_rollout = copy.deepcopy(subpolicy_inputs[:,:self.state_dim].detach().cpu().numpy())				
 
 		return orig_assembled_inputs, orig_subpolicy_inputs, latent_b
 
@@ -2300,7 +2339,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 	def rollout_latent_policy(self, orig_assembled_inputs, orig_subpolicy_inputs):
 		assembled_inputs = orig_assembled_inputs.clone().detach()
 		subpolicy_inputs = orig_subpolicy_inputs.clone().detach()
-
+		
 		# Set the previous b time to 0.
 		delta_t = 0
 
@@ -2312,7 +2351,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			##########################################
 
 			# Pick latent_z and latent_b. 
-			selected_b, new_selected_z = self.latent_policy.get_actions(assembled_inputs[:(t+1)].view((t+1,-1)), greedy=True, delta_t=delta_t)
+			selected_b, new_selected_z = self.latent_policy.get_actions(assembled_inputs[:(t+1)].view((t+1,-1)), greedy=True, delta_t=delta_t, batch_size=1)
 
 			if t==0:
 				selected_b = torch.ones_like(selected_b).to(device).float()
@@ -2333,37 +2372,51 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			if self.args.discrete_z:
 				assembled_inputs[t+1, self.input_size+selected_z[-1]] = 1.
 			else:
-				assembled_inputs[t+1, self.input_size:self.input_size+self.latent_z_dimensionality] = selected_z[-1]
+				if self.args.batch_size>1:
+					assembled_inputs[t+1, :, self.input_size:self.input_size+self.latent_z_dimensionality] = selected_z[-1]
+					assembled_inputs[t+1, :, self.input_size+self.latent_z_dimensionality]	 = selected_b[-1]
+				else:
+					assembled_inputs[t+1, self.input_size:self.input_size+self.latent_z_dimensionality] = selected_z[-1]
+					assembled_inputs[t+1, self.input_size+self.latent_z_dimensionality]	 = selected_b[-1]
 			
-			# This was also using wrong dimensions... oops :P 
-			assembled_inputs[t+1, self.input_size+self.latent_z_dimensionality]	 = selected_b[-1]
-
 			# Before copying over, set conditional_info from the environment at the current timestep.
 
 			if self.conditional_viz_env:
 				self.set_env_conditional_info()
 
 			if self.conditional_info_size>0:
-				assembled_inputs[t+1, -self.conditional_info_size:] = torch.tensor(self.conditional_information).to(device).float()
-
-			# Set z's to 0.
-			subpolicy_inputs[t, self.input_size:self.input_size+self.number_policies] = 0.
+				if self.args.batch_size>1:
+					assembled_inputs[t+1, :, -self.conditional_info_size:] = torch.tensor(self.conditional_information).to(device).float()
+				else:
+					assembled_inputs[t+1, -self.conditional_info_size:] = torch.tensor(self.conditional_information).to(device).float()
 
 			# Set z and b in subpolicy input for the future subpolicy passes.			
 			if self.args.discrete_z:
+				# Set z's to 0.
+				subpolicy_inputs[t, self.input_size:self.input_size+self.number_policies] = 0.
 				subpolicy_inputs[t, self.input_size+selected_z[-1]] = 1.
 			else:
-				subpolicy_inputs[t, self.input_size:] = selected_z[-1]
+				if self.args.batch_size>1:
+					subpolicy_inputs[t, :, self.input_size:] = selected_z[-1]
+				else:
+					subpolicy_inputs[t, self.input_size:] = selected_z[-1]
 
 			# Now pass subpolicy net forward and get action and next state. 
 			action_to_execute, new_state = self.take_rollout_step(subpolicy_inputs[:(t+1)].view((t+1,-1)), t, use_env=self.conditional_viz_env)
 			state_action_tuple = torch.cat([new_state, action_to_execute],dim=1)
 
-			# Now update assembled input. 
-			assembled_inputs[t+1, :self.input_size] = state_action_tuple
-			subpolicy_inputs[t+1, :self.input_size] = state_action_tuple
+			# Now update assembled input.
+			if self.args.batch_size>1:
+				assembled_inputs[t+1, :, :self.input_size] = state_action_tuple
+				subpolicy_inputs[t+1, :, :self.input_size] = state_action_tuple
+			else:
+				assembled_inputs[t+1, :self.input_size] = state_action_tuple
+				subpolicy_inputs[t+1, :self.input_size] = state_action_tuple
 
-		self.latent_trajectory_rollout = copy.deepcopy(subpolicy_inputs[:,:self.state_dim].detach().cpu().numpy())
+		if self.args.batch_size>1:
+			self.latent_trajectory_rollout = copy.deepcopy(subpolicy_inputs[:,:,:self.state_dim].detach().cpu().numpy())
+		else:
+			self.latent_trajectory_rollout = copy.deepcopy(subpolicy_inputs[:,:self.state_dim].detach().cpu().numpy())
 
 		concatenated_selected_b = np.concatenate([selected_b.detach().cpu().numpy(),np.zeros((1))],axis=-1)
 
@@ -2376,6 +2429,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		return concatenated_selected_b
 
+	@gpu_profile
 	def rollout_visuals(self, counter, i, get_image=True):
 
 		# if self.args.data=='Roboturk':
@@ -2391,23 +2445,34 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		############# (A) VARIATIONAL POLICY ROLLOUT. #############
 		###########################################################
 
-		orig_assembled_inputs, orig_subpolicy_inputs, variational_segmentation = self.rollout_variational_network(counter, i)		
+		orig_assembled_inputs, orig_subpolicy_inputs, variational_segmentation = self.rollout_variational_network(counter, i)
 
 		###########################################################
 		################ (B) LATENT POLICY ROLLOUT. ###############
 		###########################################################
 
-		latent_segmentation = self.rollout_latent_policy(orig_assembled_inputs, orig_subpolicy_inputs)
+		if self.args.viz_latent_rollout:
+			latent_segmentation = self.rollout_latent_policy(orig_assembled_inputs, orig_subpolicy_inputs)
+		
+		latent_rollout_image = None
 
 		if get_image==True:
-			latent_rollout_image = self.visualize_trajectory(self.latent_trajectory_rollout, segmentations=latent_segmentation, i=i, suffix='Latent')
-			variational_rollout_image = self.visualize_trajectory(self.variational_trajectory_rollout, segmentations=variational_segmentation.detach().cpu().numpy(), i=i, suffix='Variational')	
+			if self.args.batch_size>1:
+				if self.args.viz_latent_rollout:						
+					latent_rollout_image = self.visualize_trajectory(self.latent_trajectory_rollout[:,0,:], segmentations=latent_segmentation, i=i, suffix='Latent')
+				variational_rollout_image = self.visualize_trajectory(self.variational_trajectory_rollout[:,0,:], segmentations=variational_segmentation.detach().cpu().numpy(), i=i, suffix='Variational')	
+
+			else:				
+				if self.args.viz_latent_rollout:						
+					latent_rollout_image = self.visualize_trajectory(self.latent_trajectory_rollout, segmentations=latent_segmentation, i=i, suffix='Latent')
+				variational_rollout_image = self.visualize_trajectory(self.variational_trajectory_rollout, segmentations=variational_segmentation.detach().cpu().numpy(), i=i, suffix='Variational')	
 
 			return variational_rollout_image, latent_rollout_image
 		else:
 			return None, None
 
-	def run_iteration(self, counter, i):
+	@gpu_profile
+	def run_iteration(self, counter, i, skip_iteration=False):
 
 		# With learnt discrete subpolicy: 
 
@@ -2422,14 +2487,20 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		############# (0) #############
 		# Get sample we're going to train on. Single sample as of now. 		
-		sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj = self.collect_inputs(i)			
+		# sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj = self.collect_inputs(i)
 
-		if sample_traj is not None:
+		input_dictionary = {}
+		# input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], input_dictionary['concatenated_traj'], input_dictionary['old_concatenated_traj'] = self.collect_inputs(i)
+
+		self.batch_indices_sizes.append({'batch_size': sample_traj.shape[0], 'i': i})
+
+		if (sample_traj is not None) and not(skip_iteration):
 			############# (1) #############
 			# Sample latent variables from p(\zeta | \tau).
+			
 			latent_z_indices, latent_b, variational_b_logprobabilities, variational_z_logprobabilities,\
 			variational_b_probabilities, variational_z_probabilities, kl_divergence, prior_loglikelihood = self.variational_policy.forward(torch.tensor(old_concatenated_traj).to(device).float(), self.epsilon)
-			
+
 			########## (2) & (3) ##########
 			# Evaluate Log Likelihoods of actions and options as "Return" for Variational policy.
 			subpolicy_loglikelihoods, subpolicy_loglikelihood, subpolicy_entropy,\
@@ -2453,8 +2524,10 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 				# Update Plots. 
 				# self.update_plots(counter, sample_map, loglikelihood)
-				self.update_plots(counter, i, learnt_subpolicy_loglikelihood, latent_loglikelihood, subpolicy_entropy, 
-					sample_traj, latent_z_logprobability, latent_b_logprobability, kl_divergence, prior_loglikelihood)
+
+				with torch.no_grad():
+					self.update_plots(counter, i, learnt_subpolicy_loglikelihood, latent_loglikelihood, subpolicy_entropy, 
+						sample_traj, latent_z_logprobability, latent_b_logprobability, kl_divergence, prior_loglikelihood)
 					
 				# print("Latent LogLikelihood: ", latent_loglikelihood)
 				# print("Subpolicy LogLikelihood: ", learnt_subpolicy_loglikelihood)
@@ -2597,16 +2670,6 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 		sample_action_seq = np.concatenate([sample_action_seq, np.zeros((self.args.batch_size,1,self.output_size))],axis=1)
 		return np.concatenate([sample_traj, sample_action_seq],axis=-1)
 		
-	# def get_batch_element(self, i):
-
-	# 	# Make data_element a list of dictionaries. 
-	# 	data_element = []
-
-	# 	for b in range(i,i+self.args.batch_size):	
-	# 		data_element.append(self.dataset[b])
-
-	# 	return data_element
-
 	def get_batch_element(self, i):
 		# Make data_element a list of dictionaries. 
 		data_element = np.array([self.dataset[b] for b in range(i,i+self.args.batch_size)])
@@ -2688,6 +2751,80 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 			return batch_trajectory.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))			
 			# return batch_trajectory, action_sequence, concatenated_traj, old_concatenated_traj
+
+	def assemble_inputs(self, input_trajectory, latent_z_indices, latent_b, sample_action_seq, conditional_information=None, batch_size=None):
+
+		if batch_size is None:
+			batch_size = self.args.batch_size
+
+		if self.training_phase>1:
+			# Prevents gradients being propagated through this..
+			latent_z_copy = torch.tensor(latent_z_indices).to(device)
+		else:
+			latent_z_copy = latent_z_indices
+
+		if conditional_information is None:
+			conditional_information = torch.zeros((self.conditional_info_size)).to(device).float()
+
+		# Append latent z indices to sample_traj data to feed as input to BOTH the latent policy network and the subpolicy network. 					
+		assembled_inputs = torch.zeros((input_trajectory.shape[0],batch_size,self.input_size+self.latent_z_dimensionality+1+self.conditional_info_size)).to(device)		
+		assembled_inputs[:,:,:self.input_size] = torch.tensor(input_trajectory).to(device).float()
+		assembled_inputs[range(1,len(input_trajectory)),:,self.input_size:self.input_size+self.latent_z_dimensionality] = latent_z_copy[:-1]
+		
+		# We were writing the wrong dimension... should we be running again? :/ 
+		assembled_inputs[range(1,len(input_trajectory)),:,self.input_size+self.latent_z_dimensionality] = latent_b[:-1].float()
+		# assembled_inputs[range(1,len(input_trajectory)),-self.conditional_info_size:] = torch.tensor(conditional_information).to(device).float()
+
+		# Instead of feeding conditional infromation only from 1'st timestep onwards, we are going to st it from the first timestep. 
+		if self.conditional_info_size>0:
+			assembled_inputs[:,:,-self.conditional_info_size:] = torch.tensor(conditional_information).to(device).float()
+
+		# Now assemble inputs for subpolicy.
+		subpolicy_inputs = torch.zeros((len(input_trajectory),batch_size,self.input_size+self.latent_z_dimensionality)).to(device)
+		subpolicy_inputs[:,:,:self.input_size] = torch.tensor(input_trajectory).to(device).float()
+		subpolicy_inputs[range(len(input_trajectory)),:,self.input_size:] = latent_z_indices
+
+		# # This method of concatenation is wrong, because it evaluates likelihood of action [0,0] as well. 
+		# # Concatenated action sqeuence for policy network. 
+		# padded_action_seq = np.concatenate([np.zeros((1,self.output_size)),sample_action_seq],axis=0)
+		# This is the right method of concatenation, because it evaluates likelihood 			
+		padded_action_seq = np.concatenate([sample_action_seq, np.zeros((1,batch_size,self.output_size))],axis=0)
+
+		return assembled_inputs, subpolicy_inputs, padded_action_seq
+	
+	def train(self, model=None):
+
+		# Set some parameters that we need for the dry run. 
+		extent = len(self.dataset)-self.test_set_size
+		counter = 0
+		self.batch_indices_sizes = []
+
+		print("About to run a dry run. ")
+		# Do a dry run of 1 epoch, before we actually start running training. 
+		# This is so that we can figure out the batch of 1 epoch.
+		for i in range(0,extent,self.args.batch_size):		
+			# Dry run iteration. 
+			self.run_iteration(counter, self.index_list[i], skip_iteration=True)
+		
+
+		print("About to find max batch size index.")
+		# Now find maximum batch size iteration. 
+		max_batch_size_index = 0
+		max_batch_size = 0
+		for x in range(len(self.batch_indices_sizes)):
+			if self.batch_indices_sizes[x]['batch_size']>max_batch_size:
+				max_batch_size = self.batch_indices_sizes[x]['batch_size']
+				max_batch_size_index = self.batch_indices_sizes[x]['i']
+		
+		print("About to run max batch size iteration.")
+		# Now run another epoch, where we only skip iteration if it's the max batch size.
+		for i in range(0,extent,self.args.batch_size):
+			# Skip unless i is ==max_batch_size_index.
+			skip = (i!=max_batch_size_index)
+			self.run_iteration(counter, self.index_list[i], skip_iteration=skip)
+
+		# Now run original training function.
+		# super().train(model=model)
 
 class PolicyManager_BaselineRL(PolicyManager_BaseClass):
 
@@ -4578,6 +4715,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		target_source_trajectory_diffs = (target_traj_actions - source_traj_actions[target_source_neighbors.squeeze(1)])
 		self.target_source_trajectory_distance = copy.deepcopy(np.linalg.norm(target_source_trajectory_diffs,axis=(1,2)).mean())
 
+		##########################################
+		# Add more evaluation metrics here. 
+		##########################################
+
+		# self.evaluate_discriminator_accuracy()
+		# self.evaluate_cycle_reconstruction_error()
+
+
 		# Reset variables to prevent memory leaks.
 		# source_neighbors_object = None
 		# target_neighbors_object = None
@@ -4991,6 +5136,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 
 		# Encode decode function: First encodes, takes trajectory segment, and outputs latent z. The latent z is then provided to decoder (along with initial state), and then we get SOURCE domain subpolicy inputs. 
 		# Cross domain decoding function: Takes encoded latent z (and start state), and then rolls out with target decoder. Function returns, target trajectory, action sequence, and TARGET domain subpolicy inputs. 
+
 
 
 

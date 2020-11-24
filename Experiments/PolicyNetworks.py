@@ -188,6 +188,7 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 			
 		return log_probabilities, entropy
 
+	@gpu_profile
 	def get_actions(self, input, greedy=False, batch_size=None):
 		if batch_size is None:
 			batch_size = self.batch_size
@@ -609,9 +610,12 @@ class ContinuousLatentPolicyNetwork_ConstrainedBPrior(ContinuousLatentPolicyNetw
 
 		return prior_value
 
-	def get_actions(self, input, greedy=False, epsilon=0.001, delta_t=0):
+	def get_actions(self, input, greedy=False, epsilon=0.001, delta_t=0, batch_size=None):
 
-		format_input = input.view((input.shape[0], self.batch_size, self.input_size))
+		if batch_size is None:
+			batch_size = self.batch_size
+
+		format_input = input.view((input.shape[0], batch_size, self.input_size))
 		hidden = None
 		outputs, hidden = self.lstm(format_input)
 	
@@ -1274,7 +1278,10 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		
 		super(ContinuousVariationalPolicyNetwork_Batch, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)
 	
-	def get_prior_value(self, elapsed_t, max_limit=5):
+	def get_prior_value(self, elapsed_t, max_limit=5, batch_size=None):
+
+		if batch_size==None:
+			batch_size = self.batch_size
 		
 		skill_time_limit = max_limit-1
 		
@@ -1298,7 +1305,7 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		delt = elapsed_t-skill_time_limit
 
 		# Initialize prior vlaues. 
-		prior_value = torch.zeros((self.args.batch_size,2)).to(device).float()
+		prior_value = torch.zeros((batch_size,2)).to(device).float()
 		
 		# Since we're evaluating multiple conditions over the batch, don't do this with if-else structures. 
 		# Instead, set values of prior based on which of the following cases they fall into. 			
@@ -1312,7 +1319,7 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		######################################
 		condition_1 = torch.tensor((elapsed_t>=max_limit).astype(int)).to(device).float()
 		case_1_block = np.array([[0,1]])
-		case_1_value = torch.tensor(np.repeat(case_1_block, self.args.batch_size, axis=0)).to(device).float()
+		case_1_value = torch.tensor(np.repeat(case_1_block, batch_size, axis=0)).to(device).float()
 
 		######################################
 		# CASE 2:  If we're not over max limt, but over the typical skill time length.
@@ -1324,7 +1331,7 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 
 		# Create basic building block that's going to repeat, that we use for the var_skill_length=0 case. 
 		block = np.array([[0,1]])
-		block_repeat = np.repeat(block, self.args.batch_size, axis=0)
+		block_repeat = np.repeat(block, batch_size, axis=0)
 
 		# Create array that sets values based on var_skill_length cases. 
 		case_2_value = torch.tensor((self.args.var_skill_length*prob_biases[intermediate_values]) + \
@@ -1335,7 +1342,7 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		######################################
 		condition_3 = torch.tensor((elapsed_t<skill_time_limit).astype(int)).to(device).float()
 		case_3_block = np.array([[1,0]])
-		case_3_value = torch.tensor(np.repeat(case_3_block, self.args.batch_size, axis=0)).to(device).float()
+		case_3_value = torch.tensor(np.repeat(case_3_block, batch_size, axis=0)).to(device).float()
 
 		######################################
 		# Now set the prior values. 
@@ -1369,11 +1376,18 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		# return prior_value
 		####################################
 		####################################
+	
+	# @gpu_profile
+	def forward(self, input, epsilon, new_z_selection=True, batch_size=None):
 
-	def forward(self, input, epsilon, new_z_selection=True):
+		if batch_size is None:
+			batch_size = self.batch_size			
+
+		# print("VAR POL")
+		
 
 		# Input Format must be: Sequence_Length x Batch_Size x Input_Size. 	
-		format_input = input.view((input.shape[0], self.batch_size, self.input_size))
+		format_input = input.view((input.shape[0], batch_size, self.input_size))
 		hidden = None
 		outputs, hidden = self.lstm(format_input)
 
@@ -1402,10 +1416,10 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		# Set the first b to 1, and the time b was == 1. 		
 		# sampled_b = torch.zeros(input.shape[0]).to(device).int()
 		# Changing to batching.. 
-		sampled_b = torch.zeros(input.shape[0], self.args.batch_size).to(device).int()
+		sampled_b = torch.zeros(input.shape[0], batch_size).to(device).int()
 		sampled_b[0] = 1
 
-		prev_time = np.zeros((self.args.batch_size))
+		prev_time = np.zeros((batch_size))
 		# prev_time = 0
 
 		for t in range(1,input.shape[0]):
@@ -1415,7 +1429,7 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 			
 			# Compute prior value. 
 			# print("SAMPLED B: ", sampled_b[:t])
-			prior_values[t] = self.get_prior_value(delta_t, max_limit=self.args.skill_length)
+			prior_values[t] = self.get_prior_value(delta_t, max_limit=self.args.skill_length, batch_size=batch_size)
 
 			# Construct probabilities.
 			variational_b_probabilities[t] = self.batch_softmax_layer(variational_b_preprobabilities[t] + prior_values[t])
@@ -1487,7 +1501,11 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		# embed()
 
 		# Also compute logprobabilities of the latent_z's sampled from this net. 
-		variational_z_logprobabilities = self.dists.log_prob(sampled_z_index.unsqueeze(1))
+		if self.args.batch_size>1:
+			variational_z_logprobabilities = self.dists.log_prob(sampled_z_index)
+		else:
+			variational_z_logprobabilities = self.dists.log_prob(sampled_z_index.unsqueeze(1))
+
 		variational_z_probabilities = None
 
 		# Set standard distribution for KL. 
