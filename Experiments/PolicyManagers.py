@@ -2000,6 +2000,15 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		latent_z_indices = variational_dict['latent_z_indices']
 		latent_b = variational_dict['latent_b']
 
+		##########################
+		# Set batch mask.
+		##########################
+
+		# Set batch mask. For batch_size = 1, this is just an array of ones the length of the trajectory. 
+		# For batch_size>1, this is an array of size B x Max length of batch size, with 1's for each batch element till that element's trajectory length. 
+		# This way the update policies function is inherited for batch joint training. Only the set mask changes. 
+		self.set_batch_mask()
+
 		###########################
 		# Initialize variables. 
 		###########################
@@ -2015,17 +2024,19 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		###########################
 		# Compute learnt subpolicy loglikelihood.
 		###########################
-		learnt_subpolicy_loglikelihoods, entropy = self.policy_network.forward(subpolicy_inputs, padded_action_seq)
+		unmasked_learnt_subpolicy_loglikelihoods, entropy = self.policy_network.forward(subpolicy_inputs, padded_action_seq)
 
 		# Clip values. # Comment this out to remove clipping.
-		learnt_subpolicy_loglikelihoods = torch.clamp(learnt_subpolicy_loglikelihoods,min=self.args.subpolicy_clamp_value)
+		unmasked_learnt_subpolicy_loglikelihoods = torch.clamp(unmasked_learnt_subpolicy_loglikelihoods,min=self.args.subpolicy_clamp_value)
 
 		# Multiplying the likelihoods with the subpolicy ratio before summing.
-		learnt_subpolicy_loglikelihoods = self.args.subpolicy_ratio*learnt_subpolicy_loglikelihoods
+		unmasked_learnt_subpolicy_loglikelihoods = self.args.subpolicy_ratio*unmasked_learnt_subpolicy_loglikelihoods
 
 		# Summing until penultimate timestep.
 		# learnt_subpolicy_loglikelihood = learnt_subpolicy_loglikelihoods[:-1].sum()
 		# TAKING AVERAGE HERE AS WELL.		
+		# print("Embedding in evaluate likelihood.")		
+		learnt_subpolicy_loglikelihoods = self.batch_mask*unmasked_learnt_subpolicy_loglikelihoods
 		learnt_subpolicy_loglikelihood = learnt_subpolicy_loglikelihoods[:-1].mean()
 
 		###########################
@@ -2067,7 +2078,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				latent_z_logprobabilities = latent_distributions.log_prob(latent_z_copy.unsqueeze(1))
 
 			# Multiply logprobabilities by the latent policy ratio.
-			latent_z_temporal_logprobabilities = latent_z_logprobabilities[:-1]*self.args.latentpolicy_ratio
+			# First mask the latent_z_temporal_logprobs. 			
+			unmasked_latent_z_temporal_logprobabilities = latent_z_logprobabilities[:-1]*self.args.latentpolicy_ratio
+			latent_z_temporal_logprobabilities = self.batch_mask[:-1]*unmasked_latent_z_temporal_logprobabilities
 			latent_z_logprobability = latent_z_temporal_logprobabilities.mean()
 			latent_z_probabilities = None			
 
@@ -2078,9 +2091,11 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# Adding log probabilities of termination (of whether it terminated or not), till penultimate step. 
 		
 		if self.args.batch_size>1: 
-			latent_b_temporal_logprobabilities = latent_b_logprobabilities.take(latent_b.long())[:-1]
+			unmasked_latent_b_temporal_logprobabilities = latent_b_logprobabilities.take(latent_b.long())[:-1]
 		else:
-			latent_b_temporal_logprobabilities = latent_b_logprobabilities[range(len(sample_traj)-1),latent_b[:-1].long()]
+			unmasked_latent_b_temporal_logprobabilities = latent_b_logprobabilities[range(len(sample_traj)-1),latent_b[:-1].long()]
+
+		latent_b_temporal_logprobabilities = self.batch_mask[:-1]*unmasked_latent_b_temporal_logprobabilities
 		latent_b_logprobability = latent_b_temporal_logprobabilities.mean()
 		latent_loglikelihood += latent_b_logprobability
 		latent_loglikelihood += latent_z_logprobability
@@ -2131,66 +2146,62 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 	def new_update_policies(self, i, input_dictionary, variational_dict, eval_likelihood_dict):
 
 		######################################################
-		############### Parse dictionaries. ##################
-		######################################################
-
-		sample_action_seq = input_dictionary['sample_action_seq']
-
-		latent_b = variational_dict['latent_b']
-		latent_z_indices = variational_dict['latent_z_indices']
-		variational_z_logprobabilities = variational_dict['variational_z_logprobabilities']
-		variational_b_logprobabilities = variational_dict['variational_b_logprobabilities']
-		variational_z_probabilities = variational_dict['variational_z_probabilities']
-		variational_b_probabilities = variational_dict['variational_b_probabilities']
-		kl_divergence = variational_dict['kl_divergence']
-		prior_loglikelihood = variational_dict['prior_loglikelihood']
-
-		latent_z_logprobabilities = eval_likelihood_dict['latent_z_logprobabilities']
-		latent_b_logprobabilities = eval_likelihood_dict['latent_b_logprobabilities']
-		latent_z_probabilities = eval_likelihood_dict['latent_z_probabilities']
-		latent_b_probabilities = eval_likelihood_dict['latent_b_probabilities']
-		learnt_subpolicy_loglikelihood = eval_likelihood_dict['learnt_subpolicy_loglikelihood']
-		learnt_subpolicy_loglikelihoods = eval_likelihood_dict['learnt_subpolicy_loglikelihoods']
-		latent_loglikelihood = eval_likelihood_dict['latent_loglikelihood']
-		temporal_loglikelihoods = eval_likelihood_dict['temporal_loglikelihoods']
-
-		loglikelihood = learnt_subpolicy_loglikelihood+latent_loglikelihood
-
-		######################################################
 		########### Initialize things for func, ##############
 		######################################################
 
 		# Set optimizer gradients to zero.
 		self.optimizer.zero_grad()
 
-		# Set batch mask. For batch_size = 1, this is just an array of ones the length of the trajectory. 
-		# For batch_size>1, this is an array of size B x Max length of batch size, with 1's for each batch element till that element's trajectory length. 
-		# This way the update policies function is inherited for batch joint training. Only the set mask changes. 
-		self.set_batch_mask()
+		######################################################
+		############### Parse dictionaries. ##################
+		######################################################
+
+		sample_action_seq = input_dictionary['sample_action_seq']
+
+		latent_b = variational_dict['latent_b']*self.batch_mask
+		latent_z_indices = variational_dict['latent_z_indices']*self.batch_mask.unsqueeze(2)
+		variational_z_logprobabilities = variational_dict['variational_z_logprobabilities']*self.batch_mask
+		variational_b_logprobabilities = variational_dict['variational_b_logprobabilities']*self.batch_mask.unsqueeze(2)
+		variational_z_probabilities = variational_dict['variational_z_probabilities']
+		variational_b_probabilities = variational_dict['variational_b_probabilities']*self.batch_mask.unsqueeze(2)
+		kl_divergence = variational_dict['kl_divergence']*self.batch_mask
+		prior_loglikelihood = variational_dict['prior_loglikelihood']*self.batch_mask
+
+		latent_z_logprobabilities = eval_likelihood_dict['latent_z_logprobabilities']*self.batch_mask
+		latent_b_logprobabilities = eval_likelihood_dict['latent_b_logprobabilities']*self.batch_mask.unsqueeze(2)
+		latent_z_probabilities = eval_likelihood_dict['latent_z_probabilities']
+		latent_b_probabilities = eval_likelihood_dict['latent_b_probabilities']*self.batch_mask.unsqueeze(2)
+		learnt_subpolicy_loglikelihood = eval_likelihood_dict['learnt_subpolicy_loglikelihood']
+		learnt_subpolicy_loglikelihoods = eval_likelihood_dict['learnt_subpolicy_loglikelihoods']*self.batch_mask
+		latent_loglikelihood = eval_likelihood_dict['latent_loglikelihood']
+		
+		temporal_loglikelihoods = eval_likelihood_dict['temporal_loglikelihoods']*self.batch_mask[:-1]
+
+		loglikelihood = (learnt_subpolicy_loglikelihood+latent_loglikelihood)*self.batch_mask
 
 		# Assemble prior and KL divergence losses. 
 		# Since these are output by the variational network, and we don't really need the last z predicted by it. 
-
-		embed()
-
-		prior_loglikelihood = prior_loglikelihood[:-1]		
-		kl_divergence = kl_divergence[:-1]
+		prior_loglikelihood = (self.batch_mask*prior_loglikelihood)[:-1]		
+		kl_divergence = (self.batch_mask*kl_divergence)[:-1]
 
 		######################################################
 		############## Update latent policy. #################
 		######################################################
 
 		# Remember, an NLL loss function takes <Probabilities, Sampled Value> as arguments. 
-		self.latent_b_loss = self.negative_log_likelihood_loss_function(latent_b_logprobabilities.view(-1,2), latent_b.long().view(-1,)).view(-1,self.args.batch_size)
+		self.unmasked_latent_b_loss = self.negative_log_likelihood_loss_function(latent_b_logprobabilities.view(-1,2), latent_b.long().view(-1,)).view(-1,self.args.batch_size)
+		self.latent_b_loss = self.batch_mask*self.unmasked_latent_b_loss
 		# self.latent_b_loss = self.negative_log_likelihood_loss_function(latent_b_logprobabilities, latent_b.long())		
 
 		if self.args.discrete_z:
 			self.latent_z_loss = self.negative_log_likelihood_loss_function(latent_z_logprobabilities, latent_z_indices.long())
 		# If continuous latent_z, just calculate loss as negative log likelihood of the latent_z's selected by variational network.
 		else:
-			self.latent_z_loss = -latent_z_logprobabilities.squeeze(1)
+			self.unmasked_latent_z_loss = -latent_z_logprobabilities.squeeze(1)
+			self.latent_z_loss = self.batch_mask*self.unmasked_latent_z_loss
 
 		# Compute total latent loss as weighted sum of latent_b_loss and latent_z_loss.
+		# Remember, no need to mask this with batch_mask, because it's just a sum of latent_b_loss and latent_z_loss, which are both already masked.
 		self.total_latent_loss = (self.latent_b_loss_weight*self.latent_b_loss+self.latent_z_loss_weight*self.latent_z_loss)[:-1]
 
 		#######################################################
@@ -2199,9 +2210,11 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# MUST ALWAYS COMPUTE: # Compute cross entropies. 
 		# self.variational_b_loss = self.negative_log_likelihood_loss_function(variational_b_logprobabilities[:-1], latent_b[:-1].long())
-		self.variational_b_loss = self.negative_log_likelihood_loss_function(variational_b_logprobabilities.view(-1,2), latent_b.long().view(-1,)).view(-1,self.args.batch_size)[:-1]
+		self.unmasked_variational_b_loss = self.negative_log_likelihood_loss_function(variational_b_logprobabilities.view(-1,2), latent_b.long().view(-1,)).view(-1,self.args.batch_size)
+		self.variational_b_loss = (self.batch_mask*self.unmasked_variational_b_loss)[:-1]
 
 		# In case of reparameterization, the variational loss that goes to REINFORCE should just be variational_b_loss.
+		# Remember, no need to mask this with batch_mask, because it's just derived from variational_b_loss, which is already masked.
 		self.variational_loss = self.args.var_loss_weight*self.variational_b_loss
 
 		#######################################################
@@ -2216,6 +2229,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# (2) \mathbb{E}_{x, z \sim q(z|x)} \Big[ \nabla_{\omega} \log q(z|x,\omega) \{ \log p(x||z) + \log p(z||x) - \log p(z) \} \Big] - \nabla_{\omega} D_{KL} \Big[ q(z|x) || p(z) \Big]
 
 		# Compute baseline target according to NEW GRADIENT, and Equation (2) above. 
+
 		baseline_target = (temporal_loglikelihoods - self.args.prior_weight*prior_loglikelihood).clone().detach()
 
 		if self.baseline is None:
@@ -2223,6 +2237,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		else:
 			self.baseline = (self.beta_decay*self.baseline)+(1.-self.beta_decay)*baseline_target.mean()
 			
+		# Remember, no need to mask this with batch_mask, because it's just derived from temporal_loglikelihoods and variational_b_loss, which are already masked.
 		self.reinforce_variational_loss = self.variational_loss*(baseline_target-self.baseline)
 
 		# If reparam, the variational loss is a combination of three things. 
@@ -2780,7 +2795,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 		for b in range(self.args.batch_size):
 			# self.batch_mask[b, :self.batch_trajectory_lengths[b]] = 1.
 			self.batch_mask[:self.batch_trajectory_lengths[b], b] = 1.
-			
+
 	# Get batch full trajectory. 
 	def collect_inputs(self, i, get_latents=False):
 
