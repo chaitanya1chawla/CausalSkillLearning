@@ -24,7 +24,7 @@ def return_dataset(args, data=None):
 	elif args.data=='DeterGoal':
 		dataset = DataLoaders.DeterministicGoalDirectedDataset(args.datadir)			
 	elif args.data=='MIME':
-		dataset = MIME_DataLoader.MIME_NewDataset()
+		dataset = MIME_DataLoader.MIME_NewDataset(short_traj=args.short_trajectories)
 	elif args.data=='Roboturk':		
 		dataset = Roboturk_DataLoader.Roboturk_NewSegmentedDataset(args)
 	elif args.data=='OrigRoboturk':
@@ -168,6 +168,7 @@ def parse_arguments():
 	parser.add_argument('--load_latent',dest='load_latent',type=int,default=1) # Whether to load latent policy from model or not.
 	parser.add_argument('--subpolicy_model',dest='subpolicy_model',type=str)
 	parser.add_argument('--traj_length',dest='traj_length',type=int,default=10)
+	parser.add_argument('--short_trajectories',dest='short_trajectories',type=int,default=0,help='Whether to restrict training to short trajectories, to massively save GPU memory.')
 	parser.add_argument('--skill_length',dest='skill_length',type=int,default=5)
 	parser.add_argument('--var_skill_length',dest='var_skill_length',type=int,default=0)
 

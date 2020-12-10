@@ -119,7 +119,7 @@ class MIME_Dataset(Dataset):
 
 class MIME_NewDataset(Dataset):
 
-	def __init__(self, split='all'):
+	def __init__(self, split='all', short_traj=False):
 		# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
 		self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
 
@@ -135,6 +135,17 @@ class MIME_NewDataset(Dataset):
 
 		self.dataset_length = len(self.data_list)
 
+		if short_traj:
+
+			length_threshold = 500
+			self.short_data_list = []
+			for i in range(self.dataset_length):
+				if self.data_list[i]['demo'].shape[0]<length_threshold:
+					self.short_data_list.append(self.data_list[i])
+
+			self.data_list = self.short_data_list
+			self.dataset_length = len(self.data_list)
+			
 	def __len__(self):
 		# Return length of file list. 
 		return self.dataset_length
@@ -214,7 +225,6 @@ class MIME_NewDataset(Dataset):
 		np.save("MIME_Orig_Vel_Var.npy", vel_variance)
 		np.save("MIME_Orig_Vel_Min.npy", vel_min_value)
 		np.save("MIME_Orig_Vel_Max.npy", vel_max_value)
-
 
 class MIME_Dataloader_Tester(unittest.TestCase):
 	

@@ -2036,6 +2036,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# learnt_subpolicy_loglikelihood = learnt_subpolicy_loglikelihoods[:-1].sum()
 		# TAKING AVERAGE HERE AS WELL.		
 		# print("Embedding in evaluate likelihood.")		
+		
 		learnt_subpolicy_loglikelihoods = self.batch_mask*unmasked_learnt_subpolicy_loglikelihoods
 		learnt_subpolicy_loglikelihood = learnt_subpolicy_loglikelihoods[:-1].mean()
 
@@ -2072,10 +2073,12 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			latent_b_logprobabilities, latent_b_probabilities, latent_distributions = self.latent_policy.forward(assembled_inputs_copy, self.epsilon)
 			# Evalute loglikelihood of latent z vectors under the latent policy's distributions. 			
 
+			# embed()
+
 			if self.args.batch_size>1:
-				latent_z_logprobabilities = latent_distributions.log_prob(latent_z_copy)
+				latent_z_logprobabilities = latent_distributions.log_prob(latent_z_copy)				
 			else:				
-				latent_z_logprobabilities = latent_distributions.log_prob(latent_z_copy.unsqueeze(1))
+				latent_z_logprobabilities = latent_distributions.log_prob(latent_z_copy.unsqueeze(1))				
 
 			# Multiply logprobabilities by the latent policy ratio.
 			# First mask the latent_z_temporal_logprobs. 			
@@ -2090,11 +2093,13 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# Adding log probabilities of termination (of whether it terminated or not), till penultimate step. 
 		
-		if self.args.batch_size>1: 
-			unmasked_latent_b_temporal_logprobabilities = latent_b_logprobabilities.take(latent_b.long())[:-1]
-		else:
-			unmasked_latent_b_temporal_logprobabilities = latent_b_logprobabilities[range(len(sample_traj)-1),latent_b[:-1].long()]
-
+		# if self.args.batch_size>1: 
+		# 	unmasked_latent_b_temporal_logprobabilities = latent_b_logprobabilities.take(latent_b.long())[:-1]
+		# else:
+		# 	# unmasked_latent_b_temporal_logprobabilities = latent_b_logprobabilities[range(len(sample_traj)-1),latent_b[:-1].long()]
+		# 	unmasked_latent_b_temporal_logprobabilities = latent_b_logprobabilities.take(latent_b.long())[:-1]
+			
+		unmasked_latent_b_temporal_logprobabilities = latent_b_logprobabilities.take(latent_b.long())[:-1]
 		latent_b_temporal_logprobabilities = self.batch_mask[:-1]*unmasked_latent_b_temporal_logprobabilities
 		latent_b_logprobability = latent_b_temporal_logprobabilities.mean()
 		latent_loglikelihood += latent_b_logprobability
@@ -2141,7 +2146,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# self.set_batch_mask = torch.ones((1, self.current_traj_len))
 		# Remember, dimensions are time x batch.
-		self.set_batch_mask = torch.ones((self.current_traj_len,1))
+		self.batch_mask = torch.ones((self.current_traj_len,1)).to(device).float()
 
 	def new_update_policies(self, i, input_dictionary, variational_dict, eval_likelihood_dict):
 
@@ -2158,6 +2163,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		sample_action_seq = input_dictionary['sample_action_seq']
 
+		# print("EMBEZ")
+		# embed()
 		latent_b = variational_dict['latent_b']*self.batch_mask
 		latent_z_indices = variational_dict['latent_z_indices']*self.batch_mask.unsqueeze(2)
 		variational_z_logprobabilities = variational_dict['variational_z_logprobabilities']*self.batch_mask
@@ -2166,7 +2173,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		variational_b_probabilities = variational_dict['variational_b_probabilities']*self.batch_mask.unsqueeze(2)
 		kl_divergence = variational_dict['kl_divergence']*self.batch_mask
 		prior_loglikelihood = variational_dict['prior_loglikelihood']*self.batch_mask
-
+		
 		latent_z_logprobabilities = eval_likelihood_dict['latent_z_logprobabilities']*self.batch_mask
 		latent_b_logprobabilities = eval_likelihood_dict['latent_b_logprobabilities']*self.batch_mask.unsqueeze(2)
 		latent_z_probabilities = eval_likelihood_dict['latent_z_probabilities']
@@ -2189,6 +2196,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		######################################################
 
 		# Remember, an NLL loss function takes <Probabilities, Sampled Value> as arguments. 
+		# embed()
 		self.unmasked_latent_b_loss = self.negative_log_likelihood_loss_function(latent_b_logprobabilities.view(-1,2), latent_b.long().view(-1,)).view(-1,self.args.batch_size)
 		self.latent_b_loss = self.batch_mask*self.unmasked_latent_b_loss
 		# self.latent_b_loss = self.negative_log_likelihood_loss_function(latent_b_logprobabilities, latent_b.long())		
@@ -2916,6 +2924,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 		extent = len(self.dataset)-self.test_set_size
 		counter = 0
 		self.batch_indices_sizes = []
+		# self.trajectory_lengths = []
 
 		print("About to run a dry run. ")
 		# Do a dry run of 1 epoch, before we actually start running training. 
@@ -2923,18 +2932,20 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 		for i in range(0,extent,self.args.batch_size):		
 			# Dry run iteration. 
 			self.run_iteration(counter, self.index_list[i], skip_iteration=True)
-		
 
 		print("About to find max batch size index.")
 		# Now find maximum batch size iteration. 
 		max_batch_size_index = 0
 		max_batch_size = 0
+		# traj_lengths = []
+
 		for x in range(len(self.batch_indices_sizes)):
 			if self.batch_indices_sizes[x]['batch_size']>max_batch_size:
 				max_batch_size = self.batch_indices_sizes[x]['batch_size']
 				max_batch_size_index = self.batch_indices_sizes[x]['i']
-		
+					
 		print("About to run max batch size iteration.")
+		print("This batch size is: ", max_batch_size)
 		# Now run another epoch, where we only skip iteration if it's the max batch size.
 		for i in range(0,extent,self.args.batch_size):
 			# Skip unless i is ==max_batch_size_index.
@@ -4461,6 +4472,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.tf_logger.image_summary("TSNE Target Embedding", [self.viz_dictionary['tsne_target_embedding']], counter)
 			self.tf_logger.image_summary("TSNE Combined Embeddings", [self.viz_dictionary['tsne_combined_embeddings']], counter)			
 
+			
 			# Plot source, target, and shared embeddings via PCA. 
 			self.viz_dictionary['pca_source_embedding'], self.viz_dictionary['pca_target_embedding'], self.viz_dictionary['pca_combined_embeddings'], self.viz_dictionary['pca_combined_traj_embeddings'] = self.get_embeddings(projection='pca')
 
@@ -4647,7 +4659,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# Compute VAE loss on the current domain as likelihood plus weighted KL.  
 		self.likelihood_loss = -update_dictionary['loglikelihood'].mean()
-		self.encoder_KL = update_dictionary['kl_divergence'].mean()	
+		self.encoder_KL = update_dictionary['kl_divergence'].mean()
 		self.VAE_loss = self.likelihood_loss + self.args.kl_weight*self.encoder_KL
 		
 		# Compute discriminability loss for encoder (implicitly ignores decoder).
@@ -5171,6 +5183,11 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Adding additional summaries based on cycle reconstruction.
 		self.tf_logger.scalar_summary('Cycle Reconstructed Loglikelihood', self.cycle_reconstructed_loglikelihood.mean(), counter)
 		self.tf_logger.scalar_summary('Cycle Reconstruction Loss', self.cycle_reconstruction_loss, counter)
+
+		# Original trajectory. 
+		original_trajectory = viz_dict['source_subpolicy_inputs_original'][:,:,:self.source_manager.state_dim]
+		cycle_reconstructed_trajectory = viz_dict['source_subpolicy_inputs_crossdomain'][:,:,:self.source_manager.state_dim]
+
 
 	def run_iteration(self, counter, i):
 
