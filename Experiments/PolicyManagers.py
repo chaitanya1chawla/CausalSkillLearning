@@ -4405,7 +4405,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				_, subpolicy_inputs, sample_action_seq = policy_manager.assemble_inputs(trajectory_segment, latent_z_seq, latent_b, sample_action_seq)
 
 			# Policy net doesn't use the decay epislon. (Because we never sample from it in training, only rollouts.)
-			loglikelihoods, _ = policy_manager.policy_network.forward(subpolicy_inputs, sample_action_seq)
+			loglikelihoods, _ = policy_manager.policy_network.forward(subpolicy_inputs, sample_action_seq)		
 			loglikelihood = loglikelihoods[:-1].mean()
 
 			if return_trajectory:
@@ -5005,16 +5005,9 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 
 			# Downscale the actions by action_scale_factor.
 			action_to_execute = action_to_execute/self.args.action_scale_factor
-
 			
 			# Compute next state. 
-			new_state = subpolicy_inputs[t,...,:policy_manager.state_dim]+action_to_execute
-
-			if self.args.batch_size>1:
-				new_state = subpolicy_inputs[t,:,:policy_manager.state_dim]+action_to_execute
-			else:
-				new_state = subpolicy_inputs[t,:policy_manager.state_dim]+action_to_execute
-			
+			new_state = subpolicy_inputs[t,...,:policy_manager.state_dim]+action_to_execute		
 
 			# Create new input row. 
 			input_row = torch.zeros((self.args.batch_size, 2*policy_manager.state_dim+policy_manager.latent_z_dimensionality)).to(device).float()
@@ -5029,16 +5022,10 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 			else:
 				subpolicy_inputs = torch.cat([subpolicy_inputs,input_row],dim=0)
 
-		if self.args.batch_size>1:
-			trajectory = subpolicy_inputs[:,:,:policy_manager.state_dim].detach().cpu().numpy()
-			differentiable_trajectory = subpolicy_inputs[:,:,:policy_manager.state_dim]
-			differentiable_action_seq = subpolicy_inputs[:,:,policy_manager.state_dim:2*policy_manager.state_dim]
-			differentiable_state_action_seq = subpolicy_inputs[:,:,:2*policy_manager.state_dim]
-		else:
-			trajectory = subpolicy_inputs[:,:policy_manager.state_dim].detach().cpu().numpy()
-			differentiable_trajectory = subpolicy_inputs[:,:policy_manager.state_dim]
-			differentiable_action_seq = subpolicy_inputs[:,policy_manager.state_dim:2*policy_manager.state_dim]
-			differentiable_state_action_seq = subpolicy_inputs[:,:2*policy_manager.state_dim]
+		trajectory = subpolicy_inputs[...,:policy_manager.state_dim].detach().cpu().numpy()
+		differentiable_trajectory = subpolicy_inputs[...,:policy_manager.state_dim]
+		differentiable_action_seq = subpolicy_inputs[...,policy_manager.state_dim:2*policy_manager.state_dim]
+		differentiable_state_action_seq = subpolicy_inputs[...,:2*policy_manager.state_dim]
 
 		# For differentiabiity, return tuple of trajectory, actions, state actions, and subpolicy_inputs. 
 		return [differentiable_trajectory, differentiable_action_seq, differentiable_state_action_seq, subpolicy_inputs]
@@ -5085,7 +5072,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		####################################
 		# (1) Compute single-domain reconstruction loss.
 		####################################
-
+	
 		# Compute VAE loss on the current domain as negative log likelihood likelihood plus weighted KL.  
 		self.source_likelihood_loss = -dictionary['source_loglikelihood'].mean()
 		self.source_encoder_KL = dictionary['source_kl_divergence'].mean()
@@ -5111,7 +5098,11 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Get z discriminator logprobabilities.
 		z_discriminator_logprob, self.z_discriminator_prob = self.discriminator_network(dictionary['source_latent_z'])
 		# Compute discriminability loss. Remember, this is not used for training the discriminator, but rather the encoders.
-		self.z_discriminability_loss = self.negative_log_likelihood_loss_function(z_discriminator_logprob.squeeze(1), torch.tensor(1-dictionary['domain']).to(device).long().view(1,))
+
+		domain_label = torch.tensor(1-dictionary['domain']).to(device).long().view(1,)
+		domain_label = domain_label.repeat(self.args.batch_size,)
+
+		self.z_discriminability_loss = self.negative_log_likelihood_loss_function(z_discriminator_logprob.squeeze(0), 1-domain_label).mean()
 
 		###### Block that computes discriminability losses assuming we are using trjaectory discriminators. ######
 
@@ -5133,7 +5124,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# I.e. evaluate likelihood of original actions under source_decoder (i.e. source subpolicy), with the subpolicy inputs constructed from cycle-reconstruction.
 		
 		# Get the original action sequence.
-		original_action_sequence = dictionary['source_subpolicy_inputs_original'][:,source_policy_manager.state_dim:2*source_policy_manager.state_dim]
+		original_action_sequence = dictionary['source_subpolicy_inputs_original'][...,source_policy_manager.state_dim:2*source_policy_manager.state_dim]
 
 		# Now evaluate likelihood of actions under the source decoder.
 		self.cycle_reconstructed_loglikelihood, _ = source_policy_manager.policy_network.forward(dictionary['source_subpolicy_inputs_crossdomain'], original_action_sequence)
@@ -5165,7 +5156,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		z_discriminator_detach_logprob, z_discriminator_detach_prob = self.discriminator_network(dictionary['source_latent_z'].detach())
 
 		# Compute discriminator loss for discriminator. 
-		self.z_discriminator_loss = self.negative_log_likelihood_loss_function(z_discriminator_detach_logprob.squeeze(1), torch.tensor(dictionary['domain']).to(device).long().view(1,))		
+		self.z_discriminator_loss = self.negative_log_likelihood_loss_function(z_discriminator_detach_logprob.squeeze(0), domain_label)		
 		
 		if not(self.skip_discriminator):
 			# Now go backward and take a step.
