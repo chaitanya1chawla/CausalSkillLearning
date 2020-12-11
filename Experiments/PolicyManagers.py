@@ -13,8 +13,6 @@ import TFLogger, DMP, RLUtils
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
-# Making sure RSYnc works 
-
 class PolicyManager_BaseClass():
 
 	def __init__(self):
@@ -4386,16 +4384,21 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			latent_z_seq, latent_b = policy_manager.construct_dummy_latents(latent_z)
 
 			# If we are using the pre-computed trajectory input, (in second encode_decode call, from target trajectory to target latent z.)
-			# Don't assemble trajectory in numpy, just take the previous subpolicy_inputs, and then clone it and replace the latent z in it.
+			# Don't assemble trajectory in numpy, just takze the previous subpolicy_inputs, and then clone it and replace the latent z in it.
 			# Remember, this branch is also only used in cycle consistency training. 
 			if trajectory_input is not None: 
 
 				# Now assigned trajectory_input['subpolicy_inputs'].clone() to SubPolicy_inputs, and then replace the latent z's.
 				subpolicy_inputs = trajectory_input['subpolicy_inputs'].clone()
-				subpolicy_inputs[:,2*policy_manager.state_dim:] = latent_z_seq
 
-				# Now get "sample_action_seq" for forward function. 				
-				sample_action_seq = subpolicy_inputs[:,policy_manager.state_dim:2*policy_manager.state_dim].clone()
+				if self.args.batch_size>1:
+					subpolicy_inputs[:,:,2*policy_manager.state_dim:] = latent_z_seq
+					# Now get "sample_action_seq" for forward function. 				
+					sample_action_seq = subpolicy_inputs[:,:,policy_manager.state_dim:2*policy_manager.state_dim].clone()
+				else:
+					subpolicy_inputs[:,2*policy_manager.state_dim:] = latent_z_seq
+					# Now get "sample_action_seq" for forward function. 				
+					sample_action_seq = subpolicy_inputs[:,policy_manager.state_dim:2*policy_manager.state_dim].clone()
 
 			else:
 				# This branch gets executed for plain domain adversarial training, so the changes we made above don't affect domain adversarial training. 
@@ -4437,7 +4440,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Remove nested gif objects. 
 		del self.source_manager.ground_truth_gif, self.source_manager.rollout_gif, self.target_manager.ground_truth_gif, self.target_manager.rollout_gif
 
-	# @profile
 	def update_plots(self, counter, viz_dict):
 
 		# VAE Losses. 
@@ -4559,7 +4561,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Simply just transform according to a fit transforming_object.
 		return transforming_object.transform(latent_z_set)
 
-	# @profile
 	def get_embeddings(self, projection='tsne', computed_sets=False):
 		# Function to visualize source, target, and combined embeddings: 
 
@@ -4615,7 +4616,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		return self.source_image, self.target_image, self.shared_image, self.toy_shared_embedding_image
 
-	# @profile
 	def get_trajectory_visuals(self):
 
 		i = np.random.randint(0,high=self.extent)
@@ -4647,7 +4647,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		else: 
 			return None, None, None, None
 
-	# def update_networks(self, domain, policy_manager, policy_loglikelihood, encoder_KL, discriminator_loglikelihood, latent_z):
 	def update_networks(self, domain, policy_manager, update_dictionary):
 
 		#######################
@@ -4699,7 +4698,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.discriminator_loss.backward()
 			self.discriminator_optimizer.step()
 	
-	# @profile
 	def run_iteration(self, counter, i):
 
 		# Phases: 
@@ -4743,7 +4741,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			viz_dict = {'domain': domain, 'discriminator_probs': discriminator_prob.squeeze(0).mean(axis=0)[domain].detach().cpu().numpy()}
 			self.update_plots(counter, viz_dict)
 
-	# @profile
 	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False):	
 	
 		fig = plt.figure()
@@ -4807,7 +4804,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		self.neighbor_obj_set = True
 
-	# @profile
 	def evaluate_correspondence_metrics(self, computed_sets=True):
 
 		print("Evaluating correspondence metrics.")
@@ -4961,15 +4957,21 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		neighbor_object = neighbor_object_list[1-domain]
 		trajectory_set = trajectory_set_list[1-domain]
 
+
 		# Next get closest target z. 
 		_ , target_latent_z_index = neighbor_object.kneighbors(source_latent_z.squeeze(0).detach().cpu().numpy())
 
-		# Don't actually need the target_latent_z, unless we're doing differentiable nearest neighbor transfer. 
-		# Now get the corresponding trajectory. 
-		trajectory = trajectory_set[target_latent_z_index[0,0]]
-		
-		# Finally, pick up first state. 
-		start_state = trajectory[0]
+		# Don't actually need the target_latent_z, unless we're doing differentiable nearest neighbor transfer. 					
+		if self.args.batch_size>1:
+			# Now get the corresponding trajectory. 
+			trajectory = trajectory_set[target_latent_z_index[:,0]]
+			# Finally, pick up first state. 
+			start_state = trajectory[:,0]
+		else:
+			# Now get the corresponding trajectory. 			
+			trajectory = trajectory_set[target_latent_z_index[0,0]]
+			# Finally, pick up first state. 
+			start_state = trajectory[0]
 
 		return start_state
 
@@ -4981,9 +4983,12 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Remember, the differentiable rollout is required because the backtranslation / cycle-consistency loss needs to be propagated through multiple sets of translations. 
 		# Therefore it must pass through the decoder network(s), and through the latent_z's. (It doesn't actually pass through the states / actions?).		
 
-		subpolicy_inputs = torch.zeros((1,2*policy_manager.state_dim+policy_manager.latent_z_dimensionality)).to(device).float()
-		subpolicy_inputs[0,:policy_manager.state_dim] = torch.tensor(trajectory_start).to(device).float()
+		subpolicy_inputs = torch.zeros((self.args.batch_size,2*policy_manager.state_dim+policy_manager.latent_z_dimensionality)).to(device).float()
+		subpolicy_inputs[:,:policy_manager.state_dim] = torch.tensor(trajectory_start).to(device).float()
 		subpolicy_inputs[:,2*policy_manager.state_dim:] = torch.tensor(latent_z).to(device).float()	
+
+		if self.args.batch_size>1:
+			subpolicy_inputs = subpolicy_inputs.unsqueeze(0)
 
 		if rollout_length is not None: 
 			length = rollout_length-1
@@ -5001,23 +5006,39 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 			# Downscale the actions by action_scale_factor.
 			action_to_execute = action_to_execute/self.args.action_scale_factor
 
+			
 			# Compute next state. 
-			new_state = subpolicy_inputs[t,:policy_manager.state_dim]+action_to_execute
+			new_state = subpolicy_inputs[t,...,:policy_manager.state_dim]+action_to_execute
 
-			# New input row. 
-			input_row = torch.zeros((1,2*policy_manager.state_dim+policy_manager.latent_z_dimensionality)).to(device).float()
-			input_row[0,:policy_manager.state_dim] = new_state
+			if self.args.batch_size>1:
+				new_state = subpolicy_inputs[t,:,:policy_manager.state_dim]+action_to_execute
+			else:
+				new_state = subpolicy_inputs[t,:policy_manager.state_dim]+action_to_execute
+			
+
+			# Create new input row. 
+			input_row = torch.zeros((self.args.batch_size, 2*policy_manager.state_dim+policy_manager.latent_z_dimensionality)).to(device).float()
+			input_row[:,:policy_manager.state_dim] = new_state
 			# Feed in the ORIGINAL prediction from the network as input. Not the downscaled thing. 
-			input_row[0,policy_manager.state_dim:2*policy_manager.state_dim] = actions[-1].squeeze(1)
-			input_row[0,2*policy_manager.state_dim:] = latent_z
+			input_row[:,policy_manager.state_dim:2*policy_manager.state_dim] = actions[-1].squeeze(1)
+			input_row[:,2*policy_manager.state_dim:] = latent_z
 
 			# Now that we have assembled the new input row, concatenate it along temporal dimension with previous inputs. 
-			subpolicy_inputs = torch.cat([subpolicy_inputs,input_row],dim=0)
+			if self.args.batch_size>1:
+				subpolicy_inputs = torch.cat([subpolicy_inputs,input_row.unsqueeze(0)],dim=0)
+			else:
+				subpolicy_inputs = torch.cat([subpolicy_inputs,input_row],dim=0)
 
-		trajectory = subpolicy_inputs[:,:policy_manager.state_dim].detach().cpu().numpy()
-		differentiable_trajectory = subpolicy_inputs[:,:policy_manager.state_dim]
-		differentiable_action_seq = subpolicy_inputs[:,policy_manager.state_dim:2*policy_manager.state_dim]
-		differentiable_state_action_seq = subpolicy_inputs[:,:2*policy_manager.state_dim]
+		if self.args.batch_size>1:
+			trajectory = subpolicy_inputs[:,:,:policy_manager.state_dim].detach().cpu().numpy()
+			differentiable_trajectory = subpolicy_inputs[:,:,:policy_manager.state_dim]
+			differentiable_action_seq = subpolicy_inputs[:,:,policy_manager.state_dim:2*policy_manager.state_dim]
+			differentiable_state_action_seq = subpolicy_inputs[:,:,:2*policy_manager.state_dim]
+		else:
+			trajectory = subpolicy_inputs[:,:policy_manager.state_dim].detach().cpu().numpy()
+			differentiable_trajectory = subpolicy_inputs[:,:policy_manager.state_dim]
+			differentiable_action_seq = subpolicy_inputs[:,policy_manager.state_dim:2*policy_manager.state_dim]
+			differentiable_state_action_seq = subpolicy_inputs[:,:2*policy_manager.state_dim]
 
 		# For differentiabiity, return tuple of trajectory, actions, state actions, and subpolicy_inputs. 
 		return [differentiable_trajectory, differentiable_action_seq, differentiable_state_action_seq, subpolicy_inputs]
@@ -5188,7 +5209,6 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		original_trajectory = viz_dict['source_subpolicy_inputs_original'][:,:,:self.source_manager.state_dim]
 		cycle_reconstructed_trajectory = viz_dict['source_subpolicy_inputs_crossdomain'][:,:,:self.source_manager.state_dim]
 
-
 	def run_iteration(self, counter, i):
 
 		# Phases: 
@@ -5252,8 +5272,9 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# (3 d) Cross domain decoding of target_latent_z into source trajectory. 
 		# Can use the original start state, or also use the reverse trick for start state. Try both maybe.
 		####################################
-
-		source_cross_domain_decoding_dict = self.cross_domain_decoding(dictionary['domain'], source_policy_manager, dictionary['target_latent_z'], start_state=dictionary['source_subpolicy_inputs_original'][0,:source_policy_manager.state_dim].detach().cpu().numpy())
+		
+		source_cross_domain_decoding_dict = self.cross_domain_decoding(dictionary['domain'], source_policy_manager, dictionary['target_latent_z'], start_state=dictionary['source_subpolicy_inputs_original'][0,...,:source_policy_manager.state_dim].detach().cpu().numpy())
+		# source_cross_domain_decoding_dict = self.cross_domain_decoding(dictionary['domain'], source_policy_manager, dictionary['target_latent_z'], start_state=dictionary['source_subpolicy_inputs_original'][0,:source_policy_manager.state_dim].detach().cpu().numpy())
 		dictionary['source_subpolicy_inputs_crossdomain'] = source_cross_domain_decoding_dict['subpolicy_inputs']
 
 		####################################
