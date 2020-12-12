@@ -9,6 +9,9 @@ from headers import *
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
+# torch.cuda.set_device(torch.device('cuda:1'))
+# if use_cuda:
+# 	torch.cuda.set_device(2)
 
 class PolicyNetwork_BaseClass(torch.nn.Module):
 	
@@ -146,7 +149,7 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 
 		self.variance_factor = 0.01
 
-	def forward(self, input, action_sequence, epsilon=0.001, batch_size=None):
+	def forward(self, input, action_sequence, epsilon=0.001, batch_size=None, debugging=False):
 		# Input is the trajectory sequence of shape: Sequence_Length x 1 x Input_Size. 
 		# Here, we also need the continuous actions as input to evaluate their logprobability / probability. 		
 		# format_input = torch.tensor(input).view(input.shape[0], self.batch_size, self.input_size).float().to(device)
@@ -177,8 +180,19 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		# Remember, because of Pytorch's dynamic construction, this distribution can have it's own batch size. 
 		# It doesn't matter if batch sizes changes over different forward passes of the LSTM, because we're only going
 		# to evaluate this distribution (instance)'s log probability with the same sequence length. 
-		dist = torch.distributions.MultivariateNormal(mean_outputs, torch.diag_embed(variance_outputs))
-		log_probabilities = dist.log_prob(format_action_seq)
+
+		# if debugging:
+		# 	embed()
+
+		covariance_matrix = torch.diag_embed(variance_outputs)
+
+		# Executing distribution creation on CPU and then copying back to GPU.
+		dist = torch.distributions.MultivariateNormal(mean_outputs.cpu(), covariance_matrix.cpu())
+		log_probabilities = dist.log_prob(format_action_seq.cpu()).to(device)
+
+		# dist = torch.distributions.MultivariateNormal(mean_outputs, covariance_matrix)
+		# log_probabilities = dist.log_prob(format_action_seq)
+
 		# log_probabilities = torch.distributions.MultivariateNormal(mean_outputs, torch.diag_embed(variance_outputs)).log_prob(format_action_seq)
 		entropy = dist.entropy()
 
@@ -1557,7 +1571,7 @@ class EncoderNetwork(PolicyNetwork_BaseClass):
 		self.batch_softmax_layer = torch.nn.Softmax(dim=2)
 		self.batch_logsoftmax_layer = torch.nn.LogSoftmax(dim=2)
 
-	def forward(self, input, epsilon):
+	def forward(self, input, epsilon=0.0001):
 		# Input format must be: Sequence_Length x 1 x Input_Size. 
 		# Assuming input is a numpy array. 		
 		format_input = input.view((input.shape[0], self.batch_size, self.input_size))
@@ -1565,8 +1579,8 @@ class EncoderNetwork(PolicyNetwork_BaseClass):
 		# Instead of iterating over time and passing each timestep's input to the LSTM, we can now just pass the entire input sequence.
 		outputs, hidden = self.lstm(format_input)
 
-		concatenated_outputs = torch.cat([outputs[0,:,self.hidden_size:],outputs[-1,:,:self.hidden_size]],dim=-1).view((1,1,-1))
-		
+		concatenated_outputs = torch.cat([outputs[0,:,self.hidden_size:],outputs[-1,:,:self.hidden_size]],dim=-1).view((1,self.batch_size,-1))	
+
 		# Calculate preprobs.
 		preprobabilities = self.output_layer(self.hidden_layer(concatenated_outputs))
 		probabilities = self.batch_softmax_layer(preprobabilities)
@@ -1576,6 +1590,24 @@ class EncoderNetwork(PolicyNetwork_BaseClass):
 
 		# Return latentz_encoding as output layer of last outputs. 
 		return latent_z, logprobabilities, None, None
+
+	def get_probabilities(self, input):
+		# Input format must be: Sequence_Length x 1 x Input_Size. 
+		# Assuming input is a numpy array. 		
+		format_input = input.view((input.shape[0], self.batch_size, self.input_size))
+		
+		# Instead of iterating over time and passing each timestep's input to the LSTM, we can now just pass the entire input sequence.
+		outputs, hidden = self.lstm(format_input)
+
+		concatenated_outputs = torch.cat([outputs[0,:,self.hidden_size:],outputs[-1,:,:self.hidden_size]],dim=-1).view((1,self.batch_size,-1))	
+
+		# Calculate preprobs.
+		preprobabilities = self.output_layer(self.hidden_layer(concatenated_outputs))
+		probabilities = self.batch_softmax_layer(preprobabilities)
+		logprobabilities = self.batch_logsoftmax_layer(preprobabilities)
+
+		# Return latentz_encoding as output layer of last outputs. 
+		return logprobabilities, probabilities
 
 class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 

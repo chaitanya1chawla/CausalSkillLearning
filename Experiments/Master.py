@@ -215,7 +215,8 @@ def parse_arguments():
 	parser.add_argument('--alternating_phase_size',dest='alternating_phase_size',type=int,default=2000, help='Size of alternating training phases.')
 	parser.add_argument('--discriminator_phase_size',dest='discriminator_phase_size',type=int,default=2,help='Factor by which to train discriminator more than generator.')
 	parser.add_argument('--cycle_reconstruction_loss_weight',dest='cycle_reconstruction_loss_weight',type=float,default=1.,help='Weight of the cycle-consistency reconstruction loss term.')
-	parser.add_argument('-real_translated_discriminator',dest='real_translated_discriminator',type=int,default=0,help='Whether to include real-translated discriminator based losses.')
+	parser.add_argument('--real_translated_discriminator',dest='real_translated_discriminator',type=int,default=0,help='Whether to include real-translated discriminator based losses.')
+	parser.add_argument('--real_trans_loss_weight',dest='real_trans_loss_weight',type=float,default=1.,help='Weight of discriminability loss between real and (cycle) translated trajectories.')
 
 	# Exploration and learning rate parameters. 
 	parser.add_argument('--epsilon_from',dest='epsilon_from',type=float,default=0.3)
@@ -259,4 +260,5 @@ def main(args):
 
 if __name__=='__main__':
 	main(sys.argv)
+
 

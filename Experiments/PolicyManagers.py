@@ -12,6 +12,8 @@ import TFLogger, DMP, RLUtils
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
+# if use_cuda:
+# 	torch.cuda.set_device(2)
 
 class PolicyManager_BaseClass():
 
@@ -4246,7 +4248,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.vae_loss_weight = 1.
 			self.training_phase = 1
 			self.skip_vae = False
-			self.skip_discriminator = True
+			self.skip_discriminator = True			
 
 		# Phase 2 of training: Train the discriminator, and set discriminability loss weight to original.
 		else:
@@ -4278,7 +4280,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.skip_vae = False		
 
 			self.training_phase = 2
-
 
 		self.source_manager.set_epoch(counter)
 		self.target_manager.set_epoch(counter)
@@ -4888,17 +4889,26 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		self.neighbor_obj_set = False
 
 	# Don't actually need to define these functions since they perform same steps as super functions.
-	# def create_networks(self):
+	def create_networks(self):
 
-	# 	super().create_networks()
+		super().create_networks()
 
-	# 	# Must also create two discriminator networks; one for source --> target --> source, one for target --> source --> target. 
-	# 	# Remember, since these discriminator networks are operating on the trajectory space, we have to 
-	# 	# make them LSTM networks, rather than MLPs. 
+		# Must also create two discriminator networks; one for source --> target --> source, one for target --> source --> target. 
+		# Remember, since these discriminator networks are operating on the trajectory space, we have to 
+		# make them LSTM networks, rather than MLPs. 
 
-	# 	# # We have the encoder network class that's perfect for this. Output size is 2. 
-	# 	# self.source_discriminator = EncoderNetwork(self.source_manager.input_size, self.hidden_size, self.output_size).to(device)
-	# 	# self.target_discriminator = EncoderNetwork(self.source_manager.input_size, self.hidden_size, self.output_size).to(device)
+		if self.args.real_translated_discriminator:
+			# # We have the encoder network class that's perfect for this. Output size is 2. 
+			self.source_discriminator = EncoderNetwork(self.source_manager.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size).to(device)
+			self.target_discriminator = EncoderNetwork(self.source_manager.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size).to(device)
+
+	def set_iteration(self, counter):
+		super().set_iteration(counter)
+
+		if counter<self.args.training_phase_size:
+			self.real_translated_loss_weight = 0.
+		else:
+			self.real_translated_loss_weight = self.args.real_trans_loss_weight
 
 	def create_training_ops(self):
 
@@ -4909,30 +4919,35 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# self.source_discriminator_optimizer = torch.optim.Adam(self.source_discriminator_network.parameters(),lr=self.learning_rate)
 		# self.target_discriminator_optimizer = torch.optim.Adam(self.target_discriminator_network.parameters(),lr=self.learning_rate)
 
-		# Instead of using the individuals policy manager optimizers, use one single optimizer. 
+		# Instead of using the individuals policy manager optimizers, use one single optimizer. 		
 		self.parameter_list = self.source_manager.parameter_list + self.target_manager.parameter_list
+		# Add discriminator parameters if neede.d
+		if self.args.real_translated_discriminator:			
+			self.parameter_list += list(self.source_discriminator.parameters()) + list(self.target_discriminator.parameters())
 		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate)
 
-	# def save_all_models(self, suffix):
+	def save_all_models(self, suffix):
 
-	# 	# Call super save model. 
-	# 	super().save_all_models(suffix)
+		# Call super save model. 
+		super().save_all_models(suffix)
 
-	# 	# Now save the individual source / target discriminators. 
-	# 	self.save_object['Source_Discriminator_Network'] = self.source_discriminator_network.state_dict()
-	# 	self.save_object['Target_Discriminator_Network'] = self.target_discriminator_network.state_dict()
+		if self.args.real_translated_discriminator:
+			# Now save the individual source / target discriminators. 
+			self.save_object['Source_Discriminator_Network'] = self.source_discriminator.state_dict()
+			self.save_object['Target_Discriminator_Network'] = self.target_discriminator.state_dict()
 
-	# 	# Overwrite the save from super. 
-	# 	torch.save(self.save_object,os.path.join(self.savedir,"Model_"+suffix))
+			# Overwrite the save from super. 
+			torch.save(self.save_object,os.path.join(self.savedir,"Model_"+suffix))
 
-	# def load_all_models(self, path):
+	def load_all_models(self, path):
 
-	# 	# Call super load. 
-	# 	super().load_all_models(path)
+		# Call super load. 
+		super().load_all_models(path)
 
-	# 	# Now load the individual source and target discriminators. 
-	# 	self.source_discriminator.load_state_dict(self.load_object['Source_Discriminator_Network'])
-	# 	self.target_discriminator.load_state_dict(self.load_object['Target_Discriminator_Network'])
+		if self.args.real_translated_discriminator:
+			# Now load the individual source and target discriminators. 
+			self.source_discriminator.load_state_dict(self.load_object['Source_Discriminator_Network'])
+			self.target_discriminator.load_state_dict(self.load_object['Target_Discriminator_Network'])
 
 	# A bunch of functions should just be directly usable:
 	# get_domain_manager, get_trajectory_segment_tuple, encode_decode_trajectory, update_plots, get_transform, 
@@ -5093,7 +5108,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		#
 		#	In addition to this, must also compute discriminator losses to train discriminators themselves. 
 		# 	# a) For the z discriminator (and if we're using trajectory discriminators, those too), clone and detach the inputs of the discriminator and compute a discriminator loss with the right domain used in targets / supervision. 
-		#	#	 This discriminator loss is what is used to actually train the discriminators.		
+		#	#	 This discriminator loss is what is used to actually train the discriminators.
 
 		# Get z discriminator logprobabilities.
 		z_discriminator_logprob, self.z_discriminator_prob = self.discriminator_network(dictionary['source_latent_z'])
@@ -5102,19 +5117,35 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		domain_label = torch.tensor(1-dictionary['domain']).to(device).long().view(1,)
 		domain_label = domain_label.repeat(self.args.batch_size,)
 
-		self.z_discriminability_loss = self.negative_log_likelihood_loss_function(z_discriminator_logprob.squeeze(0), 1-domain_label).mean()
+		self.z_discriminability_loss = self.discriminability_loss_weight*self.negative_log_likelihood_loss_function(z_discriminator_logprob.squeeze(0), 1-domain_label).mean()
 
 		###### Block that computes discriminability losses assuming we are using trjaectory discriminators. ######
 
-		# # Get the right trajectory discriminator network.
-		# discriminator_list = [self.source_discriminator, self.target_discriminator]		
-		# source_discriminator = discriminator_list[domain]
+		if self.args.real_translated_discriminator:
 
-		# # Now feed trajectory to the trajectory discriminator, based on whether it is the source of target discriminator.
-		# traj_discriminator_logprob, traj_discriminator_prob = source_discriminator(trajectory)
+			# Get the right trajectory discriminator network.
+			discriminator_list = [self.source_discriminator, self.target_discriminator]
+			source_discriminator = discriminator_list[dictionary['domain']]
+			
+			# First select whether we are feeding original or translated trajectory. 
+			real_or_translated = np.random.binomial(1,0.5)
+			real_trans_label = torch.tensor(1-real_or_translated).to(device).long().repeat(self.args.batch_size)
 
-		# # Compute trajectory discriminability loss, based on whether the trajectory was original or reconstructed.
-		# self.traj_discriminability_loss = self.negative_log_likelihood_loss_function(traj_discriminator_logprob.squeeze(1), torch.tensor(1-original_or_reconstructed).to(device).long().view(1,))
+			# Based on whether original or translated trajectory, set trajectory object to either the original trajectory or cross domain decoded trajectory. 
+			if real_or_translated==0:
+				trajectory = dictionary['source_subpolicy_inputs_original'][...,:2*source_policy_manager.state_dim]
+			else:
+				trajectory = dictionary['source_subpolicy_inputs_crossdomain'][...,:2*source_policy_manager.state_dim]
+
+			# # Now feed trajectory to the trajectory discriminator, based on whether it is the source of target discriminator.
+			traj_discriminator_logprob, traj_discriminator_prob = source_discriminator.get_probabilities(trajectory)
+			
+			# # Compute trajectory discriminability loss, based on whether the trajectory was original or reconstructed.
+			# self.traj_discriminability_loss = self.negative_log_likelihood_loss_function(traj_discriminator_logprob.squeeze(1), torch.tensor(1-original_or_reconstructed).to(device).long().view(1,))
+			self.traj_discriminability_loss = self.negative_log_likelihood_loss_function(traj_discriminator_logprob.squeeze(0), 1-real_trans_label).mean()
+			self.weighted_real_translated_loss = self.real_translated_loss_weight*self.traj_discriminability_loss
+		else:
+			self.weighted_real_translated_loss = 0.
 
 		####################################
 		# (3) Compute cycle-consistency losses.
@@ -5136,7 +5167,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		####################################
 
 		# First combine losses.
-		self.total_VAE_loss = self.source_reconstruction_loss + self.z_discriminability_loss + self.cycle_reconstruction_loss
+		self.total_VAE_loss = self.source_reconstruction_loss + self.z_discriminability_loss + self.cycle_reconstruction_loss + self.weighted_real_translated_loss
 
 		# If we are in a encoder / decoder training phase, compute gradients and step.  
 		if not(self.skip_vae):
@@ -5155,12 +5186,25 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# went backward through. Instead, just pass things through the discriminator again, but this time detaching latent_z. 
 		z_discriminator_detach_logprob, z_discriminator_detach_prob = self.discriminator_network(dictionary['source_latent_z'].detach())
 
-		# Compute discriminator loss for discriminator. 
-		self.z_discriminator_loss = self.negative_log_likelihood_loss_function(z_discriminator_detach_logprob.squeeze(0), domain_label)		
+		# Compute discriminator loss for discriminator. 		
+		self.z_discriminator_loss = self.negative_log_likelihood_loss_function(z_discriminator_detach_logprob.squeeze(0), domain_label).mean()
 		
+		####################################
+		if self.args.real_translated_discriminator:
+	
+			# Feed previously set trajectory object to correct discriminator, after detaching it to prevent opposite gradient flow.
+			traj_discriminator_logprob, traj_discriminator_prob = source_discriminator.get_probabilities(trajectory.detach())
+			# Now compute loss.
+			self.real_translated_discriminator_loss = self.negative_log_likelihood_loss_function(traj_discriminator_logprob.squeeze(0), real_trans_label).mean()
+		else:
+			self.real_translated_discriminator_loss = 0.
+
+		####################################
+		self.total_discriminator_loss = self.z_discriminator_loss + self.real_translated_discriminator_loss
+
 		if not(self.skip_discriminator):
 			# Now go backward and take a step.
-			self.z_discriminator_loss.backward()
+			self.total_discriminator_loss.backward()
 			self.discriminator_optimizer.step()
 
 	def update_plots(self, counter, viz_dict):
@@ -5199,6 +5243,10 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Original trajectory. 
 		original_trajectory = viz_dict['source_subpolicy_inputs_original'][:,:,:self.source_manager.state_dim]
 		cycle_reconstructed_trajectory = viz_dict['source_subpolicy_inputs_crossdomain'][:,:,:self.source_manager.state_dim]
+
+		if self.args.real_translated_discriminator:
+			self.tf_logger.scalar_summary('Real Translated Discriminability Loss', self.weighted_real_translated_loss.mean(), counter)
+			self.tf_logger.scalar_summary('Real Translated Discriminator Loss', self.real_translated_discriminator_loss.mean(), counter)
 
 	def run_iteration(self, counter, i):
 
@@ -5243,7 +5291,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		####################################
 		# (2) & (3 a) Get source trajectory (segment) and encode into latent z. Decode using source decoder, to get loglikelihood for reconstruction objectve. 
 		####################################
-
+		
 		dictionary['source_subpolicy_inputs_original'], dictionary['source_latent_z'], dictionary['source_loglikelihood'], dictionary['source_kl_divergence'] = self.encode_decode_trajectory(source_policy_manager, i)
 
 		####################################
