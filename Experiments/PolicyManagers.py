@@ -1141,7 +1141,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		
 		for t in range(self.rollout_timesteps-1):
 
-			actions = self.policy_network.get_actions(subpolicy_inputs,greedy=True)
+			actions = self.policy_network.get_actions(subpolicy_inputs,greedy=True,batch_size=1)
 			
 			# Select last action to execute.
 			action_to_execute = actions[-1].squeeze(1)
@@ -1315,8 +1315,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 
 		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
-		
-	
+			
 		if self.args.setting=='transfer' or self.args.setting=='cycle_transfer':
 			# self.source_manager.rollout_timesteps = 5
 			# self.source_manager.state_dim = 2		
@@ -1348,10 +1347,12 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 					self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 					self.gt_trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
 
-					# if get_visuals:
-						# (2) Now rollout policy.			
-						# self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z, return_traj=True)
-						# self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z, return_traj=True))
+					if get_visuals:
+						# (2) Now rollout policy.	
+						if self.args.setting=='transfer' or self.args.setting=='cycle_transfer':
+							self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
+						else:
+							self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True))
 
 				if i*self.args.batch_size+b>=self.N:
 					break 
@@ -4474,7 +4475,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.tf_logger.image_summary("TSNE Source Embedding", [self.viz_dictionary['tsne_source_embedding']], counter)
 			self.tf_logger.image_summary("TSNE Target Embedding", [self.viz_dictionary['tsne_target_embedding']], counter)
 			self.tf_logger.image_summary("TSNE Combined Embeddings", [self.viz_dictionary['tsne_combined_embeddings']], counter)			
-
 			
 			# Plot source, target, and shared embeddings via PCA. 
 			self.viz_dictionary['pca_source_embedding'], self.viz_dictionary['pca_target_embedding'], self.viz_dictionary['pca_combined_embeddings'], self.viz_dictionary['pca_combined_traj_embeddings'] = self.get_embeddings(projection='pca')
@@ -4767,8 +4767,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.shared_trajectory_set = np.zeros((2*self.N, traj_length, 2))
 			
 			self.shared_trajectory_set[:self.N] = self.source_manager.trajectory_set
-			self.shared_trajectory_set[self.N:] = self.target_manager.trajectory_set
-			
+			self.shared_trajectory_set[self.N:] = self.target_manager.trajectory_set			
+
 			color_range_min = 0.2*color_scaling
 			color_range_max = 0.8*color_scaling+traj_length-1
 
