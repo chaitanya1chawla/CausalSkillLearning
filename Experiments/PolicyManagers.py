@@ -1313,14 +1313,15 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Set N:
 		self.N = 100
 
-
 		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
 			
 		if self.args.setting=='transfer' or self.args.setting=='cycle_transfer':
 			# self.source_manager.rollout_timesteps = 5
 			# self.source_manager.state_dim = 2		
 			self.rollout_timesteps = 5
-			self.state_dim = 2		
+			if self.args.source_domain=='ContinuousNonZero':
+				self.state_dim = 2		
+
 
 			self.trajectory_set = np.zeros((self.N, self.rollout_timesteps, self.state_dim))
 
@@ -4426,7 +4427,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		del self.source_trajectory_image, self.source_reconstruction_image, self.target_trajectory_image, self.target_reconstruction_image
 
 		# Deleting objects from get_embeddings()
-		del self.source_image, self.target_image, self.shared_image, self.toy_shared_embedding_image
+		del self.source_image, self.target_image, self.shared_image, self.samedomain_shared_embedding_image
 
 		# Deleting copies of objects in update_plots.
 		del self.viz_dictionary
@@ -4492,7 +4493,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Should be able to use the policy manager's functions to do this.
 			self.viz_dictionary['source_trajectory'], self.viz_dictionary['source_reconstruction'], self.viz_dictionary['target_trajectory'], self.viz_dictionary['target_reconstruction'] = self.get_trajectory_visuals()
 
-			if self.viz_dictionary['source_trajectory'] is not None:
+			if self.viz_dictionary['source_trajectory'] is not None and self.args.source_domain=='ContinuousNonZero':
 				# Now actually plot the images.
 
 				if self.args.source_domain=='ContinuousNonZero':
@@ -4509,7 +4510,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					self.tf_logger.gif_summary("Target Trajectory", [self.viz_dictionary['target_trajectory']], counter)
 					self.tf_logger.gif_summary("Target Reconstruction", [self.viz_dictionary['target_reconstruction']], counter)
 
-			if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':
+			# if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':
+			if self.args.source_domain==self.args.target_domain:
 				# Evaluate metrics and plot them. 
 				# self.evaluate_correspondence_metrics(computed_sets=False)
 				# Actually, we've probably computed trajectory and latent sets. 
@@ -4517,6 +4519,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 				self.tf_logger.scalar_summary('Source To Target Trajectory Distance', self.source_target_trajectory_distance, counter)		
 				self.tf_logger.scalar_summary('Target To Source Trajectory Distance', self.target_source_trajectory_distance, counter)
+				self.tf_logger.scalar_summary('Source To Target Trajectory Normalized Distance', self.source_target_trajectory_normalized_distance, counter)
+				self.tf_logger.scalar_summary('Target To Source Trajectory Normalized Distance', self.target_source_trajectory_normalized_distance, counter) 
 
 			# Clean up objects consuming memory. 			
 			self.free_memory()
@@ -4611,11 +4615,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.target_image = self.plot_embedding(target_embedded_zs, "Target_Embedding")
 		self.shared_image = self.plot_embedding(shared_embedded_zs, "Shared_Embedding", shared=True)	
 
-		toy_shared_embedding_image = None
-		if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':			
-			self.toy_shared_embedding_image = self.plot_embedding(shared_embedded_zs, "Toy_Shared_Traj_Embedding", shared=True, trajectory=True)
+		samedomain_shared_embedding_image = None
+		# if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':
+		if self.args.source_domain==self.args.target_domain:
+			self.samedomain_shared_embedding_image = self.plot_embedding(shared_embedded_zs, "SameDomain_Shared_Traj_Embedding", shared=True, trajectory=True)
 
-		return self.source_image, self.target_image, self.shared_image, self.toy_shared_embedding_image
+		return self.source_image, self.target_image, self.shared_image, self.samedomain_shared_embedding_image
 
 	def get_trajectory_visuals(self):
 
@@ -4764,7 +4769,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			
 			# Assemble shared trajectory set. 
 			traj_length = len(self.source_manager.trajectory_set[0,:,0])
-			self.shared_trajectory_set = np.zeros((2*self.N, traj_length, 2))
+			self.shared_trajectory_set = np.zeros((2*self.N, traj_length, self.state_dim))
 			
 			self.shared_trajectory_set[:self.N] = self.source_manager.trajectory_set
 			self.shared_trajectory_set[self.N:] = self.target_manager.trajectory_set			
@@ -4841,6 +4846,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		target_source_trajectory_diffs = (target_traj_actions - source_traj_actions[target_source_neighbors.squeeze(1)])
 		self.target_source_trajectory_distance = copy.deepcopy(np.linalg.norm(target_source_trajectory_diffs,axis=(1,2)).mean())
+
+		self.source_target_trajectory_normalized_distance = self.source_target_trajectory_distance/(np.linalg.norm(source_traj_actions, axis=2).mean())
+		self.target_source_trajectory_normalized_distance = self.target_source_trajectory_distance/(np.linalg.norm(target_traj_actions, axis=2).mean())		
 
 		##########################################
 		# Add more evaluation metrics here. 
@@ -5243,6 +5251,9 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Original trajectory. 
 		original_trajectory = viz_dict['source_subpolicy_inputs_original'][:,:,:self.source_manager.state_dim]
 		cycle_reconstructed_trajectory = viz_dict['source_subpolicy_inputs_crossdomain'][:,:,:self.source_manager.state_dim]
+
+		self.original_cycle_reconstructed_trajectory_diffs = copy.deepcopy((((original_trajectory - cycle_reconstructed_trajectory).detach().numpy())**2).mean())
+		self.tf_logger.scalar_summary('Cycle Reconstruction Distance', self.original_cycle_reconstructed_trajectory_diffs, counter)
 
 		if self.args.real_translated_discriminator:
 			self.tf_logger.scalar_summary('Real Translated Discriminability Loss', self.weighted_real_translated_loss.mean(), counter)
