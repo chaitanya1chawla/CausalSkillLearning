@@ -1391,9 +1391,12 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				# traj_image = self.visualize_trajectory(rollout_traj)
 
 		# Compute average reconstruction error.
-		self.gt_traj_set_array = np.array(self.gt_trajectory_set)
-		self.trajectory_set = np.array(self.trajectory_set)
-		self.avg_reconstruction_error = (self.gt_traj_set_array-self.trajectory_set).mean()
+		if get_visuals:
+			self.gt_traj_set_array = np.array(self.gt_trajectory_set)
+			self.trajectory_set = np.array(self.trajectory_set)
+			self.avg_reconstruction_error = (self.gt_traj_set_array-self.trajectory_set).mean()
+		else:
+			self.avg_reconstruction_error = 0.
 
 	def visualize_embedding_space(self, suffix=None):
 
@@ -1600,7 +1603,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		self.args = args
 		self.data = self.args.data
-		self.number_policies = number_policies
+		self.number_policies = 4
 		self.latent_z_dimensionality = self.args.z_dimensions
 		self.dataset = dataset
 
@@ -2975,6 +2978,24 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 		# Now run original training function.
 		super().train(model=model)
+
+class PolicyManager_Context(PolicyManager_BatchJoint):
+
+	def __init__(self, number_policies=4, dataset=None, args=None):
+
+		super(PolicyManager_Context, self).__init__(number_policies, dataset, args)
+
+	def create_networks(self):
+
+		# Call super create networks. 
+		super.create_networks()
+
+		# Now create a context decoder.
+		# self.context_decoder = ()
+	
+	def 
+
+
 
 class PolicyManager_BaselineRL(PolicyManager_BaseClass):
 
@@ -4517,9 +4538,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 			# We are also going to log Ground Truth trajectories and their reconstructions in each of the domains, to make sure our networks are learning. 		
 			# Should be able to use the policy manager's functions to do this.
-			self.viz_dictionary['source_trajectory'], self.viz_dictionary['source_reconstruction'], self.viz_dictionary['target_trajectory'], self.viz_dictionary['target_reconstruction'] = self.get_trajectory_visuals()
+			if not(self.args.no_mujoco):
+				self.viz_dictionary['source_trajectory'], self.viz_dictionary['source_reconstruction'], self.viz_dictionary['target_trajectory'], self.viz_dictionary['target_reconstruction'] = self.get_trajectory_visuals()
 
-			if self.viz_dictionary['source_trajectory'] is not None:
+			if self.viz_dictionary['source_trajectory'] is not None and not(self.args.no_mujoco):
 				# Now actually plot the images.
 
 				if self.args.source_domain=='ContinuousNonZero':
@@ -4654,20 +4676,41 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.target_image = self.plot_embedding(target_embedded_zs, "Target_Embedding")
 		self.samedomain_shared_embedding_image = None
 
-		# if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':
-		if self.args.source_domain==self.args.target_domain:
-			if projection=='tsne':
+		# if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':		
+		# if self.args.source_domain==self.args.target_domain:
+		# 	if projection=='tsne':
+		# 		self.samedomain_shared_embedding_image_p5 = self.plot_embedding(shared_embedded_zs_p5, "SameDomain_Shared_Traj_Embedding Perplexity 5", shared=True, trajectory=True)
+		# 		self.samedomain_shared_embedding_image_p10 = self.plot_embedding(shared_embedded_zs_p10, "SameDomain_Shared_Traj_Embedding Perplexity 10", shared=True, trajectory=True)
+		# 		self.samedomain_shared_embedding_image_p30 = self.plot_embedding(shared_embedded_zs_p30, "SameDomain_Shared_Traj_Embedding Perplexity 30", shared=True, trajectory=True)
+
+		# 			return self.source_image, self.target_image, self.shared_image_p5, self.shared_image_p10, self.shared_image_p30, \
+		# 			 self.samedomain_shared_embedding_image_p5, self.samedomain_shared_embedding_image_p10, self.samedomain_shared_embedding_image_p30
+		# 	else:
+		# 		self.samedomain_shared_embedding_image = self.plot_embedding(shared_embedded_zs, "SameDomain_Shared_Traj_Embedding", shared=True, trajectory=True)
+
+		# 		return self.source_image, self.target_image, self.shared_image, self.samedomain_shared_embedding_image
+		
+		if projection=='tsne':
+
+			if self.args.source_domain==self.args.target_domain:
 				self.samedomain_shared_embedding_image_p5 = self.plot_embedding(shared_embedded_zs_p5, "SameDomain_Shared_Traj_Embedding Perplexity 5", shared=True, trajectory=True)
 				self.samedomain_shared_embedding_image_p10 = self.plot_embedding(shared_embedded_zs_p10, "SameDomain_Shared_Traj_Embedding Perplexity 10", shared=True, trajectory=True)
 				self.samedomain_shared_embedding_image_p30 = self.plot_embedding(shared_embedded_zs_p30, "SameDomain_Shared_Traj_Embedding Perplexity 30", shared=True, trajectory=True)
-
-				return self.source_image, self.target_image, self.shared_image_p5, self.shared_image_p10, self.shared_image_p30, \
-					 self.samedomain_shared_embedding_image_p5, self.samedomain_shared_embedding_image_p10, self.samedomain_shared_embedding_image_p30
 			else:
-				self.samedomain_shared_embedding_image = self.plot_embedding(shared_embedded_zs, "SameDomain_Shared_Traj_Embedding", shared=True, trajectory=True)
+				self.samedomain_shared_embedding_image_p5  = None
+				self.samedomain_shared_embedding_image_p10 = None
+				self.samedomain_shared_embedding_image_p30 = None
 
-				return self.source_image, self.target_image, self.shared_image, self.samedomain_shared_embedding_image
-		
+			return self.source_image, self.target_image, self.shared_image_p5, self.shared_image_p10, self.shared_image_p30, \
+				self.samedomain_shared_embedding_image_p5, self.samedomain_shared_embedding_image_p10, self.samedomain_shared_embedding_image_p30
+
+		else:
+			if self.args.source_domain==self.args.target_domain:
+				self.samedomain_shared_embedding_image = self.plot_embedding(shared_embedded_zs, "SameDomain_Shared_Traj_Embedding", shared=True, trajectory=True)
+			else:
+				self.samedomain_shared_embedding_image = None
+			return self.source_image, self.target_image, self.shared_image, self.samedomain_shared_embedding_image
+
 	def get_trajectory_visuals(self):
 
 		i = np.random.randint(0,high=self.extent)
@@ -4960,7 +5003,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		if self.args.real_translated_discriminator:
 			# # We have the encoder network class that's perfect for this. Output size is 2. 
 			self.source_discriminator = EncoderNetwork(self.source_manager.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size).to(device)
-			self.target_discriminator = EncoderNetwork(self.source_manager.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size).to(device)
+			self.target_discriminator = EncoderNetwork(self.target_manager.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size).to(device)
 
 	def set_iteration(self, counter):
 		super().set_iteration(counter)

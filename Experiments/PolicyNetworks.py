@@ -1838,3 +1838,169 @@ class DiscreteMLP(torch.nn.Module):
 		probabilities = self.batch_softmax_layer(preprobability_outputs)
 
 		return log_probabilities, probabilities
+
+class ContextDecoder(ContinuousVariationalPolicyNetwork):
+
+	def __init__(self, input_size, hidden_size, z_dimensions, args, number_layers=4):
+
+		# Ensures inheriting from torch.nn.Module goes nicely and cleanly. 	
+		super(ContextDecoder, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)		
+		self.z_dimensions = z_dimensions
+
+		self.context_decoder_mlp = ContinuousMLP(z_dimensions, hidden_size, z_dimensions, args=None, number_layers=number_layers=)		
+
+	# def pad_inputs(self, input_z, total_length):
+
+	# 	# Padding to length total length. 
+	# 	# padded_inputs = torch.zeros((total_length,input_z.shape[]))
+
+	def forward(self, z_vector):
+
+		# This implementation of the ContextDecoder takes in a batch of Z vectors.
+		# It then predicts the logprobability of predicting the correct context Zs for a given input Z. 
+		# Remember, for each element in the batch, we must do this for each Z as the input Z in the z_vector, and for each other Z as the context Z. 
+		# This can be implemented as Batching, since they are all independent anyway. 
+
+		# Assume Z vector is of shape: 
+		# Number_Zs x Batch_Size x Z_Dimensions. 
+
+		# Does this assume constant number of Z's across batches? 
+		# Well... yes? Must pad and mask that as well.
+
+		# Must then treat as... 
+		# 1 Given Z x (Number-of-pairs x Batch_Size) x Z_Dimensions.
+		# Where number-of-pairs is.. Nx(N-1). 
+
+		###################################
+		# (1) First get input_zs, and context_zs, and build a mask.
+		###################################
+		
+		self.number_context_zs = z_vector.shape[0]	
+		
+		# Input_zs are basically just the z_vector reshaped to.. 1 x (Batch_Size x Number_Context_Zs) X Z_Dimensions		
+		input_zs = z_vector.view((1,-1,self.z_dimensions))
+
+		# Context_zs are basically z_vector replicated to... Number_Context_Zs**2 x Batch_Size x Z_Dimensions.
+		# (We then mask diagonal / autoregressive pairs later... )
+		context_zs = z_vector.repeat(self.number_context_zs, 1, 1).view((self.number_context_zs,-1,self.z_dimensions))
+
+		# Construct mask as... ones only in off diagonal positions with respect to pairs of Input / Context Z's.
+		mask = torch.ones((self.number_context_zs, self.number_context_zs, self.batch_size, self.z_dimensions)) - \
+			torch.eye(self.number_context_zs).view(self.number_context_zs,self.number_context_zs,1,1).repeat(1,1,self.batch_size,self.z_dimensions)
+		# mask = 1. - torch.eye(self.number_context_zs).view(self.number_context_zs,self.number_context_zs,1,1).repeat(1,1,self.batch_size,self.z_dimensions)
+
+		# Reshape mask.
+		mask = mask.to(device).view(self.number_context_zs,-1,self.z_dimensions)
+
+		#####################################
+		# (2) In this case, feed input_zs to MLP to evaluate likelihoods of context_zs.
+		#####################################
+
+		# Now feed the input_zs to MLP, and get predictions.
+		# Remember, these are going to be single outputs... but we are going to minimize average distance from context zs.
+		predicted_context_zs = self.context_decoder_mlp(input_zs)
+
+		# Distances
+		distances = predicted_context_zs - context_zs.view(self.number_context_zs,-1,self.z_dimensions)
+
+		# Squared distances. 
+		squared_distances = distances**2
+
+		# Masked distances
+		masked_distances = mask*squared_distances
+
+		return masked_distances 
+
+
+
+
+		#####################################
+		# (2) In this case, feed input_zs to MLP to evaluate likelihoods of context_zs.
+		#####################################
+
+		# Swap batch and element axes for cdist. 
+		z_vector_transposed = torch.transpose(z_vector, 1, 0)
+
+		# Now feed the input_zs to MLP, and get predictions.
+		# Remember, these are going to be single outputs... but we are going to minimize average distance from context zs.
+		predicted_context_zs = self.context_decoder_mlp(z_vector_transposed)
+
+		# Now make the mask. 
+		mask = (1.-torch.eye(self.number_context_zs)).view(1,self.number_context_zs,self.number_context_zs).repeat(self.batch_size,1,1)
+		
+		# Compute distances.
+		distances = torch.cdist(z_vector_transposed, predicted_context_zs)
+
+		# Now mask distances. 
+		masked_distances = mask*distances
+
+		return masked_distances
+
+	# def forward(self, z_vector):
+
+	# 	# This implementation of the ContextDecoder takes in a batch of Z vectors.
+	# 	# It then predicts the logprobability of predicting the correct context Zs for a given input Z. 
+	# 	# Remember, for each element in the batch, we must do this for each Z as the input Z in the z_vector, and for each other Z as the context Z. 
+	# 	# This can be implemented as Batching, since they are all independent anyway. 
+
+	# 	# Assume Z vector is of shape: 
+	# 	# Number_Zs x Batch_Size x Z_Dimensions. 
+
+	# 	# Does this assume constant number of Z's across batches? 
+	# 	# Well... yes? Must pad and mask that as well.
+
+	# 	# Must then treat as... 
+	# 	# 1 Given Z x (Number-of-pairs x Batch_Size) x Z_Dimensions.
+	# 	# Where number-of-pairs is.. Nx(N-1). 
+
+	# 	###################################
+	# 	# (1) First get input_zs, and context_zs, and build a mask.
+	# 	###################################
+		
+	# 	self.number_context_zs = z_vector.shape[0]	
+		
+	# 	# Input_zs are basically just the z_vector reshaped to.. 1 x (Batch_Size x Number_Context_Zs) X Z_Dimensions		
+	# 	input_zs = z_vector.view((1,-1,self.z_dimensions))
+	# 	# Context_zs are basically z_vector replicated to... Number_Context_Zs**2 x Batch_Size x Z_Dimensions.
+	# 	# (We then mask diagonal / autoregressive pairs later... )
+	# 	context_zs = z_vector.repeat(self.number_context_zs, 1, 1).view((self.number_context_zs,-1,self.z_dimensions))
+
+	# 	# Construct mask as... ones only in off diagonal positions with respect to pairs of Input / Context Z's.
+	# 	mask = torch.ones((self.number_context_zs, self.number_context_zs, self.batch_size, self.z_dimensions)) - \
+	# 		torch.eye(self.number_context_zs).view(self.number_context_zs,self.number_context_zs,1,1).repeat(1,1,self.batch_size,self.z_dimensions)
+
+	# 	# Reshape mask.
+	# 	mask = mask.view(self.number_context_zs,-1,self.z_dimensions)
+
+	# 	# #####################################
+	# 	# #####################################
+	# 	# # In this case, use the LSTM decoder to predict context zs given the input z.
+	# 	# #####################################
+	# 	# #####################################
+
+	# 	# # ###################################
+	# 	# # # (2) Pad input_zs appropriately and build a mask. 
+	# 	# # ###################################
+
+	# 	# # padded_input_zs = self.pad_inputs(input_zs)
+	
+	# 	# ###################################
+	# 	# # (3) Now use input_zs to evaluate likelihood of context_zs. 
+	# 	# ###################################
+	
+	# 	# # Input Format must be: Sequence_Length x Batch_Size x Input_Size. 	
+	# 	# format_input = padded_input_zs.view((padded_input_zs.shape[0], self.batch_size, self.input_size))
+	# 	# hidden = None
+	# 	# outputs, hidden = self.lstm(format_input)
+
+	# 	# mean_outputs = self.mean_output_layer(outputs)
+	# 	# variance_value = 0.05
+	
+	# 	# # Create "distributions" for easy log probability. 
+	# 	# self.dists = torch.distributions.MultivariateNormal(mean_outputs, variance_value*torch.diag_embed(torch.ones_like(mean_outputs)))
+
+	# 	# # Compute and return logprobability of predicting context_zs from the input_zs. 
+	# 	# context_z_logprobability = self.dists.log_prob(context_zs)		
+	# 	# return context_z_logprobability
+
+
