@@ -1880,40 +1880,6 @@ class ContextDecoder(ContinuousVariationalPolicyNetwork):
 		# Input_zs are basically just the z_vector reshaped to.. 1 x (Batch_Size x Number_Context_Zs) X Z_Dimensions		
 		input_zs = z_vector.view((1,-1,self.z_dimensions))
 
-		# Context_zs are basically z_vector replicated to... Number_Context_Zs**2 x Batch_Size x Z_Dimensions.
-		# (We then mask diagonal / autoregressive pairs later... )
-		context_zs = z_vector.repeat(self.number_context_zs, 1, 1).view((self.number_context_zs,-1,self.z_dimensions))
-
-		# Construct mask as... ones only in off diagonal positions with respect to pairs of Input / Context Z's.
-		mask = torch.ones((self.number_context_zs, self.number_context_zs, self.batch_size, self.z_dimensions)) - \
-			torch.eye(self.number_context_zs).view(self.number_context_zs,self.number_context_zs,1,1).repeat(1,1,self.batch_size,self.z_dimensions)
-		# mask = 1. - torch.eye(self.number_context_zs).view(self.number_context_zs,self.number_context_zs,1,1).repeat(1,1,self.batch_size,self.z_dimensions)
-
-		# Reshape mask.
-		mask = mask.to(device).view(self.number_context_zs,-1,self.z_dimensions)
-
-		#####################################
-		# (2) In this case, feed input_zs to MLP to evaluate likelihoods of context_zs.
-		#####################################
-
-		# Now feed the input_zs to MLP, and get predictions.
-		# Remember, these are going to be single outputs... but we are going to minimize average distance from context zs.
-		predicted_context_zs = self.context_decoder_mlp(input_zs)
-
-		# Distances
-		distances = predicted_context_zs - context_zs.view(self.number_context_zs,-1,self.z_dimensions)
-
-		# Squared distances. 
-		squared_distances = distances**2
-
-		# Masked distances
-		masked_distances = mask*squared_distances
-
-		return masked_distances 
-
-
-
-
 		#####################################
 		# (2) In this case, feed input_zs to MLP to evaluate likelihoods of context_zs.
 		#####################################
