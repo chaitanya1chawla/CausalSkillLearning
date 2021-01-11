@@ -1397,9 +1397,7 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		if batch_size is None:
 			batch_size = self.batch_size			
 
-		# print("VAR POL")
-		
-
+		# print("VAR POL")	
 		# Input Format must be: Sequence_Length x Batch_Size x Input_Size. 	
 		format_input = input.view((input.shape[0], batch_size, self.input_size))
 		hidden = None
@@ -1535,8 +1533,90 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 			print("Embedding in Variational Network.")
 			embed()
 
+		embed()
+		
 		return sampled_z_index, sampled_b, variational_b_logprobabilities.squeeze(1), \
 		 variational_z_logprobabilities, variational_b_probabilities.squeeze(1), variational_z_probabilities, kl_divergence, prior_loglikelihood
+
+class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNetwork_Batch):
+
+	def __init__(self, input_size, hidden_size, z_dimensions, args, number_layers=4):
+		
+		super(ContinuousContextualVariationalPolicyNetwork, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)
+
+		# Define a bidirectional LSTM now.
+		self.contextual_lstm = torch.nn.LSTM(input_size=self.args.z_dimensions,hidden_size=self.hidden_size,num_layers=self.num_layers, bidirectional=True)
+		self.z_output_layer = torch.nn.Linear(2*self.hidden_size, self.z_dimensions)
+
+	def forward(self, input, epsilon, new_z_selection=True, batch_size=None):
+		
+		# First run the forward function of the original variational network. 
+		# This runs the initial LSTM and predicts the original embedding of skills. 
+		sampled_z_index, sampled_b, variational_b_logprobabilities, \
+		 variational_z_logprobabilities, variational_b_probabilities, \
+		 variational_z_probabilities, kl_divergence, prior_loglikelihood = super.forward(input, epsilon, new_z_selection=new_z_selection, batch_size=batch_size)
+
+		# Now parse the sequence of per timestep z's to sequence of z's of length = the number of skills in the trajectory. 
+		# The latent_b vector has this information, specified in terms of when b=1. 
+		distinct_indices_collection = []
+		z_sequence_collection = []
+		# Also collect indices to mask, at specified mask fraction
+		mask_indices_collection = []
+		max_distinct_zs = 0
+
+		print("Embed before the loop in Context Var.")
+		embed()
+		
+		for j in range(self.args.batch_size):
+			# Get times at which we actually observe distinct z's.
+			distinct_z_indices = torch.where(sampled_b[:,j])[0].clone().detach().cpu().numpy()
+
+			# Keep track of max, so that we can create a tensor of that size.
+			if len(distinct_z_indices)>max_distinct_zs:
+				max_distinct_zs = len(distinct_z_indices)
+
+			# mask_indices.append(np.random.choice(distinct_z_indices, size=int(len(distinct_z_indices)*self.args.mask_fraction), replace=False))
+			# These mask indices index into the distinct_indices list, so the values in mask indices are positions in the list to be masked.
+			# Masking strategy - uniformly randomly sample mask_fraction arbitrarily. 
+			mask_indices = np.random.choice(range(len(distinct_z_indices)), size=int(len(distinct_z_indices)*self.args.mask_fraction), replace=False)
+			mask_indices_collection.append(mask_indices)
+
+			# Now copy over the masked indices into a single list. 
+			distinct_indices_collection.append(copy.deepcopy(distinct_z_indices))
+
+			# Now actually mask the chosen mask indices.
+			masked_z = sampled_z_index[distinct_z_indices,j]
+			masked_z[mask_indices] = 0.
+
+			# Now copy over the masked indices into a single list. 
+			z_sequence_collection.append(masked_z)
+
+		# Now that we've gotten the distinct z sequence, make padded tensor version of this. 
+		self.initial_skill_embedding = torch.zeros((max_distinct_zs, self.args.batch_size, self.args.z_dimensions)).to(device).float()
+		# Having created a tensor for this, copy into the tensor. 
+		for j in range(self.args.batch_size):
+			self.initial_skill_embedding[:len(z_sequence_collection[j]),j] = z_sequence_collection[j]
+
+		# Now that we've gotten the initial skill embeddings (from the distinct z sequence), 
+		# Feed it into the contextual LSTM, and predict new contextual embeddings. 
+		contextual_outputs, contextual_hidden = self.contextual_lstm(self.initial_skill_embedding)
+		contextual_skill_embedding = self.z_output_layer(contextual_outputs)
+
+		# Now must reconstruct the original z vector (sampled_z_indices). # Incidentally this removes need for masking of z's.
+		# Must use the original sampled_b to take care of this. 
+		new_sampled_z_indices = torch.zeros_Like(sampled_z_index).to(device)
+
+		for j in range(self.args.batch_size):
+			# Use distinct_z_indices, where we have already computed torch.where(sampled_b[:,j]). 
+			# May need to manipulate this to negate the where. 
+			for k in range(len(distinct_indices_collection[j])-1):
+				new_sampled_z_indices[distinct_indices_collection[j][k]:distinct_indices_collection[j][k+1],j] = z_sequence_collection[j][k]
+			new_sampled_z_indices[distinct_indices_collection[j][-1]:,j] = z_sequence_collection[j][-1]
+
+		print("Embed after the loop in Context Var.")
+		embed()
+
+		pass
 
 class EncoderNetwork(PolicyNetwork_BaseClass):
 
@@ -1844,10 +1924,10 @@ class ContextDecoder(ContinuousVariationalPolicyNetwork):
 	def __init__(self, input_size, hidden_size, z_dimensions, args, number_layers=4):
 
 		# Ensures inheriting from torch.nn.Module goes nicely and cleanly. 	
-		super(ContextDecoder, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)		
+		super(ContextDecoder, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)
 		self.z_dimensions = z_dimensions
 
-		self.context_decoder_mlp = ContinuousMLP(z_dimensions, hidden_size, z_dimensions, args=None, number_layers=number_layers=)		
+		self.context_decoder_mlp = ContinuousMLP(z_dimensions, hidden_size, z_dimensions, args=None, number_layers=number_layers)
 
 	# def pad_inputs(self, input_z, total_length):
 

@@ -49,19 +49,29 @@ class Master():
 				self.policy_manager = PolicyManager_BatchJoint(self.args.number_policies, self.dataset, self.args)
 			else:
 				self.policy_manager = PolicyManager_Joint(self.args.number_policies, self.dataset, self.args)
+
+		elif self.args.setting=='context':
+			# Assume we're going to run with batch size > 1. 
+			self.policy_manager = PolicyManager_BatchJoint(self.args.number_policies, self.dataset, self.args)
+
 		elif self.args.setting=='pretrain_sub':
 			if self.args.batch_size > 1: # Only setting batch manager for training.
 				self.policy_manager = PolicyManager_BatchPretrain(self.args.number_policies, self.dataset, self.args)
 			else:
 				self.policy_manager = PolicyManager_Pretrain(self.args.number_policies, self.dataset, self.args)
+
 		elif self.args.setting=='baselineRL':
 			self.policy_manager = PolicyManager_BaselineRL(args=self.args)
+
 		elif self.args.setting=='downstreamRL':
 			self.policy_manager = PolicyManager_DownstreamRL(args=self.args)
+
 		elif self.args.setting=='DMP':			
 			self.policy_manager = PolicyManager_DMPBaselines(self.args.number_policies, self.dataset, self.args)
+
 		elif self.args.setting=='imitation':
 			self.policy_manager = PolicyManager_Imitation(self.args.number_policies, self.dataset, self.args)
+
 		elif self.args.setting=='transfer' or self.args.setting=='cycle_transfer':
 			source_dataset = return_dataset(self.args, data=self.args.source_domain)
 			target_dataset = return_dataset(self.args, data=self.args.target_domain)
@@ -208,7 +218,8 @@ def parse_arguments():
 	parser.add_argument('--kl_weight',dest='kl_weight',type=float,default=0.01)
 	parser.add_argument('--var_loss_weight',dest='var_loss_weight',type=float,default=1.)
 	parser.add_argument('--prior_weight',dest='prior_weight',type=float,default=0.00001)
-
+	parser.add_argument('--context_loss_weight',dest='context_loss_weight',type=float,default=1.,help='Weight of context loss.')
+	
 	# Cross Domain Skill Transfer parameters. 
 	parser.add_argument('--discriminability_weight',dest='discriminability_weight',type=float,default=1.,help='Weight of discriminability loss in cross domain skill transfer.') 
 	parser.add_argument('--vae_loss_weight',dest='vae_loss_weight',type=float,default=1.,help='Weight of VAE loss in cross domain skill transfer.') 	

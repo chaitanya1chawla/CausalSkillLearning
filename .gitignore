@@ -10,3 +10,4 @@ Experiments/Code_Runs/*
 .vscode/settings.json
 Experiments/.vscode/settings.json
 Experiments/Statistics/*
+Logging Results/models.txt

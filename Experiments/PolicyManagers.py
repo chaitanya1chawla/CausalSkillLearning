@@ -1743,31 +1743,31 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		
 		# If we are using reparameterization, use a global optimizer, and a global loss function. 
 		# This means gradients are being handled properly. 
-		parameter_list = list(self.latent_policy.parameters()) + list(self.variational_policy.parameters())
+		self.parameter_list = list(self.latent_policy.parameters()) + list(self.variational_policy.parameters())
 		if not(self.args.fix_subpolicy):
-			parameter_list = parameter_list + list(self.policy_network.parameters())
-		self.optimizer = torch.optim.Adam(parameter_list, lr=self.learning_rate)
+			self.parameter_list = self.parameter_list + list(self.policy_network.parameters())
+		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate)
 
 	def save_all_models(self, suffix):
 
-		logdir = os.path.join(self.args.logdir, self.args.name)
-		savedir = os.path.join(logdir,"saved_models")
-		if not(os.path.isdir(savedir)):
+		self.logdir = os.path.join(self.args.logdir, self.args.name)
+		self.savedir = os.path.join(self.logdir,"saved_models")
+		if not(os.path.isdir(self.savedir)):
 			os.mkdir(savedir)
-		save_object = {}
-		save_object['Latent_Policy'] = self.latent_policy.state_dict()
-		save_object['Policy_Network'] = self.policy_network.state_dict()
-		save_object['Variational_Policy'] = self.variational_policy.state_dict()
-		torch.save(save_object,os.path.join(savedir,"Model_"+suffix))
+		self.save_object = {}
+		self.save_object['Latent_Policy'] = self.latent_policy.state_dict()
+		self.save_object['Policy_Network'] = self.policy_network.state_dict()
+		self.save_object['Variational_Policy'] = self.variational_policy.state_dict()
+		torch.save(self.save_object,os.path.join(self.savedir,"Model_"+suffix))
 
-	def load_all_models(self, path, just_subpolicy=False):		
-		load_object = torch.load(path)
-		self.policy_network.load_state_dict(load_object['Policy_Network'])
+	def load_all_models(self, path, just_subpolicy=False):
+		self.load_object = torch.load(path)
+		self.policy_network.load_state_dict(self.load_object['Policy_Network'])
 
 		if not(just_subpolicy):
 			if self.args.load_latent:
-				self.latent_policy.load_state_dict(load_object['Latent_Policy'])		
-			self.variational_policy.load_state_dict(load_object['Variational_Policy'])
+				self.latent_policy.load_state_dict(self.load_object['Latent_Policy'])		
+			self.variational_policy.load_state_dict(self.load_object['Variational_Policy'])
 
 	def set_epoch(self, counter):
 		if self.args.train:
@@ -2303,6 +2303,12 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.total_loss = self.subpolicy_loss + self.total_weighted_latent_loss + self.total_variational_loss + self.prior_loss
 
 		################################################
+		# If we're implementing context based training, add. 
+		################################################
+		if self.args.setting=='context':
+			self.total_loss += self.context_loss
+
+		################################################
 		if self.args.debug:
 			if self.iter%self.args.debug==0:
 				print("Embedding in Update Policies")
@@ -2657,6 +2663,12 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			eval_likelihood_dict = self.evaluate_loglikelihoods(input_dictionary, variational_dict)
 
 			if self.args.train:
+
+				####################################
+				# (4b) If context, compute context loss
+				####################################
+				if self.args.setting=='context':
+					self.compute_context_loss(input_dictionary, variational_dict)
 				
 				####################################
 				# (5) Update policies. 
@@ -2673,37 +2685,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 				print("#########################################")
 
-			else:
-
-				if self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
-					pass
-				else:
-					print("#############################################")			
-					print("Trajectory",i)
-					print("Predicted Z: \n", latent_z_indices.detach().cpu().numpy())
-					print("True Z     : \n", np.array(self.dataset.Y_array[i][:self.args.traj_length]))
-					print("Latent B   : \n", latent_b.detach().cpu().numpy())
-					# print("Variational Probs: \n", variational_z_probabilities.detach().cpu().numpy())
-					# print("Latent Probs     : \n", latent_z_probabilities.detach().cpu().numpy())
-					print("Latent B Probs   : \n", latent_b_probabilities.detach().cpu().numpy())
-
-					if self.args.subpolicy_model:
-
-						eval_encoded_logprobs = torch.zeros((latent_z_indices.shape[0]))
-						eval_orig_encoder_logprobs = torch.zeros((latent_z_indices.shape[0]))
-
-						torch_concat_traj = torch.tensor(concatenated_traj).to(device).float()
-
-						# For each timestep z in latent_z_indices, evaluate likelihood under pretrained encoder model. 
-						for t in range(latent_z_indices.shape[0]):
-							eval_encoded_logprobs[t] = self.encoder_network.forward(torch_concat_traj, z_sample_to_evaluate=latent_z_indices[t])					
-							_, eval_orig_encoder_logprobs[t], _, _ = self.encoder_network.forward(torch_concat_traj)
-
-						print("Encoder Loglikelihood:", eval_encoded_logprobs.detach().cpu().numpy())
-						print("Orig Encoder Loglikelihood:", eval_orig_encoder_logprobs.detach().cpu().numpy())
-				
-				if self.args.debug:
-					embed()			
+			if self.args.debug:
+				embed()			
 
 	def evaluate_metrics(self):
 		self.distances = -np.ones((self.test_set_size))
@@ -2791,10 +2774,10 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 		self.policy_network = ContinuousPolicyNetwork(self.input_size, self.hidden_size, self.output_size, self.args, self.number_layers).to(device)
 		self.latent_policy = ContinuousLatentPolicyNetwork_ConstrainedBPrior(self.input_size+self.conditional_info_size, self.hidden_size, self.args, self.number_layers).to(device)
 
-		if self.args.batch_size > 1:			
+		if self.args.setting=='context':
+			self.variational_policy = ContinuousContextualVariationalPolicyNetwork(self.input_size, self.hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.number_layers).to(device)
+		else:
 			self.variational_policy = ContinuousVariationalPolicyNetwork_Batch(self.input_size, self.hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.number_layers).to(device)
-		else:			
-			self.variational_policy = ContinuousVariationalPolicyNetwork_ConstrainedBPrior(self.input_size, self.hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.number_layers).to(device)
 
 	# Batch concatenation functions. 
 	def concat_state_action(self, sample_traj, sample_action_seq):
@@ -2991,11 +2974,33 @@ class PolicyManager_Context(PolicyManager_BatchJoint):
 		super.create_networks()
 
 		# Now create a context decoder.
-		# self.context_decoder = ()
-	
-	def 
+		self.context_decoder = ContextDecoder(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, self.args, self.args.number_layers)
 
+	def create_training_ops(self):
 
+		super.create_training_ops()
+
+		# Add context decoder parameters to the optimizer. 
+		self.parameter_list = self.parameter_list + list(self.context_decoder.parameters())
+		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate)
+
+	def save_all_models(self, suffix):
+
+		super.save_all_models(self, suffix)
+
+		# Now add context decoder to save object and overwrite mode file.
+		self.save_object['ContextDecoder'] = self.context_decoder.state_dict()
+		torch.save(self.save_object,os.path.join(self.savedir,"Model_"+suffix))
+
+	def load_all_models(self, path, just_subpolicy=False):
+
+		super.load_all_models(self, path, just_subpolicy=just_subpolicy)
+		self.context_decoder.load_state_dict(self.load_object['ContextDecoder'])
+
+	def compute_context_loss(self, input_dict, variational_dict):
+
+		pass
+		# Compute context loss, so that update policies can add it to total loss.	
 
 class PolicyManager_BaselineRL(PolicyManager_BaseClass):
 
