@@ -1596,7 +1596,7 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 
 			# Now actually mask the chosen mask indices.
 			masked_z = sampled_z_index[distinct_z_indices,j]
-			# masked_z[mask_indices] = 0.
+			masked_z[mask_indices] = 0.
 
 			# Now copy over the masked indices into a single list. 
 			z_sequence_collection.append(masked_z)
@@ -1611,7 +1611,7 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 		# Now that we've gotten the initial skill embeddings (from the distinct z sequence), 
 		# Feed it into the contextual LSTM, and predict new contextual embeddings. 
 		contextual_outputs, contextual_hidden = self.contextual_lstm(self.initial_skill_embedding)
-		contextual_skill_embedding = self.z_output_layer(contextual_outputs)
+		self.contextual_skill_embedding = self.z_output_layer(contextual_outputs)
 
 		# Now must reconstruct the z vector (sampled_z_indices). # Incidentally this removes need for masking of z's.
 		# Must use the original sampled_b to take care of this. 
@@ -1621,14 +1621,8 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 			# Use distinct_z_indices, where we have already computed torch.where(sampled_b[:,j]). 
 			# May need to manipulate this to negate the where. 
 			for k in range(len(distinct_indices_collection[j])-1):
-				# new_sampled_z_indices[distinct_indices_collection[j][k]:distinct_indices_collection[j][k+1],j] = contextual_skill_embedding[k,j]		# What it should be. 
-				new_sampled_z_indices[distinct_indices_collection[j][k]:distinct_indices_collection[j][k+1],j] = self.initial_skill_embedding[k,j]		# Testing assembly.
-			# new_sampled_z_indices[distinct_indices_collection[j][-1]:,j] = contextual_skill_embedding[-1,j]		# WHat it should be. 
-			# new_sampled_z_indices[distinct_indices_collection[j][-1]:,j] = self.initial_skill_embedding[-1,j]		# Testing assembly works with reconstruction of original sampled_z_index. 
-			new_sampled_z_indices[distinct_indices_collection[j][-1]:batch_trajectory_lengths[j],j] = self.initial_skill_embedding[k+1,j]		# Testing assembly works with reconstruction of original sampled_z_index. 
-
-		print("Embed after the loop in Context Var.")
-		embed()
+				new_sampled_z_indices[distinct_indices_collection[j][k]:distinct_indices_collection[j][k+1],j] = self.contextual_skill_embedding[k,j]
+			new_sampled_z_indices[distinct_indices_collection[j][-1]:batch_trajectory_lengths[j],j] = self.contextual_skill_embedding[k+1,j]
 
 		pass
 
