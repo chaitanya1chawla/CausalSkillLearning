@@ -102,7 +102,7 @@ class Master():
 				else:					
 					self.policy_manager.evaluate(model=self.args.model)		
 				
-		elif self.args.setting=='learntsub':
+		elif self.args.setting=='learntsub' or self.args.setting=='joint' or self.args.setting=='context':
 			if self.args.train:
 				if self.args.model:
 					self.policy_manager.train(self.args.model)
@@ -218,7 +218,7 @@ def parse_arguments():
 	parser.add_argument('--kl_weight',dest='kl_weight',type=float,default=0.01)
 	parser.add_argument('--var_loss_weight',dest='var_loss_weight',type=float,default=1.)
 	parser.add_argument('--prior_weight',dest='prior_weight',type=float,default=0.00001)
-	parser.add_argument('--context_loss_weight',dest='context_loss_weight',type=float,default=1.,help='Weight of context loss.')
+	# parser.add_argument('--context_loss_weight',dest='context_loss_weight',type=float,default=1.,help='Weight of context loss.')
 	
 	# Cross Domain Skill Transfer parameters. 
 	parser.add_argument('--discriminability_weight',dest='discriminability_weight',type=float,default=1.,help='Weight of discriminability loss in cross domain skill transfer.') 
@@ -256,6 +256,9 @@ def parse_arguments():
 	# Transfer learning domains, etc. 
 	parser.add_argument('--source_domain',dest='source_domain',type=str,help='What the source domain is in transfer.')
 	parser.add_argument('--target_domain',dest='target_domain',type=str,help='What the target domain is in transfer.')
+
+	# Parameters for contextual training. 
+	parser.add_argument('--mask_fraction',dest='mask_fraction',type=float,default=0.15,help='What fraction of zs to mask in contextual embedding.')
 
 	return parser.parse_args()
 

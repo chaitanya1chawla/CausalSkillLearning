@@ -2172,7 +2172,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# Remember, dimensions are time x batch.
 		self.batch_mask = torch.ones((self.current_traj_len,1)).to(device).float()
 
-	def new_update_policies(self, i, input_dictionary, variational_dict, eval_likelihood_dict):
+	def update_policies(self, i, input_dictionary, variational_dict, eval_likelihood_dict):
 
 		######################################################
 		########### Initialize things for func, ##############
@@ -2187,8 +2187,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		sample_action_seq = input_dictionary['sample_action_seq']
 
-		# print("EMBEZ")
-		# embed()
 		latent_b = variational_dict['latent_b']*self.batch_mask
 		latent_z_indices = variational_dict['latent_z_indices']*self.batch_mask.unsqueeze(2)
 		variational_z_logprobabilities = variational_dict['variational_z_logprobabilities']*self.batch_mask
@@ -2302,11 +2300,11 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		elif self.training_phase==2 or self.training_phase==3:
 			self.total_loss = self.subpolicy_loss + self.total_weighted_latent_loss + self.total_variational_loss + self.prior_loss
 
-		################################################
-		# If we're implementing context based training, add. 
-		################################################
-		if self.args.setting=='context':
-			self.total_loss += self.context_loss
+		# ################################################
+		# # If we're implementing context based training, add. 
+		# ################################################
+		# if self.args.setting=='context':
+		# 	self.total_loss += self.context_loss
 
 		################################################
 		if self.args.debug:
@@ -2674,7 +2672,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				# (5) Update policies. 
 				####################################
 				
-				self.new_update_policies(i, input_dictionary, variational_dict, eval_likelihood_dict)
+				self.update_policies(i, input_dictionary, variational_dict, eval_likelihood_dict)
 
 				####################################
 				# (6) Update plots and logging of stats. 

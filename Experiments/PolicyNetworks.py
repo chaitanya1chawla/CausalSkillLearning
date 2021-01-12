@@ -957,12 +957,12 @@ class ContinuousVariationalPolicyNetwork(PolicyNetwork_BaseClass):
 		variational_z_probabilities = None
 
 		# Set standard distribution for KL. 
-		standard_distribution = torch.distributions.MultivariateNormal(torch.zeros((self.output_size)).to(device),torch.eye((self.output_size)).to(device))
+		self.standard_distribution = torch.distributions.MultivariateNormal(torch.zeros((self.output_size)).to(device),torch.eye((self.output_size)).to(device))
 		# Compute KL.
-		kl_divergence = torch.distributions.kl_divergence(self.dists, standard_distribution)
+		kl_divergence = torch.distributions.kl_divergence(self.dists, self.standard_distribution)
 
 		# Prior loglikelihood
-		prior_loglikelihood = standard_distribution.log_prob(sampled_z_index)
+		prior_loglikelihood = self.standard_distribution.log_prob(sampled_z_index)
 
 		# if self.args.debug:
 		# 	print("#################################")
@@ -1137,12 +1137,12 @@ class ContinuousVariationalPolicyNetwork_BPrior(ContinuousVariationalPolicyNetwo
 		variational_z_probabilities = None
 
 		# Set standard distribution for KL. 
-		standard_distribution = torch.distributions.MultivariateNormal(torch.zeros((self.output_size)).to(device),torch.eye((self.output_size)).to(device))
+		self.standard_distribution = torch.distributions.MultivariateNormal(torch.zeros((self.output_size)).to(device),torch.eye((self.output_size)).to(device))
 		# Compute KL.
-		kl_divergence = torch.distributions.kl_divergence(self.dists, standard_distribution)
+		kl_divergence = torch.distributions.kl_divergence(self.dists, self.standard_distribution)
 
 		# Prior loglikelihood
-		prior_loglikelihood = standard_distribution.log_prob(sampled_z_index)
+		prior_loglikelihood = self.standard_distribution.log_prob(sampled_z_index)
 
 		if self.args.debug:
 			print("#################################")
@@ -1271,12 +1271,12 @@ class ContinuousVariationalPolicyNetwork_ConstrainedBPrior(ContinuousVariational
 		variational_z_probabilities = None
 
 		# Set standard distribution for KL. 
-		standard_distribution = torch.distributions.MultivariateNormal(torch.zeros((self.output_size)).to(device),torch.eye((self.output_size)).to(device))
+		self.standard_distribution = torch.distributions.MultivariateNormal(torch.zeros((self.output_size)).to(device),torch.eye((self.output_size)).to(device))
 		# Compute KL.
-		kl_divergence = torch.distributions.kl_divergence(self.dists, standard_distribution)
+		kl_divergence = torch.distributions.kl_divergence(self.dists, self.standard_distribution)
 
 		# Prior loglikelihood
-		prior_loglikelihood = standard_distribution.log_prob(sampled_z_index)
+		prior_loglikelihood = self.standard_distribution.log_prob(sampled_z_index)
 
 		if self.args.debug:
 			print("#################################")
@@ -1530,12 +1530,12 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		variational_z_probabilities = None
 
 		# Set standard distribution for KL. 
-		standard_distribution = torch.distributions.MultivariateNormal(torch.zeros((self.output_size)).to(device),torch.eye((self.output_size)).to(device))
+		self.standard_distribution = torch.distributions.MultivariateNormal(torch.zeros((self.output_size)).to(device),torch.eye((self.output_size)).to(device))
 		# Compute KL.
-		kl_divergence = torch.distributions.kl_divergence(self.dists, standard_distribution)
+		kl_divergence = torch.distributions.kl_divergence(self.dists, self.standard_distribution)
 
 		# Prior loglikelihood
-		prior_loglikelihood = standard_distribution.log_prob(sampled_z_index)
+		prior_loglikelihood = self.standard_distribution.log_prob(sampled_z_index)
 
 		if self.args.debug:
 			print("#################################")
@@ -1622,9 +1622,15 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 			# May need to manipulate this to negate the where. 
 			for k in range(len(distinct_indices_collection[j])-1):
 				new_sampled_z_indices[distinct_indices_collection[j][k]:distinct_indices_collection[j][k+1],j] = self.contextual_skill_embedding[k,j]
-			new_sampled_z_indices[distinct_indices_collection[j][-1]:batch_trajectory_lengths[j],j] = self.contextual_skill_embedding[k+1,j]
+			new_sampled_z_indices[distinct_indices_collection[j][-1]:batch_trajectory_lengths[j],j] = self.contextual_skill_embedding[k+1,j]	
+		
+		# Now recompute prior_loglikelihood with the new zs. 
+		prior_loglikelihood = self.standard_distribution.log_prob(new_sampled_z_indices)
 
-		pass
+		# Return same objects as original forward function. 
+		return new_sampled_z_indices, sampled_b, variational_b_logprobabilities, \
+		 variational_z_logprobabilities, variational_b_probabilities, \
+		 variational_z_probabilities, kl_divergence, prior_loglikelihood
 
 class EncoderNetwork(PolicyNetwork_BaseClass):
 
@@ -1778,9 +1784,9 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		logprobability = dist.log_prob(latent_z)
 
 		# Set standard distribution for KL. 
-		standard_distribution = torch.distributions.MultivariateNormal(torch.zeros((self.output_size)).to(device),torch.eye((self.output_size)).to(device))
+		self.standard_distribution = torch.distributions.MultivariateNormal(torch.zeros((self.output_size)).to(device),torch.eye((self.output_size)).to(device))
 		# Compute KL.
-		kl_divergence = torch.distributions.kl_divergence(dist, standard_distribution)
+		kl_divergence = torch.distributions.kl_divergence(dist, self.standard_distribution)
 
 		if self.args.debug:
 			print("###############################")
