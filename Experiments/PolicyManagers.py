@@ -2661,12 +2661,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			eval_likelihood_dict = self.evaluate_loglikelihoods(input_dictionary, variational_dict)
 
 			if self.args.train:
-
-				####################################
-				# (4b) If context, compute context loss
-				####################################
-				if self.args.setting=='context':
-					self.compute_context_loss(input_dictionary, variational_dict)
 				
 				####################################
 				# (5) Update policies. 
