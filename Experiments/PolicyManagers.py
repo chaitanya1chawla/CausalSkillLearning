@@ -1753,7 +1753,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.logdir = os.path.join(self.args.logdir, self.args.name)
 		self.savedir = os.path.join(self.logdir,"saved_models")
 		if not(os.path.isdir(self.savedir)):
-			os.mkdir(savedir)
+			os.mkdir(self.savedir)
 		self.save_object = {}
 		self.save_object['Latent_Policy'] = self.latent_policy.state_dict()
 		self.save_object['Policy_Network'] = self.policy_network.state_dict()
@@ -1775,15 +1775,28 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				self.epsilon = self.initial_epsilon-self.decay_rate*counter
 			else:
 				self.epsilon = self.final_epsilon		
-
+		
 			if counter<self.training_phase_size:
 				self.training_phase=1
+
+				# Set this variable to 0, and then the first time we encounter training phase 2, we change it to 1. 				
+				self.reset_subpolicy_training = 0
+
 			elif self.training_phase_size<=counter and counter<2*self.training_phase_size:
 				self.training_phase=2	
-				print("In Phase 2.")			
+				print("In Phase 2.")		
 
-			else:
-				
+				# If we are encountering training phase 2 for the first time.
+				if self.reset_subpolicy_training==0:
+					self.reset_subpolicy_training = 1
+
+					# Now set args.fix_subpolicy to False, and then recreate optimizer. 
+					self.args.fix_subpolicy = 0
+					self.create_training_ops()
+
+					# One issue is this resets variational network optimizer parameters, but that's okay.		
+
+			else:		
 				self.training_phase=3
 				self.latent_z_loss_weight = 0.01*self.args.lat_b_wt
 				# For training phase = 3, set latent_b_loss weight to 1 and latent_z_loss weight to something like 0.1 or 0.01. 
@@ -1861,11 +1874,16 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# # Generate trajectory rollouts so we can calculate distance metric. 
 		# self.rollout_visuals(counter, i, get_image=False)
 
-		# Compute trajectory distance between:
-		var_rollout_distance = ((self.variational_trajectory_rollout-sample_traj)**2).mean()
+		if self.args.batch_size>1:
+			reference_traj = sample_traj[:self.batch_trajectory_lengths[self.selected_index], self.selected_index]
+		else:
+			reference_traj = sample_traj
+
+		# Compute trajectory distance between:		
+		var_rollout_distance = ((self.variational_trajectory_rollout-reference_traj)**2).mean()
 		latent_rollout_distance = 0.
 		if self.args.viz_latent_rollout:
-			latent_rollout_distance = ((self.latent_trajectory_rollout-sample_traj)**2).mean()
+			latent_rollout_distance = ((self.latent_trajectory_rollout-reference_traj)**2).mean()
 
 		return var_rollout_distance, latent_rollout_distance
 	
@@ -2382,17 +2400,20 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		############# (0) #############
 		# Get sample we're going to train on. Single sample as of now.
 		_ , sample_action_seq, concatenated_traj, old_concatenated_traj = self.collect_inputs(i)
+
 				
 		if self.args.batch_size>1: 
-			sample_action_seq = sample_action_seq[:,0,:]
-			concatenated_traj = concatenated_traj[:,0,:]
-			old_concatenated_traj = old_concatenated_traj[:,0,:]
-
+			self.selected_index = 0
+			sample_action_seq = sample_action_seq[:,self.selected_index,:]
+			concatenated_traj = concatenated_traj[:,self.selected_index,:]
+			old_concatenated_traj = old_concatenated_traj[:,self.selected_index,:]
+		
 		if self.args.traj_length>0:
 			self.rollout_timesteps = self.args.traj_length
 		else:
-			self.rollout_timesteps = len(concatenated_traj)		
-
+			self.rollout_timesteps = self.batch_trajectory_lengths[self.selected_index]
+			# self.rollout_timesteps = len(concatenated_traj)		
+		
 		############# (1) #############
 		# Sample latent variables from p(\zeta | \tau).
 
@@ -2432,12 +2453,13 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		############# (A) VARIATIONAL POLICY ROLLOUT. #############
 		###########################################################
 	
-		subpolicy_inputs = orig_subpolicy_inputs.clone().detach()
+		subpolicy_inputs = orig_subpolicy_inputs.clone().detach()[:self.batch_trajectory_lengths[self.selected_index]]
 
+		print("Rolling out variational network.")
 		# For number of rollout timesteps: 
 		for t in range(self.rollout_timesteps-1):
 			# Take a rollout step. Feed into policy, get action, step, return new input. 
-			print("Rolling out variational policy, timestep: ", t)
+			# print("Rolling out variational policy, timestep: ", t)
 
 			action_to_execute, new_state = self.take_rollout_step(subpolicy_inputs[:(t+1)].view((t+1,-1)), t)
 			state_action_tuple = torch.cat([new_state, action_to_execute],dim=1)			
@@ -2484,15 +2506,21 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			pass
 
 	def rollout_latent_policy(self, orig_assembled_inputs, orig_subpolicy_inputs):
-		assembled_inputs = orig_assembled_inputs.clone().detach()
-		subpolicy_inputs = orig_subpolicy_inputs.clone().detach()
+		assembled_inputs = orig_assembled_inputs.clone().detach()[:self.rollout_timesteps]
+		subpolicy_inputs = orig_subpolicy_inputs.clone().detach()[:self.rollout_timesteps]
 		
 		# Set the previous b time to 0.
 		delta_t = 0
 
+		print("Rolling out latent policy.")
+		# embed()
+
 		# For number of rollout timesteps:
 		for t in range(self.rollout_timesteps-1):
-			print("Rolling out latent policy, timestep: ", t)
+			
+			if t%10==0:
+				print("Rolling out latent policy, timestep: ", t)
+
 			##########################################
 			#### CODE FOR NEW Z SELECTION ROLLOUT ####
 			##########################################
@@ -2573,7 +2601,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# Clear these variables from memory.
 		del subpolicy_inputs, assembled_inputs
-
+		print("Finishing rollout.")
 		return concatenated_selected_b
 
 	# @gpu_profile
@@ -2605,9 +2633,10 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		if get_image==True:
 			if self.args.batch_size>1:
-				if self.args.viz_latent_rollout:						
-					latent_rollout_image = self.visualize_trajectory(self.latent_trajectory_rollout[:,0,:], segmentations=latent_segmentation, i=i, suffix='Latent')
-				variational_rollout_image = self.visualize_trajectory(self.variational_trajectory_rollout[:,0,:], segmentations=variational_segmentation.detach().cpu().numpy(), i=i, suffix='Variational')	
+				print("Now visualizing rolled out trajectories.")
+				if self.args.viz_latent_rollout:					
+					latent_rollout_image = self.visualize_trajectory(self.latent_trajectory_rollout[:,self.selected_index,:], segmentations=latent_segmentation, i=i, suffix='Latent')
+				variational_rollout_image = self.visualize_trajectory(self.variational_trajectory_rollout[:,self.selected_index,:], segmentations=variational_segmentation.detach().cpu().numpy(), i=i, suffix='Variational')	
 
 			else:				
 				if self.args.viz_latent_rollout:						
