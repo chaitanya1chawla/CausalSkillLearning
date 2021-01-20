@@ -1621,8 +1621,9 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 			# Use distinct_z_indices, where we have already computed torch.where(sampled_b[:,j]). 
 			# May need to manipulate this to negate the where. 
 			for k in range(len(distinct_indices_collection[j])-1):
-				new_sampled_z_indices[distinct_indices_collection[j][k]:distinct_indices_collection[j][k+1],j] = self.contextual_skill_embedding[k,j]
-			new_sampled_z_indices[distinct_indices_collection[j][-1]:batch_trajectory_lengths[j],j] = self.contextual_skill_embedding[k+1,j]	
+				new_sampled_z_indices[distinct_indices_collection[j][k]:distinct_indices_collection[j][k+1],j] = self.contextual_skill_embedding[k,j]			
+			# new_sampled_z_indices[distinct_indices_collection[j][-1]:batch_trajectory_lengths[j],j] = self.contextual_skill_embedding[k+1,j]
+			new_sampled_z_indices[distinct_indices_collection[j][-1]:batch_trajectory_lengths[j],j] = self.contextual_skill_embedding[len(distinct_indices_collection[j])-1,j]	
 		
 		# Now recompute prior_loglikelihood with the new zs. 
 		prior_loglikelihood = self.standard_distribution.log_prob(new_sampled_z_indices)

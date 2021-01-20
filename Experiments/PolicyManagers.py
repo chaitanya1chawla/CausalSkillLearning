@@ -1787,6 +1787,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				print("In Phase 2.")		
 
 				# If we are encountering training phase 2 for the first time.
+				# if self.reset_subpolicy_training==0 and self.args.setting=='context':
 				if self.reset_subpolicy_training==0:
 					self.reset_subpolicy_training = 1
 
@@ -2316,7 +2317,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.total_loss = self.subpolicy_loss + self.total_variational_loss + self.prior_loss
 		# IF DONE WITH PHASE ONE:
 		elif self.training_phase==2 or self.training_phase==3:
-			self.total_loss = self.subpolicy_loss + self.total_weighted_latent_loss + self.total_variational_loss + self.prior_loss
+			# Debugging joint training.
+			self.total_loss = self.subpolicy_loss + self.total_variational_loss + self.prior_loss
+			# self.total_loss = self.subpolicy_loss + self.total_weighted_latent_loss + self.total_variational_loss + self.prior_loss
 
 		# ################################################
 		# # If we're implementing context based training, add. 
@@ -2707,6 +2710,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				print("#########################################")
 
 			if self.args.debug:
+				print("Embedding in Run Iteration.")
 				embed()			
 
 	def evaluate_metrics(self):
@@ -2781,6 +2785,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# 	self.run_iteration(0, i)
 
 		if self.args.debug:
+			print("Embedding in Evaluate.")
 			embed()
 
 class PolicyManager_BatchJoint(PolicyManager_Joint):
