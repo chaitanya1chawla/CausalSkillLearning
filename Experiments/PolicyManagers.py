@@ -199,12 +199,16 @@ class PolicyManager_BaseClass():
 			if self.args.setting=='transfer' or self.args.setting=='cycle_transfer':
 				extent = self.extent
 			else:
-				extent = len(self.dataset)-self.test_set_size
+				if self.args.debugging_datapoints>-1:				
+					extent = self.args.debugging_datapoints
+				else:
+					extent = len(self.dataset)-self.test_set_size
 
 			# np.random.shuffle(self.index_list)
 			self.shuffle(extent)
 			self.batch_indices_sizes = []
 			# Modifying to make training functions handle batches. 
+			
 			for i in range(0,extent,self.args.batch_size):
 
 				print("Epoch: ",e," Trajectory:",i, "Datapoints: ", self.index_list[i])
@@ -1790,12 +1794,18 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				# if self.reset_subpolicy_training==0 and self.args.setting=='context':
 				if self.reset_subpolicy_training==0:
 					self.reset_subpolicy_training = 1
+					
+					# Instead of recreating the optimizer, we can also add the policy network parameters to the optimizer's paramters. 
+					# self.optimizer.add_param_group({'params': self.policy_network.parameters()})
 
-					# Now set args.fix_subpolicy to False, and then recreate optimizer. 
+					# Initially we weren't recreating the optimizer, but now we are going to try it, and set the learning rate smaller. 
+					# Now set args.fix_subpolicy to False, and then recreate optimizer; this will add the policy network parameters to optimizer.
 					self.args.fix_subpolicy = 0
+					self.learning_rate = 1e-2		
 					self.create_training_ops()
 
-					# One issue is this resets variational network optimizer parameters, but that's okay.		
+					# One issue is this resets variational network optimizer parameters, but that's okay.
+					# The add param group option didn't do this, but now we are going to recreate the optimizer with a smaller learning rate.
 
 			else:		
 				self.training_phase=3
@@ -1915,6 +1925,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.tf_logger.scalar_summary('Latent B LogProbability', latent_b_logprobability, counter)
 		self.tf_logger.scalar_summary('KL Divergence', torch.mean(kl_divergence), counter)
 		self.tf_logger.scalar_summary('Prior LogLikelihood', torch.mean(prior_loglikelihood), counter)
+		self.tf_logger.scalar_summary('Epoch', self.current_epoch_running, counter)
 
 		if counter%self.args.display_freq==0:
 			# Now adding visuals for MIME, so it doesn't depend what data we use.
@@ -2411,11 +2422,12 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			concatenated_traj = concatenated_traj[:,self.selected_index,:]
 			old_concatenated_traj = old_concatenated_traj[:,self.selected_index,:]
 		
-		if self.args.traj_length>0:
-			self.rollout_timesteps = self.args.traj_length
-		else:
-			self.rollout_timesteps = self.batch_trajectory_lengths[self.selected_index]
-			# self.rollout_timesteps = len(concatenated_traj)		
+		# if self.args.traj_length>0:
+		# 	self.rollout_timesteps = self.args.traj_length
+		# else:
+		# 	self.rollout_timesteps = self.batch_trajectory_lengths[self.selected_index]
+		# 	# self.rollout_timesteps = len(concatenated_traj)		
+		self.rollout_timesteps = self.batch_trajectory_lengths[self.selected_index]
 		
 		############# (1) #############
 		# Sample latent variables from p(\zeta | \tau).
@@ -2908,8 +2920,23 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			# Scaling action sequence by some factor.             
 			scaled_action_sequence = self.args.action_scale_factor*action_sequence
 
-			return batch_trajectory.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))			
-			# return batch_trajectory, action_sequence, concatenated_traj, old_concatenated_traj
+			
+			# If trajectory length is set to something besides -1, restrict trajectory length to this.
+			if self.args.traj_length > -1 :			
+				batch_trajectory = batch_trajectory.transpose((1,0,2))[:self.args.traj_length]
+				scaled_action_sequence = scaled_action_sequence.transpose((1,0,2))[:self.args.traj_length-1]
+				concatenated_traj = concatenated_traj.transpose((1,0,2))[:self.args.traj_length]
+				old_concatenated_traj = old_concatenated_traj.transpose((1,0,2))[:self.args.traj_length]
+
+				for x in range(self.args.batch_size):
+					if self.batch_trajectory_lengths[x] > self.args.traj_length:
+						self.batch_trajectory_lengths[x] = self.args.traj_length
+				# self.max_batch_traj_length = self.args.traj_length
+				self.max_batch_traj_length = self.batch_trajectory_lengths.max()
+				# self.current_traj_len = self.args.traj_length
+			
+			# return batch_trajectory.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))			
+			return batch_trajectory, scaled_action_sequence, concatenated_traj, old_concatenated_traj
 
 	def assemble_inputs(self, input_trajectory, latent_z_indices, latent_b, sample_action_seq, conditional_information=None, batch_size=None):
 
@@ -2958,7 +2985,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 		counter = 0
 		self.batch_indices_sizes = []
 		# self.trajectory_lengths = []
-
+		
+		self.current_epoch_running = -1
 		print("About to run a dry run. ")
 		# Do a dry run of 1 epoch, before we actually start running training. 
 		# This is so that we can figure out the batch of 1 epoch.
