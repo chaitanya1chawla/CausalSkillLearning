@@ -1026,7 +1026,6 @@ class ContinuousVariationalPolicyNetwork_BPrior(ContinuousVariationalPolicyNetwo
 			else:
 				max_limit = 20
 				skill_time_limit = max_limit-1	
-
 		prior_value = torch.zeros((1,2)).to(device).float()
 		# If at or over hard limit.
 		if elapsed_t>=max_limit:
@@ -1297,8 +1296,7 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		if batch_size==None:
 			batch_size = self.batch_size
 		
-		skill_time_limit = max_limit-1
-		
+		skill_time_limit = max_limit-1	
 
 		if self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 			# If allowing variable skill length, set length for this sample.				
@@ -1313,6 +1311,18 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 
 			else:
 				max_limit = 20
+				skill_time_limit = max_limit-1	
+		else:
+			# If allowing variable skill length, set length for this sample.				
+			if self.args.var_skill_length:
+				# probabilities = np.array([0.1,0.2,0.4,0.2,0.1])
+				prob_biases = np.array([[0.8,0.],[0.4,0.],[0.,0.],[0.,0.4]])				
+
+				max_limit = 6
+				skill_time_limit = 4
+
+			else:
+				max_limit = 5
 				skill_time_limit = max_limit-1	
 
 		# Compute elapsed time - skill time limit.
@@ -1329,14 +1339,14 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		# embed()	
 
 		######################################
-		# CASE 1: If we're over the max limit:
+		# CASE 1: If we're at / over the max limit:
 		######################################
 		condition_1 = torch.tensor((elapsed_t>=max_limit).astype(int)).to(device).float()
 		case_1_block = np.array([[0,1]])
 		case_1_value = torch.tensor(np.repeat(case_1_block, batch_size, axis=0)).to(device).float()
 
 		######################################
-		# CASE 2:  If we're not over max limt, but over the typical skill time length.
+		# CASE 2:  If we're not over max limt, but at/ over the typical skill time length.
 		######################################
 		condition_2 = torch.tensor((elapsed_t>=skill_time_limit).astype(int)*(elapsed_t<max_limit).astype(int)).to(device).float()
 
@@ -1393,7 +1403,7 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 	
 	# @gpu_profile
 	def forward(self, input, epsilon, new_z_selection=True, batch_size=None, batch_trajectory_lengths=None):
-
+		
 		if batch_size is None:
 			batch_size = self.batch_size			
 		# if batch_trajectory_lengths is not None: 
@@ -1554,7 +1564,10 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 		# Define a bidirectional LSTM now.
 		self.z_dimensions = self.args.z_dimensions
 		self.contextual_lstm = torch.nn.LSTM(input_size=self.args.z_dimensions,hidden_size=self.hidden_size,num_layers=self.num_layers, bidirectional=True)
-		self.z_output_layer = torch.nn.Linear(2*self.hidden_size, self.z_dimensions)
+		# self.z_output_layer = torch.nn.Linear(2*self.hidden_size, self.z_dimensions)
+
+		self.contextual_mean_output_layer = torch.nn.Linear(2*self.hidden_size,self.output_size)
+		self.contextual_variances_output_layer = torch.nn.Linear(2*self.hidden_size, self.output_size)
 
 	def forward(self, input, epsilon, new_z_selection=True, batch_size=None, batch_trajectory_lengths=None):
 		
@@ -1562,7 +1575,8 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 		# This runs the initial LSTM and predicts the original embedding of skills. 
 		sampled_z_index, sampled_b, variational_b_logprobabilities, \
 		 variational_z_logprobabilities, variational_b_probabilities, \
-		 variational_z_probabilities, kl_divergence, prior_loglikelihood = super().forward(input, epsilon, new_z_selection=new_z_selection, batch_size=batch_size, batch_trajectory_lengths=batch_trajectory_lengths)
+		 variational_z_probabilities, kl_divergence, prior_loglikelihood = \
+			 super().forward(input, epsilon, new_z_selection=new_z_selection, batch_size=batch_size, batch_trajectory_lengths=batch_trajectory_lengths)
 
 		# Now parse the sequence of per timestep z's to sequence of z's of length = the number of skills in the trajectory. 
 		# The latent_b vector has this information, specified in terms of when b=1. 
@@ -1611,7 +1625,26 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 		# Now that we've gotten the initial skill embeddings (from the distinct z sequence), 
 		# Feed it into the contextual LSTM, and predict new contextual embeddings. 
 		contextual_outputs, contextual_hidden = self.contextual_lstm(self.initial_skill_embedding)
-		self.contextual_skill_embedding = self.z_output_layer(contextual_outputs)
+		# self.contextual_skill_embedding = self.z_output_layer(contextual_outputs)
+
+		# Now recreate distributions, so we can evaluate new KL.
+		self.contextual_mean = self.contextual_mean_output_layer(contextual_outputs)
+		var_epsilon = 0.001
+		self.contextual_variance = self.variance_factor*(self.variance_activation_layer(self.contextual_variances_output_layer(contextual_outputs))+self.variance_activation_bias) + var_epsilon
+		self.contextual_dists = torch.distributions.MultivariateNormal(self.contextual_mean, torch.diag_embed(self.contextual_variance))
+
+		if self.args.train:
+			noise = torch.randn_like(self.contextual_variance)
+
+			# Instead of *sampling* the latent z from a distribution, construct using mu + sig * eps (random noise).
+			self.contextual_skill_embedding = (self.contextual_mean + self.contextual_variance*noise).squeeze(1)
+			# Ought to be able to pass gradients through this latent_z now.
+
+		# If evaluating, greedily get action.
+		else:
+			self.contextual_skill_embedding = self.contextual_mean.squeeze(1)
+
+		######### 
 
 		# Now must reconstruct the z vector (sampled_z_indices). # Incidentally this removes need for masking of z's.
 		# Must use the original sampled_b to take care of this. 
@@ -1627,6 +1660,9 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 		
 		# Now recompute prior_loglikelihood with the new zs. 
 		prior_loglikelihood = self.standard_distribution.log_prob(new_sampled_z_indices)
+
+		# Also recompute the KL. 
+		# kl_divergence = torch.distributions.kl_divergence(self.contextual_dists, self.standard_distribution).mean()
 
 		# Return same objects as original forward function. 
 		return new_sampled_z_indices, sampled_b, variational_b_logprobabilities, \

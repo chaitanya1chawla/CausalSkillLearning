@@ -1798,10 +1798,11 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 					# Instead of recreating the optimizer, we can also add the policy network parameters to the optimizer's paramters. 
 					# self.optimizer.add_param_group({'params': self.policy_network.parameters()})
 
-					# Initially we weren't recreating the optimizer, but now we are going to try it, and set the learning rate smaller. 
 					# Now set args.fix_subpolicy to False, and then recreate optimizer; this will add the policy network parameters to optimizer.
 					self.args.fix_subpolicy = 0
-					self.learning_rate = 1e-2		
+
+					# Initially we weren't recreating the optimizer, but now we are going to try it, and set the learning rate smaller. 
+					self.learning_rate = 1e-5		
 					self.create_training_ops()
 
 					# One issue is this resets variational network optimizer parameters, but that's okay.
@@ -1926,6 +1927,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.tf_logger.scalar_summary('KL Divergence', torch.mean(kl_divergence), counter)
 		self.tf_logger.scalar_summary('Prior LogLikelihood', torch.mean(prior_loglikelihood), counter)
 		self.tf_logger.scalar_summary('Epoch', self.current_epoch_running, counter)
+		self.tf_logger.scalar_summary('Latent Z Mean', torch.mean(variational_dict['latent_z_indices']), counter)
+		self.tf_logger.scalar_summary('Training Phase', self.training_phase, counter)
 
 		if counter%self.args.display_freq==0:
 			# Now adding visuals for MIME, so it doesn't depend what data we use.
@@ -1985,11 +1988,19 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		else:
 
-			if self.training_phase>1:
-				# Prevents gradients being propagated through this..
-				latent_z_copy = torch.tensor(latent_z_indices).to(device)
-			else:
-				latent_z_copy = latent_z_indices
+			################
+			# This seems like it could be a major issue in the contextual embedding training. 
+			# If you made this a copy, and added parameters of the subpolicy to the optimizer... 
+			# Stops gradients going back into the variational network from this. 
+			################
+			# if self.training_phase>1:
+			# 	# Prevents gradients being propagated through this..
+			# 	latent_z_copy = torch.tensor(latent_z_indices).to(device)
+			# else:
+			# 	latent_z_copy = latent_z_indices
+
+			# INSTEAD, just try the latent_z_copy. 
+			latent_z_copy = latent_z_indices
 
 			if conditional_information is None:
 				conditional_information = torch.zeros((self.conditional_info_size)).to(device).float()
@@ -2086,11 +2097,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# Multiplying the likelihoods with the subpolicy ratio before summing.
 		unmasked_learnt_subpolicy_loglikelihoods = self.args.subpolicy_ratio*unmasked_learnt_subpolicy_loglikelihoods
 
-		# Summing until penultimate timestep.
-		# learnt_subpolicy_loglikelihood = learnt_subpolicy_loglikelihoods[:-1].sum()
-		# TAKING AVERAGE HERE AS WELL.		
-		# print("Embedding in evaluate likelihood.")		
-		
+		# Averaging until penultimate timestep.
 		learnt_subpolicy_loglikelihoods = self.batch_mask*unmasked_learnt_subpolicy_loglikelihoods
 		learnt_subpolicy_loglikelihood = learnt_subpolicy_loglikelihoods[:-1].mean()
 
@@ -2126,8 +2133,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			# If not, we need to evaluate the latent probabilties of latent_z_indices under latent_policy. 			
 			latent_b_logprobabilities, latent_b_probabilities, latent_distributions = self.latent_policy.forward(assembled_inputs_copy, self.epsilon)
 			# Evalute loglikelihood of latent z vectors under the latent policy's distributions. 			
-
-			# embed()
 
 			if self.args.batch_size>1:
 				latent_z_logprobabilities = latent_distributions.log_prob(latent_z_copy)				
@@ -2176,10 +2181,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			if self.iter%self.args.debug==0:
 				print("Embedding in the Evaluate Likelihoods Function.")
 				embed()
-
-		# return None, None, None, latent_loglikelihood, \
-		#  latent_b_logprobabilities, latent_z_logprobabilities, latent_b_probabilities, latent_z_probabilities, \
-		#  latent_z_logprobability, latent_b_logprobability, learnt_subpolicy_loglikelihood, learnt_subpolicy_loglikelihoods, temporal_loglikelihoods
 
 		# Parse return objects into dicitonary. 
 		return_dict = {}
@@ -2302,7 +2303,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# If reparam, the variational loss is a combination of three things. 
 		# Losses from latent policy and subpolicy into variational network for the latent_z's, the reinforce loss on the latent_b's, and the KL divergence. 
-		# But since we don't need to additionall compute the gradients from latent and subpolicy into variational network, just set the variational loss to reinforce + KL.
+		# But since we don't need to additional compute the gradients from latent and subpolicy into variational network, just set the variational loss to reinforce + KL.
 		# self.total_variational_loss = (self.reinforce_variational_loss.sum() + self.args.kl_weight*kl_divergence.squeeze(1).sum()).sum()
 		self.total_variational_loss = (self.reinforce_variational_loss + self.args.kl_weight*kl_divergence.squeeze(1)).mean()
 
@@ -2692,7 +2693,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			####################################
 			# (3) Sample latent variables from variational network p(\zeta | \tau).
 			####################################
-			
+
 			variational_dict = {}
 			variational_dict['latent_z_indices'], variational_dict['latent_b'], variational_dict['variational_b_logprobabilities'], variational_dict['variational_z_logprobabilities'], \
 			variational_dict['variational_b_probabilities'], variational_dict['variational_z_probabilities'], variational_dict['kl_divergence'], variational_dict['prior_loglikelihood'] = \
@@ -2867,6 +2868,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				self.conditional_information[4:] = self.dataset.get_goal_position[i]
 			else:
 				self.conditional_information = np.zeros((self.args.condition_size))
+			self.batch_trajectory_lengths = concatenated_traj.shape[1]*np.zeros((self.args.batch_size))
+			self.max_batch_traj_length = concatenated_traj.shape[1]
 
 			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
 
@@ -2919,7 +2922,6 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 			# Scaling action sequence by some factor.             
 			scaled_action_sequence = self.args.action_scale_factor*action_sequence
-
 			
 			# If trajectory length is set to something besides -1, restrict trajectory length to this.
 			if self.args.traj_length > -1 :			
@@ -2931,23 +2933,31 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				for x in range(self.args.batch_size):
 					if self.batch_trajectory_lengths[x] > self.args.traj_length:
 						self.batch_trajectory_lengths[x] = self.args.traj_length
-				# self.max_batch_traj_length = self.args.traj_length
 				self.max_batch_traj_length = self.batch_trajectory_lengths.max()
-				# self.current_traj_len = self.args.traj_length
-			
-			# return batch_trajectory.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))			
-			return batch_trajectory, scaled_action_sequence, concatenated_traj, old_concatenated_traj
 
+				return batch_trajectory, scaled_action_sequence, concatenated_traj, old_concatenated_traj
+
+			return batch_trajectory.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
+			
 	def assemble_inputs(self, input_trajectory, latent_z_indices, latent_b, sample_action_seq, conditional_information=None, batch_size=None):
 
 		if batch_size is None:
 			batch_size = self.args.batch_size
 
-		if self.training_phase>1:
-			# Prevents gradients being propagated through this..
-			latent_z_copy = torch.tensor(latent_z_indices).to(device)
-		else:
-			latent_z_copy = latent_z_indices
+		################
+		# This seems like it could be a major issue in the contextual embedding training. 
+		# If you made this a copy, and added parameters of the subpolicy to the optimizer... 
+		# Stops gradients going back into the variational network from this. 
+		################
+		# if self.training_phase>1:
+		# 	# Prevents gradients being propagated through this..
+		# 	latent_z_copy = torch.tensor(latent_z_indices).to(device)
+		# else:
+		# 	latent_z_copy = latent_z_indices
+
+		# INSTEAD, just try the latent_z_copy. 
+		latent_z_copy = latent_z_indices
+		# latent_z_copy = torch.tensor(latent_z_indices).to(device)
 
 		if conditional_information is None:
 			conditional_information = torch.zeros((self.conditional_info_size)).to(device).float()

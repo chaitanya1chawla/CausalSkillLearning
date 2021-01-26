@@ -82,6 +82,7 @@ class Master():
 				self.policy_manager = PolicyManager_CycleConsistencyTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)				
 
 		if self.args.debug:
+			print("Embedding in Master.")
 			embed()
 			
 		# Create networks and training operations. 
@@ -150,7 +151,7 @@ def parse_arguments():
 	parser.add_argument('--model',dest='model',type=str)
 	parser.add_argument('--logdir',dest='logdir',type=str,default='Experiment_Logs/')
 	parser.add_argument('--epochs',dest='epochs',type=int,default=500) # Number of epochs to train for. Reduce for Mocap.
-
+	parser.add_argument('--debugging_datapoints',dest='debugging_datapoints',type=int,default=-1,help='How many data points to run training on. If greater than 0, only select that many datapoints for debugging.')
 	# Training setting. 
 	parser.add_argument('--discrete_z',dest='discrete_z',type=int,default=0)
 	# parser.add_argument('--transformer',dest='transformer',type=int,default=0)	
@@ -184,7 +185,7 @@ def parse_arguments():
 
 	# Parameters for evaluation. 
 	parser.add_argument('--display_freq',dest='display_freq',type=int,default=10000)
-	parser.add_argument('--save_freq',dest='save_freq',type=int,default=1)	
+	parser.add_argument('--save_freq',dest='save_freq',type=int,default=5)	
 	parser.add_argument('--eval_freq',dest='eval_freq',type=int,default=20)	
 	parser.add_argument('--perplexity',dest='perplexity',type=float,default=30,help='Value of perplexity fed to TSNE.')
 	parser.add_argument('--latent_set_file_path',dest='latent_set_file_path',type=str,help='File path to pre-computed latent sets to visualize.')
@@ -204,7 +205,7 @@ def parse_arguments():
 	parser.add_argument('--lat_z_wt',dest='lat_z_wt',type=float,default=0.1)
 	parser.add_argument('--lat_b_wt',dest='lat_b_wt',type=float,default=1.)
 	parser.add_argument('--z_probability_factor',dest='z_probability_factor',type=float,default=0.1)
-	parser.add_argument('--b_probability_factor',dest='b_probability_factor',type=float,default=0.1)
+	parser.add_argument('--b_probability_factor',dest='b_probability_factor',type=float,default=0.01)
 	parser.add_argument('--subpolicy_clamp_value',dest='subpolicy_clamp_value',type=float,default=-5)
 	parser.add_argument('--latent_clamp_value',dest='latent_clamp_value',type=float,default=-5)
 	parser.add_argument('--min_variance_bias',dest='min_variance_bias',type=float,default=0.01)
