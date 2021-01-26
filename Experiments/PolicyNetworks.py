@@ -1158,8 +1158,12 @@ class ContinuousVariationalPolicyNetwork_ConstrainedBPrior(ContinuousVariational
 		# Ensures inheriting from torch.nn.Module goes nicely and cleanly. 	
 		super(ContinuousVariationalPolicyNetwork_ConstrainedBPrior, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)
 
-		self.min_skill_time = 12
-		self.max_skill_time = 16
+		if self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
+			self.min_skill_time = 12
+			self.max_skill_time = 16
+		else:
+			self.min_skill_time = 4
+			self.max_skill_time = 6
 
 	def forward(self, input, epsilon, new_z_selection=True, batch_size=1):
 
@@ -1408,7 +1412,6 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 			batch_size = self.batch_size			
 		# if batch_trajectory_lengths is not None: 
 
-
 		# print("VAR POL")	
 		# Input Format must be: Sequence_Length x Batch_Size x Input_Size. 	
 		format_input = input.view((input.shape[0], batch_size, self.input_size))
@@ -1480,6 +1483,7 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 			# Maybe a safer way to execute this: 
 			prev_time[(torch.where(sampled_b[t]==1)[0]).cpu().detach().numpy()] = t		
 
+
 		#######################################
 		################ Set Z ################
 		#######################################
@@ -1550,8 +1554,8 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		if self.args.debug:
 			print("#################################")
 			print("Embedding in Variational Network.")
-			embed()
-		
+			embed()		
+
 		return sampled_z_index, sampled_b, variational_b_logprobabilities.squeeze(1), \
 		 variational_z_logprobabilities, variational_b_probabilities.squeeze(1), variational_z_probabilities, kl_divergence, prior_loglikelihood
 
@@ -1585,7 +1589,7 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 		# Also collect indices to mask, at specified mask fraction
 		mask_indices_collection = []
 		max_distinct_zs = 0
-
+		
 		for j in range(self.args.batch_size):
 
 			# Mask z's that extend past the trajectory length. 
@@ -1624,6 +1628,8 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 
 		# Now that we've gotten the initial skill embeddings (from the distinct z sequence), 
 		# Feed it into the contextual LSTM, and predict new contextual embeddings. 
+
+
 		contextual_outputs, contextual_hidden = self.contextual_lstm(self.initial_skill_embedding)
 		# self.contextual_skill_embedding = self.z_output_layer(contextual_outputs)
 

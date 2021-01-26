@@ -1624,6 +1624,10 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.traj_length = 5
 		self.conditional_info_size = 6		
 
+		if self.args.data=='ContinuousNonZero':
+			self.conditional_info_size = self.args.condition_size
+			self.conditional_viz_env = False
+
 		if self.args.data=='MIME':
 			self.state_size = 16	
 			self.state_dim = 16
@@ -2350,12 +2354,16 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.optimizer.step()
 
 	def set_env_conditional_info(self):
-		obs = self.environment._get_observation()
-		self.conditional_information = np.zeros((self.conditional_info_size))
-		cond_state = np.concatenate([obs['robot-state'],obs['object-state']])
-		self.conditional_information[:cond_state.shape[-1]] = cond_state
-		# Also setting particular index in conditional information to 1 for task ID.
-		self.conditional_information[-self.number_tasks+self.task_id_for_cond_info] = 1
+
+		if self.args.data == 'ContinuousNonZero':
+			self.conditional_information = np.zeros((self.conditional_info_size))
+		else:			
+			obs = self.environment._get_observation()
+			self.conditional_information = np.zeros((self.conditional_info_size))
+			cond_state = np.concatenate([obs['robot-state'],obs['object-state']])
+			self.conditional_information[:cond_state.shape[-1]] = cond_state
+			# Also setting particular index in conditional information to 1 for task ID.
+			self.conditional_information[-self.number_tasks+self.task_id_for_cond_info] = 1
 
 	def take_rollout_step(self, subpolicy_input, t, use_env=False):
 
@@ -2388,9 +2396,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			new_state = torch.tensor(new_state_numpy).to(device).float().view((1,-1))
 
 			# This should be true by default...
-			# if self.conditional_viz_env:
-			# 	self.set_env_conditional_info()
-			self.set_env_conditional_info()
+			if self.conditional_viz_env:
+				self.set_env_conditional_info()
 			
 		else:
 			# Compute next state by adding action to state. 
@@ -2868,7 +2875,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				self.conditional_information[4:] = self.dataset.get_goal_position[i]
 			else:
 				self.conditional_information = np.zeros((self.args.condition_size))
-			self.batch_trajectory_lengths = concatenated_traj.shape[1]*np.zeros((self.args.batch_size))
+			self.batch_trajectory_lengths = concatenated_traj.shape[1]*np.ones((self.args.batch_size)).astype(int)
 			self.max_batch_traj_length = concatenated_traj.shape[1]
 
 			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
