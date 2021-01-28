@@ -5094,10 +5094,6 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Call super training ops. 
 		super().create_training_ops()
 
-		# # Now create discriminator optimizers. 
-		# self.source_discriminator_optimizer = torch.optim.Adam(self.source_discriminator_network.parameters(),lr=self.learning_rate)
-		# self.target_discriminator_optimizer = torch.optim.Adam(self.target_discriminator_network.parameters(),lr=self.learning_rate)
-
 		# Instead of using the individuals policy manager optimizers, use one single optimizer. 		
 		self.parameter_list = self.source_manager.parameter_list + self.target_manager.parameter_list
 		# Add discriminator parameters if neede.d
@@ -5240,7 +5236,9 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 
 		# Now rollout in target domain.		
 		cross_domain_decoding_dict = {}
-		cross_domain_decoding_dict['differentiable_trajectory'], cross_domain_decoding_dict['differentiable_action_seq'], cross_domain_decoding_dict['differentiable_state_action_seq'], cross_domain_decoding_dict['subpolicy_inputs'] = self.differentiable_rollout(domain_manager, start_state, latent_z)
+		cross_domain_decoding_dict['differentiable_trajectory'], cross_domain_decoding_dict['differentiable_action_seq'], \
+			cross_domain_decoding_dict['differentiable_state_action_seq'], cross_domain_decoding_dict['subpolicy_inputs'] = \
+			self.differentiable_rollout(domain_manager, start_state, latent_z)
 		# differentiable_trajectory, differentiable_action_seq, differentiable_state_action_seq, subpolicy_inputs = self.differentiable_rollout(domain_manager, start_state, latent_z)
 
 		# return differentiable_trajectory, subpolicy_inputs
@@ -5513,7 +5511,264 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Encode decode function: First encodes, takes trajectory segment, and outputs latent z. The latent z is then provided to decoder (along with initial state), and then we get SOURCE domain subpolicy inputs. 
 		# Cross domain decoding function: Takes encoded latent z (and start state), and then rolls out with target decoder. Function returns, target trajectory, action sequence, and TARGET domain subpolicy inputs. 
 
+class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTransfer):
+	
+	# Inherit from cycle con transfer. 
+	def __init__(self, args=None, source_dataset=None, target_dataset=None):
+
+		super(PolicyManager_FixEmbedCycleConTransfer, self).__init__(args, source_dataset, target_dataset)
+
+		self.translation_model_layers = 2
+
+	def create_networks(self):
+		
+		 # Call super create networks, to create all the necessary networks. 
+		super().create_networks()
+
+		# In addition, now create translation model networks.
+		self.forward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers)
+		self.backward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers)
+
+		# Create list of translation models to select from based on source domain.
+		self.translation_model_list = [self.forward_translation_model, self.backward_translation_model]
+
+		# Instead of single z discriminator, require two different z discriminators. 
+		# del self.discriminator_network
+
+		# Now create individual z discriminators.
+		self.source_z_discriminator = DiscreteMLP(self.args.z_dimensions, self.hidden_size, 2).to(device)
+		self.target_z_discriminator = DiscreteMLP(self.args.z_dimensions, self.hidden_size, 2).to(device)
+		
+		# Create lists of discriminators. 
+		self.discriminator_list = [self.source_discriminator, self.target_discriminator]
+		self.z_discriminator_list = [self.source_z_discriminator, self.target_z_discriminator]
+		
+	def create_training_ops(self):
+
+		# Don't actually call super().create_training_ops(),
+		# Because this creates optimizers with source and target encoder decoder parameters in the optimizer. 
+
+		# Instead, create other things here. 
+		self.negative_log_likelihood_loss_function = torch.nn.NLLLoss(reduction='none')
+
+		# Set regular parameter list. 
+		self.parameter_list = list(self.forward_translation_model.parameters()) + list(self.backward_translation_model.parameters())
+		# Now create optimizer for translation models. 
+		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate)
+
+		# Set discriminator parameter list. 
+		self.discrimator_parameter_list = list(self.source_z_discriminator.parameters()) + list(self.target_z_discriminator.parameters()) + list(self.source_discriminator.parameters()) + list(self.target_discriminator.parameters())
+		# Create common optimizer for source, target, and discriminator networks. 
+		self.discriminator_optimizer = torch.optim.Adam(self.discrimator_parameter_list, lr=self.learning_rate)
+
+	def save_all_models(self, suffix):
+
+		# Call super save model. 
+		super().save_all_models(suffix)
+
+		# del self.save_object['Discriminator_Network']
+
+		self.save_object['forward_translation_model'] = self.forward_translation_model.state_dict()
+		self.save_object['backward_translation_model'] = self.backward_translation_model.state_dict()
+		self.save_object['source_z_discriminator'] = self.source_z_discriminator.state_dict()
+		self.save_object['target_z_discriminator'] = self.target_z_discriminator.state_dict()
+
+		# Overwrite the save from super. 
+		torch.save(self.save_object,os.path.join(self.savedir,"Model_"+suffix))
+
+	def load_all_models(self, path):
+
+		# Call super load. 
+		super().load_all_models(path)
+
+		# Load translation model.
+		self.forward_translation_model.load_state_dict(self.load_object['forward_translation_model'])
+		self.backward_translation_model.load_state_dict(self.load_object['backward_translation_model'])
+		self.source_z_discriminator.load_state_dict(self.load_object['source_z_discriminator'])
+		self.target_z_discriminator.load_state_dict(self.load_object['target_z_discriminator'])
+
+	def backtranslate_latent_z(self, domain, latent_z):
+		
+		# Get translation models.
+		forward_translation_model = self.translation_model_list[domain]
+		backward_translation_model = self.translation_model_list[1-domain]
+
+		backtranslation_dict = {}
+
+		# Translate Z. 
+		translated_latent_z = forward_translation_model.forward(latent_z)
+		backtranslated_latent_z = backward_translation_model.forward(translated_latent_z)
+
+		return translated_latent_z, backtranslated_latent_z
+
+	def update_networks(self, dictionary, source_policy_manager):
+
+		# Remember, we don't actually need reconstruction losses now, we just need discriminator and discriminability losses. 
+
+		####################################
+		# (0) Zero out gradients. 
+		####################################
+
+		self.optimizer.zero_grad()
+
+		####################################
+		# (1) Compute discriminability losses to train translation models.
+		####################################
+
+		# Get the correct trajectory discriminator networks.
+		source_discriminator = self.discriminator_list[dictionary['domain']]
+		source_z_discriminator = self.z_discriminator_list[dictionary['domain']]
+		
+		# First select whether we are feeding original or translated trajectory. 
+		real_or_translated = np.random.binomial(1,0.5)
+		real_trans_label = torch.tensor(1-real_or_translated).to(device).long().repeat(self.args.batch_size)
+
+		# Based on whether original or translated trajectory, set trajectory object to either the original trajectory or cross domain decoded trajectory.
+		if real_or_translated==0:
+			# If real, set the trajectory and the latent_z as original ones.
+			trajectory = dictionary['source_subpolicy_inputs_original'][...,:2*source_policy_manager.state_dim]
+			latent_z = dictionary['source_latent_z']
+		else:
+			# If translated, set the trajectory and latent_z as backtranslated ones. 
+			trajectory = dictionary['source_subpolicy_inputs_crossdomain'][...,:2*source_policy_manager.state_dim]
+			latent_z = dictionary['backtranslated_latent_z']
+		
+		####################################
+		# (1 a) Compute traj_discriminability_loss. 
+		####################################
+
+		# Now feed trajectory to the trajectory discriminator, based on whether it is the source of target discriminator.
+		traj_discriminator_logprob, traj_discriminator_prob = source_discriminator.get_probabilities(trajectory)
+
+		# Compute trajectory discriminability loss, based on whether the trajectory was original or reconstructed.
+		self.traj_discriminability_loss = self.negative_log_likelihood_loss_function(traj_discriminator_logprob.squeeze(0), 1-real_trans_label).mean()
+		self.weighted_real_translated_loss = self.real_translated_loss_weight*self.traj_discriminability_loss
+
+		####################################
+		# (1 b) Compute z_discriminability_loss.
+		####################################
+
+		# Now feed latent_z into the z_discriminator. 
+		z_discriminator_logprob, z_discriminator_prob = source_z_discriminator.forward(latent_z)
+		
+		# Compute z discriminability loss, based on whether the latent_z was original or translated. 
+		self.z_discriminability_loss = self.negative_log_likelihood_loss_function(z_discriminator_logprob.squeeze(0), 1-real_trans_label).mean()
+
+		####################################
+		# (2) Compute cycle-consistency losses.
+		####################################
+
+		# Must compute likelihoods of original actions under the cycle reconstructed trajectory states. 
+		# I.e. evaluate likelihood of original actions under source_decoder (i.e. source subpolicy), with the subpolicy inputs constructed from cycle-reconstruction.
+
+		# Get the original action sequence.
+		original_action_sequence = dictionary['source_subpolicy_inputs_original'][...,source_policy_manager.state_dim:2*source_policy_manager.state_dim]
+
+		# Now evaluate likelihood of actions under the source decoder.
+		self.cycle_reconstructed_loglikelihood, _ = source_policy_manager.policy_network.forward(dictionary['source_subpolicy_inputs_crossdomain'], original_action_sequence)
+		# Reweight the cycle reconstructed likelihood to construct the loss.
+		self.cycle_reconstruction_loss = -self.args.cycle_reconstruction_loss_weight*self.cycle_reconstructed_loglikelihood.mean()
 
 
+		####################################
+		# (3 a) Compute total loss. 
+		####################################
+
+		# First combine losses.
+		self.total_VAE_loss = self.z_discriminability_loss + self.weighted_real_translated_loss + self.cycle_reconstruction_loss
+
+		####################################
+		# (3 a) Compute gradients and step to update translation models.
+		####################################
+		if not(self.skip_vae):
+			self.total_VAE_loss.backward()
+			self.optimizer.step()
 
 
+		####################################
+		# (4) Now compute discriminator losses and update discriminator network(s).
+		####################################
+
+		# First zero out the discriminator gradients. 
+		self.discriminator_optimizer.zero_grad()
+
+		####################################
+		# (4 a) Feed previously set trajectory object to correct discriminator, after detaching it to prevent opposite gradient flow.
+		####################################
+		traj_discriminator_logprob, traj_discriminator_prob = source_discriminator.get_probabilities(trajectory.detach())
+		# Now compute loss.
+		self.real_translated_discriminator_loss = self.negative_log_likelihood_loss_function(traj_discriminator_logprob.squeeze(0), real_trans_label).mean()
+
+		####################################
+		# (4 b) Feed previously set latent_z object to correct z_discriminator, after detaching it to prevent opposite gradient flow.
+		####################################
+		z_discriminator_logprob, z_discriminator_prob = source_z_discriminator.forward(latent_z.detach())
+		# Now compute loss.
+		self.z_discriminator_loss = self.negative_log_likelihood_loss_function(z_discriminator_logprob.squeeze(0), real_trans_label).mean()
+
+		####################################
+		# (4 c) Compute total discriminator loss.
+		####################################		
+		self.total_discriminator_loss = self.z_discriminator_loss + self.real_translated_discriminator_loss
+
+		if not(self.skip_discriminator):
+			# Now go backward and take a step.
+			self.total_discriminator_loss.backward()
+			self.discriminator_optimizer.step()
+
+	def update_plots(self, counter, viz_dict):
+
+		# Set reconstruction losses to 0, just to recylce plotting function.
+		self.source_likelihood_loss = 0.
+		self.source_encoder_KL = 0.
+		self.source_reconstruction_loss = 0.
+		
+		super().update_plots(counter, viz_dict)
+
+	def run_iteration(self, counter, i):
+
+		####################################
+		# (0) Setup things like training phases, epislon values, etc.
+		####################################
+
+		self.set_iteration(counter)
+		dictionary = {}
+		target_dict = {}
+
+		####################################
+		# (1) Select which domain to use as source domain (also supervision of z discriminator for this iteration). 
+		####################################
+
+		dictionary['domain'], source_policy_manager, target_policy_manager = self.get_source_target_domain_managers()
+
+		####################################
+		# (2) & (3 a) Get source trajectory (segment) and encode into latent z. Decode using source decoder, to get loglikelihood for reconstruction objectve. 
+		####################################
+		
+		dictionary['source_subpolicy_inputs_original'], dictionary['source_latent_z'], dictionary['source_loglikelihood'], dictionary['source_kl_divergence'] = self.encode_decode_trajectory(source_policy_manager, i)
+
+		####################################
+		# (3 b) Back translate the latent z.
+		####################################
+
+		dictionary['translated_latent_z'], dictionary['backtranslated_latent_z'] = self.backtranslate_latent_z(dictionary['source_latent_z'])
+
+		####################################
+		# (3 c) Decode backtranslated latent_z into source trajectory. 
+		####################################
+		
+		source_cross_domain_decoding_dict = self.cross_domain_decoding(dictionary['domain'], source_policy_manager, dictionary['backtranslated_latent_z'], start_state=dictionary['source_subpolicy_inputs_original'][0,...,:source_policy_manager.state_dim].detach().cpu().numpy())
+		dictionary['source_subpolicy_inputs_crossdomain'] = source_cross_domain_decoding_dict['subpolicy_inputs']
+
+		####################################
+		# (4) Compute all losses, reweight, and take gradient steps.
+		####################################
+
+		# Update networks.
+		self.update_networks(dictionary, source_policy_manager)
+
+		####################################
+		# (5) Accumulate and plot statistics of training.
+		####################################
+		
+		self.update_plots(counter, dictionary)

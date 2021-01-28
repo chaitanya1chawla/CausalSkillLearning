@@ -72,7 +72,7 @@ class Master():
 		elif self.args.setting=='imitation':
 			self.policy_manager = PolicyManager_Imitation(self.args.number_policies, self.dataset, self.args)
 
-		elif self.args.setting=='transfer' or self.args.setting=='cycle_transfer':
+		elif self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
 			source_dataset = return_dataset(self.args, data=self.args.source_domain)
 			target_dataset = return_dataset(self.args, data=self.args.target_domain)
 
@@ -80,6 +80,8 @@ class Master():
 				self.policy_manager = PolicyManager_Transfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 			elif self.args.setting=='cycle_transfer':
 				self.policy_manager = PolicyManager_CycleConsistencyTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)				
+			elif self.args.setting=='fixembed':
+				self.policy_manager = PolicyManager_FixEmbedCycleConTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 
 		if self.args.debug:
 			print("Embedding in Master.")
@@ -91,7 +93,7 @@ class Master():
 	def run(self):
 		if self.args.setting=='pretrain_sub' or self.args.setting=='pretrain_prior' or \
 			self.args.setting=='imitation' or self.args.setting=='baselineRL' or self.args.setting=='downstreamRL' or \
-			 self.args.setting=='transfer' or self.args.setting=='cycle_transfer':
+			 self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
 			if self.args.train:
 				if self.args.model:
 					self.policy_manager.train(self.args.model)
@@ -119,6 +121,7 @@ class Master():
 		# elif self.args.setting=='baselineRL' or self.args.setting=='downstreamRL':
 		# 	if self.args.train:
 		# 		if self.args.model:
+		
 		# 			self.policy_manager.train(self.args.model)
 		# 		else:
 		# 			self.policy_manager.train()
