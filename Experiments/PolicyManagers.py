@@ -35,7 +35,8 @@ class PolicyManager_BaseClass():
 		if self.args.setting=='imitation':
 			extent = self.dataset.get_number_task_demos(self.demo_task_index)
 		if (self.args.setting=='transfer' and isinstance(self, PolicyManager_Transfer)) or \
-			(self.args.setting=='cycle_transfer' and isinstance(self, PolicyManager_CycleConsistencyTransfer)):
+			(self.args.setting=='cycle_transfer' and isinstance(self, PolicyManager_CycleConsistencyTransfer)) or \
+			(self.args.setting=='fixembed' and isinstance(self, PolicyManager_FixEmbedCycleConTransfer)):
 				extent = self.extent
 		else:
 			extent = len(self.dataset)-self.test_set_size
@@ -196,7 +197,7 @@ class PolicyManager_BaseClass():
 			# For every item in the epoch:
 			if self.args.setting=='imitation':
 				extent = self.dataset.get_number_task_demos(self.demo_task_index)
-			if self.args.setting=='transfer' or self.args.setting=='cycle_transfer':
+			if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
 				extent = self.extent
 			else:
 				if self.args.debugging_datapoints>-1:				
@@ -1282,6 +1283,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.mean_distance = self.distances[self.distances>0].mean()
 
 	def evaluate(self, model=None, suffix=None):
+
 		if model:
 			self.load_all_models(model)
 
@@ -1330,7 +1332,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
 			
-		if self.args.setting=='transfer' or self.args.setting=='cycle_transfer':
+		if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
 			if self.args.data=='ContinuousNonZero':
 				self.state_dim = 2
 				self.rollout_timesteps = 5		
@@ -1368,7 +1370,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 					if get_visuals:
 						# (2) Now rollout policy.	
-						if self.args.setting=='transfer' or self.args.setting=='cycle_transfer':
+						if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
 							self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
 						else:
 							self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True))
@@ -1386,7 +1388,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				if get_visuals:
 					# (2) Now rollout policy.			
-					if self.args.setting=='transfer' or self.args.setting=='cycle_transfer':
+					if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
 						self.trajectory_set[i] = self.rollout_visuals(i, latent_z=latent_z, return_traj=True)
 					else: 
 						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z, return_traj=True))
@@ -1407,10 +1409,12 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.get_trajectory_and_latent_sets()
 
 		# TSNE on latentz's.
-		tsne = skl_manifold.TSNE(n_components=2,random_state=0)
+		tsne = skl_manifold.TSNE(n_components=2,random_state=0,perplexity=self.args.perplexity)
 		embedded_zs = tsne.fit_transform(self.latent_z_set)
 
-		ratio = 0.3
+		# ratio = 0.3
+		ratio = (embedded_zs.max()-embedded_zs.min())*0.01
+		
 		for i in range(self.N):
 			plt.scatter(embedded_zs[i,0]+ratio*self.trajectory_set[i,:,0],embedded_zs[i,1]+ratio*self.trajectory_set[i,:,1],c=range(self.rollout_timesteps),cmap='jet')
 
@@ -4569,13 +4573,15 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.tf_logger.scalar_summary('VAE Loss', self.VAE_loss, counter)
 		self.tf_logger.scalar_summary('Total VAE Loss', self.total_VAE_loss, counter)
 		self.tf_logger.scalar_summary('Domain', viz_dict['domain'], counter)
-
+		self.tf_logger.scalar_summary('Training Phase', self.training_phase, counter)
+		self.tf_logger.scalar_summary('Training Discriminator', self.skip_vae, counter)
+		self.tf_logger.scalar_summary('Training Embeddings or Translation Models', self.skip_discriminator , counter)
 		# Plot discriminator values after we've started training it. 
 		if self.training_phase>1:
 			# Discriminator Loss. 
-			self.tf_logger.scalar_summary('Discriminator Loss', self.discriminator_loss, counter)
+			self.tf_logger.scalar_summary('Z Discriminator Loss', self.discriminator_loss, counter)
 			# Compute discriminator prob of right action for logging. 
-			self.tf_logger.scalar_summary('Discriminator Probability', viz_dict['discriminator_probs'], counter)
+			self.tf_logger.scalar_summary('Z Discriminator Probability', viz_dict['discriminator_probs'], counter)
 		
 		# If we are displaying things: 
 		if counter%self.args.display_freq==0:
@@ -4841,7 +4847,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Compute discriminability loss for encoder (implicitly ignores decoder).
 		# Pretend the label was the opposite of what it is, and train the encoder to make the discriminator think this was what was true. 
 		# I.e. train encoder to make discriminator maximize likelihood of wrong label.
-		domain_label = torch.tensor(1-domain).to(device).long().view(1,)
+		# domain_label = torch.tensor(1-domain).to(device).long().view(1,)
+		domain_label = torch.tensor(domain).to(device).long().view(1,)
 		domain_label = domain_label.repeat(self.args.batch_size,)
 		# self.discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['discriminator_logprob'].squeeze(1), domain_label)
 		self.discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['discriminator_logprob'].squeeze(0), 1-domain_label).mean()
@@ -5290,7 +5297,8 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		z_discriminator_logprob, self.z_discriminator_prob = self.discriminator_network(dictionary['source_latent_z'])
 		# Compute discriminability loss. Remember, this is not used for training the discriminator, but rather the encoders.
 
-		domain_label = torch.tensor(1-dictionary['domain']).to(device).long().view(1,)
+		# domain_label = torch.tensor(1-dictionary['domain']).to(device).long().view(1,)
+		domain_label = torch.tensor(dictionary['domain']).to(device).long().view(1,)
 		domain_label = domain_label.repeat(self.args.batch_size,)
 
 		self.z_discriminability_loss = self.discriminability_loss_weight*self.negative_log_likelihood_loss_function(z_discriminator_logprob.squeeze(0), 1-domain_label).mean()
@@ -5406,7 +5414,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		self.VAE_loss = self.source_reconstruction_loss
 				
 		self.discriminability_loss = self.z_discriminability_loss
-		self.discriminator_loss = self.z_discriminator_loss
+		self.discriminator_loss = self.z_discriminator_loss		
 		viz_dict['discriminator_probs'] = self.z_discriminator_prob.mean().detach().cpu().numpy()
 
 		# Using super update_plots instead of implementing from scratch. 
@@ -5518,7 +5526,19 @@ class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTrans
 
 		super(PolicyManager_FixEmbedCycleConTransfer, self).__init__(args, source_dataset, target_dataset)
 
+		if self.args.source_model is not None:
+			self.source_manager.load_all_models(self.args.source_model)
+		if self.args.target_model is not None:
+			self.target_manager.load_all_models(self.args.target_model)
+
 		self.translation_model_layers = 2
+		self.args.real_translated_discriminator = 1
+
+	def setup(self):
+		super().setup()
+
+		self.source_manager.rollout_timesteps = 5
+		self.target_manager.rollout_timesteps = 5
 
 	def create_networks(self):
 		
@@ -5526,8 +5546,8 @@ class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTrans
 		super().create_networks()
 
 		# In addition, now create translation model networks.
-		self.forward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers)
-		self.backward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers)
+		self.forward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
+		self.backward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
 
 		# Create list of translation models to select from based on source domain.
 		self.translation_model_list = [self.forward_translation_model, self.backward_translation_model]
@@ -5605,9 +5625,9 @@ class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTrans
 
 		# Remember, we don't actually need reconstruction losses now, we just need discriminator and discriminability losses. 
 
-		####################################
+		########################################################################
 		# (0) Zero out gradients. 
-		####################################
+		########################################################################
 
 		self.optimizer.zero_grad()
 
@@ -5621,7 +5641,8 @@ class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTrans
 		
 		# First select whether we are feeding original or translated trajectory. 
 		real_or_translated = np.random.binomial(1,0.5)
-		real_trans_label = torch.tensor(1-real_or_translated).to(device).long().repeat(self.args.batch_size)
+		# real_trans_label = torch.tensor(1-real_or_translated).to(device).long().repeat(self.args.batch_size)
+		real_trans_label = torch.tensor(real_or_translated).to(device).long().repeat(self.args.batch_size)
 
 		# Based on whether original or translated trajectory, set trajectory object to either the original trajectory or cross domain decoded trajectory.
 		if real_or_translated==0:
@@ -5633,15 +5654,19 @@ class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTrans
 			trajectory = dictionary['source_subpolicy_inputs_crossdomain'][...,:2*source_policy_manager.state_dim]
 			latent_z = dictionary['backtranslated_latent_z']
 		
+		
 		####################################
 		# (1 a) Compute traj_discriminability_loss. 
 		####################################
 
 		# Now feed trajectory to the trajectory discriminator, based on whether it is the source of target discriminator.
-		traj_discriminator_logprob, traj_discriminator_prob = source_discriminator.get_probabilities(trajectory)
-
+		self.traj_discriminator_logprob, traj_discriminator_prob = source_discriminator.get_probabilities(trajectory)
+		# Logging probability. 
+		# self.traj_discriminator_prob = traj_discriminator_prob[...,1-real_or_translated]
+		self.traj_discriminator_prob = traj_discriminator_prob[...,real_or_translated]
+		
 		# Compute trajectory discriminability loss, based on whether the trajectory was original or reconstructed.
-		self.traj_discriminability_loss = self.negative_log_likelihood_loss_function(traj_discriminator_logprob.squeeze(0), 1-real_trans_label).mean()
+		self.traj_discriminability_loss = self.negative_log_likelihood_loss_function(self.traj_discriminator_logprob.squeeze(0), 1-real_trans_label).mean()
 		self.weighted_real_translated_loss = self.real_translated_loss_weight*self.traj_discriminability_loss
 
 		####################################
@@ -5649,10 +5674,13 @@ class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTrans
 		####################################
 
 		# Now feed latent_z into the z_discriminator. 
-		z_discriminator_logprob, z_discriminator_prob = source_z_discriminator.forward(latent_z)
-		
+		self.z_discriminator_logprob, z_discriminator_prob = source_z_discriminator.forward(latent_z)
+		# Logging probability. 
+		# self.z_discriminator_prob = z_discriminator_prob[...,1-real_or_translated]
+		self.z_discriminator_prob = z_discriminator_prob[...,real_or_translated]
+
 		# Compute z discriminability loss, based on whether the latent_z was original or translated. 
-		self.z_discriminability_loss = self.negative_log_likelihood_loss_function(z_discriminator_logprob.squeeze(0), 1-real_trans_label).mean()
+		self.z_discriminability_loss = self.negative_log_likelihood_loss_function(self.z_discriminator_logprob.squeeze(0), 1-real_trans_label).mean()
 
 		####################################
 		# (2) Compute cycle-consistency losses.
@@ -5684,10 +5712,9 @@ class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTrans
 			self.total_VAE_loss.backward()
 			self.optimizer.step()
 
-
-		####################################
+		########################################################################
 		# (4) Now compute discriminator losses and update discriminator network(s).
-		####################################
+		########################################################################
 
 		# First zero out the discriminator gradients. 
 		self.discriminator_optimizer.zero_grad()
@@ -5723,6 +5750,11 @@ class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTrans
 		self.source_encoder_KL = 0.
 		self.source_reconstruction_loss = 0.
 		
+		self.tf_logger.scalar_summary('Real Translated Trajectory Discriminator Probability', self.traj_discriminator_prob.mean(), counter)
+		self.tf_logger.scalar_summary('Real Translated Trajectory Discriminator Logprobability', self.traj_discriminator_logprob.mean(), counter)
+		self.tf_logger.scalar_summary('Z Discriminator Logprobability', self.z_discriminator_logprob.mean(), counter)
+
+
 		super().update_plots(counter, viz_dict)
 
 	def run_iteration(self, counter, i):
@@ -5751,13 +5783,14 @@ class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTrans
 		# (3 b) Back translate the latent z.
 		####################################
 
-		dictionary['translated_latent_z'], dictionary['backtranslated_latent_z'] = self.backtranslate_latent_z(dictionary['source_latent_z'])
+		dictionary['translated_latent_z'], dictionary['backtranslated_latent_z'] = self.backtranslate_latent_z(dictionary['domain'], dictionary['source_latent_z'])
 
 		####################################
 		# (3 c) Decode backtranslated latent_z into source trajectory. 
 		####################################
 		
-		source_cross_domain_decoding_dict = self.cross_domain_decoding(dictionary['domain'], source_policy_manager, dictionary['backtranslated_latent_z'], start_state=dictionary['source_subpolicy_inputs_original'][0,...,:source_policy_manager.state_dim].detach().cpu().numpy())
+		source_cross_domain_decoding_dict = self.cross_domain_decoding(dictionary['domain'], source_policy_manager, dictionary['backtranslated_latent_z'], \
+			start_state=dictionary['source_subpolicy_inputs_original'][0,...,:source_policy_manager.state_dim].detach().cpu().numpy())
 		dictionary['source_subpolicy_inputs_crossdomain'] = source_cross_domain_decoding_dict['subpolicy_inputs']
 
 		####################################
