@@ -2825,9 +2825,12 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 		self.latent_policy = ContinuousLatentPolicyNetwork_ConstrainedBPrior(self.input_size+self.conditional_info_size, self.hidden_size, self.args, self.number_layers).to(device)
 
 		if self.args.setting=='context':
-			self.variational_policy = ContinuousContextualVariationalPolicyNetwork(self.input_size, self.hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.number_layers).to(device)
+			if self.args.new_context:
+				self.variational_policy = ContinuousNewContextualVariationalPolicyNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.args.var_number_layers).to(device)
+			else:
+				self.variational_policy = ContinuousContextualVariationalPolicyNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.args.var_number_layers).to(device)
 		else:
-			self.variational_policy = ContinuousVariationalPolicyNetwork_Batch(self.input_size, self.hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.number_layers).to(device)
+			self.variational_policy = ContinuousVariationalPolicyNetwork_Batch(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.args.var_number_layers).to(device)
 
 	# Batch concatenation functions. 
 	def concat_state_action(self, sample_traj, sample_action_seq):
@@ -5540,6 +5543,59 @@ class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTrans
 		self.source_manager.rollout_timesteps = 5
 		self.target_manager.rollout_timesteps = 5
 
+	def set_iteration(self, counter):
+
+		# Based on what phase of training we are in, set discriminability loss weight, etc. 
+		
+		# Phase 1 of training: Don't train discriminator at all, set discriminability loss weight to 0.
+		if counter<self.args.training_phase_size:
+			# self.discriminability_loss_weight = 0.
+			# self.real_translated_loss_weight = 0.
+
+			self.discriminability_loss_weight = self.args.discriminability_weight
+			self.real_translated_loss_weight = self.args.real_trans_loss_weight
+
+			self.vae_loss_weight = 1.
+			self.training_phase = 1
+			self.skip_vae = False
+			self.skip_discriminator = True			
+
+		# Phase 2 of training: Train the discriminator, and set discriminability loss weight to original.
+		else:
+			self.discriminability_loss_weight = self.args.discriminability_weight
+			self.real_translated_loss_weight = self.args.real_trans_loss_weight
+
+			self.vae_loss_weight = self.args.vae_loss_weight
+
+			# Now make discriminator and vae train in alternating fashion. 
+			# Set number of iterations of alteration. 
+			# self.alternating_phase_size = self.args.alternating_phase_size*self.extent
+
+			# # If odd epoch, train discriminator. (Just so that we start training discriminator first).
+			# if (counter/self.alternating_phase_size)%2==1:			
+			# 	self.skip_discriminator = False
+			# 	self.skip_vae = True
+			# # Otherwise train VAE.
+			# else:
+			# 	self.skip_discriminator = True
+			# 	self.skip_vae = False		
+
+			# Train discriminator for k times as many steps as VAE. Set args.alternating_phase_size as 1 for this. 
+			if (counter/self.args.alternating_phase_size)%(self.args.discriminator_phase_size+1)>=1:
+				print("Training Discriminator.")
+				self.skip_discriminator = False
+				self.skip_vae = True
+			# Otherwise train VAE.
+			else:
+				print("Training VAE.")
+				self.skip_discriminator = True
+				self.skip_vae = False		
+
+			self.training_phase = 2
+
+		self.source_manager.set_epoch(counter)
+		self.target_manager.set_epoch(counter)
+
 	def create_networks(self):
 		
 		 # Call super create networks, to create all the necessary networks. 
@@ -5680,8 +5736,8 @@ class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTrans
 		self.z_discriminator_prob = z_discriminator_prob[...,real_or_translated]
 
 		# Compute z discriminability loss, based on whether the latent_z was original or translated. 
-		self.z_discriminability_loss = self.negative_log_likelihood_loss_function(self.z_discriminator_logprob.squeeze(0), 1-real_trans_label).mean()
-
+		self.unweighted_z_discriminability_loss = self.negative_log_likelihood_loss_function(self.z_discriminator_logprob.squeeze(0), 1-real_trans_label).mean()
+		self.z_discriminability_loss = self.discriminability_loss_weight*self.unweighted_z_discriminability_loss
 		####################################
 		# (2) Compute cycle-consistency losses.
 		####################################

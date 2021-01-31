@@ -94,15 +94,16 @@ class Master():
 		if self.args.setting=='pretrain_sub' or self.args.setting=='pretrain_prior' or \
 			self.args.setting=='imitation' or self.args.setting=='baselineRL' or self.args.setting=='downstreamRL' or \
 			 self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
+			
 			if self.args.train:
 				if self.args.model:
 					self.policy_manager.train(self.args.model)
 				else:
 					self.policy_manager.train()
-			else:
+			else:				
 				if self.args.setting=='pretrain_prior':
 					self.policy_manager.train(self.args.model)
-				else:					
+				else:														
 					self.policy_manager.evaluate(model=self.args.model)		
 				
 		elif self.args.setting=='learntsub' or self.args.setting=='joint' or self.args.setting=='context':
@@ -161,7 +162,11 @@ def parse_arguments():
 	parser.add_argument('--z_dimensions',dest='z_dimensions',type=int,default=64)
 	parser.add_argument('--number_layers',dest='number_layers',type=int,default=5)
 	parser.add_argument('--hidden_size',dest='hidden_size',type=int,default=64)
+	parser.add_argument('--var_number_layers',dest='var_number_layers',type=int,default=5)
+	parser.add_argument('--var_hidden_size',dest='var_hidden_size',type=int,default=64)
+
 	parser.add_argument('--environment',dest='environment',type=str,default='SawyerLift') # Defines robosuite environment for RL.
+
 	
 	# Data parameters. 
 	parser.add_argument('--traj_segments',dest='traj_segments',type=int,default=1) # Defines whether to use trajectory segments for pretraining or entire trajectories. Useful for baseline implementation.
@@ -260,9 +265,12 @@ def parse_arguments():
 	# Transfer learning domains, etc. 
 	parser.add_argument('--source_domain',dest='source_domain',type=str,help='What the source domain is in transfer.')
 	parser.add_argument('--target_domain',dest='target_domain',type=str,help='What the target domain is in transfer.')
+	parser.add_argument('--source_model',dest='source_model',type=str,help='What model to use for the source domain.',default=None)
+	parser.add_argument('--target_model',dest='target_model',type=str,help='What model to use for the target domain.',default=None)
 
 	# Parameters for contextual training. 
 	parser.add_argument('--mask_fraction',dest='mask_fraction',type=float,default=0.15,help='What fraction of zs to mask in contextual embedding.')
+	parser.add_argument('--new_context',dest='new_context',type=int,default=0,help='Whether to implement new contextual embedding model or original one.')
 
 	return parser.parse_args()
 
@@ -278,5 +286,6 @@ def main(args):
 
 if __name__=='__main__':
 	main(sys.argv)
+
 
 

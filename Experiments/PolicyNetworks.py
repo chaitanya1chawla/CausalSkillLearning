@@ -1606,7 +1606,10 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 			# mask_indices.append(np.random.choice(distinct_z_indices, size=int(len(distinct_z_indices)*self.args.mask_fraction), replace=False))
 			# These mask indices index into the distinct_indices list, so the values in mask indices are positions in the list to be masked.
 			# Masking strategy - uniformly randomly sample mask_fraction arbitrarily. 
-			mask_indices = np.random.choice(range(len(distinct_z_indices)), size=int(len(distinct_z_indices)*self.args.mask_fraction), replace=False)
+			number_mask_elements = np.ceil(len(distinct_z_indices)*self.args.mask_fraction).astype(int)
+			if number_mask_elements==1 and len(distinct_z_indices)==1:
+				number_mask_elements = 0
+			mask_indices = np.random.choice(range(len(distinct_z_indices)), size=number_mask_elements, replace=False)
 			mask_indices_collection.append(copy.deepcopy(mask_indices))
 
 			# Now copy over the masked indices into a single list. 
@@ -1628,8 +1631,6 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 
 		# Now that we've gotten the initial skill embeddings (from the distinct z sequence), 
 		# Feed it into the contextual LSTM, and predict new contextual embeddings. 
-
-
 		contextual_outputs, contextual_hidden = self.contextual_lstm(self.initial_skill_embedding)
 		# self.contextual_skill_embedding = self.z_output_layer(contextual_outputs)
 
@@ -1652,6 +1653,8 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 
 		######### 
 
+
+
 		# Now must reconstruct the z vector (sampled_z_indices). # Incidentally this removes need for masking of z's.
 		# Must use the original sampled_b to take care of this. 
 		new_sampled_z_indices = torch.zeros_like(sampled_z_index).to(device)
@@ -1672,6 +1675,121 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 
 		# Return same objects as original forward function. 
 		return new_sampled_z_indices, sampled_b, variational_b_logprobabilities, \
+		 variational_z_logprobabilities, variational_b_probabilities, \
+		 variational_z_probabilities, kl_divergence, prior_loglikelihood
+
+class ContinuousNewContextualVariationalPolicyNetwork(ContinuousContextualVariationalPolicyNetwork):
+	
+	def __init__(self, input_size, hidden_size, z_dimensions, args, number_layers=4):
+		
+		super(ContinuousNewContextualVariationalPolicyNetwork, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)
+
+	def forward(self, input, epsilon, new_z_selection=True, batch_size=None, batch_trajectory_lengths=None):
+		
+		#####################
+		# First run the forward function of the original variational network. 
+		# This runs the initial LSTM and predicts the original embedding of skills. 
+		#####################
+
+		sampled_z_index, sampled_b, variational_b_logprobabilities, \
+		 variational_z_logprobabilities, variational_b_probabilities, \
+		 variational_z_probabilities, kl_divergence, prior_loglikelihood = \
+			 super().forward(input, epsilon, new_z_selection=new_z_selection, batch_size=batch_size, batch_trajectory_lengths=batch_trajectory_lengths)
+
+		#####################
+		# Now parse the sequence of per timestep z's to sequence of z's of length = the number of skills in the trajectory. 
+		# The latent_b vector has this information, specified in terms of when b=1. 
+		#####################
+
+		# Create separate masking object.
+		contextual_mask = torch.ones_like(sampled_z_index).to(device).float()	
+		
+		for j in range(self.args.batch_size):
+			
+			#####################
+			# Mask z's that extend past the trajectory length. 
+			#####################
+
+			sampled_b[batch_trajectory_lengths[j]:,j] = 0
+			sampled_z_index[batch_trajectory_lengths[j]:,j] = 0.
+			contextual_mask[batch_trajectory_lengths[j]:,j] = 0.
+
+			#####################
+			# Get times at which we actually observe distinct z's.
+			#####################
+
+			distinct_z_indices = torch.where(sampled_b[:,j])[0].clone().detach().cpu().numpy()
+
+			#####################
+			# These mask indices index into the distinct_indices list, so the values in mask indices are positions in the list to be masked.
+			# Masking strategy - uniformly randomly sample mask_fraction arbitrarily. 
+			#####################
+
+			number_mask_elements = np.ceil(len(distinct_z_indices)*self.args.mask_fraction).astype(int)
+			if number_mask_elements==1 and len(distinct_z_indices)==1:
+				number_mask_elements = 0				
+			mask_indices = np.random.choice(range(len(distinct_z_indices)), size=number_mask_elements, replace=False)
+
+			#####################			
+			# Now actually mask the chosen mask indices.
+			#####################
+			for k in range(len(mask_indices)):				
+				if mask_indices[k]+1 >= len(distinct_z_indices):
+					end_index = contextual_mask.shape[0]
+				else:
+					end_index = distinct_z_indices[mask_indices[k]+1]
+				contextual_mask[distinct_z_indices[mask_indices[k]]:end_index,j]  = 0
+
+		#####################
+		# Now mask the sampled input to create the masked input. 
+		#####################
+
+		self.initial_skill_embedding = contextual_mask*sampled_z_index
+
+		#####################
+		# Now that we've gotten the initial skill embeddings (from the distinct z sequence), 
+		# Feed it into the contextual LSTM, and predict new contextual embeddings. 
+		#####################
+	
+		contextual_outputs, contextual_hidden = self.contextual_lstm(self.initial_skill_embedding)
+		
+		#####################
+		# Now recreate distributions, so we can evaluate new KL.
+		#####################
+
+		self.contextual_mean = self.contextual_mean_output_layer(contextual_outputs)
+		var_epsilon = 0.001
+		self.contextual_variance = self.variance_factor*(self.variance_activation_layer(self.contextual_variances_output_layer(contextual_outputs))+self.variance_activation_bias) + var_epsilon
+		self.contextual_dists = torch.distributions.MultivariateNormal(self.contextual_mean, torch.diag_embed(self.contextual_variance))
+
+		if self.args.train:
+			noise = torch.randn_like(self.contextual_variance)
+			# Instead of *sampling* the latent z from a distribution, construct using mu + sig * eps (random noise).
+			self.contextual_skill_embedding = (self.contextual_mean + self.contextual_variance*noise).squeeze(1)
+			# Ought to be able to pass gradients through this latent_z now.
+		# If evaluating, greedily get action.
+		else:
+			self.contextual_skill_embedding = self.contextual_mean.squeeze(1)
+
+		#####################
+		# Since the contextual embeddings are just predicted by an LSTM, use the same technique of "NEw z selection"
+		# as in the original variational network, that copies over the previous timesteps' z, if b at that timestep = 0. (i.e. continue).
+		#####################
+
+		for t in range(1,input.shape[0]):
+			# If b_t==0, just use previous z. 
+			# If b_t==1, sample new z. Here, we've cloned this from sampled_z's, so there's no need to do anything. 
+			# sampled_z_index[t, torch.where(sampled_b[t]==0)[0]] = sampled_z_index[t-1, torch.where(sampled_b[t]==0)[0]]
+			self.contextual_skill_embedding[t, torch.where(sampled_b[t]==0)[0]] = self.contextual_skill_embedding[t-1, torch.where(sampled_b[t]==0)[0]]
+
+		# Now recompute prior_loglikelihood with the new zs. 
+		prior_loglikelihood = self.standard_distribution.log_prob(self.contextual_skill_embedding)
+
+		# Also recompute the KL. 
+		# kl_divergence = torch.distributions.kl_divergence(self.contextual_dists, self.standard_distribution).mean()
+
+		# Return same objects as original forward function. 
+		return self.contextual_skill_embedding, sampled_b, variational_b_logprobabilities, \
 		 variational_z_logprobabilities, variational_b_probabilities, \
 		 variational_z_probabilities, kl_divergence, prior_loglikelihood
 
