@@ -5,9 +5,18 @@
 *.jpg
 *.gif
 *.pyc
+*.npy
 Experiments/Experimental_Logs/*
 Experiments/Code_Runs/*
 .vscode/settings.json
 Experiments/.vscode/settings.json
 Experiments/Statistics/*
 Logging Results/models.txt
+*Runs.py
+workspace.code-workspace
+DataGenerator/settings.json
+DataGenerator/.vscode/settings.json
+Experiments/parse_realroboturk.py
+Experiments/Code_Runs/CycleTransfer_Runs.py
+DataGenerator/DeterministicGoalDirectedTraj.py
+DataGenerator/NewGoalDirectedTraj.py

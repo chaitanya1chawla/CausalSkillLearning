@@ -23,6 +23,8 @@ def return_dataset(args, data=None):
 		dataset = DataLoaders.ContinuousNonZeroToyDataset(args.datadir)
 	elif args.data=='DeterGoal':
 		dataset = DataLoaders.DeterministicGoalDirectedDataset(args.datadir)			
+	elif args.data=='DirContNonZero':
+		dataset = DataLoaders.ContinuousDirectedNonZeroToyDataset(args.datadir)
 	elif args.data=='MIME':
 		dataset = MIME_DataLoader.MIME_NewDataset(short_traj=args.short_trajectories)
 	elif args.data=='Roboturk':		

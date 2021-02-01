@@ -8,7 +8,7 @@ import numpy as np
 from IPython import embed
 import matplotlib.pyplot as plt
 
-number_datapoints = 10000
+number_datapoints = 50000
 number_timesteps = 15
 
 x_array_dataset = np.zeros((number_datapoints, number_timesteps, 2))

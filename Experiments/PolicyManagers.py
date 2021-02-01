@@ -623,7 +623,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Inputs is now states and actions.
 
 		# Model size parameters
-		# if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
+		# if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
 		self.state_size = 2
 		self.state_dim = 2
 		self.input_size = 2*self.state_size
@@ -971,7 +971,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 	def get_trajectory_segment(self, i):
 
-		if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
+		if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
 			# Sample trajectory segment from dataset. 
 			sample_traj, sample_action_seq = self.dataset[i]
 
@@ -1112,7 +1112,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# 	# Step in environment with action.
 		# 	# Update inputs with new state and previously executed action. 
 
-		if self.args.data=='ContinuousNonZero':
+		if self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero':
 			self.state_dim = 2
 			self.rollout_timesteps = 5
 		elif self.args.data=='MIME':
@@ -1269,7 +1269,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		np.set_printoptions(suppress=True,precision=2)
 
-		if self.args.data=='ContinuousNonZero':
+		if self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero':
 			self.visualize_embedding_space(suffix=suffix)
 
 		if self.args.data=="MIME" or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
@@ -1313,7 +1313,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
 			
 		if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
-			if self.args.data=='ContinuousNonZero':
+			ifself.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero':
 				self.state_dim = 2
 				self.rollout_timesteps = 5		
 			if self.args.data=='MIME':
@@ -1444,7 +1444,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 	def get_trajectory_segment(self, i):
 	
-		if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
+		if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
 
 			# Sample trajectory segment from dataset. 
 			sample_traj, sample_action_seq = self.dataset[i:i+self.args.batch_size]
@@ -1608,7 +1608,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.traj_length = 5
 		self.conditional_info_size = 6		
 
-		if self.args.data=='ContinuousNonZero':
+		if self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero':
 			self.conditional_info_size = self.args.condition_size
 			self.conditional_viz_env = False
 
@@ -2780,7 +2780,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.pretrain_policy_manager.load_all_models(model, only_policy=True)			
 			self.pretrain_policy_manager.visualize_robot_data()			
 
-		elif self.args.data=='ContinuousNonZero':
+		elif self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero':
 			self.visualize_joint_skill_embedding_space()
 
 		if self.args.subpolicy_model:
@@ -3020,7 +3020,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 	def get_skill_visual_in_context(self, traj, segment_start=None, segment_end=None):
 		
-		if self.args.data=='ContinuousNonZero':
+		if self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero':
 
 			# If Toy data, then... 
 			# Generate image of trajectory. 
@@ -3111,7 +3111,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 	def collect_inputs(self, i, get_latents=False):
 
 		# Toy Data
-		if self.args.data=='DeterGoal' or self.args.data=='ContinuousNonZero':
+		if self.args.data=='DeterGoal' or self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero':
 
 			# Sample trajectory segment from dataset. 
 			sample_traj, sample_action_seq = self.dataset[i:i+self.args.batch_size]
