@@ -6,9 +6,10 @@
 
 import numpy as np
 from IPython import embed
+import matplotlib.pyplot as plt
 
-number_datapoints = 50000
-number_timesteps = 25
+number_datapoints = 10000
+number_timesteps = 15
 
 x_array_dataset = np.zeros((number_datapoints, number_timesteps, 2))
 a_array_dataset = np.zeros((number_datapoints, number_timesteps-1, 2))
@@ -19,6 +20,7 @@ goal_array_dataset = np.zeros((number_datapoints, 1),dtype=int)
 action_map = np.array([[0,-1],[-1,0],[0,1],[1,0]])
 start_states = np.array([[-2,-2],[-2,2],[2,-2],[2,2]])*5
 valid_options = np.array([[2,3],[3,0],[1,2],[0,1]])
+lim = 30
 
 for i in range(number_datapoints):
 
@@ -41,9 +43,12 @@ for i in range(number_datapoints):
 			# b_array_dataset[i,t] = np.random.binomial(1,pb_x[0,x_array_dataset[i,t]])
 
 			# If 3,4,5 timesteps have passed, terminate. 
-			if reset_counter>=3 and reset_counter<5:
-				b_array_dataset[i,t] = np.random.binomial(1,0.33)
-			elif reset_counter==5:
+			# if reset_counter>=3 and reset_counter<5:
+			# 	b_array_dataset[i,t] = np.random.binomial(1,0.33)
+			# elif reset_counter==5:
+			# 	b_array_dataset[i,t] = 1
+
+			if reset_counter==4:
 				b_array_dataset[i,t] = 1
 
 		# GET Y
@@ -68,8 +73,19 @@ for i in range(number_datapoints):
 		# GET X
 		x_array_dataset[i,t+1] = x_array_dataset[i,t]+a_array_dataset[i,t]
 
+	
+	if i%1000==0:
+		plt.scatter(start_states[:,0],start_states[:,1],s=50)
+		# plt.scatter()
+		plt.scatter(x_array_dataset[i,:,0],x_array_dataset[i,:,1],cmap='jet',c=range(number_timesteps))
+		plt.xlim(-lim,lim)
+		plt.ylim(-lim,lim)
+		plt.savefig("Traj_{0}.png".format(i))
+		plt.close()
+
 np.save("X_dir_cont_nonzero.npy",x_array_dataset)
 np.save("Y_dir_cont_nonzero.npy",y_array_dataset)
 np.save("B_dir_cont_nonzero.npy",b_array_dataset)
 np.save("A_dir_cont_nonzero.npy",a_array_dataset)
 np.save("G_dir_cont_nonzero.npy",goal_array_dataset)
+
