@@ -361,26 +361,6 @@ class PolicyManager_BaseClass():
 
 
 			self.indices = range(self.N)
-		# for i in range(self.N):
-
-		# 	print("#########################################")	
-		# 	print("Getting visuals for trajectory: ",i)
-		# 	latent_z, sample_traj, sample_action_seq = self.run_iteration(0, i, return_z=True)
-
-		# 	if latent_z is not None:
-		# 		self.indices.append(i)
-
-		# 		if len(sample_traj)>self.max_len:
-		# 			self.max_len = len(sample_traj)
-		# 		self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())		
-				
-		# 		trajectory_rollout = self.get_robot_visuals(i, latent_z, sample_traj)
-				
-		# 		# self.trajectory_set[i] = copy.deepcopy(sample_traj)
-		# 		# self.trajectory_rollout_set[i] = copy.deepcopy(trajectory_rollout)	
-
-		# 		self.trajectory_set.append(copy.deepcopy(sample_traj))
-		# 		self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))
 
 		gt_animation_object = self.visualize_robot_embedding(embedded_z, gt=True)
 		rollout_animation_object = self.visualize_robot_embedding(embedded_z, gt=False)
@@ -1907,7 +1887,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		return var_rollout_distance, latent_rollout_distance
 	
-	# @gpu_profile
 	def update_plots(self, counter, i, input_dictionary, variational_dict, eval_likelihood_dict):
 	
 
@@ -2631,7 +2610,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		print("Finishing rollout.")
 		return concatenated_selected_b
 
-	# @gpu_profile
 	def rollout_visuals(self, counter, i, variational_dict=None, get_image=True):
 
 		# if self.args.data=='Roboturk':
@@ -2674,8 +2652,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		else:
 			return None, None
 
-	# @gpu_profile
-	def run_iteration(self, counter, i, skip_iteration=False):
+	def run_iteration(self, counter, i, skip_iteration=False, return_dicts=False):
 
 		# With learnt discrete subpolicy: 
 
@@ -2735,7 +2712,10 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			if self.args.debug:
 				print("Embedding in Run Iteration.")
-				embed()			
+				embed()		
+
+		if return_dicts:
+			return input_dictionary, variational_dict, eval_likelihood_dict	
 
 	def evaluate_metrics(self):
 		self.distances = -np.ones((self.test_set_size))
@@ -2783,11 +2763,14 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		if model:
 			self.load_all_models(model)
-
+		
 		np.set_printoptions(suppress=True,precision=2)
 
 		print("Running Evaluation of State Distances on small test set.")
-		self.evaluate_metrics()
+		if self.args.setting=='context' or self.args.setting=='joint' or self.args.setting=='learntsub':
+			self.initialize_training_batches()
+		else:
+			self.evaluate_metrics()
 
 		# Visualize space if the subpolicy has been trained...
 		if (self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap') and (self.args.fix_subpolicy==0):
@@ -2796,6 +2779,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.pretrain_policy_manager.setup()
 			self.pretrain_policy_manager.load_all_models(model, only_policy=True)			
 			self.pretrain_policy_manager.visualize_robot_data()			
+
+		elif self.args.data=='ContinuousNonZero':
+			self.visualize_joint_skill_embedding_space()
 
 		if self.args.subpolicy_model:
 			print("Loading encoder.")
@@ -2811,6 +2797,263 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		if self.args.debug:
 			print("Embedding in Evaluate.")
 			embed()
+
+	def get_latent_trajectory_segmentation_sets(self):
+
+		print("Getting latent_z, trajectory, segmentation sets.")
+
+		# For N number of random trajectories from MIME: 
+		#	# Encode trajectory using encoder into latent_z sequence. 
+		# 	# Get distinct latent_z's from this latent_z sequence. 
+		# 	# Get corresponding trajectory segment. 
+		# Embed distinct latent_z's.
+
+		# Set N:
+		self.N = 20
+
+		# We're going to store 3 sets of things. 
+		# (1) The contextual skill embeddings of the latent_z's. 
+		# (2) The full trajectory in which the skill is executed, so we can visualize this skill in context.
+		# (3) The segmentations so we can highlight the current latent z and differentiate it from context.  
+
+		self.latent_z_set = []
+		self.trajectory_set = []
+		self.segmentation_set = []
+
+		break_var = 0
+		self.number_set_elements = 0 
+
+		# Use the dataset to get reasonable trajectories (because without the information bottleneck / KL between N(0,1), cannot just randomly sample.)
+		for i in range(self.N//self.args.batch_size+1):
+
+			# (1) Encoder trajectory. 
+			input_dict, variational_dict, _ = self.run_iteration(0, i, return_dicts=True)
+
+			# Assuming we're running with batch size>1.
+			for b in range(self.args.batch_size):
+
+				# If we've computed enough z's, break at the end of this batch.
+				if i*self.args.batch_size+b>=self.N:
+					break_var = 1
+
+				# Get segmentations.				
+				distinct_z_indices = torch.where(variational_dict['latent_b'][:,b])[0].clone().detach().cpu().numpy()
+				# Get distinct z's.
+				distinct_zs = variational_dict['latent_z_indices'][distinct_z_indices, b].clone().detach().cpu().numpy()
+				
+				# Copy over these into lists.
+				self.latent_z_set.append(copy.deepcopy(distinct_zs))
+				self.trajectory_set.append(copy.deepcopy(input_dict['sample_traj'][:,b]))
+				self.segmentation_set.append(copy.deepcopy(distinct_z_indices))
+				
+				self.number_set_elements += 1 
+
+			if i*self.args.batch_size+b>=self.N or break_var:
+				break
+
+	def visualize_joint_skill_embedding_space(self, suffix=None):
+		
+		print("Visualizing Skill Embedding Space.")
+
+		#################################
+		# First get latent_z's, trajectories, and segmentations.
+		#################################
+		self.get_latent_trajectory_segmentation_sets()
+
+		#################################
+		# Create variables. 
+		#################################
+
+		self.embedding_latent_z_set = []
+		self.embedding_image_set = []
+		self.embedding_traj_set = []
+		self.embedding_segment_set = []
+
+		#################################
+		# For all the elements in the set, generate image of this element. 
+		#################################
+
+		for j in range(len(self.latent_z_set)):
+
+			#################################
+			# Parse element. 
+			################################# 
+
+			latent_z_seq = self.latent_z_set[j]
+			segmentation = self.segmentation_set[j]
+			trajectory = self.trajectory_set[j]	
+			self.embedding_traj_set.append(copy.deepcopy(trajectory))
+			
+			#################################
+			# There are multiple elements here - 
+			#################################
+
+			for k in range(len(latent_z_seq)):
+
+				#################################
+				# For each z.. 
+				latent_z = latent_z_seq[k]
+				self.embedding_latent_z_set.append(copy.deepcopy(latent_z))
+				
+				#################################
+				# Get segmentation.
+				#################################
+
+				start_index = segmentation[k]
+				if k+1 >= len(latent_z_seq):
+					end_index = trajectory.shape[0]
+				else:					
+					end_index = segmentation[k+1]
+				self.embedding_segment_set.append([start_index, end_index])
+
+				#################################
+				# Get image. 		
+				#################################
+
+				image = self.get_skill_visual_in_context(trajectory, segment_start=start_index, segment_end=end_index)
+				self.embedding_image_set.append(copy.deepcopy(image))
+
+		#################################
+		# Now that we've gotten the entire set of latent_z's and their corresponding trajectory images, plot it all.
+		#################################
+
+		print("Plotting Embedding Space.")
+
+		#################################
+		# First project it into a TSNE space.
+		#################################
+
+		# For that, convert to numpy arrays..
+		self.embedding_latent_z_set_array = np.array(self.embedding_latent_z_set)
+
+		tsne = skl_manifold.TSNE(n_components=2,random_state=0,perplexity=self.args.perplexity)
+		embedded_zs = tsne.fit_transform(self.embedding_latent_z_set_array)
+
+		#################################
+		# Create save dictionary.
+		#################################
+
+		model_epoch = int(os.path.split(self.args.model)[1].lstrip("Model_epoch"))		
+		self.dir_name = os.path.join(self.args.logdir,self.args.name,"MEval","m{0}".format(model_epoch))
+
+		if not(os.path.isdir(self.dir_name)):
+			os.mkdir(self.dir_name)
+
+		if suffix is not None:
+			self.dir_name = os.path.join(self.dir_name, suffix)
+
+		if not(os.path.isdir(self.dir_name)):
+			os.mkdir(self.dir_name)
+
+		#################################
+		# Create a scatter plot of the embedding itself. The plot does not seem to work without this. 
+		#################################
+
+		matplotlib.rcParams['figure.figsize'] = [4,4]
+		fig, ax = plt.subplots()
+		ax.scatter(embedded_zs[:,0],embedded_zs[:,1])		
+		plt.savefig("{0}/Raw_Embedding_Joint_{1}_perp{2}.png".format(self.dir_name,self.args.name,self.args.perplexity))
+		plt.close()
+
+		#################################
+		# Now overlay images.
+		#################################
+
+		# matplotlib.rcParams['figure.figsize'] = [8, 8]
+		# zoom_factor = 0.04
+		# matplotlib.rcParams['figure.figsize'] = [40, 40]		
+		# zoom_factor = 0.4
+		matplotlib.rcParams['figure.figsize'] = [100, 100]		
+		zoom_factor = 0.5
+
+		fig, ax = plt.subplots()
+
+		# Plot z's.
+		ax.scatter(embedded_zs[:,0],embedded_zs[:,1])
+		
+		# Now set some plot parameters. 
+		ax.axis('off')
+		ax.set_title("Embedding of Latent Representation of our Model",fontdict={'fontsize':5})
+		artists = []
+		
+		#################################
+		# For number of samples in TSNE / Embedding, create a Image object for each of them. 
+		#################################
+
+		for k in range(len(self.embedding_image_set)):	
+			if k%10==0:
+				print(k)
+			
+			# Create offset image (so that we can place it where we choose), with specific zoom. 
+			imagebox = OffsetImage(self.embedding_image_set[k].transpose([1,2,0]),zoom=zoom_factor)
+			
+			# Create an annotation box to put the offset image into. specify offset image, position, and disable bounding frame. 
+			ab = AnnotationBbox(imagebox, (embedded_zs[k,0],embedded_zs[k,1]), frameon=False)
+
+			# Add the annotation box artist to the list artists. 
+			artists.append(ax.add_artist(ab))	
+
+		#################################
+		# With direct trajectory overlays instead of  inset images.
+		#################################
+
+		# ratio = 0.2 
+
+		# for k, traj in enumerate(self.embedding_traj_set):
+
+		# 	ax.scatter(embedded_zs[k,0]+ratio*traj[:,0],embedded_zs[k,1]+ratio*traj[:,1],c=range(len(traj)),s=100,cmap='jet',vmin=0,vmax=len(traj))
+
+		# 	# if self.args.setting=='context':
+		# 	segment_start = self.embedding_segment_set[k][0]
+		# 	segment_end = self.embedding_segment_set[k][1]
+			
+		# 	ax.scatter(embedded_zs[k,0]+ratio*traj[segment_start:segment_end,0],embedded_zs[k,1]+ratio*traj[segment_start:segment_end,1],c=range(segment_start,segment_end),s=200,cmap='jet',vmin=0,vmax=len(traj),edgecolors='k',linewidth=2.)
+	
+		#################################
+		# Save Figure.
+		#################################
+		
+		plt.savefig("{0}/Embedding_Joint_{1}_perp{2}.png".format(self.dir_name,self.args.name,self.args.perplexity))
+		plt.close()	
+
+
+
+	def get_skill_visual_in_context(self, traj, segment_start=None, segment_end=None):
+		
+		if self.args.data=='ContinuousNonZero':
+
+			# If Toy data, then... 
+			# Generate image of trajectory. 
+			
+			fig = plt.figure()		
+			ax = fig.gca()
+
+			# If generating contextual embedding visuals, visualize entire trajectory for context. 
+			# Otherwise just visualize the trajectory segment.
+			# if self.args.setting=='context':
+			ax.scatter(traj[:,0],traj[:,1],c=range(len(traj)),s=30,cmap='jet',vmin=0,vmax=len(traj))
+
+			# if self.args.setting=='context':
+			ax.scatter(traj[segment_start:segment_end,0],traj[segment_start:segment_end,1],c=range(segment_start,segment_end),s=60,cmap='jet',vmin=0,vmax=len(traj),edgecolors='k',linewidth=2.)
+	
+			scale = 15
+			plt.xlim(-scale,scale)
+			plt.ylim(-scale,scale)
+	
+			fig.canvas.draw()
+	
+			width, height = fig.get_size_inches() * fig.get_dpi()
+			image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)
+			
+			# Already got image data. Now close plot so it doesn't cry.
+			# fig.gcf()
+			plt.close()
+
+			image = np.transpose(image, axes=[2,0,1])
+
+			return image
+		else:
+			pass
 
 class PolicyManager_BatchJoint(PolicyManager_Joint):
 
@@ -3002,8 +3245,9 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 		return assembled_inputs, subpolicy_inputs, padded_action_seq
 	
-	def train(self, model=None):
+	def initialize_training_batches(self):
 
+		print("Initializing batches to manage GPU memory.")
 		# Set some parameters that we need for the dry run. 
 		extent = len(self.dataset)-self.test_set_size
 		counter = 0
@@ -3036,6 +3280,11 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			# Skip unless i is ==max_batch_size_index.
 			skip = (i!=max_batch_size_index)
 			self.run_iteration(counter, self.index_list[i], skip_iteration=skip)
+
+	def train(self, model=None):
+
+		# Run some initialization process to manage GPU memory with variable sized batches.
+		self.initialize_training_batches()
 
 		# Now run original training function.
 		super().train(model=model)

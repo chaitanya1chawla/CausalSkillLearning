@@ -271,6 +271,7 @@ def parse_arguments():
 	# Parameters for contextual training. 
 	parser.add_argument('--mask_fraction',dest='mask_fraction',type=float,default=0.15,help='What fraction of zs to mask in contextual embedding.')
 	parser.add_argument('--new_context',dest='new_context',type=int,default=0,help='Whether to implement new contextual embedding model or original one.')
+	parser.add_argument('--ELMO_embeddings',dest='ELMO_embeddings',type=int,default=0,help='Whether to implement ELMO style embeddings.')
 
 	return parser.parse_args()
 

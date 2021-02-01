@@ -1788,8 +1788,16 @@ class ContinuousNewContextualVariationalPolicyNetwork(ContinuousContextualVariat
 		# Also recompute the KL. 
 		# kl_divergence = torch.distributions.kl_divergence(self.contextual_dists, self.standard_distribution).mean()
 
+		#######
+		# Try ELMO embeddings.
+		if self.args.ELMO_embeddings:
+			self.elmo_contextual_skill_embedding = self.contextual_skill_embedding + sampled_z_index
+		else:
+			# If not using ELMO embedding, just use the newly predicted ones.
+			self.elmo_contextual_skill_embedding = self.contextual_skill_embedding
+
 		# Return same objects as original forward function. 
-		return self.contextual_skill_embedding, sampled_b, variational_b_logprobabilities, \
+		return self.elmo_contextual_skill_embedding, sampled_b, variational_b_logprobabilities, \
 		 variational_z_logprobabilities, variational_b_probabilities, \
 		 variational_z_probabilities, kl_divergence, prior_loglikelihood
 
