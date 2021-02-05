@@ -2787,6 +2787,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.assemble_joint_skill_embedding_space()
 			self.visualize_joint_skill_embedding_space()
 
+			# Copy embedding_latent_z_set_array.
+			self.global_z_set = copy.deepcopy(self.embedding_latent_z_set_array)
+
 			print("Evaluate contextual representations.")
 			self.evaluate_contextual_representations()			
 
@@ -2858,80 +2861,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			if i*self.args.batch_size+b>=self.N or break_var:
 				break
 
-	# @profile
-	# def assemble_joint_skill_embedding_space(self, suffix=None, preset_latent_sets=False):
-		
-	# 	print("Assemble Skill Embedding Space.")		
-
-	# 	#################################
-	# 	# First get latent_z's, trajectories, and segmentations.
-	# 	#################################
-
-	# 	if not(preset_latent_sets):
-	# 		self.get_latent_trajectory_segmentation_sets()
-
-	# 	# This function sets.. latent_z_set, trajectory_set, and segmentation_set. 
-
-	# 	#################################
-	# 	# Create variables. 
-	# 	#################################
-
-	# 	self.embedding_latent_z_set = []
-	# 	self.embedding_image_set = {}
-	# 	self.embedding_traj_set = []
-	# 	self.embedding_segment_set = []
-
-	# 	#################################
-	# 	# For all the elements in the set, generate image of this element. 
-	# 	#################################
-
-	# 	for j in range(len(self.latent_z_set)):
-			
-	# 		print("Parsing element {0} in assemble_joint_skill_embedding_space.".format(j))
-	# 		#################################
-	# 		# Parse element. 
-	# 		################################# 
-
-	# 		latent_z_seq = self.latent_z_set[j]
-	# 		segmentation = self.segmentation_set[j]
-	# 		trajectory = self.trajectory_set[j]	
-						
-	# 		self.embedding_traj_set.append(copy.deepcopy(trajectory))
-	
-	# 		#################################
-	# 		# There are multiple elements here - 
-	# 		#################################
-
-	# 		for k in range(len(latent_z_seq)):
-
-	# 			#################################
-	# 			# For each z.. 
-	# 			latent_z = latent_z_seq[k]				
-	# 			self.embedding_latent_z_set.append(copy.deepcopy(latent_z))
-				
-	# 			#################################
-	# 			# Get segmentation.
-	# 			#################################
-
-	# 			start_index = segmentation[k]
-	# 			if k+1 >= len(latent_z_seq):
-	# 				end_index = trajectory.shape[0]
-	# 			else:					
-	# 				end_index = segmentation[k+1]
-								
-	# 			self.embedding_segment_set.append([start_index, end_index])
-	# 			#################################
-	# 			# Get image. 		
-	# 			#################################
-	# 			image = self.get_skill_visual_in_context(trajectory, segment_start=start_index, segment_end=end_index)				
-	# 			self.embedding_image_set['image_{0}'.format(k)] = copy.deepcopy(image)
-
-	# 			del image
-
-	# 	# For that, convert to numpy arrays..
-	# 	self.embedding_latent_z_set_array = np.array(self.embedding_latent_z_set)
-
-	def assemble_joint_skill_embedding_space(self, suffix=None, preset_latent_sets=False):
+	def assemble_joint_skill_embedding_space(self, preset_latent_sets=False):
 		
 		print("Assemble Skill Embedding Space.")		
 
@@ -2940,8 +2870,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		#################################
 
 		if not(preset_latent_sets):
-			self.get_latent_trajectory_segmentation_sets()
-
+			self.get_latent_trajectory_segmentation_sets()		
 		# This function sets.. latent_z_set, trajectory_set, and segmentation_set. 
 
 		#################################
@@ -2959,11 +2888,11 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		for j in range(len(self.latent_z_set)):
 			
-			print("Parsing element {0} in assemble_joint_skill_embedding_space.".format(j))
+			# print("Parsing element {0} in assemble_joint_skill_embedding_space.".format(j))
 			#################################
 			# Parse element. 
 			################################# 
-
+			
 			latent_z_seq = self.latent_z_set[j]
 			segmentation = self.segmentation_set[j]
 			trajectory = self.trajectory_set[j]	
@@ -2971,43 +2900,58 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.embedding_traj_set['traj_{0}'.format(j)] = copy.deepcopy(trajectory)
 	
 			#################################
-			# There are multiple elements here - 
+			# There may be multiple elements here - check.
 			#################################
+			if len(latent_z_seq.shape)>1:				
+				run_till = len(latent_z_seq)
+			else:
+				run_till = 1
 
-			for k in range(len(latent_z_seq)):
+			# for k in range(len(latent_z_seq)):
+			for k in range(run_till):
 
 				#################################
 				# For each z.. 
-				latent_z = latent_z_seq[k]				
+				if run_till==1:
+					latent_z = latent_z_seq
+				else:
+					latent_z = latent_z_seq[k]	
 				# self.embedding_latent_z_set.append(copy.deepcopy(latent_z))
-				self.embedding_latent_z_set['latent_z_{0}'.format(k)] = copy.deepcopy(latent_z)
+				self.embedding_latent_z_set['latent_z_j{0}_k{1}'.format(j,k)] = copy.deepcopy(latent_z)
 				
 				#################################
 				# Get segmentation.
 				#################################
 
 				start_index = segmentation[k]
+				# if run_till==1:
+				# 	end_index = segmentation[k+1]
+				# else:
 				if k+1 >= len(latent_z_seq):
+					# Because this won't evaluate to true if latent_z_seq is a single z, because len(latent_z_seq) = 64. 
 					end_index = trajectory.shape[0]
 				else:					
 					end_index = segmentation[k+1]
 								
 				# self.embedding_segment_set.append([start_index, end_index])
-				self.embedding_segment_set['segment_{0}'.format(k)] = [start_index, end_index]
+				self.embedding_segment_set['segment_j{0}_k{1}'.format(j,k)] = [start_index, end_index]
 
 				#################################
 				# Get image. 		
 				#################################
-				image = self.get_skill_visual_in_context(trajectory, segment_start=start_index, segment_end=end_index)				
-				self.embedding_image_set['image_{0}'.format(k)] = copy.deepcopy(image)
-
-				del image
+				# t1 = time.time()
+				# image = self.get_skill_visual_in_context(trajectory, segment_start=start_index, segment_end=end_index)
+				# t2 = time.time()
+				# # self.embedding_image_set['image_{0}'.format(k)] = copy.deepcopy(image)
+				# self.embedding_image_set['image_{0}'.format(k)] = image
+				
+				self.embedding_image_set['image_j{0}_k{1}'.format(j,k)] = self.get_skill_visual_in_context(trajectory, segment_start=start_index, segment_end=end_index)
 
 		# For that, convert to numpy arrays..
 		# self.embedding_latent_z_set_array = np.array(self.embedding_latent_z_set)
 		self.embedding_latent_z_set_array = np.array(list(self.embedding_latent_z_set.values()))
 
-	def visualize_joint_skill_embedding_space(self, suffix=None, global_z_set=None):
+	def visualize_joint_skill_embedding_space(self, suffix=None, global_z_set=None, image_suffix=None):
 		
 		#################################
 		# Now that we've gotten the entire set of latent_z's and their corresponding trajectory images, plot it all.
@@ -3020,8 +2964,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		#################################
 
 		# If we have kept track of global z's, append those to embedding_latent_z_set to visualize, for contrast. 
-		if global_z_set is not None:
-			self.embedded_latent_z_set_array = np.concatenate([self.embedding_latent_z_set_array, global_z_set])
+		if global_z_set is not None:			
+			self.embedding_latent_z_set_array = np.concatenate([self.embedding_latent_z_set_array, global_z_set])
 
 		tsne = skl_manifold.TSNE(n_components=2,random_state=0,perplexity=self.args.perplexity)
 		embedded_zs = tsne.fit_transform(self.embedding_latent_z_set_array)
@@ -3049,7 +2993,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		matplotlib.rcParams['figure.figsize'] = [4,4]
 		fig, ax = plt.subplots()
 		ax.scatter(embedded_zs[:,0],embedded_zs[:,1])		
-		plt.savefig("{0}/Raw_Embedding_Joint_{1}_perp{2}.png".format(self.dir_name,self.args.name,self.args.perplexity))
+		plt.savefig("{0}/Raw_Embedding_Joint_{1}_perp{2}_{3}.png".format(self.dir_name,self.args.name,self.args.perplexity,image_suffix))
 		plt.close()
 
 		#################################
@@ -3060,13 +3004,14 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# zoom_factor = 0.04
 		# matplotlib.rcParams['figure.figsize'] = [40, 40]		
 		# zoom_factor = 0.4
-		matplotlib.rcParams['figure.figsize'] = [100, 100]		
+		matplotlib.rcParams['figure.figsize'] = [80, 80]
+		# matplotlib.rcParams['figure.figsize'] = [100, 100]
 		zoom_factor = 0.5
 
 		fig, ax = plt.subplots()
 
 		# Plot z's.
-		ax.scatter(embedded_zs[:,0],embedded_zs[:,1])
+		ax.scatter(embedded_zs[:,0],embedded_zs[:,1],s=100)
 
 		# Now set some plot parameters. 
 		ax.axis('off')
@@ -3079,8 +3024,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# for k in range(len(self.embedding_image_set)):	
 		for k, v in enumerate(self.embedding_image_set):
-			if k%10==0:
-				print(k)
+			# if k%10==0:
+			# 	print(k)
 			
 			# Create offset image (so that we can place it where we choose), with specific zoom. 
 			imagebox = OffsetImage(self.embedding_image_set[v].transpose([1,2,0]),zoom=zoom_factor)
@@ -3111,7 +3056,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# Save Figure.
 		#################################
 		
-		plt.savefig("{0}/Embedding_Joint_{1}_perp{2}.png".format(self.dir_name,self.args.name,self.args.perplexity))
+		plt.savefig("{0}/Embedding_Joint_{1}_perp{2}_{3}.png".format(self.dir_name,self.args.name,self.args.perplexity, image_suffix))
 		plt.close()	
 
 	def get_skill_visual_in_context(self, traj, segment_start=None, segment_end=None):
@@ -3120,7 +3065,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			# If Toy data, then... 
 			# Generate image of trajectory. 
-			
+			matplotlib.rcParams['figure.figsize'] = [5,5]
+
 			fig = plt.figure()		
 			ax = fig.gca()
 
@@ -3182,35 +3128,119 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			# Now that we have things assembled nicely, get unique sequences,
 			# ID of which sequence the particular element in distinct_z is, 
+			# Inverse indices, which describe the 
 			# and the count of how many of such unique elements exist.
 			print("Running unique.")
 			self.skill_sequence, self.skill_index, self.skill_inverse_indices, self.skill_counts = np.unique(distinct_zs, axis=0, return_inverse=True, return_index=True, return_counts=True)
 
 	def evaluate_contextual_representations(self):
 		
+		####################################
+		print("####################################")
 		print("Compute unique sequences of skills., for context evaluation.")		
+		print("####################################")
 		self.set_context_histogram()
-			
+		
 		# Things to evaluate. 
-		
+
 		####################################
-		# (1) Evaluate representations of similar sets of skill sequences, for which there are at least k trajectories.
 		####################################
-		
-		# Before we start evaluating contextual representations, copy global_z_set for contrast. 
-		self.global_z_set = copy.deepcopy(self.embedding_latent_z_set_array)		
+		# (1) Evaluate similar skills in different skill sequences. 
+		# (1) Using the ground truth option label to ascertain whether skills are "similar" or not.
+
+		# Ideally we'd like to see - 
+		# (a) Similar skills have overall close embeddings (compared to global sets), but embeddings change based on context. 
+		# (b) Similar contexts / skill sequences result in more similar skill embeddings than different contexts. 
+		####################################
+		####################################
+
+		print("#####################################################")
+		print("Now evaluating embeddings of the same skill in different contexts / amongst different skill sequences.")
+		print("#####################################################")
+
+		# Since there are just 4 skills used to generate the data, we should evaluate embeddings for all of them. 
+		number_of_datapoints = self.args.batch_size
+		# If we look at consider_labels_from# of these, should find batch_size number of relevant z's.
+		consider_labels_from = 2*number_of_datapoints
+
+		i=0				
+		indices = np.arange(i,i+consider_labels_from)
+		self.dataset_b, self.dataset_z = self.dataset.get_latent_variables(indices)
+
+		for k in range(self.args.number_policies):
+
+			# For each skill, get number_of_datapoint number of different trajectories that have the relevant skill. 
+			special_indices = []
+			relevant_z_indices = np.where((self.dataset_z==k).any(axis=-1))[0]
+			special_indices = relevant_z_indices[:number_of_datapoints]
+			
+			print("#####################################################")
+			print("Running evaluations of the same skill in different contexts, for skill ID: ",k)		
+
+			# Now feed into run iteration. 
+			input_dict, variational_dict, eval_likelihood_dict = self.run_iteration(0, i, return_dicts=True, special_indices=special_indices)
+
+			self.latent_z_set = []
+			self.trajectory_set = []
+			self.segmentation_set = []
+
+			for b in range(number_of_datapoints):
+			
+				# Get segmentations.		
+				distinct_z_indices = torch.where(variational_dict['latent_b'][:,b])[0].clone().detach().cpu().numpy()
+				# Get distinct z's.
+				distinct_zs = variational_dict['latent_z_indices'][distinct_z_indices, b].clone().detach().cpu().numpy()
+
+				# Get timesteps for which it's the relevant skill under the GT labels. 
+				relevant_z_indices = np.where((self.dataset_latent_z_labels[b,:]==k))[0]
+
+				# Now add the last timestep 
+				histogram_bins = np.concatenate([distinct_z_indices,np.array(input_dict['sample_traj'].shape[0:1])])
+				
+				# Find out which bin the relevant_z_indices intersect the most with. 
+				counts, bins = np.histogram(relevant_z_indices, bins=histogram_bins)
+				relevant_bin = counts.argmax()
+				relevant_index = bins[relevant_bin]
+
+				# Copy to lists.				
+				self.trajectory_set.append(input_dict['sample_traj'][:,b])
+				self.latent_z_set.append(distinct_zs[relevant_bin])
+				self.segmentation_set.append([bins[relevant_bin],bins[relevant_bin+1]])
+
+			# Now that latent_z_set, trajectory_set and segmentation_set are set, call - 
+			self.assemble_joint_skill_embedding_space(preset_latent_sets=True)
+			# # Now that we have the dictionaries... embed and visualize them. 
+			self.visualize_joint_skill_embedding_space(suffix='SameSkill_DiffContext', global_z_set=self.global_z_set, image_suffix="Skill{0}".format(k))
+
+
+		####################################
+		####################################
+		# (2) Evaluate representations of similar sets of skill sequences, for which there are at least k trajectories.
+		# (2) This shows different skills in similar skill sequences. 
+
+		# What does this tell us? For each unique sequence of skills, what does the embedding of the skills executed in this sequence look like? 
+		# (a) Ideally want to see that the same skill in the same sequence of skill is embedded together. 
+		# (b) Ideally want to see different skills in the same sequence of skill embedded differently. 		
+		####################################
+		####################################
 
 		minimum_trajectories = 20
+		max_viz_trajs = 20
 
 		# Figure out where we have enough datapoints to make reasonable comparisons.
-		eval_skill_sequence_indices = np.where(self.skill_counts>minimum_trajectories)[0]
+		eval_skill_sequence_indices = np.where(self.skill_counts>minimum_trajectories)[0][:max_viz_trajs]
 
+		print("#####################################################")
 		print("Iterating over skill sequences, and visualizing them.")
+		print("#####################################################")
 
 		# For all skill_sequences for which we have these minimum number of trajectories.
 		for i, skill_seq in enumerate(eval_skill_sequence_indices):
 			
+			print("#####################################################")
 			print("Currently operating on skills sequence ", i)
+			
+
 			# Get dataset indices for this specific skill sequence.
 			special_indices = np.where(self.skill_inverse_indices==skill_seq)[0]
 
@@ -3237,17 +3267,10 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				self.trajectory_set.append(copy.deepcopy(input_dict['sample_traj'][:,b]))
 				self.segmentation_set.append(copy.deepcopy(distinct_z_indices))
 
-			# print("Embedding in contextual representation evaluation.")
-			# embed()
-
 			# Now that latent_z_set, trajectory_set and segmentation_set are set, call - 
-			self.assemble_joint_skill_embedding_space(suffix='Skill_{0}'.format(i), preset_latent_sets=True)
+			self.assemble_joint_skill_embedding_space(preset_latent_sets=True)
 			# # Now that we have the dictionaries... embed and visualize them. 
-			self.visualize_joint_skill_embedding_space(suffix='Skill_{0}'.format(i), global_z_set=self.global_z_set)
-
-		####################################
-		# (2) Evaluate 
-		####################################
+			self.visualize_joint_skill_embedding_space(suffix='SkillSeq', global_z_set=self.global_z_set, image_suffix="Seq{0}".format(i))
 
 class PolicyManager_BatchJoint(PolicyManager_Joint):
 
@@ -3310,9 +3333,12 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			# Sample trajectory segment from dataset. 
 			if special_indices is not None:
 				sample_traj, sample_action_seq = self.dataset[special_indices]
+				self.dataset_latent_b_labels, self.dataset_latent_z_labels = self.dataset.get_latent_variables(special_indices)			
 			else:
 				sample_traj, sample_action_seq = self.dataset[i:i+self.args.batch_size]
-
+				indices = np.arange(i,i+self.args.batch_size)
+				self.dataset_latent_b_labels, self.dataset_latent_z_labels = self.dataset.get_latent_variables(indices)
+				
 			concatenated_traj = self.concat_state_action(sample_traj, sample_action_seq)		
 			old_concatenated_traj = self.old_concat_state_action(sample_traj, sample_action_seq)
 
