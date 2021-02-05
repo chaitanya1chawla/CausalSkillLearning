@@ -2025,13 +2025,17 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# Currently returns: 
 		# s0, s1, s2, s3, ..., sn-1, sn
-		#  _, a0, a1, a2, ..., an_1, an
+		#  _, a0, a1, a2, ..., an-2, an-1
 		return np.concatenate([sample_traj, sample_action_seq],axis=-1)
 
 	def old_concat_state_action(self, sample_traj, sample_action_seq):
 		# Add blank to the END of action sequence and then concatenate.
 		sample_action_seq = np.concatenate([sample_action_seq, np.zeros((1,self.output_size))],axis=0)
 		return np.concatenate([sample_traj, sample_action_seq],axis=-1)
+
+	def differentiable_old_concate_state_action(self, sample_traj, sample_action_seq):
+		sample_action_seq = torch.concatenate([sample_action_seq, torch.zeros((1,self.output_size))],axis=0)
+		return torch.concatenate([sample_traj, sample_action_seq],axis=-1)
 
 	def setup_eval_against_encoder(self):
 		# Creates a network, loads the network from pretraining model file. 
@@ -2073,6 +2077,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# Need to assemble inputs first - returns a Torch CUDA Tensor.
 		# This doesn't need to take in actions, because we can evaluate for all actions then select. 
 		assembled_inputs, subpolicy_inputs, padded_action_seq = self.assemble_inputs(concatenated_traj, latent_z_indices, latent_b, sample_action_seq, self.conditional_information)
+
 
 		###########################
 		# Compute learnt subpolicy loglikelihood.
@@ -2182,6 +2187,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		return_dict['learnt_subpolicy_loglikelihood'] = learnt_subpolicy_loglikelihood
 		return_dict['learnt_subpolicy_loglikelihoods'] = learnt_subpolicy_loglikelihoods
 		return_dict['temporal_loglikelihoods'] = temporal_loglikelihoods
+		return_dict['subpolicy_inputs'] = subpolicy_inputs
 
 		return return_dict
 
@@ -2653,7 +2659,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		else:
 			return None, None
 
-	def run_iteration(self, counter, i, skip_iteration=False, return_dicts=False, special_indices=None):
+	def run_iteration(self, counter, i, skip_iteration=False, return_dicts=False, special_indices=None, train=True, input_dictionary=None):
 
 		# With learnt discrete subpolicy: 
 
@@ -2673,8 +2679,14 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# (1) & (2) get sample from collect inputs function. 
 		####################################
 
-		input_dictionary = {}
-		input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], input_dictionary['concatenated_traj'], input_dictionary['old_concatenated_traj'] = self.collect_inputs(i, special_indices=special_indices)
+		if input_dictionary is None:
+			input_dictionary = {}
+			input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], input_dictionary['concatenated_traj'], input_dictionary['old_concatenated_traj'] = self.collect_inputs(i, special_indices=special_indices)
+			input_dictionary['old_concatenated_traj'] = torch.tensor(input_dictionary['old_concatenated_traj']).to(device).float()
+		else:
+			pass
+			# Things should already be set. 
+
 		self.batch_indices_sizes.append({'batch_size': input_dictionary['sample_traj'].shape[0], 'i': i})
 
 		if (input_dictionary['sample_traj'] is not None) and not(skip_iteration):
@@ -2686,7 +2698,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			variational_dict = {}
 			variational_dict['latent_z_indices'], variational_dict['latent_b'], variational_dict['variational_b_logprobabilities'], variational_dict['variational_z_logprobabilities'], \
 			variational_dict['variational_b_probabilities'], variational_dict['variational_z_probabilities'], variational_dict['kl_divergence'], variational_dict['prior_loglikelihood'] = \
-				self.variational_policy.forward(torch.tensor(input_dictionary['old_concatenated_traj']).to(device).float(), self.epsilon, batch_trajectory_lengths=self.batch_trajectory_lengths)
+				self.variational_policy.forward(input_dictionary['old_concatenated_traj'], self.epsilon, batch_trajectory_lengths=self.batch_trajectory_lengths)
 
 			####################################
 			# (4) Evaluate Log Likelihoods of actions and options as "Return" for Variational policy.
@@ -2694,7 +2706,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			
 			eval_likelihood_dict = self.evaluate_loglikelihoods(input_dictionary, variational_dict)
 
-			if self.args.train:
+			if self.args.train and train:
 				
 				####################################
 				# (5) Update policies. 
@@ -5539,7 +5551,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		pass
 
-# Writing a cycle consistency transfer PM class.
 class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 
 	# Inherit from transfer. 
