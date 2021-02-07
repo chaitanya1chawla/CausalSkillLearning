@@ -7,7 +7,6 @@
 from headers import *
 import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader
 from PolicyManagers import *
-from NewPolicyManagers import *
 import TestClass
 
 def return_dataset(args, data=None):
@@ -75,7 +74,7 @@ class Master():
 		elif self.args.setting=='imitation':
 			self.policy_manager = PolicyManager_Imitation(self.args.number_policies, self.dataset, self.args)
 
-		elif self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
+		elif self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed' or self.args.setting=='jointtransfer':
 			source_dataset = return_dataset(self.args, data=self.args.source_domain)
 			target_dataset = return_dataset(self.args, data=self.args.target_domain)
 
@@ -85,6 +84,8 @@ class Master():
 				self.policy_manager = PolicyManager_CycleConsistencyTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)				
 			elif self.args.setting=='fixembed':
 				self.policy_manager = PolicyManager_FixEmbedCycleConTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
+			elif self.args.setting=='jointtransfer':
+				self.policy_manager = PolicyManager_JointTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 
 		if self.args.debug:
 			print("Embedding in Master.")
@@ -96,7 +97,7 @@ class Master():
 	def run(self):
 		if self.args.setting=='pretrain_sub' or self.args.setting=='pretrain_prior' or \
 			self.args.setting=='imitation' or self.args.setting=='baselineRL' or self.args.setting=='downstreamRL' or \
-			 self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
+			 self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed' or self.args.setting=='jointtransfer':
 			
 			if self.args.train:
 				if self.args.model:
@@ -169,7 +170,6 @@ def parse_arguments():
 	parser.add_argument('--var_hidden_size',dest='var_hidden_size',type=int,default=64)
 
 	parser.add_argument('--environment',dest='environment',type=str,default='SawyerLift') # Defines robosuite environment for RL.
-
 	
 	# Data parameters. 
 	parser.add_argument('--traj_segments',dest='traj_segments',type=int,default=1) # Defines whether to use trajectory segments for pretraining or entire trajectories. Useful for baseline implementation.

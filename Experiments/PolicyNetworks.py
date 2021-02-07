@@ -6,6 +6,7 @@
 
 from headers import *
 
+
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
@@ -1678,11 +1679,19 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 		 variational_z_logprobabilities, variational_b_probabilities, \
 		 variational_z_probabilities, kl_divergence, prior_loglikelihood
 
-class ContinuousNewContextualVariationalPolicyNetwork(ContinuousContextualVariationalPolicyNetwork):
+# class ContinuousNewContextualVariationalPolicyNetwork(ContinuousContextualVariationalPolicyNetwork):
+class ContinuousNewContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNetwork_Batch):
 	
 	def __init__(self, input_size, hidden_size, z_dimensions, args, number_layers=4):
 		
 		super(ContinuousNewContextualVariationalPolicyNetwork, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)
+		# Define a bidirectional LSTM now.
+		self.z_dimensions = self.args.z_dimensions
+		self.contextual_lstm = torch.nn.LSTM(input_size=self.args.z_dimensions,hidden_size=self.hidden_size,num_layers=self.num_layers, bidirectional=True)
+		# self.z_output_layer = torch.nn.Linear(2*self.hidden_size, self.z_dimensions)
+
+		self.contextual_mean_output_layer = torch.nn.Linear(2*self.hidden_size,self.output_size)
+		self.contextual_variances_output_layer = torch.nn.Linear(2*self.hidden_size, self.output_size)
 
 	def forward(self, input, epsilon, new_z_selection=True, batch_size=None, batch_trajectory_lengths=None):
 		
@@ -1786,7 +1795,7 @@ class ContinuousNewContextualVariationalPolicyNetwork(ContinuousContextualVariat
 		prior_loglikelihood = self.standard_distribution.log_prob(self.contextual_skill_embedding)
 
 		# Also recompute the KL. 
-		# kl_divergence = torch.distributions.kl_divergence(self.contextual_dists, self.standard_distribution).mean()
+		kl_divergence = torch.distributions.kl_divergence(self.contextual_dists, self.standard_distribution)
 
 		#######
 		# Try ELMO embeddings.
@@ -2101,6 +2110,9 @@ class DiscreteMLP(torch.nn.Module):
 		probabilities = self.batch_softmax_layer(preprobability_outputs)
 
 		return log_probabilities, probabilities
+
+	def get_probabilities(self, input):
+		return self.forward(input)
 
 class ContextDecoder(ContinuousVariationalPolicyNetwork):
 
