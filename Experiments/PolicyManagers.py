@@ -2854,7 +2854,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		for i in range(self.N//self.args.batch_size+1):
 
 			# (1) Encoder trajectory. 
-			input_dict, variational_dict, _ = self.run_iteration(0, i, return_dicts=True, train=False)
+			with torch.no_grad():
+				input_dict, variational_dict, _ = self.run_iteration(0, i, return_dicts=True, train=False)
 
 			# Assuming we're running with batch size>1.
 			for b in range(self.args.batch_size):
@@ -5228,10 +5229,15 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.source_manager.get_trajectory_and_latent_sets(get_visuals=False)
 		self.target_manager.get_trajectory_and_latent_sets(get_visuals=False)
 		
+		
 		# Now assemble them into local variables.
 		self.N = self.source_manager.N
-		self.source_latent_zs = self.source_manager.latent_z_set
-		self.target_latent_zs = self.target_manager.latent_z_set		
+		if self.args.setting=='joint_transfer':
+			self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
+			self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)
+		else:
+			self.source_latent_zs = self.source_manager.latent_z_set
+			self.target_latent_zs = self.target_manager.latent_z_set
 		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
 
 		# Now that the latent sets for both source and target domains are computed: 
