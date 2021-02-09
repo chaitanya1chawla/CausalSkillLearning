@@ -74,7 +74,7 @@ class Master():
 		elif self.args.setting=='imitation':
 			self.policy_manager = PolicyManager_Imitation(self.args.number_policies, self.dataset, self.args)
 
-		elif self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed' or self.args.setting=='jointtransfer':
+		elif self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer']:
 			source_dataset = return_dataset(self.args, data=self.args.source_domain)
 			target_dataset = return_dataset(self.args, data=self.args.target_domain)
 
@@ -86,6 +86,8 @@ class Master():
 				self.policy_manager = PolicyManager_FixEmbedCycleConTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 			elif self.args.setting=='jointtransfer':
 				self.policy_manager = PolicyManager_JointTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
+			elif self.args.setting=='jointcycletransfer':
+				self.policy_manager = PolicyManager_JointCycleTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 
 		if self.args.debug:
 			print("Embedding in Master.")
@@ -95,10 +97,8 @@ class Master():
 		self.policy_manager.setup()
 
 	def run(self):
-		if self.args.setting=='pretrain_sub' or self.args.setting=='pretrain_prior' or \
-			self.args.setting=='imitation' or self.args.setting=='baselineRL' or self.args.setting=='downstreamRL' or \
-			 self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed' or self.args.setting=='jointtransfer':
-			
+		if self.args.setting in ['pretrain_sub','pretrain_prior','imitation','baselineRL','downstreamRL',\
+			'transfer','cycle_transfer','jointtransfer','fixembed','jointcycletransfer']:
 			if self.args.train:
 				if self.args.model:
 					self.policy_manager.train(self.args.model)
@@ -110,7 +110,8 @@ class Master():
 				else:														
 					self.policy_manager.evaluate(model=self.args.model)		
 				
-		elif self.args.setting=='learntsub' or self.args.setting=='joint' or self.args.setting=='context':
+		# elif self.args.setting=='learntsub' or self.args.setting=='joint' or self.args.setting=='context':
+		elif self.args.setting in ['learntsub','joint','context']:
 			if self.args.train:
 				if self.args.model:
 					self.policy_manager.train(self.args.model)
@@ -273,8 +274,10 @@ def parse_arguments():
 
 	# Parameters for contextual training. 
 	parser.add_argument('--mask_fraction',dest='mask_fraction',type=float,default=0.15,help='What fraction of zs to mask in contextual embedding.')
-	parser.add_argument('--new_context',dest='new_context',type=int,default=0,help='Whether to implement new contextual embedding model or original one.')
+	parser.add_argument('--context',dest='context',type=int,default=1,help='Whether to implement contextual embedding model or original joint embedding model in Joint Transfer setting.')
+	parser.add_argument('--new_context',dest='new_context',type=int,default=1,help='Whether to implement new contextual embedding model or original one.')
 	parser.add_argument('--ELMO_embeddings',dest='ELMO_embeddings',type=int,default=0,help='Whether to implement ELMO style embeddings.')
+	parser.add_argument('--eval_jointtransfer_metrics',dest='eval_jointtransfer_metrics',type=int,default=0,help='Whether to evaluate correspondence metrics in joint transfer setting.')
 
 	return parser.parse_args()
 

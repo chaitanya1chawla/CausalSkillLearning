@@ -374,11 +374,15 @@ class PolicyManager_BaseClass():
 		# Save webpage. 
 		self.write_results_HTML()
 
-	def rollout_robot_trajectory(self, trajectory_start, latent_z, rollout_length=None):
+	def rollout_robot_trajectory(self, trajectory_start, latent_z, rollout_length=None, z_seq=False):
 
 		subpolicy_inputs = torch.zeros((1,2*self.state_dim+self.latent_z_dimensionality)).to(device).float()
 		subpolicy_inputs[0,:self.state_dim] = torch.tensor(trajectory_start).to(device).float()
-		subpolicy_inputs[:,2*self.state_dim:] = torch.tensor(latent_z).to(device).float()	
+
+		if z_seq:
+			subpolicy_inputs[:,2*self.state_dim:] = torch.tensor(latent_z[0]).to(device).float()	
+		else:
+			subpolicy_inputs[:,2*self.state_dim:] = torch.tensor(latent_z).to(device).float()	
 
 		if rollout_length is not None: 
 			length = rollout_length-1
@@ -404,20 +408,24 @@ class PolicyManager_BaseClass():
 			input_row[0,:self.state_dim] = new_state
 			# Feed in the ORIGINAL prediction from the network as input. Not the downscaled thing. 
 			input_row[0,self.state_dim:2*self.state_dim] = actions[-1].squeeze(1)
-			input_row[0,2*self.state_dim:] = torch.tensor(latent_z).to(device).float()
+
+			if z_seq:
+				input_row[0,2*self.state_dim:] = torch.tensor(latent_z[t+1]).to(device).float()
+			else:
+				input_row[0,2*self.state_dim:] = torch.tensor(latent_z).to(device).float()
 
 			subpolicy_inputs = torch.cat([subpolicy_inputs,input_row],dim=0)
 
 		trajectory = subpolicy_inputs[:,:self.state_dim].detach().cpu().numpy()
 		return trajectory
 
-	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False):		
+	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False):		
 
 		# 1) Feed Z into policy, rollout trajectory. 
 		# print("Embedding in get robot visuals.")
 		# embed()
 		
-		trajectory_rollout = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=trajectory.shape[0])
+		trajectory_rollout = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=trajectory.shape[0], z_seq=z_seq)
 		
 		# 2) Unnormalize data. 
 		if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
@@ -1778,7 +1786,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			elif self.training_phase_size<=counter and counter<2*self.training_phase_size:
 				self.training_phase=2	
-				print("In Phase 2.")		
+				# print("In Phase 2.")		
 
 				# If we are encountering training phase 2 for the first time.
 				# if self.reset_subpolicy_training==0 and self.args.setting=='context':
@@ -1806,10 +1814,11 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				# This should be run when counter > 2*self.training_phase_size, and less than 3*self.training_phase_size.
 				if counter>3*self.training_phase_size:
 					# Set equal after 3. 
-					print("In Phase 4.")
+					# print("In Phase 4.")
 					self.latent_z_loss_weight = 0.1*self.args.lat_b_wt
 				else:
-					print("In Phase 3.")
+					# print("In Phase 3.")
+					pass
 
 		else:
 			self.epsilon = 0.
@@ -2827,7 +2836,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 	def get_latent_trajectory_segmentation_sets(self):
 
-		print("Getting latent_z, trajectory, segmentation sets.")
+		# print("Getting latent_z, trajectory, segmentation sets.")
 
 		# For N number of random trajectories from MIME: 
 		#	# Encode trajectory using encoder into latent_z sequence. 
@@ -2846,6 +2855,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.latent_z_set = []
 		self.trajectory_set = []
 		self.segmentation_set = []
+		self.segmented_trajectory_set = []
 
 		break_var = 0
 		self.number_set_elements = 0 
@@ -2874,10 +2884,31 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				self.trajectory_set.append(copy.deepcopy(input_dict['sample_traj'][:,b]))
 				self.segmentation_set.append(copy.deepcopy(distinct_z_indices))
 				
+				# Add each trajectory segment to segmented_trajectory_set. 
+				for k in range(len(distinct_z_indices)-1):					
+					traj_segment = input_dict['sample_traj'][distinct_z_indices[k]:distinct_z_indices[k+1],b]
+					self.segmented_trajectory_set.append(copy.deepcopy(traj_segment))				
+				
+				traj_segment = input_dict['sample_traj'][distinct_z_indices[k+1]:,b]
+				self.segmented_trajectory_set.append(copy.deepcopy(traj_segment))
+
 				self.number_set_elements += 1 
 
 			if i*self.args.batch_size+b>=self.N or break_var:
 				break
+
+		self.avg_reconstruction_error = 0.
+
+
+		# # if self.args.setting=='jointtransfer':
+		# # 	self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
+		# # 	self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)
+		# # else:
+		# self.source_latent_zs = self.source_manager.latent_z_set
+		# self.target_latent_zs = self.target_manager.latent_z_set
+		# if self.args.setting=='jointtransfer':
+		# 	self.latent_z_set = np.concatenate(self.latent_z_set)
+		# 	self.trajectory_set = np.array(self.trajectory_set)
 
 	def assemble_joint_skill_embedding_space(self, preset_latent_sets=False):
 		
@@ -3302,14 +3333,14 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 		self.policy_network = ContinuousPolicyNetwork(self.input_size, self.hidden_size, self.output_size, self.args, self.number_layers).to(device)
 		self.latent_policy = ContinuousLatentPolicyNetwork_ConstrainedBPrior(self.input_size+self.conditional_info_size, self.hidden_size, self.args, self.number_layers).to(device)
 
-		if self.args.setting=='context' or self.args.setting=='jointtransfer':
+		if (self.args.setting=='context' or (self.args.setting=='jointtransfer' and self.args.context)):
 			if self.args.new_context:
 				self.variational_policy = ContinuousNewContextualVariationalPolicyNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.args.var_number_layers).to(device)
 			else:
 				self.variational_policy = ContinuousContextualVariationalPolicyNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.args.var_number_layers).to(device)
 		else:
 			self.variational_policy = ContinuousVariationalPolicyNetwork_Batch(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.args.var_number_layers).to(device)
-
+		
 	# Batch concatenation functions. 
 	def concat_state_action(self, sample_traj, sample_action_seq):
 		# Add blank to start of action sequence and then concatenate. 
@@ -5145,7 +5176,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.tf_logger.scalar_summary('Target Trajectory Reconstruction Error', self.target_manager.avg_reconstruction_error, counter)
 
 			# if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':
-			if self.args.source_domain==self.args.target_domain:
+			if self.args.source_domain==self.args.target_domain and self.args.eval_jointtransfer_metrics:
 				# Evaluate metrics and plot them. 
 				# self.evaluate_correspondence_metrics(computed_sets=False)
 				# Actually, we've probably computed trajectory and latent sets. 
@@ -5228,16 +5259,17 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Use source and target policy manager set computing functions, because they can handle batches		
 		self.source_manager.get_trajectory_and_latent_sets(get_visuals=False)
 		self.target_manager.get_trajectory_and_latent_sets(get_visuals=False)
-		
-		
+				
 		# Now assemble them into local variables.
 		self.N = self.source_manager.N
-		if self.args.setting=='joint_transfer':
+		if self.args.setting=='jointtransfer':
 			self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
 			self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)
+			
 		else:
 			self.source_latent_zs = self.source_manager.latent_z_set
 			self.target_latent_zs = self.target_manager.latent_z_set
+
 		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
 
 		# Now that the latent sets for both source and target domains are computed: 
@@ -5303,7 +5335,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		i = np.random.randint(0,high=self.extent)
 
 		# First get a trajectory, starting point, and latent z.
-		source_trajectory, source_latent_z = self.encode_decode_trajectory(self.source_manager, i, return_trajectory=True)
+		if self.args.setting=='jointtransfer':
+			source_input_traj, source_var_dict, _ = self.encode_decode_trajectory(self.source_manager, i, return_trajectory=True)
+			source_trajectory = source_input_traj['sample_traj']
+			source_latent_z = source_var_dict['latent_z_indices']			
+		else:
+			source_trajectory, source_latent_z = self.encode_decode_trajectory(self.source_manager, i, return_trajectory=True)
 
 		if self.args.batch_size>1:
 			source_trajectory = source_trajectory[:,0]
@@ -5314,10 +5351,16 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		if source_trajectory is not None:
 			# Reconstruct using the source domain manager. 
-			_, self.source_trajectory_image, self.source_reconstruction_image = self.source_manager.get_robot_visuals(0, source_latent_z, source_trajectory, return_image=True, return_numpy=True)
+
+			_, self.source_trajectory_image, self.source_reconstruction_image = self.source_manager.get_robot_visuals(0, source_latent_z, source_trajectory, return_image=True, return_numpy=True, z_seq=(self.args.setting=='jointtransfer'))
 
 			# Now repeat the same for target domain - First get a trajectory, starting point, and latent z.
-			target_trajectory, target_latent_z = self.encode_decode_trajectory(self.target_manager, i, return_trajectory=True)
+			if self.args.setting=='jointtransfer':
+				target_input_dict, target_var_dict, _ = self.encode_decode_trajectory(self.target_manager, i, return_trajectory=True)
+				target_trajectory = target_input_dict['sample_traj']
+				target_latent_z = target_var_dict['latent_z_indices']
+			else:
+				target_trajectory, target_latent_z = self.encode_decode_trajectory(self.target_manager, i, return_trajectory=True)
 
 			if self.args.batch_size>1:
 				target_trajectory = target_trajectory[:,0]
@@ -5327,7 +5370,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# embed()
 
 			# Reconstruct using the target domain manager. 
-			_, self.target_trajectory_image, self.target_reconstruction_image = self.target_manager.get_robot_visuals(0, target_latent_z, target_trajectory, return_image=True, return_numpy=True)
+			_, self.target_trajectory_image, self.target_reconstruction_image = self.target_manager.get_robot_visuals(0, target_latent_z, target_trajectory, return_image=True, return_numpy=True, z_seq=(self.args.setting=='jointtransfer'))
 
 			# return np.array(self.source_trajectory_image), np.array(self.source_reconstruction_image), np.array(self.target_trajectory_image), np.array(self.target_reconstruction_image)
 			return self.source_trajectory_image, self.source_reconstruction_image, self.target_trajectory_image, self.target_reconstruction_image	
@@ -5436,34 +5479,48 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		ax = fig.gca()
 		
 		if shared:
-			colors = 0.2*np.ones((2*self.N))
-			colors[self.N:] = 0.8
+			# colors = 0.2*np.ones((2*self.N))
+			colors = 0.2*np.ones((embedded_zs.shape[0]))
+			# colors[self.N:] = 0.8
+			colors[embedded_zs.shape[0]//2:] = 0.8
 		else:
-			colors = 0.2*np.ones((self.N))
+			# colors = 0.2*np.ones((self.N))
+			colors = 0.2*np.ones((embedded_zs.shape[0]))
 
 		if trajectory:
 			# Create a scatter plot of the embedding.
 
 			self.source_manager.get_trajectory_and_latent_sets()
 			self.target_manager.get_trajectory_and_latent_sets()
+			
 
+			if self.args.setting=='jointtransfer':
+				# self.source_manager.trajectory_set = np.array(self.source_manager.trajectory_set)
+				# self.target_manager.trajectory_set = np.array(self.target_manager.trajectory_set)
+				# traj_length = len(self.source_manager.trajectory_set[0,:,0])
+				# Create a shared trajectory set from both individual segmented_trajectory_set(s). 
+				self.shared_trajectory_set = self.source_manager.segmented_trajectory_set+self.target_manager.segmented_trajectory_set
+				
+			else:
+				# Assemble shared trajectory set. 
+				traj_length = len(self.source_manager.trajectory_set[0,:,0])
+				self.shared_trajectory_set = np.zeros((2*self.N, traj_length, self.source_manager.state_dim))
+				self.shared_trajectory_set[:self.N] = self.source_manager.trajectory_set
+				self.shared_trajectory_set[self.N:] = self.target_manager.trajectory_set			
+			
 			ratio = 0.4
-			color_scaling = 15
-			
-			# Assemble shared trajectory set. 
-			traj_length = len(self.source_manager.trajectory_set[0,:,0])
-			self.shared_trajectory_set = np.zeros((2*self.N, traj_length, self.source_manager.state_dim))
-			
-			self.shared_trajectory_set[:self.N] = self.source_manager.trajectory_set
-			self.shared_trajectory_set[self.N:] = self.target_manager.trajectory_set			
-
+			color_scaling = 15			
+			max_traj_length = 20
 			color_range_min = 0.2*color_scaling
-			color_range_max = 0.8*color_scaling+traj_length-1
+			color_range_max = 0.8*color_scaling+max_traj_length-1
 
-			for i in range(2*self.N):
-				ax.scatter(embedded_zs[i,0]+ratio*self.shared_trajectory_set[i,:,0],embedded_zs[i,1]+ratio*self.shared_trajectory_set[i,:,1],c=colors[i]*color_scaling+range(traj_length),cmap='jet',vmin=color_range_min,vmax=color_range_max)
+			# for i in range(2*self.N):
+			for i in range(min(embedded_zs.shape[0],len(self.shared_trajectory_set))):
+				seg_traj_len = len(self.shared_trajectory_set[i])
+				ax.scatter(embedded_zs[i,0]+ratio*self.shared_trajectory_set[i][:,0],embedded_zs[i,1]+ratio*self.shared_trajectory_set[i][:,1], \
+					c=colors[i]*color_scaling+range(seg_traj_len),cmap='jet',vmin=color_range_min,vmax=color_range_max)
 
-		else:
+		else:			
 			# Create a scatter plot of the embedding.
 			ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors,vmin=0,vmax=1,cmap='jet')
 		
@@ -5498,6 +5555,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 			self.source_latent_z_set = []
 			self.target_latent_z_set = []
+
 			for b in range(self.args.batch_size):
 				self.source_latent_z_set.append(self.source_manager.latent_z_set[b][0])
 				self.target_latent_z_set.append(self.target_manager.latent_z_set[b][0])
@@ -5526,9 +5584,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# self.source_neighbors_object = NearestNeighbors(n_neighbors=1, algorithm='auto').fit(self.source_manager.latent_z_set)
 		# self.target_neighbors_object = NearestNeighbors(n_neighbors=1, algorithm='auto').fit(self.target_manager.latent_z_set)
 
-		# Compute neighbors. 
+		# Compute neighbors. 	
 		_, source_target_neighbors = self.source_neighbors_object.kneighbors(self.target_manager.latent_z_set)
 		_, target_source_neighbors = self.target_neighbors_object.kneighbors(self.source_manager.latent_z_set)
+		# _, source_target_neighbors = self.source_neighbors_object.kneighbors(self.target_latent_z_set)
+		# _, target_source_neighbors = self.target_neighbors_object.kneighbors(self.source_latent_z_set)
+
+
 
 		# # Now compute trajectory distances for neighbors. 
 		# source_target_trajectory_diffs = (self.source_manager.trajectory_set - self.target_manager.trajectory_set[source_target_neighbors.squeeze(1)])
@@ -5539,6 +5601,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# Remember, absolute trajectory differences is meaningless, since the data is randomly initialized across the state space. 
 		# Instead, compare actions. I.e. first compute differences along the time dimension. 
+
 		source_traj_actions = np.diff(self.source_manager.trajectory_set,axis=1)
 		target_traj_actions = np.diff(self.target_manager.trajectory_set,axis=1)
 
@@ -6390,13 +6453,13 @@ class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTrans
 		
 		self.update_plots(counter, dictionary)
 
-class PolicyManager_JointTransfer(PolicyManager_CycleConsistencyTransfer):
+class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 
 	# Inherit from transfer.
 	def __init__(self, args=None, source_dataset=None, target_dataset=None):
 			
 		# The inherited functions refer to self.args. Also making this to make inheritance go smooth.
-		super(PolicyManager_JointTransfer, self).__init__(args, source_dataset, target_dataset)
+		super(PolicyManager_JointCycleTransfer, self).__init__(args, source_dataset, target_dataset)
 
 		self.args = args
 
