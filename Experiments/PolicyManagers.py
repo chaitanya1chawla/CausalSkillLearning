@@ -35,7 +35,8 @@ class PolicyManager_BaseClass():
 		if (self.args.setting=='transfer' and isinstance(self, PolicyManager_Transfer)) or \
 			(self.args.setting=='cycle_transfer' and isinstance(self, PolicyManager_CycleConsistencyTransfer)) or \
 			(self.args.setting=='fixembed' and isinstance(self, PolicyManager_FixEmbedCycleConTransfer)) or \
-			(self.args.setting=='jointtransfer' and isinstance(self, PolicyManager_JointTransfer)):
+			(self.args.setting=='jointtransfer' and isinstance(self, PolicyManager_JointTransfer)) or \
+			(self.args.setting=='jointcycletransfer' and isinstance(self, PolicyManager_JointCycleTransfer)):
 				extent = self.extent
 		else:
 			extent = len(self.dataset)-self.test_set_size
@@ -199,7 +200,8 @@ class PolicyManager_BaseClass():
 			# For every item in the epoch:
 			if self.args.setting=='imitation':
 				extent = self.dataset.get_number_task_demos(self.demo_task_index)
-			if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed' or self.args.setting=='jointtransfer':
+			# if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed' or self.args.setting=='jointtransfer':
+			if self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer']:
 				extent = self.extent
 			else:
 				if self.args.debugging_datapoints>-1:				
@@ -2710,7 +2712,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			variational_dict['latent_z_indices'], variational_dict['latent_b'], variational_dict['variational_b_logprobabilities'], variational_dict['variational_z_logprobabilities'], \
 			variational_dict['variational_b_probabilities'], variational_dict['variational_z_probabilities'], variational_dict['kl_divergence'], variational_dict['prior_loglikelihood'] = \
 				self.variational_policy.forward(input_dictionary['old_concatenated_traj'], self.epsilon, batch_trajectory_lengths=self.batch_trajectory_lengths)
-
+			
 			####################################
 			# (4) Evaluate Log Likelihoods of actions and options as "Return" for Variational policy.
 			####################################
@@ -4941,7 +4943,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.target_manager.create_networks()
 
 		# Now must also create discriminator.
-		if self.args.setting=='jointtransfer':
+		if self.args.setting=='jointcycletransfer':
 			self.discriminator_network = EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size).to(device)
 		else:
 			self.discriminator_network = DiscreteMLP(self.input_size, self.hidden_size, self.output_size).to(device)
@@ -5262,7 +5264,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				
 		# Now assemble them into local variables.
 		self.N = self.source_manager.N
-		if self.args.setting=='jointtransfer':
+		if self.args.setting in ['jointtransfer','jointcycletransfer']:
 			self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
 			self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)
 			
@@ -5335,8 +5337,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		i = np.random.randint(0,high=self.extent)
 
 		# First get a trajectory, starting point, and latent z.
-		if self.args.setting=='jointtransfer':
-			source_input_traj, source_var_dict, _ = self.encode_decode_trajectory(self.source_manager, i, return_trajectory=True)
+		if self.args.setting in ['jointtransfer','jointcycletransfer']:
+			source_input_traj, source_var_dict, _ = self.encode_decode_trajectory(self.source_manager, i)
 			source_trajectory = source_input_traj['sample_traj']
 			source_latent_z = source_var_dict['latent_z_indices']			
 		else:
@@ -5352,11 +5354,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		if source_trajectory is not None:
 			# Reconstruct using the source domain manager. 
 
-			_, self.source_trajectory_image, self.source_reconstruction_image = self.source_manager.get_robot_visuals(0, source_latent_z, source_trajectory, return_image=True, return_numpy=True, z_seq=(self.args.setting=='jointtransfer'))
+			_, self.source_trajectory_image, self.source_reconstruction_image = self.source_manager.get_robot_visuals(0, source_latent_z, source_trajectory, return_image=True, return_numpy=True, z_seq=(self.args.setting in ['jointtransfer','jointcycletransfer']))
 
 			# Now repeat the same for target domain - First get a trajectory, starting point, and latent z.
-			if self.args.setting=='jointtransfer':
-				target_input_dict, target_var_dict, _ = self.encode_decode_trajectory(self.target_manager, i, return_trajectory=True)
+			if self.args.setting in ['jointtransfer','jointcycletransfer']:
+				target_input_dict, target_var_dict, _ = self.encode_decode_trajectory(self.target_manager, i)
 				target_trajectory = target_input_dict['sample_traj']
 				target_latent_z = target_var_dict['latent_z_indices']
 			else:
@@ -5370,7 +5372,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# embed()
 
 			# Reconstruct using the target domain manager. 
-			_, self.target_trajectory_image, self.target_reconstruction_image = self.target_manager.get_robot_visuals(0, target_latent_z, target_trajectory, return_image=True, return_numpy=True, z_seq=(self.args.setting=='jointtransfer'))
+			_, self.target_trajectory_image, self.target_reconstruction_image = self.target_manager.get_robot_visuals(0, target_latent_z, target_trajectory, return_image=True, return_numpy=True, z_seq=(self.args.setting in ['jointtransfer','jointcycletransfer']))
 
 			# return np.array(self.source_trajectory_image), np.array(self.source_reconstruction_image), np.array(self.target_trajectory_image), np.array(self.target_reconstruction_image)
 			return self.source_trajectory_image, self.source_reconstruction_image, self.target_trajectory_image, self.target_reconstruction_image	
@@ -5396,10 +5398,18 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Pretend the label was the opposite of what it is, and train the encoder to make the discriminator think this was what was true. 
 		# I.e. train encoder to make discriminator maximize likelihood of wrong label.
 		# domain_label = torch.tensor(1-domain).to(device).long().view(1,)
-		domain_label = torch.tensor(domain).to(device).long().view(1,)
-		domain_label = domain_label.repeat(self.args.batch_size,)
+
+		# print("Embedding in Joint transfer update net")
+		# embed()
+
+		# domain_label = torch.tensor(domain).to(device).long().view(1,)
+		# domain_label = domain_label.repeat(self.args.batch_size,)
+		# domain_label = domain*torch.ones(update_dictionary['discriminator_logprob'].shape[:2]).to(device).long()
 		# self.discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['discriminator_logprob'].squeeze(1), domain_label)
-		self.discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['discriminator_logprob'].squeeze(0), 1-domain_label).mean()
+		# self.discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['discriminator_logprob'].squeeze(0), 1-domain_label.squeeze(0)).mean()
+
+		domain_label = domain*torch.ones(update_dictionary['discriminator_logprob'].shape[0]*update_dictionary['discriminator_logprob'].shape[1]).to(device).long()
+		self.discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['discriminator_logprob'].view(-1,2), 1-domain_label).mean()
 			
 		# Total encoder loss: 
 		self.total_VAE_loss = self.vae_loss_weight*self.VAE_loss + self.discriminability_loss_weight*self.discriminability_loss
@@ -5422,7 +5432,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# Compute discriminator loss for discriminator. 
 		# self.discriminator_loss = self.negative_log_likelihood_loss_function(discriminator_logprob.squeeze(1), torch.tensor(domain).to(device).long().view(1,))		
-		self.discriminator_loss = self.negative_log_likelihood_loss_function(discriminator_logprob.squeeze(0), domain_label).mean()
+		self.discriminator_loss = self.negative_log_likelihood_loss_function(discriminator_logprob.view(-1,2), domain_label).mean()
 
 
 		if not(self.skip_discriminator):
@@ -5453,6 +5463,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# (1) Select which domain to run on. This is supervision of discriminator.
 		# Use same domain across batch for simplicity. 
 		domain = np.random.binomial(1,0.5)
+		self.counter = counter
 
 		# (1.5) Get domain policy manager. 
 		policy_manager = self.get_domain_manager(domain)
@@ -5463,6 +5474,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		if update_dictionary['latent_z'] is not None:
 			# (4) Feed latent z's to discriminator, and get discriminator likelihoods. 
+			# In the joint transfer case:
 			update_dictionary['discriminator_logprob'], discriminator_prob = self.discriminator_network(update_dictionary['latent_z'])
 
 			# (5) Compute and apply gradient updates. 
@@ -5494,7 +5506,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.target_manager.get_trajectory_and_latent_sets()
 			
 
-			if self.args.setting=='jointtransfer':
+			if self.args.setting in ['jointtransfer','jointcycletransfer']:
 				# self.source_manager.trajectory_set = np.array(self.source_manager.trajectory_set)
 				# self.target_manager.trajectory_set = np.array(self.target_manager.trajectory_set)
 				# traj_length = len(self.source_manager.trajectory_set[0,:,0])
@@ -5549,7 +5561,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# print("Embed before computing neighbor objects.")
 		# embed()
 		# Reassembling for neearest neighbor object creation.
-		if self.args.setting=='jointtransfer':
+		if self.args.setting in ['jointtransfer','jointcycletransfer']:
 			# self.source_latent_z_set = np.concatenate(self.source_manager.latent_z_set)
 			# self.target_latent_z_set = np.concatenate(self.target_manager.latent_z_set)
 
@@ -6453,6 +6465,143 @@ class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTrans
 		
 		self.update_plots(counter, dictionary)
 
+class PolicyManager_JointTransfer(PolicyManager_Transfer):
+
+	# Inherit from transfer.
+	def __init__(self, args=None, source_dataset=None, target_dataset=None):
+			
+		# The inherited functions refer to self.args. Also making this to make inheritance go smooth.
+		super(PolicyManager_JointTransfer, self).__init__(args, source_dataset, target_dataset)
+
+		self.args = args
+
+		# Before instantiating policy managers of source or target domains; create copies of args with data attribute changed. 		
+		self.source_args = copy.deepcopy(args)
+		self.source_args.data = self.source_args.source_domain
+		self.source_dataset = source_dataset
+
+		self.target_args = copy.deepcopy(args)
+		self.target_args.data = self.target_args.target_domain
+		self.target_dataset = target_dataset
+
+		# Now create two instances of policy managers for each domain. Call them source and target domain policy managers. 
+		self.source_manager = PolicyManager_BatchJoint(number_policies=4, dataset=self.source_dataset, args=self.source_args)
+		self.target_manager = PolicyManager_BatchJoint(number_policies=4, dataset=self.target_dataset, args=self.target_args)
+
+		self.source_dataset_size = len(self.source_manager.dataset) - self.source_manager.test_set_size
+		self.target_dataset_size = len(self.target_manager.dataset) - self.target_manager.test_set_size
+
+		# Now create variables that we need. 
+		self.number_epochs = self.args.epochs
+		self.extent = min(self.source_dataset_size, self.target_dataset_size)		
+
+		# Now setup networks for these PolicyManagers. 		
+		self.source_manager.setup()
+		self.source_manager.initialize_training_batches()
+		self.target_manager.setup()
+		self.target_manager.initialize_training_batches()
+
+		if self.args.source_model is not None:
+			self.source_manager.load_all_models(self.args.source_model)
+		if self.args.target_model is not None:
+			self.target_manager.load_all_models(self.args.target_model)
+
+		# Now define other parameters that will be required for the discriminator, etc. 
+		self.input_size = self.args.z_dimensions
+		self.hidden_size = self.args.hidden_size
+		self.output_size = 2
+		self.learning_rate = self.args.learning_rate
+
+	def save_all_models(self, suffix):
+		self.logdir = os.path.join(self.args.logdir, self.args.name)
+		self.savedir = os.path.join(self.logdir,"saved_models")
+		if not(os.path.isdir(self.savedir)):
+			os.mkdir(self.savedir)
+
+		self.save_object = {}
+
+		# Source
+		self.save_object['Source_Policy_Network'] = self.source_manager.policy_network.state_dict()
+		self.save_object['Source_Encoder_Network'] = self.source_manager.variational_policy.state_dict()
+		# Target
+		self.save_object['Target_Policy_Network'] = self.target_manager.policy_network.state_dict()
+		self.save_object['Target_Encoder_Network'] = self.target_manager.variational_policy.state_dict()
+		# Discriminator
+		self.save_object['Discriminator_Network'] = self.discriminator_network.state_dict()				
+
+		torch.save(self.save_object,os.path.join(self.savedir,"Model_"+suffix))
+
+	def load_all_models(self, path):
+		self.load_object = torch.load(path)
+
+		# Source
+		self.source_manager.policy_network.load_state_dict(self.load_object['Source_Policy_Network'])
+		self.source_manager.variational_policy.load_state_dict(self.load_object['Source_Encoder_Network'])
+		# Target
+		self.target_manager.policy_network.load_state_dict(self.load_object['Target_Policy_Network'])
+		self.target_manager.variational_policy.load_state_dict(self.load_object['Target_Encoder_Network'])
+		# Discriminator
+		self.discriminator_network.load_state_dict(self.load_object['Discriminator_Network'])
+
+	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False):
+
+		# Check if the index is too big. If yes, just sample randomly.
+		if i >= len(policy_manager.dataset):
+			i = np.random.randint(0, len(policy_manager.dataset))
+
+		# Since the joint training manager nicely lets us get dictionaries, just use it, but remember not to train. 
+		# This does all the steps we need.
+		source_input_dict, source_var_dict, source_eval_dict = policy_manager.run_iteration(self.counter, i, return_dicts=True, train=False)
+
+		return source_input_dict, source_var_dict, source_eval_dict
+
+	def run_iteration(self, counter, i):
+
+		# Phases: 
+		# Phase 1:  Train encoder-decoder for both domains initially, so that discriminator is not fed garbage. 
+		# Phase 2:  Train encoder, decoder for each domain, and discriminator concurrently. 
+
+		# Algorithm: 
+		# For every epoch:
+		# 	# For every datapoint: 
+		# 		# 1) Select which domain to use (source or target, i.e. with 50% chance, select either domain).
+		# 		# 2) Get trajectory segments from desired domain. 
+		# 		# 3) Encode trajectory segments into latent z's and compute likelihood of trajectory actions under the decoder.
+		# 		# 4) Feed into discriminator, get likelihood of each domain.
+		# 		# 5) Compute and apply gradient updates. 
+
+		# Remember to make domain agnostic function calls to encode, feed into discriminator, get likelihoods, etc. 
+
+		# (0) Setup things like training phases, epislon values, etc.
+		self.set_iteration(counter)
+
+		# (1) Select which domain to run on. This is supervision of discriminator.
+		# Use same domain across batch for simplicity. 
+		domain = np.random.binomial(1,0.5)
+		self.counter = counter
+
+		# (1.5) Get domain policy manager. 
+		policy_manager = self.get_domain_manager(domain)
+				
+		# (2) & (3) Get trajectory segment and encode and decode. 
+		update_dictionary = {}		
+		source_input_dict, source_var_dict, source_eval_dict = self.encode_decode_trajectory(policy_manager, i)
+		update_dictionary['subpolicy_inputs'], update_dictionary['latent_z'], update_dictionary['loglikelihood'], update_dictionary['kl_divergence'] = \
+			source_eval_dict['subpolicy_inputs'], source_var_dict['latent_z_indices'], source_eval_dict['learnt_subpolicy_loglikelihoods'], source_var_dict['kl_divergence']
+
+		if update_dictionary['latent_z'] is not None:
+			# (4) Feed latent z's to discriminator, and get discriminator likelihoods. 
+			# In the joint transfer case:
+			update_dictionary['discriminator_logprob'], discriminator_prob = self.discriminator_network(update_dictionary['latent_z'])
+
+			# (5) Compute and apply gradient updates. 
+			# self.update_networks(domain, policy_manager, loglikelihood, kl_divergence, discriminator_logprob, latent_z)
+			self.update_networks(domain, policy_manager, update_dictionary)
+
+			# Now update Plots. 			
+			viz_dict = {'domain': domain, 'discriminator_probs': discriminator_prob.squeeze(0).mean(axis=0)[domain].detach().cpu().numpy()}
+			self.update_plots(counter, viz_dict)
+
 class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 
 	# Inherit from transfer.
@@ -6501,10 +6650,12 @@ class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 		self.learning_rate = self.args.learning_rate
 	
 	def save_all_models(self, suffix):
+		# super.save_all_models(self, suffix)
 		self.logdir = os.path.join(self.args.logdir, self.args.name)
 		self.savedir = os.path.join(self.logdir,"saved_models")
 		if not(os.path.isdir(self.savedir)):
 			os.mkdir(self.savedir)
+
 		self.save_object = {}
 
 		# Source
