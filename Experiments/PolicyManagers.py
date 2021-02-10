@@ -44,7 +44,9 @@ class PolicyManager_BaseClass():
 		self.index_list = np.arange(0,extent)
 		self.initialize_plots()
 
-		if self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer']:
+		# if self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer']:
+		if self.args.setting in ['jointtransfer'] and isinstance(self, PolicyManager_JointTransfer) or \
+			self.args.setting in ['jointcycletransfer'] and isinstance(self, PolicyManager_JointCycleTransfer):
 			self.load_domain_models()
 
 	def initialize_plots(self):
@@ -223,10 +225,6 @@ class PolicyManager_BaseClass():
 				# Probably need to make run iteration handle batch of current index plus batch size.				
 				# with torch.autograd.set_detect_anomaly(True):
 						
-				print("#####################################")
-				print("EMBEDDING RIGHT BEFORE RUN ITERATION.")
-				print("#####################################")
-				embed()
 				self.run_iteration(counter, self.index_list[i])
 
 				counter = counter+1
@@ -5000,6 +4998,17 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Discriminator
 		self.discriminator_network.load_state_dict(self.load_object['Discriminator_Network'])
 
+	def load_domain_models(self):
+		
+		if self.args.source_subpolicy_model is not None:
+			self.source_manager.load_all_models(self.args.source_subpolicy_model, just_subpolicy=True)
+		elif self.args.source_model is not None:
+			self.source_manager.load_all_models(self.args.source_model)
+		if self.args.target_subpolicy_model is not None:
+			self.target_manager.load_all_models(self.args.target_subpolicy_model, just_subpolicy=True)
+		elif self.args.target_model is not None:
+			self.target_manager.load_all_models(self.args.target_model)
+
 	def get_domain_manager(self, domain):
 		# Create a list, and just index into this list. 
 		domain_manager_list = [self.source_manager, self.target_manager]
@@ -5532,9 +5541,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.shared_trajectory_set[self.N:] = self.target_manager.trajectory_set			
 			
 			# ratio = 0.4
-			ratio = (embedded_zs.max()-embedded_zs.min())*0.01
-			color_scaling = 15			
-			max_traj_length = 20
+			preratio = 0.02
+			ratio = (embedded_zs.max()-embedded_zs.min())*preratio
+			color_scaling = 15
+			max_traj_length = 6
 			color_range_min = 0.2*color_scaling
 			color_range_max = 0.8*color_scaling+max_traj_length-1
 
@@ -6549,17 +6559,6 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 		self.target_manager.variational_policy.load_state_dict(self.load_object['Target_Encoder_Network'])
 		# Discriminator
 		self.discriminator_network.load_state_dict(self.load_object['Discriminator_Network'])
-
-	def load_domain_models(self):
-		
-		if self.args.source_subpolicy_model is not None:
-			self.source_manager.load_all_models(self.args.source_subpolicy_model, just_subpolicy=True)
-		elif self.args.source_model is not None:
-			self.source_manager.load_all_models(self.args.source_model)
-		if self.args.target_subpolicy_model is not None:
-			self.target_manager.load_all_models(self.args.target_subpolicy_model, just_subpolicy=True)
-		elif self.args.target_model is not None:
-			self.target_manager.load_all_models(self.args.target_model)
 
 	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False):
 
