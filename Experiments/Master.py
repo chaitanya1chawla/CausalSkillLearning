@@ -169,7 +169,6 @@ def parse_arguments():
 	parser.add_argument('--hidden_size',dest='hidden_size',type=int,default=64)
 	parser.add_argument('--var_number_layers',dest='var_number_layers',type=int,default=5)
 	parser.add_argument('--var_hidden_size',dest='var_hidden_size',type=int,default=64)
-
 	parser.add_argument('--environment',dest='environment',type=str,default='SawyerLift') # Defines robosuite environment for RL.
 	
 	# Data parameters. 
@@ -271,6 +270,8 @@ def parse_arguments():
 	parser.add_argument('--target_domain',dest='target_domain',type=str,help='What the target domain is in transfer.')
 	parser.add_argument('--source_model',dest='source_model',type=str,help='What model to use for the source domain.',default=None)
 	parser.add_argument('--target_model',dest='target_model',type=str,help='What model to use for the target domain.',default=None)
+	parser.add_argument('--source_subpolicy_model',dest='source_subpolicy_model',type=str,help='What subpolicy model to use for the source domain.',default=None)
+	parser.add_argument('--target_subpolicy_model',dest='target_subpolicy_model',type=str,help='What subpolicy model to use for the target domain.',default=None)
 
 	# Parameters for contextual training. 
 	parser.add_argument('--mask_fraction',dest='mask_fraction',type=float,default=0.15,help='What fraction of zs to mask in contextual embedding.')

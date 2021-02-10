@@ -44,6 +44,9 @@ class PolicyManager_BaseClass():
 		self.index_list = np.arange(0,extent)
 		self.initialize_plots()
 
+		if self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer']:
+			self.load_domain_models()
+
 	def initialize_plots(self):
 		if self.args.name is not None:
 			logdir = os.path.join(self.args.logdir, self.args.name)
@@ -219,6 +222,11 @@ class PolicyManager_BaseClass():
 				print("Epoch: ",e," Trajectory:",i, "Datapoints: ", self.index_list[i])
 				# Probably need to make run iteration handle batch of current index plus batch size.				
 				# with torch.autograd.set_detect_anomaly(True):
+						
+				print("#####################################")
+				print("EMBEDDING RIGHT BEFORE RUN ITERATION.")
+				print("#####################################")
+				embed()
 				self.run_iteration(counter, self.index_list[i])
 
 				counter = counter+1
@@ -1405,6 +1413,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		embedded_zs = tsne.fit_transform(self.latent_z_set)
 
 		# ratio = 0.3
+		# if self.args.setting in ['transfer','cycletransfer','']
 		ratio = (embedded_zs.max()-embedded_zs.min())*0.01
 		
 		for i in range(self.N):
@@ -4864,7 +4873,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.target_args = copy.deepcopy(args)
 		self.target_args.data = self.target_args.target_domain
 		self.target_dataset = target_dataset
-
+		
 		# Now create two instances of policy managers for each domain. Call them source and target domain policy managers. 
 		if self.args.batch_size>1:
 			self.source_manager = PolicyManager_BatchPretrain(dataset=self.source_dataset, args=self.source_args)
@@ -4876,13 +4885,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.source_dataset_size = len(self.source_manager.dataset) - self.source_manager.test_set_size
 		self.target_dataset_size = len(self.target_manager.dataset) - self.target_manager.test_set_size
 
-		# Now create variables that we need. 
-		self.number_epochs = self.args.epochs
-		self.extent = min(self.source_dataset_size, self.target_dataset_size)		
-
 		# Now setup networks for these PolicyManagers. 		
 		self.source_manager.setup()
 		self.target_manager.setup()
+
+		# Now create variables that we need. 
+		self.number_epochs = self.args.epochs
+		self.extent = min(self.source_dataset_size, self.target_dataset_size)		
 
 		# Now define other parameters that will be required for the discriminator, etc. 
 		self.input_size = self.args.z_dimensions
@@ -5482,7 +5491,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.update_networks(domain, policy_manager, update_dictionary)
 
 			# Now update Plots. 			
-			viz_dict = {'domain': domain, 'discriminator_probs': discriminator_prob.squeeze(0).mean(axis=0)[domain].detach().cpu().numpy()}
+			# viz_dict = {'domain': domain, 'discriminator_probs': discriminator_prob.squeeze(0).mean(axis=0)[domain].detach().cpu().numpy()}
+			viz_dict = {'domain': domain, 'discriminator_probs': discriminator_prob[...,domain].detach().cpu().numpy().mean()}
+
 			self.update_plots(counter, viz_dict)
 
 	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False):	
@@ -5520,7 +5531,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.shared_trajectory_set[:self.N] = self.source_manager.trajectory_set
 				self.shared_trajectory_set[self.N:] = self.target_manager.trajectory_set			
 			
-			ratio = 0.4
+			# ratio = 0.4
+			ratio = (embedded_zs.max()-embedded_zs.min())*0.01
 			color_scaling = 15			
 			max_traj_length = 20
 			color_range_min = 0.2*color_scaling
@@ -6499,12 +6511,7 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 		self.source_manager.setup()
 		self.source_manager.initialize_training_batches()
 		self.target_manager.setup()
-		self.target_manager.initialize_training_batches()
-
-		if self.args.source_model is not None:
-			self.source_manager.load_all_models(self.args.source_model)
-		if self.args.target_model is not None:
-			self.target_manager.load_all_models(self.args.target_model)
+		self.target_manager.initialize_training_batches()		
 
 		# Now define other parameters that will be required for the discriminator, etc. 
 		self.input_size = self.args.z_dimensions
@@ -6542,6 +6549,17 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 		self.target_manager.variational_policy.load_state_dict(self.load_object['Target_Encoder_Network'])
 		# Discriminator
 		self.discriminator_network.load_state_dict(self.load_object['Discriminator_Network'])
+
+	def load_domain_models(self):
+		
+		if self.args.source_subpolicy_model is not None:
+			self.source_manager.load_all_models(self.args.source_subpolicy_model, just_subpolicy=True)
+		elif self.args.source_model is not None:
+			self.source_manager.load_all_models(self.args.source_model)
+		if self.args.target_subpolicy_model is not None:
+			self.target_manager.load_all_models(self.args.target_subpolicy_model, just_subpolicy=True)
+		elif self.args.target_model is not None:
+			self.target_manager.load_all_models(self.args.target_model)
 
 	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False):
 
@@ -6584,7 +6602,7 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 		policy_manager = self.get_domain_manager(domain)
 				
 		# (2) & (3) Get trajectory segment and encode and decode. 
-		update_dictionary = {}		
+		update_dictionary = {}
 		source_input_dict, source_var_dict, source_eval_dict = self.encode_decode_trajectory(policy_manager, i)
 		update_dictionary['subpolicy_inputs'], update_dictionary['latent_z'], update_dictionary['loglikelihood'], update_dictionary['kl_divergence'] = \
 			source_eval_dict['subpolicy_inputs'], source_var_dict['latent_z_indices'], source_eval_dict['learnt_subpolicy_loglikelihoods'], source_var_dict['kl_divergence']
@@ -6599,7 +6617,9 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 			self.update_networks(domain, policy_manager, update_dictionary)
 
 			# Now update Plots. 			
-			viz_dict = {'domain': domain, 'discriminator_probs': discriminator_prob.squeeze(0).mean(axis=0)[domain].detach().cpu().numpy()}
+			# viz_dict = {'domain': domain, 'discriminator_probs': discriminator_prob.squeeze(0).mean(axis=0)[domain].detach().cpu().numpy()}
+			viz_dict = {'domain': domain, 'discriminator_probs': discriminator_prob[...,domain].detach().cpu().numpy().mean()}
+
 			self.update_plots(counter, viz_dict)
 
 class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
@@ -6638,10 +6658,15 @@ class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 		self.target_manager.setup()
 		self.target_manager.initialize_training_batches()
 
+		if self.args.source_subpolicy_model is not None:
+			self.source_manager.load_all_models(self.args.source_subpolicy_model, just_subpolicy=True)
+		if self.args.target_subpolicy_model is not None:
+			self.target_manager.load_all_models(self.args.target_subpolicy_model, just_subpolicy=True)
 		if self.args.source_model is not None:
 			self.source_manager.load_all_models(self.args.source_model)
 		if self.args.target_model is not None:
 			self.target_manager.load_all_models(self.args.target_model)
+
 
 		# Now define other parameters that will be required for the discriminator, etc. 
 		self.input_size = self.args.z_dimensions
