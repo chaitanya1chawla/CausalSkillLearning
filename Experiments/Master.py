@@ -161,6 +161,8 @@ def parse_arguments():
 	parser.add_argument('--logdir',dest='logdir',type=str,default='Experiment_Logs/')
 	parser.add_argument('--epochs',dest='epochs',type=int,default=500) # Number of epochs to train for. Reduce for Mocap.
 	parser.add_argument('--debugging_datapoints',dest='debugging_datapoints',type=int,default=-1,help='How many data points to run training on. If greater than 0, only select that many datapoints for debugging.')
+	parser.add_argument('--seed',dest='seed',type=int,default=0,help='Seed value to initialize random processes.')
+
 	# Training setting. 
 	parser.add_argument('--discrete_z',dest='discrete_z',type=int,default=0)
 	# parser.add_argument('--transformer',dest='transformer',type=int,default=0)	
@@ -240,12 +242,16 @@ def parse_arguments():
 	parser.add_argument('--cycle_reconstruction_loss_weight',dest='cycle_reconstruction_loss_weight',type=float,default=1.,help='Weight of the cycle-consistency reconstruction loss term.')
 	parser.add_argument('--real_translated_discriminator',dest='real_translated_discriminator',type=int,default=0,help='Whether to include real-translated discriminator based losses.')
 	parser.add_argument('--real_trans_loss_weight',dest='real_trans_loss_weight',type=float,default=1.,help='Weight of discriminability loss between real and (cycle) translated trajectories.')
+	parser.add_argument('--z_transform_discriminator',dest='z_transform_discriminator',type=int,default=0,help='Whether to use z transform discriminators.')
+	parser.add_argument('--z_transform_discriminability_weight',dest='z_transform_discriminability_weight',type=float,default=1.,help='Weight of z transformation discriminability loss.')
+	parser.add_argument('--z_transform_discriminator_weight',dest='z_transform_discriminator_weight',type=float,default=1.,help='Weight of z transformation discriminator loss.')
 
 	# Exploration and learning rate parameters. 
 	parser.add_argument('--epsilon_from',dest='epsilon_from',type=float,default=0.3)
 	parser.add_argument('--epsilon_to',dest='epsilon_to',type=float,default=0.05)
 	parser.add_argument('--epsilon_over',dest='epsilon_over',type=int,default=30)
 	parser.add_argument('--learning_rate',dest='learning_rate',type=float,default=1e-4)
+	parser.add_argument('--transfer_learning_rate',dest='transfer_learning_rate',type=float,default=1e-4)
 
 	# Baseline parameters. 
 	parser.add_argument('--baseline_kernels',dest='baseline_kernels',type=int,default=15)
@@ -272,6 +278,10 @@ def parse_arguments():
 	parser.add_argument('--target_model',dest='target_model',type=str,help='What model to use for the target domain.',default=None)
 	parser.add_argument('--source_subpolicy_model',dest='source_subpolicy_model',type=str,help='What subpolicy model to use for the source domain.',default=None)
 	parser.add_argument('--target_subpolicy_model',dest='target_subpolicy_model',type=str,help='What subpolicy model to use for the target domain.',default=None)
+	parser.add_argument('--fix_source',dest='fix_source',type=int,default=0,help='Whether to fix source domain representation.')
+	parser.add_argument('--fix_target',dest='fix_target',type=int,default=0,help='Whether to fix target domain representation.')
+	parser.add_argument('--load_from_transfer',dest='load_from_transfer',type=int,default=0,help='Whether we are loading joint model from transfer training.')
+	# parser.add_argument('--reset_subpolicy_training',dest='reset_subpolicy_training',type=int,default=1,help='Whether to reset subpolicy training.')
 
 	# Parameters for contextual training. 
 	parser.add_argument('--mask_fraction',dest='mask_fraction',type=float,default=0.15,help='What fraction of zs to mask in contextual embedding.')
@@ -294,6 +304,7 @@ def main(args):
 
 if __name__=='__main__':
 	main(sys.argv)
+
 
 
 
