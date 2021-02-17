@@ -5159,6 +5159,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.viz_dictionary['tsne_combined_traj_embeddings_p5'], self.viz_dictionary['tsne_combined_traj_embeddings_p10'], self.viz_dictionary['tsne_combined_traj_embeddings_p30'] = \
 					self.get_embeddings(projection='tsne')
 			
+			if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':			
+				self.tf_logger.image_summary("TSNE Source Traj Embedding", [self.source_traj_image], counter)
+				self.tf_logger.image_summary("TSNE Target Traj Embedding", [self.target_traj_image], counter)
+
 
 			# Now actually plot the images.			
 			self.tf_logger.image_summary("TSNE Source Embedding", [self.viz_dictionary['tsne_source_embedding']], counter)
@@ -5175,10 +5179,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.tf_logger.image_summary("PCA Target Embedding", [self.viz_dictionary['pca_target_embedding']], counter)
 			self.tf_logger.image_summary("PCA Combined Embeddings", [self.viz_dictionary['pca_combined_embeddings']], counter)		
 
-			if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':
-				
-				self.tf_logger.image_summary("TSNE Source Traj Embedding", [self.source_traj_image], counter)
-				self.tf_logger.image_summary("TSNE Target Traj Embedding", [self.target_traj_image], counter)
+			if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':			
+				# self.tf_logger.image_summary("TSNE Source Traj Embedding", [self.source_traj_image], counter)
+				# self.tf_logger.image_summary("TSNE Target Traj Embedding", [self.target_traj_image], counter)
 
 				self.tf_logger.image_summary("PCA Combined Trajectory Embeddings", [self.viz_dictionary['pca_combined_traj_embeddings']], counter)
 				self.tf_logger.image_summary("TSNE Combined Trajectory Embeddings Perplexity 5", [self.viz_dictionary['tsne_combined_traj_embeddings_p5']], counter)
@@ -5611,24 +5614,35 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			else:
 				# Depending on whether we're visualizing the source or target domain
 				if viz_domain=='source':
-					self.shared_trajectory_set = self.source_manager.trajectory_set
+					self.shared_trajectory_set = self.source_manager.segmented_trajectory_set
 				elif viz_domain=='target':
-					self.shared_trajectory_set = self.target_manager.trajectory_set
+					self.shared_trajectory_set = self.target_manager.segmented_trajectory_set
 			
 			# ratio = 0.4
-			# preratio = 0.015
-			preratio = 0.005
+			preratio = 0.01
 			ratio = (embedded_zs.max()-embedded_zs.min())*preratio
 			color_scaling = 15
 			max_traj_length = 6
 			color_range_min = 0.2*color_scaling
 			color_range_max = 0.8*color_scaling+max_traj_length-1
 
-			# for i in range(2*self.N):
-			for i in range(min(embedded_zs.shape[0],len(self.shared_trajectory_set))):
+			# ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors,vmin=0,vmax=1,cmap='jet')
+			# print("Embed in Viz")
+			# embed()
+
+			# for i in range(min(embedded_zs.shape[0],len(self.shared_trajectory_set))):
+			# 	seg_traj_len = len(self.shared_trajectory_set[i])
+			# 	ax.scatter(embedded_zs[i,0]+ratio*self.shared_trajectory_set[i][:,0],embedded_zs[i,1]+ratio*self.shared_trajectory_set[i][:,1], \
+			# 		c=colors[i]*color_scaling+range(seg_traj_len),cmap='jet',vmin=color_range_min,vmax=color_range_max)
+
+			# Randomize the order of the plot, so that one domain doesn't overwrite the other in the plot. 
+			random_range = list(range(min(embedded_zs.shape[0],len(self.shared_trajectory_set))))
+			random.shuffle(random_range)
+			for i in random_range:
 				seg_traj_len = len(self.shared_trajectory_set[i])
 				ax.scatter(embedded_zs[i,0]+ratio*self.shared_trajectory_set[i][:,0],embedded_zs[i,1]+ratio*self.shared_trajectory_set[i][:,1], \
 					c=colors[i]*color_scaling+range(seg_traj_len),cmap='jet',vmin=color_range_min,vmax=color_range_max)
+
 
 		else:			
 			# Create a scatter plot of the embedding.
