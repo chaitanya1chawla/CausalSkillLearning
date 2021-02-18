@@ -2817,7 +2817,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				self.load_all_models(model)
 		
 		np.set_printoptions(suppress=True,precision=2)
-
 		
 		if self.args.setting=='context' or self.args.setting=='joint' or self.args.setting=='learntsub':
 			self.initialize_training_batches()
@@ -3301,11 +3300,11 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		####################################
 		####################################
 
-		minimum_trajectories = 20
-		max_viz_trajs = 20
+		self.minimum_trajectories = 20
+		self.max_viz_trajs = 20
 
 		# Figure out where we have enough datapoints to make reasonable comparisons.
-		eval_skill_sequence_indices = np.where(self.skill_counts>minimum_trajectories)[0][:max_viz_trajs]
+		eval_skill_sequence_indices = np.where(self.skill_counts>self.minimum_trajectories)[0][:self.max_viz_trajs]
 
 		print("#####################################################")
 		print("Iterating over skill sequences, and visualizing them.")
@@ -5619,7 +5618,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					self.shared_trajectory_set = self.target_manager.segmented_trajectory_set
 			
 			# ratio = 0.4
-			preratio = 0.01
+			# preratio = 0.01
+			preratio = 0.005
 			ratio = (embedded_zs.max()-embedded_zs.min())*preratio
 			color_scaling = 15
 			max_traj_length = 6
@@ -5663,6 +5663,19 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		return image
 
+	def compute_neighbors(self, computed_sets=False):
+		
+		# First make sure neighbor objects are set. 
+		self.set_neighbor_objects(computed_sets=computed_sets)
+
+		# Now that neighbor objects are set, compute neighbors. 			
+		if self.args.setting=='jointtransfer':
+			_, self.source_target_neighbors = self.source_neighbors_object.kneighbors(self.target_latent_zs)
+			_, self.target_source_neighbors = self.target_neighbors_object.kneighbors(self.source_latent_zs)
+		else:
+			_, self.source_target_neighbors = self.source_neighbors_object.kneighbors(self.target_manager.latent_z_set)
+			_, self.target_source_neighbors = self.target_neighbors_object.kneighbors(self.source_manager.latent_z_set)
+
 	def set_neighbor_objects(self, computed_sets=False):
 
 		with torch.no_grad():
@@ -5693,50 +5706,53 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		self.neighbor_obj_set = True
 
-	def evaluate_correspondence_metrics(self, computed_sets=True):
-
-		print("Evaluating correspondence metrics.")
-		# Evaluate the correspondence and alignment metrics. 
-		# Whether latent_z_sets and trajectory_sets are already computed for each manager.
-		self.set_neighbor_objects(computed_sets)
-
-		# if not(computed_sets):
-		# 	self.source_manager.get_trajectory_and_latent_sets()
-		# 	self.target_manager.get_trajectory_and_latent_sets()
-
-		# # Compute nearest neighbors for each set. First build KD-Trees / Ball-Trees. 
-		# self.source_neighbors_object = NearestNeighbors(n_neighbors=1, algorithm='auto').fit(self.source_manager.latent_z_set)
-		# self.target_neighbors_object = NearestNeighbors(n_neighbors=1, algorithm='auto').fit(self.target_manager.latent_z_set)
-
-		# Compute neighbors. 	
-		_, source_target_neighbors = self.source_neighbors_object.kneighbors(self.target_manager.latent_z_set)
-		_, target_source_neighbors = self.target_neighbors_object.kneighbors(self.source_manager.latent_z_set)
-		# _, source_target_neighbors = self.source_neighbors_object.kneighbors(self.target_latent_z_set)
-		# _, target_source_neighbors = self.target_neighbors_object.kneighbors(self.source_latent_z_set)
-
-
-
-		# # Now compute trajectory distances for neighbors. 
-		# source_target_trajectory_diffs = (self.source_manager.trajectory_set - self.target_manager.trajectory_set[source_target_neighbors.squeeze(1)])
-		# self.source_target_trajectory_distance = copy.deepcopy(np.linalg.norm(source_target_trajectory_diffs,axis=(1,2)).mean())
-
-		# target_source_trajectory_diffs = (self.target_manager.trajectory_set - self.source_manager.trajectory_set[target_source_neighbors.squeeze(1)])
-		# self.target_source_trajectory_distance = copy.deepcopy(np.linalg.norm(target_source_trajectory_diffs,axis=(1,2)).mean())
+	def evaluate_translated_trajectory_distances(self):
+		# Evaluate translated trajectory distances - from source to target and target to source domains. 
 
 		# Remember, absolute trajectory differences is meaningless, since the data is randomly initialized across the state space. 
 		# Instead, compare actions. I.e. first compute differences along the time dimension. 
 
+		# If we're in the jointtransfer setting, we should be using segmented_trajectory_set(s) instead of trajectory_set.
 		source_traj_actions = np.diff(self.source_manager.trajectory_set,axis=1)
 		target_traj_actions = np.diff(self.target_manager.trajectory_set,axis=1)
 
-		source_target_trajectory_diffs = (source_traj_actions - target_traj_actions[source_target_neighbors.squeeze(1)])
+		source_target_trajectory_diffs = (source_traj_actions - target_traj_actions[self.source_target_neighbors.squeeze(1)])
 		self.source_target_trajectory_distance = copy.deepcopy(np.linalg.norm(source_target_trajectory_diffs,axis=(1,2)).mean())
 
-		target_source_trajectory_diffs = (target_traj_actions - source_traj_actions[target_source_neighbors.squeeze(1)])
+		target_source_trajectory_diffs = (target_traj_actions - source_traj_actions[self.target_source_neighbors.squeeze(1)])
 		self.target_source_trajectory_distance = copy.deepcopy(np.linalg.norm(target_source_trajectory_diffs,axis=(1,2)).mean())
 
 		self.source_target_trajectory_normalized_distance = self.source_target_trajectory_distance/(np.linalg.norm(source_traj_actions, axis=2).mean())
 		self.target_source_trajectory_normalized_distance = self.target_source_trajectory_distance/(np.linalg.norm(target_traj_actions, axis=2).mean())		
+
+	def evaluate_correspondence_metrics(self, computed_sets=True):
+
+		print("Evaluating correspondence metrics.")
+		# Evaluate the correspondence and alignment metrics. 
+
+		# Whether latent_z_sets and trajectory_sets are already computed for each manager.
+		self.compute_neighbors(computed_sets)
+
+		print("Embed in evaluate correspondence metrics after the compute neighbors.")
+		embed()	
+
+		# Now that the neighbors have been computed, compute translated trajectory reconstruction errors via nearest neighbor z's. 
+		# Only use this version of evaluating trajectory distance.
+		if not(self.args.setting in ['jointtransfer']):		
+			
+			self.evaluate_translated_trajectory_distances()		
+
+		if self.args.setting in ['jointtransfer']:			
+			pass
+			# If we are actually in joint transfer setting: 
+
+			################################################
+			# Evaluate the following correspondence metrics.
+			# 1) Evaluate average translated latent z error.			
+			################################################ 
+
+			
+
 
 		##########################################
 		# Add more evaluation metrics here. 
@@ -5744,7 +5760,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# self.evaluate_discriminator_accuracy()
 		# self.evaluate_cycle_reconstruction_error()
-
 
 		# Reset variables to prevent memory leaks.
 		# source_neighbors_object = None
