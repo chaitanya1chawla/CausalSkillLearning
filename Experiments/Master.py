@@ -9,7 +9,7 @@ import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader
 from PolicyManagers import *
 import TestClass
 
-def return_dataset(args, data=None):
+def return_dataset(args, data=None, create_dataset_variation=False):
 	
 	# The data parameter overrides the data in args.data. 
 	# This is so that we can call return_dataset with source and target data for transfer setting.
@@ -20,7 +20,7 @@ def return_dataset(args, data=None):
 	if args.data=='Continuous':
 		dataset = DataLoaders.ContinuousToyDataset(args.datadir)
 	elif args.data=='ContinuousNonZero':
-		dataset = DataLoaders.ContinuousNonZeroToyDataset(args.datadir)
+		dataset = DataLoaders.ContinuousNonZeroToyDataset(args.datadir, create_dataset_variation=create_dataset_variation)
 	elif args.data=='DeterGoal':
 		dataset = DataLoaders.DeterministicGoalDirectedDataset(args.datadir)			
 	elif args.data=='DirContNonZero':
@@ -42,8 +42,8 @@ class Master():
 
 	def __init__(self, arguments):
 		self.args = arguments 
-
-		self.dataset = return_dataset(self.args)
+		
+		self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)
 
 		# Now define policy manager.
 		if self.args.setting=='learntsub' or self.args.setting=='joint':
@@ -75,8 +75,13 @@ class Master():
 			self.policy_manager = PolicyManager_Imitation(self.args.number_policies, self.dataset, self.args)
 
 		elif self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer']:
+		
 			source_dataset = return_dataset(self.args, data=self.args.source_domain)
 			target_dataset = return_dataset(self.args, data=self.args.target_domain)
+		
+			# If we're creating a variation in the dataset: 
+			if self.args.dataset_variation:
+				target_dataset = return_dataset(self.args, data=self.args.target_domain, create_dataset_variation=create_dataset_variation)
 
 			if self.args.setting=='transfer':
 				self.policy_manager = PolicyManager_Transfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
@@ -171,6 +176,7 @@ def parse_arguments():
 	parser.add_argument('--hidden_size',dest='hidden_size',type=int,default=64)
 	parser.add_argument('--var_number_layers',dest='var_number_layers',type=int,default=5)
 	parser.add_argument('--var_hidden_size',dest='var_hidden_size',type=int,default=64)
+	parser.add_argument('--dropout',dest='dropout',type=float,default=0.,help='Whether to set dropout.') 
 	parser.add_argument('--environment',dest='environment',type=str,default='SawyerLift') # Defines robosuite environment for RL.
 	
 	# Data parameters. 
@@ -200,6 +206,7 @@ def parse_arguments():
 	parser.add_argument('--display_freq',dest='display_freq',type=int,default=10000)
 	parser.add_argument('--save_freq',dest='save_freq',type=int,default=5)	
 	parser.add_argument('--eval_freq',dest='eval_freq',type=int,default=20)	
+	parser.add_argument('--metric_eval_freq',dest='metric_eval_freq',type=int,default=10000)	
 	parser.add_argument('--perplexity',dest='perplexity',type=float,default=30,help='Value of perplexity fed to TSNE.')
 	parser.add_argument('--latent_set_file_path',dest='latent_set_file_path',type=str,help='File path to pre-computed latent sets to visualize.')
 	parser.add_argument('--viz_latent_rollout',dest='viz_latent_rollout',type=int,default=0,help='Whether to visualize latent rollout or not.')
@@ -239,12 +246,14 @@ def parse_arguments():
 	parser.add_argument('--vae_loss_weight',dest='vae_loss_weight',type=float,default=1.,help='Weight of VAE loss in cross domain skill transfer.') 	
 	parser.add_argument('--alternating_phase_size',dest='alternating_phase_size',type=int,default=2000, help='Size of alternating training phases.')
 	parser.add_argument('--discriminator_phase_size',dest='discriminator_phase_size',type=int,default=2,help='Factor by which to train discriminator more than generator.')
+	parser.add_argument('--generator_phase_size',dest='generator_phase_size',type=int,default=1,help='Factor by which to train generaotr more than discriminator.')
 	parser.add_argument('--cycle_reconstruction_loss_weight',dest='cycle_reconstruction_loss_weight',type=float,default=1.,help='Weight of the cycle-consistency reconstruction loss term.')
 	parser.add_argument('--real_translated_discriminator',dest='real_translated_discriminator',type=int,default=0,help='Whether to include real-translated discriminator based losses.')
 	parser.add_argument('--real_trans_loss_weight',dest='real_trans_loss_weight',type=float,default=1.,help='Weight of discriminability loss between real and (cycle) translated trajectories.')
 	parser.add_argument('--z_transform_discriminator',dest='z_transform_discriminator',type=int,default=0,help='Whether to use z transform discriminators.')
 	parser.add_argument('--z_transform_discriminability_weight',dest='z_transform_discriminability_weight',type=float,default=1.,help='Weight of z transformation discriminability loss.')
 	parser.add_argument('--z_transform_discriminator_weight',dest='z_transform_discriminator_weight',type=float,default=1.,help='Weight of z transformation discriminator loss.')
+	parser.add_argument('--max_viz_trajs',dest='max_viz_trajs',type=int,default=20,help='How many trajectories to visualize.')
 
 	# Exploration and learning rate parameters. 
 	parser.add_argument('--epsilon_from',dest='epsilon_from',type=float,default=0.3)
@@ -281,8 +290,9 @@ def parse_arguments():
 	parser.add_argument('--fix_source',dest='fix_source',type=int,default=0,help='Whether to fix source domain representation.')
 	parser.add_argument('--fix_target',dest='fix_target',type=int,default=0,help='Whether to fix target domain representation.')
 	parser.add_argument('--load_from_transfer',dest='load_from_transfer',type=int,default=0,help='Whether we are loading joint model from transfer training.')
+	parser.add_argument('--dataset_variation',dest='dataset_variation',type=int,default=0,help='Whether to use flipped or original version of the dataset.')
 	# parser.add_argument('--reset_subpolicy_training',dest='reset_subpolicy_training',type=int,default=1,help='Whether to reset subpolicy training.')
-
+	
 	# Parameters for contextual training. 
 	parser.add_argument('--mask_fraction',dest='mask_fraction',type=float,default=0.15,help='What fraction of zs to mask in contextual embedding.')
 	parser.add_argument('--context',dest='context',type=int,default=1,help='Whether to implement contextual embedding model or original joint embedding model in Joint Transfer setting.')
@@ -304,6 +314,7 @@ def main(args):
 
 if __name__=='__main__':
 	main(sys.argv)
+
 
 
 

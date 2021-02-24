@@ -1702,6 +1702,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.test_set_size = 500
 		self.baseline_value = 0.
 		self.beta_decay = 0.9
+		self.max_viz_trajs = self.args.max_viz_trajs
 
 		self. learning_rate = self.args.learning_rate
 
@@ -2818,7 +2819,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		
 		np.set_printoptions(suppress=True,precision=2)
 		
-		if self.args.setting=='context' or self.args.setting=='joint' or self.args.setting=='learntsub':
+		if self.args.setting in ['context','joint','learntsub','jointtransfer']:
 			self.initialize_training_batches()
 		else:
 			# print("Running Evaluation of State Distances on small test set.")
@@ -3050,7 +3051,12 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# Create save dictionary.
 		#################################
 
-		model_epoch = int(os.path.split(self.args.model)[1].lstrip("Model_epoch"))		
+		if self.args.model is not None:
+			model_epoch = int(os.path.split(self.args.model)[1].lstrip("Model_epoch"))		
+		else:
+			# Create fake directory. 
+			model_epoch = "during_training"
+
 		self.dir_name = os.path.join(self.args.logdir,self.args.name,"MEval","m{0}".format(model_epoch))
 
 		if not(os.path.isdir(self.dir_name)):
@@ -3209,15 +3215,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			print("Running unique.")
 			self.skill_sequence, self.skill_index, self.skill_inverse_indices, self.skill_counts = np.unique(distinct_zs, axis=0, return_inverse=True, return_index=True, return_counts=True)
 
-	def evaluate_contextual_representations(self):
-		
-		####################################
-		print("####################################")
-		print("Compute unique sequences of skills., for context evaluation.")		
-		print("####################################")
-		self.set_context_histogram()
-		
-		# Things to evaluate. 
+	def evaluate_similar_skills_different_skill_sequences(self, specific_index=None):
 
 		####################################
 		####################################
@@ -3243,7 +3241,17 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		indices = np.arange(i,i+consider_labels_from)
 		self.dataset_b, self.dataset_z = self.dataset.get_latent_variables(indices)
 
-		for k in range(self.args.number_policies):
+		# Set range to evaluate over. 
+		if specific_index is not None:
+			# If we have a specific index (likely because the jointtransfer setting is using this function), 
+			# Just evaluate for that specific index.
+			eval_range = range(specific_index,specific_index+1)
+			suffix = "_SPI{0}".format(specific_index)
+		else:
+			eval_range = range(self.args.number_policies)
+			suffix = ""
+		# for k in range(self.args.number_policies):
+		for k in eval_range:
 
 			# For each skill, get number_of_datapoint number of different trajectories that have the relevant skill. 
 			special_indices = []
@@ -3254,7 +3262,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			print("Running evaluations of the same skill in different contexts, for skill ID: ",k)		
 
 			# Now feed into run iteration. 
-			input_dict, variational_dict, eval_likelihood_dict = self.run_iteration(0, i, return_dicts=True, special_indices=special_indices)
+			input_dict, variational_dict, eval_likelihood_dict = self.run_iteration(0, i, return_dicts=True, special_indices=special_indices, train=False)
 
 			self.latent_z_set = []
 			self.trajectory_set = []
@@ -3264,6 +3272,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			
 				# Get segmentations.		
 				distinct_z_indices = torch.where(variational_dict['latent_b'][:,b])[0].clone().detach().cpu().numpy()
+				
 				# Get distinct z's.
 				distinct_zs = variational_dict['latent_z_indices'][distinct_z_indices, b].clone().detach().cpu().numpy()
 
@@ -3286,8 +3295,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			# Now that latent_z_set, trajectory_set and segmentation_set are set, call - 
 			self.assemble_joint_skill_embedding_space(preset_latent_sets=True)
 			# # Now that we have the dictionaries... embed and visualize them. 
-			self.visualize_joint_skill_embedding_space(suffix='SameSkill_DiffContext', global_z_set=self.global_z_set, image_suffix="Skill{0}".format(k))
+			self.visualize_joint_skill_embedding_space(suffix='SameSkill_DiffContext{0}'.format(suffix), global_z_set=self.global_z_set, image_suffix="Skill{0}".format(k))
 
+	def evaluate_similar_skill_sequences(self, specific_index=None):
 
 		####################################
 		####################################
@@ -3301,7 +3311,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		####################################
 
 		self.minimum_trajectories = 20
-		self.max_viz_trajs = 20
+		# self.max_viz_trajs = 5
 
 		# Figure out where we have enough datapoints to make reasonable comparisons.
 		eval_skill_sequence_indices = np.where(self.skill_counts>self.minimum_trajectories)[0][:self.max_viz_trajs]
@@ -3310,22 +3320,35 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		print("Iterating over skill sequences, and visualizing them.")
 		print("#####################################################")
 
-		# For all skill_sequences for which we have these minimum number of trajectories.
-		for i, skill_seq in enumerate(eval_skill_sequence_indices):
-			
+		# Set evaluation range. 
+		if specific_index is not None:
+			eval_range = range(specific_index, specific_index+1)
+			suffix = "_SPI{0}".format(specific_index)
+		else:
+			# For all skill_sequences for which we have these minimum number of trajectories.
+			eval_range = range(len(eval_skill_sequence_indices))
+			suffix = ""
+		# for i, skill_seq in enumerate(eval_skill_sequence_indices):
+		for i in eval_range:
+
+			# Since we switched to ranges, set this element based on the current index.
+			skill_seq = eval_skill_sequence_indices[i]
+								
 			print("#####################################################")
-			print("Currently operating on skills sequence ", i)
-			
+			print("Currently operating on skills sequence ", i)			
 
 			# Get dataset indices for this specific skill sequence.
 			special_indices = np.where(self.skill_inverse_indices==skill_seq)[0]
 
 			# Now if special_indices > batch_size, randomly sample a batch of them.
-			if special_indices.shape[0] > self.args.batch_size:
-				special_indices = np.random.choice(special_indices, size=self.args.batch_size)
+			# if special_indices.shape[0] > self.args.batch_size:
+				# special_indices = np.random.choice(special_indices, size=self.args.batch_size)
+
+			# Instead of randomly sampling indices, just select the first batch_size of them.	
+			special_indices = special_indices[:self.args.batch_size]
 
 			# Now feed into run iteration. 
-			input_dict, variational_dict, eval_likelihood_dict = self.run_iteration(0, i, return_dicts=True, special_indices=special_indices)
+			input_dict, variational_dict, eval_likelihood_dict = self.run_iteration(0, i, return_dicts=True, special_indices=special_indices, train=False)
 
 			# Reset the latent, trajectory, and segmentation sets.			
 			self.latent_z_set = []
@@ -3346,7 +3369,30 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			# Now that latent_z_set, trajectory_set and segmentation_set are set, call - 
 			self.assemble_joint_skill_embedding_space(preset_latent_sets=True)
 			# # Now that we have the dictionaries... embed and visualize them. 
-			self.visualize_joint_skill_embedding_space(suffix='SkillSeq', global_z_set=self.global_z_set, image_suffix="Seq{0}".format(i))
+			self.visualize_joint_skill_embedding_space(suffix='SkillSeq{0}'.format(suffix), global_z_set=self.global_z_set, image_suffix="Seq{0}".format(i))
+	
+	def evaluate_contextual_representations(self, skip_same_skill=False, specific_index=None):
+		
+		####################################
+		print("####################################")
+		print("Compute unique sequences of skills., for context evaluation.")		
+		print("####################################")
+		self.set_context_histogram()
+		
+		# Things to evaluate. 
+
+		####################################
+		# (1) Evaluate similar skills in different skill sequences. 
+		####################################
+		
+		if not(skip_same_skill):
+			self.evaluate_similar_skills_different_skill_sequences(specific_index=specific_index)
+
+		####################################
+		# (2) Evaluate representations of similar sets of skill sequences, for which there are at least k trajectories.
+		####################################
+
+		self.evaluate_similar_skill_sequences(specific_index=specific_index)
 
 class PolicyManager_BatchJoint(PolicyManager_Joint):
 
@@ -3409,7 +3455,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			# Sample trajectory segment from dataset. 
 			if special_indices is not None:
 				sample_traj, sample_action_seq = self.dataset[special_indices]
-				self.dataset_latent_b_labels, self.dataset_latent_z_labels = self.dataset.get_latent_variables(special_indices)			
+				self.dataset_latent_b_labels, self.dataset_latent_z_labels = self.dataset.get_latent_variables(special_indices)
 			else:
 				sample_traj, sample_action_seq = self.dataset[i:i+self.args.batch_size]
 				indices = np.arange(i,i+self.args.batch_size)
@@ -4898,25 +4944,24 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Set number of iterations of alteration. 
 			# self.alternating_phase_size = self.args.alternating_phase_size*self.extent
 
-			# # If odd epoch, train discriminator. (Just so that we start training discriminator first).
-			# if (counter/self.alternating_phase_size)%2==1:			
-			# 	self.skip_discriminator = False
-			# 	self.skip_vae = True
-			# # Otherwise train VAE.
-			# else:
-			# 	self.skip_discriminator = True
-			# 	self.skip_vae = False		
-
 			# Train discriminator for k times as many steps as VAE. Set args.alternating_phase_size as 1 for this. 
-			if (counter/self.args.alternating_phase_size)%(self.args.discriminator_phase_size+1)>=1:
-				print("Training Discriminator.")
-				self.skip_discriminator = False
-				self.skip_vae = True
-			# Otherwise train VAE.
-			else:
+			# Instead of using discriminator_phase_size steps for every 1 generator step.
+			# Now, training generator / VAE for generator_phase_size. 
+			# First get how many alternating phases we've completed so far. 
+			completed_alternating_training_phases = (counter//self.args.alternating_phase_size)
+			# Now figure out how many stages of discriminator phase sizes and generator phase sizes we've completed.
+			modulo_phase = completed_alternating_training_phases%(self.args.discriminator_phase_size+self.args.generator_phase_size)
+			# If we haven't yet completed the right number of generator phase sizes is done, train the generator. 
+			train_generator = modulo_phase<self.args.generator_phase_size
+
+			if train_generator:
 				print("Training VAE.")
 				self.skip_discriminator = True
-				self.skip_vae = False		
+				self.skip_vae = False						
+			else:
+				print("Training Discriminator.")
+				self.skip_discriminator = False
+				self.skip_vae = True	
 
 			self.training_phase = 2
 
@@ -4933,7 +4978,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		if self.args.setting=='jointcycletransfer':
 			self.discriminator_network = EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size).to(device)
 		else:
-			self.discriminator_network = DiscreteMLP(self.input_size, self.hidden_size, self.output_size).to(device)
+			self.discriminator_network = DiscreteMLP(self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
 
 	def create_training_ops(self):
 
@@ -5214,17 +5259,20 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.tf_logger.scalar_summary('Target Trajectory Reconstruction Error', self.target_manager.avg_reconstruction_error, counter)
 
 			# if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':
-			if self.args.source_domain==self.args.target_domain and self.args.eval_jointtransfer_metrics:
+			if self.args.source_domain==self.args.target_domain and self.args.eval_jointtransfer_metrics and counter%self.args.metric_eval_freq==0:
 				# Evaluate metrics and plot them. 
 				# self.evaluate_correspondence_metrics(computed_sets=False)
 				# Actually, we've probably computed trajectory and latent sets. 
 				self.evaluate_correspondence_metrics()
-				
+								
 				self.tf_logger.scalar_summary('Source To Target Translation Trajectory Error', self.source_target_trajectory_distance, counter)		
 				self.tf_logger.scalar_summary('Target To Source Translation Trajectory Error', self.target_source_trajectory_distance, counter)
 				self.tf_logger.scalar_summary('Source To Target Translation Trajectory Normalized Error', self.source_target_trajectory_normalized_distance, counter)
 				self.tf_logger.scalar_summary('Target To Source Translation Trajectory Normalized Error', self.target_source_trajectory_normalized_distance, counter) 
 	
+				self.tf_logger.scalar_summary('Average Corresponding Z Sequence Error', self.average_corresponding_z_sequence_error.mean(), counter)
+				self.tf_logger.scalar_summary('Average Corresponding Z Transition Sequence Error', self.average_corresponding_z_transition_sequence_error.mean(), counter)
+
 			# Clean up objects consuming memory. 			
 			self.free_memory()
 		
@@ -5577,7 +5625,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.update_plots(counter, viz_dict)
 
 	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False, viz_domain=None):	
-	
+
+		
+		# Setting fig size everywhere so that it doesn't go nuts. 
+		matplotlib.rcParams['figure.figsize'] = [5,5]
 		fig = plt.figure()
 		ax = fig.gca()
 		
@@ -5725,6 +5776,70 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.source_target_trajectory_normalized_distance = self.source_target_trajectory_distance/(np.linalg.norm(source_traj_actions, axis=2).mean())
 		self.target_source_trajectory_normalized_distance = self.target_source_trajectory_distance/(np.linalg.norm(target_traj_actions, axis=2).mean())		
 
+	def evaluate_skill_sequences_across_domains(self):
+
+		################################################ 
+		# 1) Evaluate the same skill sequence across both domains. 
+		################################################ 
+
+		# For the same skill sequences, evaluate:
+		# 1 a) Average discrepancy between corresponding z sequences across domains. 
+		# 1 b) Average discrepancy between z transition sequences across domains. 
+
+		self.average_corresponding_z_sequence_error = np.zeros(self.source_manager.max_viz_trajs)
+		self.average_corresponding_z_transition_sequence_error = np.zeros(self.source_manager.max_viz_trajs)
+
+		print("Running evaluate_skill_sequences_across_domains for {0} skill sequences.".format(self.source_manager.max_viz_trajs))
+		# For some set of skill sequences.
+		for k in range(self.source_manager.max_viz_trajs):
+
+			# Run individual source and target managers evaluate_similar_skill_sequences(k). 
+			self.source_manager.evaluate_contextual_representations(specific_index=k, skip_same_skill=True)
+			self.target_manager.evaluate_contextual_representations(specific_index=k, skip_same_skill=True)
+		
+			################################################
+			# Now evaluate the average discrepancy between corresponding z sequences across domains, measured as RMS error. 
+			################################################		
+			j=0
+			limit = self.args.batch_size
+			# for j in range(self.args.batch_size):
+			while j<limit:
+				if len(self.source_manager.latent_z_set[j])>4 or len(self.target_manager.latent_z_set[j])>4:
+					self.source_manager.latent_z_set.pop(j)
+					self.target_manager.latent_z_set.pop(j)
+					limit-=1
+				else:
+					j+=1
+
+			source_z = np.concatenate([self.source_manager.latent_z_set])
+			target_z = np.concatenate([self.target_manager.latent_z_set])				
+			self.average_corresponding_z_sequence_error[k] = ((source_z-target_z)**2).mean()
+
+			################################################
+			# Now evaluate the average discrepancy between corresponding z transition sequences across domains, measured as RMS error. 
+			################################################
+
+			source_z_diffs = np.diff(source_z,axis=1)
+			target_z_diffs = np.diff(target_z,axis=1)
+			self.average_corresponding_z_transition_sequence_error[k] = ((source_z_diffs-target_z_diffs)**2).mean()
+
+	def setup_crossdomain_joint_evaluation(self):
+		
+		# Set up eval for source.
+		self.source_manager.assemble_joint_skill_embedding_space()
+		self.source_manager.global_z_set = copy.deepcopy(self.source_manager.embedding_latent_z_set_array)
+
+		# Set up eval for target.
+		self.target_manager.assemble_joint_skill_embedding_space()
+		self.target_manager.global_z_set = copy.deepcopy(self.target_manager.embedding_latent_z_set_array)
+
+		# Setting dummy values for now.
+		self.source_target_trajectory_distance = 0
+		self.target_source_trajectory_distance = 0
+
+		self.source_target_trajectory_normalized_distance = 0
+		self.target_source_trajectory_normalized_distance = 0
+
 	def evaluate_correspondence_metrics(self, computed_sets=True):
 
 		print("Evaluating correspondence metrics.")
@@ -5733,9 +5848,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Whether latent_z_sets and trajectory_sets are already computed for each manager.
 		self.compute_neighbors(computed_sets)
 
-		print("Embed in evaluate correspondence metrics after the compute neighbors.")
-		embed()	
-
 		# Now that the neighbors have been computed, compute translated trajectory reconstruction errors via nearest neighbor z's. 
 		# Only use this version of evaluating trajectory distance.
 		if not(self.args.setting in ['jointtransfer']):		
@@ -5743,16 +5855,24 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.evaluate_translated_trajectory_distances()		
 
 		if self.args.setting in ['jointtransfer']:			
-			pass
+			
 			# If we are actually in joint transfer setting: 
 
 			################################################
-			# Evaluate the following correspondence metrics.
-			# 1) Evaluate average translated latent z error.			
+			# Evaluate the following correspondence metrics.					
+			################################################
+
+			################################################ 
+			# 1) First runs some things that are needed for evaluation. 
 			################################################ 
 
-			
+			self.setup_crossdomain_joint_evaluation()
 
+			################################################ 
+			# 2) Evaluate the same skill sequence across both domains. 
+			################################################ 
+
+			self.evaluate_skill_sequences_across_domains()
 
 		##########################################
 		# Add more evaluation metrics here. 
@@ -6337,8 +6457,8 @@ class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTrans
 		# del self.discriminator_network
 
 		# Now create individual z discriminators.
-		self.source_z_discriminator = DiscreteMLP(self.args.z_dimensions, self.hidden_size, 2).to(device)
-		self.target_z_discriminator = DiscreteMLP(self.args.z_dimensions, self.hidden_size, 2).to(device)
+		self.source_z_discriminator = DiscreteMLP(self.args.z_dimensions, self.hidden_size, 2, args=self.args).to(device)
+		self.target_z_discriminator = DiscreteMLP(self.args.z_dimensions, self.hidden_size, 2, args=self.args).to(device)
 		
 		# Create lists of discriminators. 
 		self.discriminator_list = [self.source_discriminator, self.target_discriminator]
@@ -6742,8 +6862,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# del self.discriminator_network
 
 		# Now create individual z discriminators.
-		self.source_z_discriminator = DiscreteMLP(self.args.z_dimensions, self.hidden_size, 2).to(device)
-		self.target_z_discriminator = DiscreteMLP(self.args.z_dimensions, self.hidden_size, 2).to(device)
+		self.source_z_discriminator = DiscreteMLP(self.args.z_dimensions, self.hidden_size, 2, args=self.args).to(device)
+		self.target_z_discriminator = DiscreteMLP(self.args.z_dimensions, self.hidden_size, 2, args=self.args).to(device)
 		
 		# Create lists of discriminators. 
 		self.discriminator_list = [self.source_discriminator, self.target_discriminator]
@@ -6877,7 +6997,7 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 		super().create_networks()
 
 		if self.args.z_transform_discriminator:
-			self.z_transform_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size).to(device)
+			self.z_transform_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
 
 	def create_training_ops(self):
 

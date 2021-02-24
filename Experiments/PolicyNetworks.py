@@ -130,7 +130,7 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 			else:
 				self.input_size = input_size+self.args.z_dimensions
 		# Create LSTM Network. 
-		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers)		
+		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers, dropout=self.args.dropout)
 
 		# Define output layers for the LSTM, and activations for this output layer. 
 		self.mean_output_layer = torch.nn.Linear(self.hidden_size,self.output_size)
@@ -418,7 +418,7 @@ class ContinuousLatentPolicyNetwork(PolicyNetwork_BaseClass):
 		self.batch_size = self.args.batch_size
 
 		# Define LSTM. 
-		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers).to(device)
+		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers, dropout=self.args.dropout).to(device)
 
 		# Transform to output space - Latent z and Latent b. 
 		# self.subpolicy_output_layer = torch.nn.Linear(self.hidden_size,self.output_size)
@@ -872,7 +872,7 @@ class ContinuousVariationalPolicyNetwork(PolicyNetwork_BaseClass):
 		self.batch_size = self.args.batch_size
 
 		# Define a bidirectional LSTM now.
-		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers, bidirectional=True)
+		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers, bidirectional=True, dropout=self.args.dropout)
 
 		# Transform to output space - Latent z and Latent b. 
 		# THIS OUTPUT LAYER TAKES 2*HIDDEN SIZE as input because it's bidirectional. 
@@ -1568,7 +1568,7 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 
 		# Define a bidirectional LSTM now.
 		self.z_dimensions = self.args.z_dimensions
-		self.contextual_lstm = torch.nn.LSTM(input_size=self.args.z_dimensions,hidden_size=self.hidden_size,num_layers=self.num_layers, bidirectional=True)
+		self.contextual_lstm = torch.nn.LSTM(input_size=self.args.z_dimensions,hidden_size=self.hidden_size,num_layers=self.num_layers, bidirectional=True, dropout=self.args.dropout)
 		# self.z_output_layer = torch.nn.Linear(2*self.hidden_size, self.z_dimensions)
 
 		self.contextual_mean_output_layer = torch.nn.Linear(2*self.hidden_size,self.output_size)
@@ -1687,7 +1687,7 @@ class ContinuousNewContextualVariationalPolicyNetwork(ContinuousVariationalPolic
 		super(ContinuousNewContextualVariationalPolicyNetwork, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)
 		# Define a bidirectional LSTM now.
 		self.z_dimensions = self.args.z_dimensions
-		self.contextual_lstm = torch.nn.LSTM(input_size=self.args.z_dimensions,hidden_size=self.hidden_size,num_layers=self.num_layers, bidirectional=True)
+		self.contextual_lstm = torch.nn.LSTM(input_size=self.args.z_dimensions,hidden_size=self.hidden_size,num_layers=self.num_layers, bidirectional=True, dropout=self.args.dropout)
 		# self.z_output_layer = torch.nn.Linear(2*self.hidden_size, self.z_dimensions)
 
 		self.contextual_mean_output_layer = torch.nn.Linear(2*self.hidden_size,self.output_size)
@@ -1828,7 +1828,7 @@ class EncoderNetwork(PolicyNetwork_BaseClass):
 		self.batch_size = batch_size
 
 		# Define a bidirectional LSTM now.
-		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers, bidirectional=True)
+		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers, bidirectional=True, dropout=self.args.dropout)
 
 		# Define output layers for the LSTM, and activations for this output layer. 
 
@@ -2085,22 +2085,25 @@ class DiscreteMLP(torch.nn.Module):
 		self.input_size = input_size
 		self.hidden_size = hidden_size
 		self.output_size = output_size
+		self.args = args 
 
 		self.input_layer = torch.nn.Linear(self.input_size, self.hidden_size)
 		self.hidden_layer = torch.nn.Linear(self.hidden_size, self.hidden_size)
 		self.output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
 		self.relu_activation = torch.nn.ReLU()
 
+		self.dropout_layer = torch.nn.Dropout(self.args.dropout)
+
 		self.batch_logsoftmax_layer = torch.nn.LogSoftmax(dim=2)
-		self.batch_softmax_layer = torch.nn.Softmax(dim=2	)		
+		self.batch_softmax_layer = torch.nn.Softmax(dim=2)		
 
 	def forward(self, input):
-
+				
 		# Assumes input is Batch_Size x Input_Size.
-		h1 = self.relu_activation(self.input_layer(input))
-		h2 = self.relu_activation(self.hidden_layer(h1))
-		h3 = self.relu_activation(self.hidden_layer(h2))
-		h4 = self.relu_activation(self.hidden_layer(h3))
+		h1 = self.dropout_layer(self.relu_activation(self.input_layer(input)))
+		h2 = self.dropout_layer(self.relu_activation(self.hidden_layer(h1)))
+		h3 = self.dropout_layer(self.relu_activation(self.hidden_layer(h2)))
+		h4 = self.dropout_layer(self.relu_activation(self.hidden_layer(h3)))
 
 		# Compute preprobability with output layer.
 		preprobability_outputs = self.output_layer(h4)
