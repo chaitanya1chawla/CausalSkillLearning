@@ -817,27 +817,65 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		return image
 
+	# def update_plots(self, counter, loglikelihood, sample_traj, stat_dictionary):
+		
+	# 	self.tf_logger.scalar_summary('Subpolicy Likelihood', loglikelihood.mean(), counter)
+	# 	self.tf_logger.scalar_summary('Total Loss', self.total_loss.mean(), counter)
+	# 	self.tf_logger.scalar_summary('Encoder KL', self.encoder_KL.mean(), counter)
+
+	# 	if not(self.args.reparam):
+	# 		self.tf_logger.scalar_summary('Baseline', self.baseline.sum(), counter)
+	# 		self.tf_logger.scalar_summary('Encoder Loss', self.encoder_loss.sum(), counter)
+	# 		self.tf_logger.scalar_summary('Reinforce Encoder Loss', self.reinforce_encoder_loss.sum(), counter)
+	# 		self.tf_logger.scalar_summary('Total Encoder Loss', self.total_encoder_loss.sum() ,counter)
+
+	# 	if self.args.entropy:
+	# 		self.tf_logger.scalar_summary('SubPolicy Entropy', torch.mean(subpolicy_entropy), counter)
+
+	# 	if counter%self.args.display_freq==0:
+	# 		if self.args.batch_size>1:
+	# 			# Just select one trajectory from batch.
+	# 			sample_traj = sample_traj[:,0]
+
+	# 		self.tf_logger.image_summary("GT Trajectory",[self.visualize_trajectory(sample_traj)], counter)
+
+	# 		############
+	# 		# Plotting embedding in tensorboard. 
+	# 		############
+
+	# 		# Get latent_z set. 
+	# 		self.get_trajectory_and_latent_sets(get_visuals=False)
+
+	# 		# Get embeddings for perplexity=5,10,30, and then plot these.
+	# 		# Once we have latent set, get embedding and plot it. 
+	# 		self.embedded_z_dict = {}
+	# 		self.embedded_z_dict['perp5'] = self.get_robot_embedding(perplexity=5)
+	# 		self.embedded_z_dict['perp10'] = self.get_robot_embedding(perplexity=10)
+	# 		self.embedded_z_dict['perp30'] = self.get_robot_embedding(perplexity=30)
+
+	# 		# Save embedded z's and trajectory and latent sets.
+	# 		self.save_latent_sets(stat_dictionary)
+
+	# 		# Now plot the embedding.
+	# 		statistics_line = "Epoch: {0}, Count: {1}, I: {2}, Batch: {3}".format(stat_dictionary['epoch'], stat_dictionary['counter'], stat_dictionary['i'], stat_dictionary['batch_size'])
+	# 		image_perp5 = self.plot_embedding(self.embedded_z_dict['perp5'], title="Z Space {0} Perp 5".format(statistics_line))
+	# 		image_perp10 = self.plot_embedding(self.embedded_z_dict['perp10'], title="Z Space {0} Perp 10".format(statistics_line))
+	# 		image_perp30 = self.plot_embedding(self.embedded_z_dict['perp30'], title="Z Space {0} Perp 30".format(statistics_line))
+
+	# 		self.tf_logger.image_summary("Embedded Z Space Perplexity 5", [image_perp5], counter)
+	# 		self.tf_logger.image_summary("Embedded Z Space Perplexity 10", [image_perp10], counter)
+	# 		self.tf_logger.image_summary("Embedded Z Space Perplexity 30", [image_perp30], counter)
+
 	def update_plots(self, counter, loglikelihood, sample_traj, stat_dictionary):
 		
-		self.tf_logger.scalar_summary('Subpolicy Likelihood', loglikelihood.mean(), counter)
-		self.tf_logger.scalar_summary('Total Loss', self.total_loss.mean(), counter)
-		self.tf_logger.scalar_summary('Encoder KL', self.encoder_KL.mean(), counter)
-
-		if not(self.args.reparam):
-			self.tf_logger.scalar_summary('Baseline', self.baseline.sum(), counter)
-			self.tf_logger.scalar_summary('Encoder Loss', self.encoder_loss.sum(), counter)
-			self.tf_logger.scalar_summary('Reinforce Encoder Loss', self.reinforce_encoder_loss.sum(), counter)
-			self.tf_logger.scalar_summary('Total Encoder Loss', self.total_encoder_loss.sum() ,counter)
-
-		if self.args.entropy:
-			self.tf_logger.scalar_summary('SubPolicy Entropy', torch.mean(subpolicy_entropy), counter)
+		# log_dict['Subpolicy Loglikelihood'] = loglikelihood.mean()
+		log_dict = {'Subpolicy Loglikelihood': loglikelihood.mean(), 'Total Loss': self.total_loss.mean(), 'Encoder KL': self.encoder_KL.mean()}
 
 		if counter%self.args.display_freq==0:
+			
 			if self.args.batch_size>1:
 				# Just select one trajectory from batch.
 				sample_traj = sample_traj[:,0]
-
-			self.tf_logger.image_summary("GT Trajectory",[self.visualize_trajectory(sample_traj)], counter)
 
 			############
 			# Plotting embedding in tensorboard. 
@@ -861,10 +899,14 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			image_perp5 = self.plot_embedding(self.embedded_z_dict['perp5'], title="Z Space {0} Perp 5".format(statistics_line))
 			image_perp10 = self.plot_embedding(self.embedded_z_dict['perp10'], title="Z Space {0} Perp 10".format(statistics_line))
 			image_perp30 = self.plot_embedding(self.embedded_z_dict['perp30'], title="Z Space {0} Perp 30".format(statistics_line))
+			
+			# Now adding image visuals to the wandb logs.
+			log_dict["GT Trajectory"] = [wandb.Image(self.visualize_trajectory(sample_traj).transpose(1,2,0))]
+			log_dict["Embedded Z Space Perplexity 5"] = [wandb.Image(image_perp5.transpose(1,2,0))]
+			log_dict["Embedded Z Space Perplexity 10"] = [wandb.Image(image_perp10.transpose(1,2,0))]
+			log_dict["Embedded Z Space Perplexity 30"] = [wandb.Image(image_perp30.transpose(1,2,0))]
 
-			self.tf_logger.image_summary("Embedded Z Space Perplexity 5", [image_perp5], counter)
-			self.tf_logger.image_summary("Embedded Z Space Perplexity 10", [image_perp10], counter)
-			self.tf_logger.image_summary("Embedded Z Space Perplexity 30", [image_perp30], counter)
+		wandb.log(log_dict, step=counter)
 
 	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False):
 	

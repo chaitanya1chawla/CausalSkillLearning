@@ -49,3 +49,5 @@ from sklearn.neighbors import NearestNeighbors
 import random
 # Removing robosuite from headers file so that we can only import it when we have a mujoco installation.
 # import robosuite
+
+import wandb

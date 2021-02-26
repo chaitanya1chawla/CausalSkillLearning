@@ -163,7 +163,8 @@ def parse_arguments():
 	parser.add_argument('--setting',dest='setting',type=str,default='gtsub')
 	parser.add_argument('--test_code',dest='test_code',type=int,default=0)
 	parser.add_argument('--model',dest='model',type=str)
-	parser.add_argument('--logdir',dest='logdir',type=str,default='Experiment_Logs/')
+	# parser.add_argument('--logdir',dest='logdir',type=str,default='Experiment_Logs/')
+	parser.add_argument('--logdir',dest='logdir',type=str,default='ExpWandbLogs/')
 	parser.add_argument('--epochs',dest='epochs',type=int,default=500) # Number of epochs to train for. Reduce for Mocap.
 	parser.add_argument('--debugging_datapoints',dest='debugging_datapoints',type=int,default=-1,help='How many data points to run training on. If greater than 0, only select that many datapoints for debugging.')
 	parser.add_argument('--seed',dest='seed',type=int,default=0,help='Seed value to initialize random processes.')
@@ -306,6 +307,10 @@ def main(args):
 
 	args = parse_arguments()
 	master = Master(args)
+ 
+	wandb.init(project=args.setting, dir=args.logdir, name=args.name)
+	# Add argparse flags to wandb config.
+	wandb.config.update(args)
 
 	if args.test_code:
 		master.test()
