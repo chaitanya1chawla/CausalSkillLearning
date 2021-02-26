@@ -4936,9 +4936,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# Phase 2 of training: Train the discriminator, and set discriminability loss weight to original.
 		else:
-			self.discriminability_loss_weight = self.args.discriminability_weight
-			self.z_transform_discriminability_loss_weight = self.args.z_transform_discriminability_weight
-			self.vae_loss_weight = self.args.vae_loss_weight
+
+			if self.args.training_phase_size<=counter and counter<self.args.training_phase_size*2:
+				self.discriminability_loss_weight = self.args.discriminability_weight
+				# self.z_transform_discriminability_loss_weight = self.args.z_transform_discriminability_weights
+				self.z_transform_discriminability_loss_weight = 0.
+				self.vae_loss_weight = self.args.vae_loss_weight
+			else:
+				self.z_transform_discriminability_loss_weight = self.args.z_transform_discriminability_weight
 
 			# Now make discriminator and vae train in alternating fashion. 
 			# Set number of iterations of alteration. 
@@ -4951,8 +4956,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			completed_alternating_training_phases = (counter//self.args.alternating_phase_size)
 			# Now figure out how many stages of discriminator phase sizes and generator phase sizes we've completed.
 			modulo_phase = completed_alternating_training_phases%(self.args.discriminator_phase_size+self.args.generator_phase_size)
-			# If we haven't yet completed the right number of generator phase sizes is done, train the generator. 
+			# If we haven't yet completed the right number of generator (discriminator) phase sizes is done, train the generator (discriminator). 
+		
 			train_generator = modulo_phase<self.args.generator_phase_size
+
+			# train_discriminator = modulo_phase<self.args.discriminator_phase_size			
+			# train_generator = modulo_phase>=self.args.discriminator_phase_size
+
+			# print(counter, completed_alternating_training_phases, modulo_phase, train_discriminator, train_generator)
 
 			if train_generator:
 				print("Training VAE.")
@@ -4964,6 +4975,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.skip_vae = True	
 
 			self.training_phase = 2
+		
 
 		self.source_manager.set_epoch(counter)
 		self.target_manager.set_epoch(counter)
@@ -7003,8 +7015,9 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 
 		super().create_training_ops()
 
+		discriminator_opt_params = self.discriminator_network.parameters()
 		if self.args.z_transform_discriminator:
-			discriminator_opt_params = list(self.discriminator_network.parameters()) + list(self.z_transform_discriminator.parameters())
+			discriminator_opt_params = list(discriminator_opt_params) + list(self.z_transform_discriminator.parameters())
 		self.discriminator_optimizer = torch.optim.Adam(discriminator_opt_params,lr=self.learning_rate)		
 
 	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False):
@@ -7085,6 +7098,8 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 				
 				# Add this probability to the dictionary to visualize.
 				viz_dict = {'z_transform_discriminator_probs': z_transform_discriminator_prob[...,domain].detach().cpu().numpy().mean()}
+			else:
+				viz_dict = {}
 
 			# (5) Compute and apply gradient updates. 			
 			self.update_networks(domain, policy_manager, update_dictionary)
