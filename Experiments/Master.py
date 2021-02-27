@@ -156,7 +156,7 @@ def parse_arguments():
 	parser.add_argument('--notes',dest='notes',type=str)
 	parser.add_argument('--name',dest='name',type=str,default=None)
 	parser.add_argument('--fake_batch_size',dest='fake_batch_size',type=int,default=1)
-	parser.add_argument('--batch_size',dest='batch_size',type=int,default=1)
+	parser.add_argument('--batch_size',dest='batch_size',type=int,default=32)
 	parser.add_argument('--training_phase_size',dest='training_phase_size',type=int,default=500000)
 	parser.add_argument('--initial_counter_value',dest='initial_counter_value',type=int,default=0)
 	parser.add_argument('--data',dest='data',type=str,default='Continuous')
@@ -231,6 +231,7 @@ def parse_arguments():
 	parser.add_argument('--latent_clamp_value',dest='latent_clamp_value',type=float,default=-5)
 	parser.add_argument('--min_variance_bias',dest='min_variance_bias',type=float,default=0.01)
 	parser.add_argument('--normalization',dest='normalization',type=str,default='None')
+	parser.add_argument('--regularization_weight',dest='regularization_weight',type=float,default=0.,help='Value of regularization weight to be added to the model.')
 
 	parser.add_argument('--likelihood_penalty',dest='likelihood_penalty',type=int,default=10)
 	parser.add_argument('--subpolicy_ratio',dest='subpolicy_ratio',type=float,default=0.01)
