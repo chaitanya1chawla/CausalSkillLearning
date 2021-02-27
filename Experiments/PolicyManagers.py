@@ -774,7 +774,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		else:
 			self.parameter_list = list(self.policy_network.parameters()) + list(self.encoder_network.parameters())
 		
-		self.optimizer = torch.optim.Adam(self.parameter_list,lr=self.learning_rate)
+		# Optimize with reguliarzation weight.
+		self.optimizer = torch.optim.Adam(self.parameter_list,lr=self.learning_rate,weight_decay=self.args.regularization_weight)
 
 	def save_all_models(self, suffix):
 
