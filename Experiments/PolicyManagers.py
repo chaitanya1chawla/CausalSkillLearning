@@ -1762,7 +1762,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.parameter_list = list(self.latent_policy.parameters()) + list(self.variational_policy.parameters())
 		if not(self.args.fix_subpolicy):
 			self.parameter_list = self.parameter_list + list(self.policy_network.parameters())
-		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate)
+		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
 
 	def save_all_models(self, suffix):
 
@@ -5009,7 +5009,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.negative_log_likelihood_loss_function = torch.nn.NLLLoss(reduction='none')
 		
 		# Create common optimizer for source, target, and discriminator networks. 
-		self.discriminator_optimizer = torch.optim.Adam(self.discriminator_network.parameters(),lr=self.learning_rate)
+		self.discriminator_optimizer = torch.optim.Adam(self.discriminator_network.parameters(),lr=self.learning_rate, weight_decay=self.args.regularization_weight)
 
 	def save_all_models(self, suffix):
 		self.logdir = os.path.join(self.args.logdir, self.args.name)
@@ -5956,7 +5956,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Add discriminator parameters if neede.d
 		if self.args.real_translated_discriminator:			
 			self.parameter_list += list(self.source_discriminator.parameters()) + list(self.target_discriminator.parameters())
-		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate)
+		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
 
 	def save_all_models(self, suffix):
 
@@ -7012,7 +7012,7 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 		discriminator_opt_params = self.discriminator_network.parameters()
 		if self.args.z_transform_discriminator:
 			discriminator_opt_params = list(discriminator_opt_params) + list(self.z_transform_discriminator.parameters())
-		self.discriminator_optimizer = torch.optim.Adam(discriminator_opt_params,lr=self.learning_rate)		
+		self.discriminator_optimizer = torch.optim.Adam(discriminator_opt_params,lr=self.learning_rate,weight_decay=self.args.regularization_weight)	
 
 	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False):
 
