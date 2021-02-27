@@ -626,6 +626,12 @@ class PolicyManager_BaseClass():
 
 		return anim
 
+	def return_wandb_image(self, image):
+		return [wandb.Image(image.transpose(1,2,0))]		
+
+	def return_wandb_gif(self, gif):
+		return wandb.Video(gif, fps=4, format='gif')
+
 class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 	def __init__(self, number_policies=4, dataset=None, args=None):
@@ -901,10 +907,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			image_perp30 = self.plot_embedding(self.embedded_z_dict['perp30'], title="Z Space {0} Perp 30".format(statistics_line))
 			
 			# Now adding image visuals to the wandb logs.
-			log_dict["GT Trajectory"] = [wandb.Image(self.visualize_trajectory(sample_traj).transpose(1,2,0))]
-			log_dict["Embedded Z Space Perplexity 5"] = [wandb.Image(image_perp5.transpose(1,2,0))]
-			log_dict["Embedded Z Space Perplexity 10"] = [wandb.Image(image_perp10.transpose(1,2,0))]
-			log_dict["Embedded Z Space Perplexity 30"] = [wandb.Image(image_perp30.transpose(1,2,0))]
+			log_dict["GT Trajectory"] = self.return_wandb_image(self.visualize_trajectory(sample_traj))
+			log_dict["Embedded Z Space Perplexity 5"] = self.return_wandb_image(image_perp5)
+			log_dict["Embedded Z Space Perplexity 10"] =  self.return_wandb_image(image_perp10)
+			log_dict["Embedded Z Space Perplexity 30"] =  self.return_wandb_image(image_perp30)
 
 		wandb.log(log_dict, step=counter)
 
@@ -1867,7 +1873,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 					self.args.fix_subpolicy = 0
 
 					# Initially we weren't recreating the optimizer, but now we are going to try it, and set the learning rate smaller. 
-					self.learning_rate = 1e-5					
+					self.learning_rate = self.args.transfer_learning_rate
 					self.create_training_ops()
 
 					# One issue is this resets variational network optimizer parameters, but that's okay.
@@ -4979,12 +4985,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Phase 2 of training: Train the discriminator, and set discriminability loss weight to original.
 		else:
 
+			self.vae_loss_weight = self.args.vae_loss_weight
+			self.discriminability_loss_weight = self.args.discriminability_weight
+
 			if self.args.training_phase_size<=counter and counter<self.args.training_phase_size*2:
-				self.discriminability_loss_weight = self.args.discriminability_weight
 				# self.z_transform_discriminability_loss_weight = self.args.z_transform_discriminability_weights
-				self.z_transform_discriminability_loss_weight = 0.
-				self.vae_loss_weight = self.args.vae_loss_weight
-			else:
+				self.z_transform_discriminability_loss_weight = 0.				
+			else:								
 				self.z_transform_discriminability_loss_weight = self.args.z_transform_discriminability_weight
 
 			# Now make discriminator and vae train in alternating fashion. 
@@ -5220,28 +5227,25 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 	def update_plots(self, counter, viz_dict):
 
-		# VAE Losses. 
-		self.tf_logger.scalar_summary('Policy LogLikelihood', self.likelihood_loss, counter)
-		self.tf_logger.scalar_summary('Discriminability Loss', self.discriminability_loss, counter)
-		self.tf_logger.scalar_summary('Encoder KL', self.encoder_KL, counter)
-		self.tf_logger.scalar_summary('VAE Loss', self.VAE_loss, counter)
-		self.tf_logger.scalar_summary('Total VAE Loss', self.total_VAE_loss, counter)
-		self.tf_logger.scalar_summary('Domain', viz_dict['domain'], counter)
-		self.tf_logger.scalar_summary('Training Phase', self.training_phase, counter)
-		self.tf_logger.scalar_summary('Training Discriminator', self.skip_vae, counter)
-		self.tf_logger.scalar_summary('Training Embeddings or Translation Models', self.skip_discriminator , counter)
+		log_dict = {'Policy Loglikelihood': self.likelihood_loss, 
+					'Discriminability Loss': self.discriminability_loss,
+					'Encoder KL': self.encoder_KL,
+					'VAE Loss': self.VAE_loss,
+					'Total VAE Loss:': self.total_VAE_loss,
+					'Domain': viz_dict['domain'],
+					'Training Phase': self.training_phase, 
+					'Training Discriminator': self.skip_vae, 
+					'Training Embeddings or Translation Models': self.skip_discriminator}
+
 		# Plot discriminator values after we've started training it. 
 		if self.training_phase>1:
-			# Discriminator Loss. 
-			self.tf_logger.scalar_summary('Z Discriminator Loss', self.discriminator_loss, counter)			
-			# Compute discriminator prob of right action for logging. 
-			self.tf_logger.scalar_summary('Z Discriminator Probability', viz_dict['discriminator_probs'], counter)
-		
+			# Compute discriminator loss and discriminator prob of right action for logging. 
+			log_dict['Z Discriminator Loss'], log_dict['Z Discriminator Probability'] = self.discriminator_loss, viz_dict['discriminator_probs']
+
 			if self.args.z_transform_discriminator:
-				self.tf_logger.scalar_summary('Total Discriminator Loss', self.total_discriminator_loss, counter)
-				self.tf_logger.scalar_summary('Z Transform Discriminator Loss', self.z_transform_discriminator_loss, counter)
-				self.tf_logger.scalar_summary('Z Transform Discriminability Loss', self.z_transform_discriminability_loss, counter)
-				self.tf_logger.scalar_summary('Z Transform Discriminator Probability', viz_dict['z_transform_discriminator_probs'], counter)
+				log_dict['Total Discriminator Loss'], log_dict['Z Transform Discriminator Loss'], log_dict['Z Transform Discriminability Loss'], \
+				log_dict['Z Transform Discriminator Probability'] = self.total_discriminator_loss, self.z_transform_discriminator_loss, \
+					self.z_transform_discriminability_loss, viz_dict['z_transform_discriminator_probs']
 
 		# If we are displaying things: 
 		if counter%self.args.display_freq==0:
@@ -5258,33 +5262,28 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					self.get_embeddings(projection='tsne')
 			
 			if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':			
-				self.tf_logger.image_summary("TSNE Source Traj Embedding", [self.source_traj_image], counter)
-				self.tf_logger.image_summary("TSNE Target Traj Embedding", [self.target_traj_image], counter)
+				log_dict['TSNE Source Traj Embedding'], log_dict['TSNE Target Traj Embedding'] = \
+					 self.return_wandb_image(self.source_traj_image), self.return_wandb_image(self.target_traj_image)
 
-
-			# Now actually plot the images.			
-			self.tf_logger.image_summary("TSNE Source Embedding", [self.viz_dictionary['tsne_source_embedding']], counter)
-			self.tf_logger.image_summary("TSNE Target Embedding", [self.viz_dictionary['tsne_target_embedding']], counter)
-			self.tf_logger.image_summary("TSNE Combined Embeddings Perplexity 5", [self.viz_dictionary['tsne_combined_embeddings_p5']], counter)
-			self.tf_logger.image_summary("TSNE Combined Embeddings Perplexity 10", [self.viz_dictionary['tsne_combined_embeddings_p10']], counter)
-			self.tf_logger.image_summary("TSNE Combined Embeddings Perplexity 30", [self.viz_dictionary['tsne_combined_embeddings_p30']], counter)
+			log_dict['TSNE Source Embedding'], log_dict['TSNE Target Embedding'], log_dict['TSNE Combined Embedding Perplexity 5'], \
+				log_dict['TSNE Combined Embedding Perplexity 10'], log_dict['TSNE Combined Embedding Perplexity 30'] = \
+					self.return_wandb_image(self.viz_dictionary['tsne_source_embedding']), self.return_wandb_image(self.viz_dictionary['tsne_target_embedding']), \
+					self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p5']), self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p10']), \
+					self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p30'])
 			
 			# Plot source, target, and shared embeddings via PCA. 
 			self.viz_dictionary['pca_source_embedding'], self.viz_dictionary['pca_target_embedding'], self.viz_dictionary['pca_combined_embeddings'], self.viz_dictionary['pca_combined_traj_embeddings'] = self.get_embeddings(projection='pca')
 
-			# Now actually plot the images.			
-			self.tf_logger.image_summary("PCA Source Embedding", [self.viz_dictionary['pca_source_embedding']], counter)
-			self.tf_logger.image_summary("PCA Target Embedding", [self.viz_dictionary['pca_target_embedding']], counter)
-			self.tf_logger.image_summary("PCA Combined Embeddings", [self.viz_dictionary['pca_combined_embeddings']], counter)		
-
+			log_dict['PCA Source Embedding'], log_dict['PCA Target Embedding'], log_dict['PCA Combined Embedding'] = \
+				self.return_wandb_image(self.viz_dictionary['pca_source_embedding']), self.return_wandb_image(self.viz_dictionary['pca_target_embedding']), \
+				self.return_wandb_image(self.viz_dictionary['pca_combined_embeddings'])
+	
 			if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':			
-				# self.tf_logger.image_summary("TSNE Source Traj Embedding", [self.source_traj_image], counter)
-				# self.tf_logger.image_summary("TSNE Target Traj Embedding", [self.target_traj_image], counter)
-
-				self.tf_logger.image_summary("PCA Combined Trajectory Embeddings", [self.viz_dictionary['pca_combined_traj_embeddings']], counter)
-				self.tf_logger.image_summary("TSNE Combined Trajectory Embeddings Perplexity 5", [self.viz_dictionary['tsne_combined_traj_embeddings_p5']], counter)
-				self.tf_logger.image_summary("TSNE Combined Trajectory Embeddings Perplexity 10", [self.viz_dictionary['tsne_combined_traj_embeddings_p10']], counter)
-				self.tf_logger.image_summary("TSNE Combined Trajectory Embeddings Perplexity 30", [self.viz_dictionary['tsne_combined_traj_embeddings_p30']], counter)
+				
+				log_dict['PCA Combined Trajectory Embeddings'], log_dict['TSNE Combined Trajectory Embeddings Perplexity 5'], \
+					log_dict['TSNE Combined Trajectory Embeddings Perplexity 10'], log_dict['TSNE Combined Trajectory Embeddings Perplexity 30'] = \
+						self.return_wandb_image(self.viz_dictionary['pca_combined_traj_embeddings']), self.return_wandb_image(self.viz_dictionary['tsne_combined_traj_embeddings_p5']), \
+						self.return_wandb_image(self.viz_dictionary['tsne_combined_traj_embeddings_p10']), self.return_wandb_image(self.viz_dictionary['tsne_combined_traj_embeddings_p30'])
 
 			# We are also going to log Ground Truth trajectories and their reconstructions in each of the domains, to make sure our networks are learning. 		
 			# Should be able to use the policy manager's functions to do this.
@@ -5295,22 +5294,21 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				# Now actually plot the images.
 
 				if self.args.source_domain=='ContinuousNonZero':
-					self.tf_logger.image_summary("Source Trajectory", [self.viz_dictionary['source_trajectory']], counter)
-					self.tf_logger.image_summary("Source Reconstruction", [self.viz_dictionary['source_reconstruction']], counter)
+					log_dict['Source Trajectory'], log_dict['Source Reconstruction'] = \
+						self.return_wandb_image(self.viz_dictionary['source_trajectory']), self.return_wandb_image(self.viz_dictionary['source_reconstruction'])
 				else:
-					self.tf_logger.gif_summary("Source Trajectory", [self.viz_dictionary['source_trajectory']], counter)
-					self.tf_logger.gif_summary("Source Reconstruction", [self.viz_dictionary['source_reconstruction']], counter)
-
+					log_dict['Source Trajectory'], log_dict['Source Reconstruction'] = \
+						self.return_wandb_gif(self.viz_dictionary['source_trajectory']), self.return_wandb_gif(self.viz_dictionary['source_reconstruction'])
 				if self.args.target_domain=='ContinuousNonZero':
-					self.tf_logger.image_summary("Target Trajectory", [self.viz_dictionary['target_trajectory']], counter)
-					self.tf_logger.image_summary("Target Reconstruction", [self.viz_dictionary['target_reconstruction']], counter)
+					log_dict['Target Trajectory'], log_dict['Target Reconstruction'] = \
+						self.return_wandb_image(self.viz_dictionary['target_trajectory']), self.return_wandb_image(self.viz_dictionary['target_reconstruction'])
 				else:
-					self.tf_logger.gif_summary("Target Trajectory", [self.viz_dictionary['target_trajectory']], counter)
-					self.tf_logger.gif_summary("Target Reconstruction", [self.viz_dictionary['target_reconstruction']], counter)
+					log_dict['Target Trajectory'], log_dict['Target Reconstruction'] = \
+						self.return_wandb_gif(self.viz_dictionary['target_trajectory']), self.return_wandb_gif(self.viz_dictionary['target_reconstruction'])
 
 			# Log Average Reconstruction Error.
-			self.tf_logger.scalar_summary('Source Trajectory Reconstruction Error', self.source_manager.avg_reconstruction_error, counter)
-			self.tf_logger.scalar_summary('Target Trajectory Reconstruction Error', self.target_manager.avg_reconstruction_error, counter)
+			log_dict['Source Trajectory Reconstruction Error'], log_dict['Target Trajectory Reconstruction Error'] = \
+				self.source_manager.avg_reconstruction_error, self.target_manager.avg_reconstruction_error
 
 			# if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':
 			if self.args.source_domain==self.args.target_domain and self.args.eval_jointtransfer_metrics and counter%self.args.metric_eval_freq==0:
@@ -5318,17 +5316,19 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				# self.evaluate_correspondence_metrics(computed_sets=False)
 				# Actually, we've probably computed trajectory and latent sets. 
 				self.evaluate_correspondence_metrics()
-								
-				self.tf_logger.scalar_summary('Source To Target Translation Trajectory Error', self.source_target_trajectory_distance, counter)		
-				self.tf_logger.scalar_summary('Target To Source Translation Trajectory Error', self.target_source_trajectory_distance, counter)
-				self.tf_logger.scalar_summary('Source To Target Translation Trajectory Normalized Error', self.source_target_trajectory_normalized_distance, counter)
-				self.tf_logger.scalar_summary('Target To Source Translation Trajectory Normalized Error', self.target_source_trajectory_normalized_distance, counter) 
-	
-				self.tf_logger.scalar_summary('Average Corresponding Z Sequence Error', self.average_corresponding_z_sequence_error.mean(), counter)
-				self.tf_logger.scalar_summary('Average Corresponding Z Transition Sequence Error', self.average_corresponding_z_transition_sequence_error.mean(), counter)
+
+				log_dict['Source To Target Translation Trajectory Error'] = self.source_target_trajectory_distance
+				log_dict['Target To Source Translation Trajectory Error'] = self.target_source_trajectory_distance
+				log_dict['Source To Target Translation Trajectory Normalized Error'] = self.source_target_trajectory_normalized_distance
+				log_dict['Target To Source Translation Trajectory Normalized Error'] = self.target_source_trajectory_normalized_distance
+				log_dict['Average Corresponding Z Sequence Error'] = self.average_corresponding_z_sequence_error.mean()
+				log_dict['Average Corresponding Z Transition Sequence Error'] = self.average_corresponding_z_transition_sequence_error.mean()
 
 			# Clean up objects consuming memory. 			
 			self.free_memory()
+		
+		# Now log everything. 
+		wandb.log(log_dict, step=counter)
 		
 	def get_transform(self, latent_z_set, projection='tsne', shared=False, perplexity=30):
 
