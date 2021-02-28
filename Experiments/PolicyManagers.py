@@ -1925,33 +1925,32 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 	
 	def update_plots(self, counter, i, input_dictionary, variational_dict, eval_likelihood_dict):
 	
-
 		# Parse dictionaries: 
 		sample_traj = input_dictionary['sample_traj']
 		kl_divergence = variational_dict['kl_divergence']
 		prior_loglikelihood = variational_dict['prior_loglikelihood']
 		subpolicy_loglikelihood = eval_likelihood_dict['learnt_subpolicy_loglikelihood']
 		latent_loglikelihood = eval_likelihood_dict['latent_loglikelihood']
-		# subpolicy_entropy = eval_likelihood_dict['subpolicy_entropy']
 		latent_z_logprobability = eval_likelihood_dict['latent_z_logprobability']
 		latent_b_logprobability = eval_likelihood_dict['latent_b_logprobability']
 		
-		self.tf_logger.scalar_summary('Latent Policy Loss', torch.mean(self.total_latent_loss), counter)
-		self.tf_logger.scalar_summary('SubPolicy Log Likelihood', subpolicy_loglikelihood.mean(), counter)
-		self.tf_logger.scalar_summary('Latent Log Likelihood', latent_loglikelihood.mean(), counter)	
-		self.tf_logger.scalar_summary('Variational Policy Loss', torch.mean(self.variational_loss), counter)
-		self.tf_logger.scalar_summary('Variational Reinforce Loss', torch.mean(self.reinforce_variational_loss), counter)
-		self.tf_logger.scalar_summary('Total Variational Policy Loss', torch.mean(self.total_variational_loss), counter)
-		self.tf_logger.scalar_summary('Baseline', self.baseline.mean(), counter)
-		self.tf_logger.scalar_summary('Total Likelihood', subpolicy_loglikelihood+latent_loglikelihood, counter)
-		self.tf_logger.scalar_summary('Epsilon', self.epsilon, counter)
-		self.tf_logger.scalar_summary('Latent Z LogProbability', latent_z_logprobability, counter)
-		self.tf_logger.scalar_summary('Latent B LogProbability', latent_b_logprobability, counter)
-		self.tf_logger.scalar_summary('KL Divergence', torch.mean(kl_divergence), counter)
-		self.tf_logger.scalar_summary('Prior LogLikelihood', torch.mean(prior_loglikelihood), counter)
-		self.tf_logger.scalar_summary('Epoch', self.current_epoch_running, counter)
-		self.tf_logger.scalar_summary('Latent Z Mean', torch.mean(variational_dict['latent_z_indices']), counter)
-		self.tf_logger.scalar_summary('Training Phase', self.training_phase, counter)
+		# Create wandb log directory. 
+		log_dict = {'Latent Policy Loss': torch.mean(self.total_latent_loss),
+					'SubPolicy Log Likelihood': subpolicy_loglikelihood.mean(),
+					'Latent Log Likelihood': latent_loglikelihood.mean(),
+					'Variational Policy Loss': torch.mean(self.variational_loss),
+					'Variational Reinforce Loss',: torch.mean(self.reinforce_variational_loss),
+					'Total Variational Policy Loss': torch.mean(self.total_variational_loss),
+					'Baseline': self.baseline.mean(),
+					'Total Likelihood': subpolicy_loglikelihood+latent_loglikelihood,
+					'Epsilon': self.epsilon,
+					'Latent Z LogProbability': latent_z_logprobability,
+					'Latent B LogProbability': latent_b_logprobability,
+					'KL Divergence': torch.mean(kl_divergence),
+					'Prior LogLikelihood': torch.mean(prior_loglikelihood),
+					'Epoch': self.current_epoch_running,
+					'Latent Z Mean': torch.mean(variational_dict['latent_z_indices']),
+					'Training Phase': self.training_phase} 
 
 		if counter%self.args.display_freq==0:
 			# Now adding visuals for MIME, so it doesn't depend what data we use.
@@ -1962,8 +1961,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			# Compute distance metrics. 
 			var_dist, latent_dist = self.compute_evaluation_metrics(sample_traj, counter, i)
-			self.tf_logger.scalar_summary('Variational Trajectory Distance', var_dist, counter)
-			self.tf_logger.scalar_summary('Latent Trajectory Distance', latent_dist, counter)
+			log_dict['Variational Trajectory Distance'] = var_dist
+			log_dict['Latent Trajectory Distance'] = latent_dist
 			
 			if self.args.batch_size>1:
 				gt_trajectory_image = np.array(self.visualize_trajectory(sample_traj[:,0,:], i=i, suffix='GT'))
@@ -1975,16 +1974,19 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			if self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 				# Feeding as list of image because gif_summary.				
-				self.tf_logger.gif_summary("GT Trajectory",[gt_trajectory_image],counter)
-				self.tf_logger.gif_summary("Variational Rollout",[variational_rollout_image],counter)
+				log_dict['GT Trajectory'] = self.return_wandb_gif(gt_trajectory_image)
+				log_dict['Variational Rollout'] = self.return_wandb_gif(variational_rollout_image)
 				if self.args.viz_latent_rollout:
-					self.tf_logger.gif_summary("Latent Rollout",[latent_rollout_image],counter)
+					log_dict['Latent Rollout'] = self.return_wandb_gif(latent_rollout_image)				
 			else:
 				# Feeding as list of image because gif_summary.
-				self.tf_logger.image_summary("GT Trajectory",[gt_trajectory_image],counter)
-				self.tf_logger.image_summary("Variational Rollout",[variational_rollout_image],counter)
+				log_dict['GT Trajectory'] = self.return_wandb_image(gt_trajectory_image)
+				log_dict['Variational Rollout'] = self.return_wandb_image(variational_rollout_image)
 				if self.args.viz_latent_rollout:
-					self.tf_logger.image_summary("Latent Rollout",[latent_rollout_image],counter)				
+					log_dict['Latent Rollout'] = self.return_wandb_image(latent_rollout_image)
+
+		# Now actually log things in wandb.
+		wandb.log(log_dict, step=counter)
 
 	def assemble_inputs(self, input_trajectory, latent_z_indices, latent_b, sample_action_seq, conditional_information=None):
 
