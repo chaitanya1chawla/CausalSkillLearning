@@ -7019,7 +7019,8 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 		# Phase 1 of training - 
 		if counter<self.args.training_phase_size:
 			self.training_phase = 1						
-
+			self.args.discriminator_phase_size = 1
+			self.args.generator_phase_size = 2
 		# Phase 2 of training - 
 		else:
 			self.args.discriminator_phase_size = 2

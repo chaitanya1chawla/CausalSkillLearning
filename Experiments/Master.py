@@ -307,9 +307,10 @@ def parse_arguments():
 def main(args):
 
 	args = parse_arguments()
-	master = Master(args)
- 
+	# Moving this up.
 	wandb.init(project=args.setting, dir=args.logdir, name=args.name)
+
+	master = Master(args)	
 	# Add argparse flags to wandb config.
 	wandb.config.update(args)
 
