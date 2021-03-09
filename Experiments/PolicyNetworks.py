@@ -2247,4 +2247,29 @@ class ContextDecoder(ContinuousVariationalPolicyNetwork):
 	# 	# context_z_logprobability = self.dists.log_prob(context_zs)		
 	# 	# return context_z_logprobability
 
+class ResidualContinuousMLP(ContinuousMLP):
 
+	def __init__(self, input_size, hidden_size, output_size, args=None, number_layers=4):
+
+		super(ResidualContinuousMLP, self).__init__()
+
+	def forward(self, input, greedy=False, action_epsilon=0.0001):
+
+		# Assumes input is Batch_Size x Input_Size.
+		h1 = self.relu_activation(self.input_layer(input))
+		h2 = self.relu_activation(self.hidden_layer(h1))
+		h3 = self.relu_activation(self.hidden_layer(h2))
+		h4 = self.relu_activation(self.hidden_layer(h3))
+
+		mean_outputs = self.output_layer(h4)
+		variance_outputs = self.variance_activation_layer(self.output_layer(h4))
+		
+		noise = torch.randn_like(variance_outputs)
+
+		if greedy: 
+			action = mean_outputs
+		else:
+			# Instead of *sampling* the action from a distribution, construct using mu + sig * eps (random noise).
+			action = mean_outputs + variance_outputs * noise
+
+		return action + input
