@@ -5694,7 +5694,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			for i in random_range:
 				seg_traj_len = len(self.shared_trajectory_set[i])
 				ax.scatter(embedded_zs[i,0]+ratio*self.shared_trajectory_set[i][:,0],embedded_zs[i,1]+ratio*self.shared_trajectory_set[i][:,1], \
-					c=colors[i]*color_scaling+range(seg_traj_len),cmap='jet',vmin=color_range_min,vmax=color_range_max)
+					c=colors[i]*color_scaling+range(seg_traj_len),cmap='jet',vmin=color_range_min,vmax=color_range_max,s=15)
 
 
 		else:			
@@ -7010,49 +7010,48 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 			discriminator_opt_params = list(discriminator_opt_params) + list(self.z_transform_discriminator.parameters())
 		self.discriminator_optimizer = torch.optim.Adam(discriminator_opt_params,lr=self.learning_rate,weight_decay=self.args.regularization_weight)	
 
-	def set_iteration(self, counter):
+	# def set_iteration(self, counter):
 		
-		self.vae_loss_weight = self.args.vae_loss_weight
-		self.discriminability_loss_weight = self.args.discriminability_weight
-		self.z_transform_discriminability_loss_weight = self.args.z_transform_discriminability_weight
+	# 	self.vae_loss_weight = self.args.vae_loss_weight
+	# 	self.discriminability_loss_weight = self.args.discriminability_weight
+	# 	self.z_transform_discriminability_loss_weight = self.args.z_transform_discriminability_weight
 
-		# Phase 1 of training - 
-		if counter<self.args.training_phase_size:
-			self.training_phase = 1						
-			self.args.discriminator_phase_size = 1
-			self.args.generator_phase_size = 2
-		# Phase 2 of training - 
-		else:
-			self.args.discriminator_phase_size = 2
-			self.args.generator_phase_size = 1
+	# 	# Phase 1 of training - 
+	# 	if counter<self.args.training_phase_size:
+	# 		self.training_phase = 1						
+	# 		self.args.discriminator_phase_size = 1
+	# 		self.args.generator_phase_size = 2
+	# 	# Phase 2 of training - 
+	# 	else:
+	# 		self.training_phase = 2
+	# 		self.args.discriminator_phase_size = 2
+	# 		self.args.generator_phase_size = 1
 
-		# Now make discriminator and vae train in alternating fashion. 
-		# Set number of iterations of alteration. 
+	# 	# Now make discriminator and vae train in alternating fashion. 
+	# 	# Set number of iterations of alteration. 
 
-		# Train discriminator for k times as many steps as VAE. Set args.alternating_phase_size as 1 for this. 
-		# Instead of using discriminator_phase_size steps for every 1 generator step.
-		# Now, training generator / VAE for generator_phase_size. 
+	# 	# Train discriminator for k times as many steps as VAE. Set args.alternating_phase_size as 1 for this. 
+	# 	# Instead of using discriminator_phase_size steps for every 1 generator step.
+	# 	# Now, training generator / VAE for generator_phase_size. 
 
-		# First get how many alternating phases we've completed so far. 
-		completed_alternating_training_phases = (counter//self.args.alternating_phase_size)
-		# Now figure out how many stages of discriminator phase sizes and generator phase sizes we've completed.
-		modulo_phase = completed_alternating_training_phases%(self.args.discriminator_phase_size+self.args.generator_phase_size)
-		# If we haven't yet completed the right number of generator (discriminator) phase sizes is done, train the generator (discriminator). 
-		train_generator = modulo_phase<self.args.generator_phase_size
+	# 	# First get how many alternating phases we've completed so far. 
+	# 	completed_alternating_training_phases = (counter//self.args.alternating_phase_size)
+	# 	# Now figure out how many stages of discriminator phase sizes and generator phase sizes we've completed.
+	# 	modulo_phase = completed_alternating_training_phases%(self.args.discriminator_phase_size+self.args.generator_phase_size)
+	# 	# If we haven't yet completed the right number of generator (discriminator) phase sizes is done, train the generator (discriminator). 
+	# 	train_generator = modulo_phase<self.args.generator_phase_size
 
-		if train_generator:
-			print("Training VAE.")
-			self.skip_discriminator = True
-			self.skip_vae = False						
-		else:
-			print("Training Discriminator.")
-			self.skip_discriminator = False
-			self.skip_vae = True	
+	# 	if train_generator:
+	# 		print("Training VAE.")
+	# 		self.skip_discriminator = True
+	# 		self.skip_vae = False						
+	# 	else:
+	# 		print("Training Discriminator.")
+	# 		self.skip_discriminator = False
+	# 		self.skip_vae = True	
 
-		self.training_phase = 2
-
-		self.source_manager.set_epoch(counter)
-		self.target_manager.set_epoch(counter)
+	# 	self.source_manager.set_epoch(counter)
+	# 	self.target_manager.set_epoch(counter)
 
 	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False):
 
@@ -7070,10 +7069,15 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 
 		# First compute the differences.
 		# No torch diff op, so do it manually. 
-		latent_z_diff = latent_z[1:] - latent_z[:-1]
-		
+		if self.args.z_transform_or_tuple:
+			# Actually compute difference.
+			latent_z_diff = latent_z[1:] - latent_z[:-1]
+		else:
+			# Instead of computing differences, we're going to copy over the subsequent / succeeding z's into the diff vector, to form a tuple.
+			latent_z_diff = latent_z[1:]
+
 		# Better way to compute weights is just roll latent_b
-		with torch.no_grad():
+		with torch.no_grad():			
 			latent_z_transformation_weights = latent_b.roll(-1,dims=0)
 
 		# Concatenate 0's to the latent_z_diff. 

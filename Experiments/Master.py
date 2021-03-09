@@ -256,6 +256,7 @@ def parse_arguments():
 	parser.add_argument('--z_transform_discriminability_weight',dest='z_transform_discriminability_weight',type=float,default=1.,help='Weight of z transformation discriminability loss.')
 	parser.add_argument('--z_transform_discriminator_weight',dest='z_transform_discriminator_weight',type=float,default=1.,help='Weight of z transformation discriminator loss.')
 	parser.add_argument('--max_viz_trajs',dest='max_viz_trajs',type=int,default=5,help='How many trajectories to visualize.')
+	parser.add_argument('--z_transform_or_tuple',dest='z_transform_or_tuple',type=int,default=1,help='Whether to use the z transform or z tuples.')	
 
 	# Exploration and learning rate parameters. 
 	parser.add_argument('--epsilon_from',dest='epsilon_from',type=float,default=0.3)
