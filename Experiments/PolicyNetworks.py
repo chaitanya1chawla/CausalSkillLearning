@@ -2251,7 +2251,7 @@ class ResidualContinuousMLP(ContinuousMLP):
 
 	def __init__(self, input_size, hidden_size, output_size, args=None, number_layers=4):
 
-		super(ResidualContinuousMLP, self).__init__()
+		super(ResidualContinuousMLP, self).__init__(input_size, hidden_size, output_size, args=None, number_layers=4)
 
 	def forward(self, input, greedy=False, action_epsilon=0.0001):
 

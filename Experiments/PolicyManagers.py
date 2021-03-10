@@ -38,6 +38,7 @@ class PolicyManager_BaseClass():
 			(self.args.setting=='cycle_transfer' and isinstance(self, PolicyManager_CycleConsistencyTransfer)) or \
 			(self.args.setting=='fixembed' and isinstance(self, PolicyManager_FixEmbedCycleConTransfer)) or \
 			(self.args.setting=='jointtransfer' and isinstance(self, PolicyManager_JointTransfer)) or \
+			(self.args.setting=='jointfixembed' and isinstance(self, PolicyManager_JointFixEmbedTransfer)) or \
 			(self.args.setting=='jointcycletransfer' and isinstance(self, PolicyManager_JointCycleTransfer)):
 				extent = self.extent
 		else:
@@ -48,6 +49,7 @@ class PolicyManager_BaseClass():
 
 		# if self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer']:
 		if self.args.setting in ['jointtransfer'] and isinstance(self, PolicyManager_JointTransfer) or \
+			self.args.setting in ['jointfixembed'] and isinstance(self, PolicyManager_JointFixEmbedTransfer) or \
 			self.args.setting in ['jointcycletransfer'] and isinstance(self, PolicyManager_JointCycleTransfer) or \
 			self.args.setting in ['fixembed'] and isinstance(self, PolicyManager_FixEmbedCycleConTransfer):
 			self.load_domain_models()
@@ -210,7 +212,7 @@ class PolicyManager_BaseClass():
 			if self.args.setting=='imitation':
 				extent = self.dataset.get_number_task_demos(self.demo_task_index)
 			# if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed' or self.args.setting=='jointtransfer':
-			if self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer']:
+			if self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed']:
 				extent = self.extent
 			else:
 				if self.args.debugging_datapoints>-1:				
@@ -4993,7 +4995,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# print("FINALLY RUNNING CREATE TRAIN OPS")
 		# # Call create training ops from each of the policy managers. Need these optimizers, because the encoder-decoders get a different loss than the discriminator. 
-		if self.args.setting in ['jointtransfer']:
+		if self.args.setting in ['jointtransfer','jointfixembed']:
 			self.source_manager.learning_rate = self.args.transfer_learning_rate
 			self.target_manager.learning_rate = self.args.transfer_learning_rate
 
@@ -5332,7 +5334,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				
 		# Now assemble them into local variables.
 		self.N = self.source_manager.N
-		if self.args.setting in ['jointtransfer','jointcycletransfer']:
+		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed']:
 			self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
 			self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)		
 		else:
@@ -5432,7 +5434,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		i = np.random.randint(0,high=self.extent)
 
 		# First get a trajectory, starting point, and latent z.
-		if self.args.setting in ['jointtransfer','jointcycletransfer']:
+		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed']:
 			source_input_traj, source_var_dict, _ = self.encode_decode_trajectory(self.source_manager, i)
 			source_trajectory = source_input_traj['sample_traj']
 			source_latent_z = source_var_dict['latent_z_indices']			
@@ -5449,10 +5451,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		if source_trajectory is not None:
 			# Reconstruct using the source domain manager. 
 
-			_, self.source_trajectory_image, self.source_reconstruction_image = self.source_manager.get_robot_visuals(0, source_latent_z, source_trajectory, return_image=True, return_numpy=True, z_seq=(self.args.setting in ['jointtransfer','jointcycletransfer']))
+			_, self.source_trajectory_image, self.source_reconstruction_image = self.source_manager.get_robot_visuals(0, source_latent_z, source_trajectory, return_image=True, return_numpy=True, z_seq=(self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed']))
 
 			# Now repeat the same for target domain - First get a trajectory, starting point, and latent z.
-			if self.args.setting in ['jointtransfer','jointcycletransfer']:
+			if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed']:
 				target_input_dict, target_var_dict, _ = self.encode_decode_trajectory(self.target_manager, i)
 				target_trajectory = target_input_dict['sample_traj']
 				target_latent_z = target_var_dict['latent_z_indices']
@@ -5467,7 +5469,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# embed()
 
 			# Reconstruct using the target domain manager. 
-			_, self.target_trajectory_image, self.target_reconstruction_image = self.target_manager.get_robot_visuals(0, target_latent_z, target_trajectory, return_image=True, return_numpy=True, z_seq=(self.args.setting in ['jointtransfer','jointcycletransfer']))
+			_, self.target_trajectory_image, self.target_reconstruction_image = self.target_manager.get_robot_visuals(0, target_latent_z, target_trajectory, return_image=True, return_numpy=True, z_seq=(self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed']))
 
 			# return np.array(self.source_trajectory_image), np.array(self.source_reconstruction_image), np.array(self.target_trajectory_image), np.array(self.target_reconstruction_image)
 			return self.source_trajectory_image, self.source_reconstruction_image, self.target_trajectory_image, self.target_reconstruction_image	
@@ -5651,7 +5653,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.source_manager.get_trajectory_and_latent_sets()
 				self.target_manager.get_trajectory_and_latent_sets()		
 
-				if self.args.setting in ['jointtransfer','jointcycletransfer']:
+				if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed']:
 					# self.source_manager.trajectory_set = np.array(self.source_manager.trajectory_set)
 					# self.target_manager.trajectory_set = np.array(self.target_manager.trajectory_set)
 					# traj_length = len(self.source_manager.trajectory_set[0,:,0])
@@ -5725,7 +5727,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.set_neighbor_objects(computed_sets=computed_sets)
 
 		# Now that neighbor objects are set, compute neighbors. 			
-		if self.args.setting=='jointtransfer':
+		if self.args.setting in ['jointtransfer','jointfixembed']:
 			_, self.source_target_neighbors = self.source_neighbors_object.kneighbors(self.target_latent_zs)
 			_, self.target_source_neighbors = self.target_neighbors_object.kneighbors(self.source_latent_zs)
 		else:
@@ -5742,7 +5744,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# print("Embed before computing neighbor objects.")
 		# embed()
 		# Reassembling for neearest neighbor object creation.
-		if self.args.setting in ['jointtransfer','jointcycletransfer']:
+		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed']:
 			# self.source_latent_z_set = np.concatenate(self.source_manager.latent_z_set)
 			# self.target_latent_z_set = np.concatenate(self.target_manager.latent_z_set)
 
@@ -5855,11 +5857,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# Now that the neighbors have been computed, compute translated trajectory reconstruction errors via nearest neighbor z's. 
 		# Only use this version of evaluating trajectory distance.
-		if not(self.args.setting in ['jointtransfer']):		
+		if not(self.args.setting in ['jointtransfer','jointfixembed']):		
 			
 			self.evaluate_translated_trajectory_distances()		
 
-		if self.args.setting in ['jointtransfer']:			
+		if self.args.setting in ['jointtransfer','jointfixembed']:			
 			
 			# If we are actually in joint transfer setting: 
 
@@ -6871,7 +6873,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.target_z_discriminator = DiscreteMLP(self.args.z_dimensions, self.hidden_size, 2, args=self.args).to(device)
 		
 		# Create lists of discriminators. 
-		self.discriminator_list = [self.source_discriminator, self.target_discriminator]
+		# self.discrimin	ator_list = [self.source_discriminator, self.target_discriminator]
 		self.z_discriminator_list = [self.source_z_discriminator, self.target_z_discriminator]
 
 		if self.args.z_transform_discriminator:
@@ -6894,17 +6896,21 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate)
 
 		# Set discriminator parameter list. 
-		self.discrimator_parameter_list = list(self.source_z_discriminator.parameters()) + list(self.target_z_discriminator.parameters())
+		self.discriminator_parameter_list = list(self.source_z_discriminator.parameters()) + list(self.target_z_discriminator.parameters())
 		if self.args.z_transform_discriminator:
 			self.discriminator_parameter_list += list(self.source_z_transform_discriminator.parameters()) + list(self.target_z_transform_discriminator.parameters())
 
 		# Create common optimizer for source, target, and discriminator networks. 
-		self.discriminator_optimizer = torch.optim.Adam(self.discrimator_parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
+		self.discriminator_optimizer = torch.optim.Adam(self.discriminator_parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
 
 	def save_all_models(self, suffix):
 
-		# Call super save model. 
-		super().save_all_models(suffix)
+		self.logdir = os.path.join(self.args.logdir, self.args.name)
+		self.savedir = os.path.join(self.logdir,"saved_models")
+		if not(os.path.isdir(self.savedir)):
+			os.mkdir(self.savedir)
+
+		self.save_object = {}
 
 		# del self.save_object['Discriminator_Network']
 
@@ -6919,9 +6925,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		torch.save(self.save_object,os.path.join(self.savedir,"Model_"+suffix))
 
 	def load_all_models(self, path):
-
-		# Call super load. 
-		super().load_all_models(path)
+		self.load_object = torch.load(path)
 
 		# Load translation model.
 		self.forward_translation_model.load_state_dict(self.load_object['forward_translation_model'])
@@ -6955,6 +6959,18 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		return latent_z_transformation_vector, latent_z_transformation_weights
 		# return latent_z_transformation_vector.view(-1,2*self.args.z_dimensions), latent_z_transformation_weights.view(-1,1)
+
+	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False):
+
+		# Check if the index is too big. If yes, just sample randomly.
+		if i >= len(policy_manager.dataset):
+			i = np.random.randint(0, len(policy_manager.dataset))
+
+		# Since the joint training manager nicely lets us get dictionaries, just use it, but remember not to train. 
+		# This does all the steps we need.
+		source_input_dict, source_var_dict, source_eval_dict = policy_manager.run_iteration(self.counter, i, return_dicts=True, train=False)
+
+		return source_input_dict, source_var_dict, source_eval_dict
 
 	def run_iteration(self, counter, i):
 
