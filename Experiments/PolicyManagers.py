@@ -5265,14 +5265,15 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				# Evaluate metrics and plot them. 
 				# self.evaluate_correspondence_metrics(computed_sets=False)
 				# Actually, we've probably computed trajectory and latent sets. 
-				self.evaluate_correspondence_metrics()
+				if counter>0:
+					self.evaluate_correspondence_metrics()
 
-				log_dict['Source To Target Translation Trajectory Error'] = self.source_target_trajectory_distance
-				log_dict['Target To Source Translation Trajectory Error'] = self.target_source_trajectory_distance
-				log_dict['Source To Target Translation Trajectory Normalized Error'] = self.source_target_trajectory_normalized_distance
-				log_dict['Target To Source Translation Trajectory Normalized Error'] = self.target_source_trajectory_normalized_distance
-				log_dict['Average Corresponding Z Sequence Error'] = self.average_corresponding_z_sequence_error.mean()
-				log_dict['Average Corresponding Z Transition Sequence Error'] = self.average_corresponding_z_transition_sequence_error.mean()
+					log_dict['Source To Target Translation Trajectory Error'] = self.source_target_trajectory_distance
+					log_dict['Target To Source Translation Trajectory Error'] = self.target_source_trajectory_distance
+					log_dict['Source To Target Translation Trajectory Normalized Error'] = self.source_target_trajectory_normalized_distance
+					log_dict['Target To Source Translation Trajectory Normalized Error'] = self.target_source_trajectory_normalized_distance
+					log_dict['Average Corresponding Z Sequence Error'] = self.average_corresponding_z_sequence_error.mean()
+					log_dict['Average Corresponding Z Transition Sequence Error'] = self.average_corresponding_z_transition_sequence_error.mean()
 
 			# Clean up objects consuming memory. 			
 			self.free_memory()
@@ -6802,6 +6803,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.vae_loss_weight = 0.
 
 	def set_translated_z_sets(self):
+
+		self.viz_dictionary = {}
 		# First copy sets so we don't accidentally perform in-place operations on any of the computed sets.
 		self.original_source_latent_z_set = copy.deepcopy(self.source_latent_zs)
 		self.original_target_latent_z_set = copy.deepcopy(self.target_latent_zs)
@@ -6815,8 +6818,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
 
 		# Get embeddings of source, and backward translated target latent_zs. 	
-		_ , _ , self.viz_dictionary['tsne_origsource_transtarget_p5'], self.viz_dictionary['tsne_origsource_transtarget_p10'], self.viz_dictionary['tsne_origsource_transtarget_p30'], \
-			self.viz_dictionary['tsne_origsource_transtarget_traj_p5'], self.viz_dictionary['tsne_origsource_transtarget_traj_p10'], self.viz_dictionary['tsne_origsource_transtarget_traj_p30'] = \
+		_ , _ , self.viz_dictionary['tsne_origsource_transtarget_p05'], self.viz_dictionary['tsne_origsource_transtarget_p10'], self.viz_dictionary['tsne_origsource_transtarget_p30'], \
+			self.viz_dictionary['tsne_origsource_transtarget_traj_p05'], self.viz_dictionary['tsne_origsource_transtarget_traj_p10'], self.viz_dictionary['tsne_origsource_transtarget_traj_p30'] = \
 				self.get_embeddings(projection='tsne', computed_sets=True)
 
 		# Comment out this block because we're not using it. 
@@ -6830,8 +6833,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
 
 		# # Get embeddings of forward translated source, and original target latent_zs. 	
-		# _ , _ , self.viz_dictionary['tsne_transsource_origtarget_p5'], self.viz_dictionary['tsne_transsource_origtarget_p10'], self.viz_dictionary['tsne_transsource_origtarget_p30'], \
-		# 	self.viz_dictionary['tsne_transsource_origtarget_traj_p5'], self.viz_dictionary['tsne_transsource_origtarget_traj_p10'], self.viz_dictionary['tsne_transsource_origtarget_traj_p30'] = \
+		# _ , _ , self.viz_dictionary['tsne_transsource_origtarget_p05'], self.viz_dictionary['tsne_transsource_origtarget_p10'], self.viz_dictionary['tsne_transsource_origtarget_p30'], \
+		# 	self.viz_dictionary['tsne_transsource_origtarget_traj_p05'], self.viz_dictionary['tsne_transsource_origtarget_traj_p10'], self.viz_dictionary['tsne_transsource_origtarget_traj_p30'] = \
 		# 		self.get_embeddings(projection='tsne', computed_sets=True)
 
 	def update_plots(self, counter, viz_dict):
@@ -6842,24 +6845,26 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		############################################################
 		# Now implement visualization of original latent set and translated z space in both directions. 
 		############################################################	
-		self.set_translated_z_sets()
 
-		# Now actually add image plots.
-		# log_dict['Target Trajectory'], log_dict['Target Reconstruction'] = \
-				# self.return_wandb_gif(self.viz_dictionary['target_trajectory']), self.return_wandb_gif(self.viz_dictionary['target_reconstruction'])
+		if counter%self.args.display_freq==0:
+			self.set_translated_z_sets()
 
-		log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p05'])
-		log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p10'])
-		log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p30'])
-		# log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p05'])
-		# log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p10'])
-		# log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p30'])
-		log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p05'])
-		log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p10'])
-		log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p30'])
-		# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p05'])
-		# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p10'])
-		# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p30'])
+			# Now actually add image plots.
+			# log_dict['Target Trajectory'], log_dict['Target Reconstruction'] = \
+					# self.return_wandb_gif(self.viz_dictionary['target_trajectory']), self.return_wandb_gif(self.viz_dictionary['target_reconstruction'])
+
+			log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p05'])
+			log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p10'])
+			log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p30'])
+			# log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p05'])
+			# log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p10'])
+			# log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p30'])
+			log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p05'])
+			log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p10'])
+			log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p30'])
+			# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p05'])
+			# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p10'])
+			# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p30'])
 
 		wandb.log(log_dict, step=counter)
 
@@ -7050,7 +7055,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			####################################
 
 			if domain==1:
-				update_dictionary['translated_latent_z'], = self.translate_latent_z(update_dictionary['latent_z'])
+				update_dictionary['translated_latent_z'] = self.translate_latent_z(update_dictionary['latent_z'])
 			else:
 				# Otherwise.... set translated z to latent z, because that's what we're going to feed t the discriminator(s). 
 				# Detach just to make sure gradients don't pass into the source encoder. 
