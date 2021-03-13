@@ -217,11 +217,16 @@ class ContinuousDirectedNonZeroToyDataset(Dataset):
 		self.dataset_directory = dataset_directory
 		# For us, this is Research/Code/GraphPlanningNetworks/scripts/DatasetPlanning/CreateDemos/Demos2
 
-		self.x_path = os.path.join(self.dataset_directory,"X_dir_cont_nonzero.npy")
-		self.a_path = os.path.join(self.dataset_directory,"A_dir_cont_nonzero.npy")
-		self.y_path = os.path.join(self.dataset_directory,"Y_dir_cont_nonzero.npy")
-		self.b_path = os.path.join(self.dataset_directory,"B_dir_cont_nonzero.npy")
-		self.g_path = os.path.join(self.dataset_directory,"G_dir_cont_nonzero.npy")
+		# self.x_path = os.path.join(self.dataset_directory,"X_dir_cont_nonzero.npy")
+		# self.a_path = os.path.join(self.dataset_directory,"A_dir_cont_nonzero.npy")
+		# self.y_path = os.path.join(self.dataset_directory,"Y_dir_cont_nonzero.npy")
+		# self.b_path = os.path.join(self.dataset_directory,"B_dir_cont_nonzero.npy")
+		# self.g_path = os.path.join(self.dataset_directory,"G_dir_cont_nonzero.npy")
+		self.x_path = os.path.join(self.dataset_directory,"X_dir_cont_nonzero_noisy.npy")
+		self.a_path = os.path.join(self.dataset_directory,"A_dir_cont_nonzero_noisy.npy")
+		self.y_path = os.path.join(self.dataset_directory,"Y_dir_cont_nonzero_noisy.npy")
+		self.b_path = os.path.join(self.dataset_directory,"B_dir_cont_nonzero_noisy.npy")
+		self.g_path = os.path.join(self.dataset_directory,"G_dir_cont_nonzero_noisy.npy")
 
 		self.X_array = np.load(self.x_path)
 		self.A_array = np.load(self.a_path)

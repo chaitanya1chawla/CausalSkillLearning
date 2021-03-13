@@ -258,7 +258,8 @@ def parse_arguments():
 	parser.add_argument('--z_transform_discriminability_weight',dest='z_transform_discriminability_weight',type=float,default=1.,help='Weight of z transformation discriminability loss.')
 	parser.add_argument('--z_transform_discriminator_weight',dest='z_transform_discriminator_weight',type=float,default=1.,help='Weight of z transformation discriminator loss.')
 	parser.add_argument('--max_viz_trajs',dest='max_viz_trajs',type=int,default=5,help='How many trajectories to visualize.')
-	parser.add_argument('--z_transform_or_tuple',dest='z_transform_or_tuple',type=int,default=1,help='Whether to use the z transform or z tuples.')	
+	parser.add_argument('--z_transform_or_tuple',dest='z_transform_or_tuple',type=int,default=0,help='Whether to use the z transform or z tuples.')	
+	parser.add_argument('--ignore_last_z_transform',dest='ignore_last_z_transform',type=int,default=0,help='Whether to ignore or last z transform.')
 
 	# Exploration and learning rate parameters. 
 	parser.add_argument('--epsilon_from',dest='epsilon_from',type=float,default=0.3)
@@ -297,13 +298,14 @@ def parse_arguments():
 	parser.add_argument('--load_from_transfer',dest='load_from_transfer',type=int,default=0,help='Whether we are loading joint model from transfer training.')
 	parser.add_argument('--dataset_variation',dest='dataset_variation',type=int,default=0,help='Whether to use flipped or original version of the dataset.')
 	# parser.add_argument('--reset_subpolicy_training',dest='reset_subpolicy_training',type=int,default=1,help='Whether to reset subpolicy training.')
+	parser.add_argument('--residual_translation',dest='residual_translation',type=int,default=0,help='Whether to use a residual model for translation or just a regular one.')
 	
 	# Parameters for contextual training. 
 	parser.add_argument('--mask_fraction',dest='mask_fraction',type=float,default=0.15,help='What fraction of zs to mask in contextual embedding.')
 	parser.add_argument('--context',dest='context',type=int,default=1,help='Whether to implement contextual embedding model or original joint embedding model in Joint Transfer setting.')
 	parser.add_argument('--new_context',dest='new_context',type=int,default=1,help='Whether to implement new contextual embedding model or original one.')
 	parser.add_argument('--ELMO_embeddings',dest='ELMO_embeddings',type=int,default=0,help='Whether to implement ELMO style embeddings.')
-	parser.add_argument('--eval_jointtransfer_metrics',dest='eval_jointtransfer_metrics',type=int,default=0,help='Whether to evaluate correspondence metrics in joint transfer setting.')
+	parser.add_argument('--eval_jointtransfer_metrics',dest='eval_jointtransfer_metrics',type=int,default=0,help='Whether to evaluate correspondence metrics in transfer setting.')
 
 	return parser.parse_args()
 
