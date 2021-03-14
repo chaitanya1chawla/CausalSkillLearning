@@ -5394,8 +5394,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		self.source_image = self.plot_embedding(shared_embedded_zs, "Source_Embedding",viz_domain='source')
 		self.target_image = self.plot_embedding(shared_embedded_zs, "Target_Embedding",viz_domain='target')
-		self.source_traj_image = self.plot_embedding(shared_embedded_zs, "Source_Embedding", trajectory=True, viz_domain='source')
-		self.target_traj_image = self.plot_embedding(shared_embedded_zs, "Target_Embedding", trajectory=True, viz_domain='target')
+		# self.source_traj_image = self.plot_embedding(shared_embedded_zs, "Source_Embedding", trajectory=True, viz_domain='source')
+		# self.target_traj_image = self.plot_embedding(shared_embedded_zs, "Target_Embedding", trajectory=True, viz_domain='target')
+		self.source_traj_image = self.plot_embedding(source_embedded_zs, "Source_Embedding", trajectory=True, viz_domain='source')
+		self.target_traj_image = self.plot_embedding(target_embedded_zs, "Target_Embedding", trajectory=True, viz_domain='target')
 
 		self.samedomain_shared_embedding_image = None
 
@@ -5642,32 +5644,49 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False, viz_domain=None):	
 		
+		############################################################
 		# Setting fig size everywhere so that it doesn't go nuts. 
+		############################################################
+
 		matplotlib.rcParams['figure.figsize'] = [5,5]
 		fig = plt.figure()
 		ax = fig.gca()
 		
+		############################################################
+		# Set colors of embedding plots based on which domain we're plotting.
+		############################################################
+
 		if shared:
 			colors = 0.2*np.ones((embedded_zs.shape[0]))
 			colors[embedded_zs.shape[0]//2:] = 0.8
 		else:
 			colors = 0.2*np.ones((embedded_zs.shape[0]))
 
+		############################################################
+		# If we're visualizing trajectories in the visualized plots. 
+		############################################################
+
 		if trajectory:
 
-			# If we're in the shared embedding setting, assembles the shared_trajectory_set. 
+			############################################################
+			# If we're in the shared embedding setting, assemble the shared_trajectory_set. 
+			############################################################
+
 			if shared:
+
+				########################################
 				# Create a scatter plot of the embedding.
+				########################################
+
 				self.source_manager.get_trajectory_and_latent_sets()
-				self.target_manager.get_trajectory_and_latent_sets()		
+				self.target_manager.get_trajectory_and_latent_sets()						
 
 				if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed']:
 					# self.source_manager.trajectory_set = np.array(self.source_manager.trajectory_set)
 					# self.target_manager.trajectory_set = np.array(self.target_manager.trajectory_set)
 					# traj_length = len(self.source_manager.trajectory_set[0,:,0])
 					# Create a shared trajectory set from both individual segmented_trajectory_set(s). 
-					self.shared_trajectory_set = self.source_manager.segmented_trajectory_set+self.target_manager.segmented_trajectory_set
-					
+					self.shared_trajectory_set = self.source_manager.segmented_trajectory_set+self.target_manager.segmented_trajectory_set					
 				else:
 					# Assemble shared trajectory set. 
 					traj_length = len(self.source_manager.trajectory_set[0,:,0])
@@ -5675,14 +5694,22 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					self.shared_trajectory_set[:self.N] = self.source_manager.trajectory_set
 					self.shared_trajectory_set[self.N:] = self.target_manager.trajectory_set		
 
-			# Otherwise just set the shared_trajectory_set...
 			else:
+
+				########################################
+				# Otherwise just set the shared_trajectory_set.
+				########################################
+
 				# Depending on whether we're visualizing the source or target domain
 				if viz_domain=='source':
 					self.shared_trajectory_set = self.source_manager.segmented_trajectory_set
 				elif viz_domain=='target':
 					self.shared_trajectory_set = self.target_manager.segmented_trajectory_set
 			
+			############################################################
+			# Now that we've set the trajectory set, plot the trajectories.
+			############################################################
+
 			# ratio = 0.4
 			# preratio = 0.01
 			preratio = 0.005
@@ -5692,25 +5719,26 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			color_range_min = 0.2*color_scaling
 			color_range_max = 0.8*color_scaling+max_traj_length-1
 
-			# ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors,vmin=0,vmax=1,cmap='jet')
-			# print("Embed in Viz")
-			# embed()
-
-			# for i in range(min(embedded_zs.shape[0],len(self.shared_trajectory_set))):
-			# 	seg_traj_len = len(self.shared_trajectory_set[i])
-			# 	ax.scatter(embedded_zs[i,0]+ratio*self.shared_trajectory_set[i][:,0],embedded_zs[i,1]+ratio*self.shared_trajectory_set[i][:,1], \
-			# 		c=colors[i]*color_scaling+range(seg_traj_len),cmap='jet',vmin=color_range_min,vmax=color_range_max)
-
 			# Randomize the order of the plot, so that one domain doesn't overwrite the other in the plot. 
 			random_range = list(range(min(embedded_zs.shape[0],len(self.shared_trajectory_set))))
 			random.shuffle(random_range)
+			
 			for i in random_range:
 				seg_traj_len = len(self.shared_trajectory_set[i])
 				ax.scatter(embedded_zs[i,0]+ratio*self.shared_trajectory_set[i][:,0],embedded_zs[i,1]+ratio*self.shared_trajectory_set[i][:,1], \
 					c=colors[i]*color_scaling+range(seg_traj_len),cmap='jet',vmin=color_range_min,vmax=color_range_max,s=15)
 
-		else:			
+
+		############################################################
+		# If we're visualizing just data points in the visualized plots. 
+		############################################################
+
+		else:
+
+			########################################
 			# Create a scatter plot of the embedding.
+			########################################
+
 			s = np.ones(embedded_zs.shape[0])*50
 			if viz_domain=='source':
 				s[(embedded_zs.shape[0]//2):] = 1
@@ -5719,6 +5747,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 			ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors,vmin=0,vmax=1,cmap='jet',s=s)
 		
+		############################################################
+		# Now make the plot and generate numpy image from it. 
+		############################################################
+
 		# Title. 
 		ax.set_title("{0}".format(title),fontdict={'fontsize':15})
 		fig.canvas.draw()
