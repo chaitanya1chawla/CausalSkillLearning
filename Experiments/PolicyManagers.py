@@ -116,8 +116,17 @@ class PolicyManager_BaseClass():
 
 			# The trajectory is going to be one step longer than the action sequence, because action sequences are constructed from state differences. Instead, truncate trajectory to length of action sequence. 		
 			# Now manage concatenated trajectory differently - {{s0,_},{s1,a0},{s2,a1},...,{sn,an-1}}.
-			concatenated_traj = self.concat_state_action(sample_traj, sample_action_seq)
-			old_concatenated_traj = self.old_concat_state_action(sample_traj, sample_action_seq)
+			# concatenated_traj = self.concat_state_action(sample_traj, sample_action_seq)
+			# old_concatenated_traj = self.old_concat_state_action(sample_traj, sample_action_seq)
+			
+			# If the collect inputs function is being called from the train function, 
+			# Then we should corrupt the inputs based on how much the input_corruption_noise is set to. 
+			# If it's 0., then no corruption. 
+			corrupted_sample_action_seq = called_from_train*self.args.input_corruption_noise*np.random.randn(*sample_action_seq.shape) + sample_action_seq
+			corrupted_sample_traj = called_from_train*self.args.input_corruption_noise*np.random.randn(*sample_traj.shape) + sample_traj
+
+			concatenated_traj = self.concat_state_action(corrupted_sample_traj, corrupted_sample_action_seq)		
+			old_concatenated_traj = self.old_concat_state_action(corrupted_sample_traj, corrupted_sample_action_seq)
 		
 			if self.args.data=='DeterGoal':
 				self.conditional_information = np.zeros((self.args.condition_size))
@@ -167,9 +176,19 @@ class PolicyManager_BaseClass():
 					self.conditional_information[:,self.cond_robot_state_size:self.cond_robot_state_size+object_states.shape[-1]] = object_states	
 					# Setting task ID too.		
 					self.conditional_information[:,-self.number_tasks+data_element['task-id']] = 1.
-			# Concatenate
-			concatenated_traj = self.concat_state_action(trajectory, action_sequence)
-			old_concatenated_traj = self.old_concat_state_action(trajectory, action_sequence)
+
+			# If the collect inputs function is being called from the train function, 
+			# Then we should corrupt the inputs based on how much the input_corruption_noise is set to. 
+			# If it's 0., then no corruption. 
+			corrupted_action_sequence = called_from_train*self.args.input_corruption_noise*np.random.randn(*action_sequence.shape) + action_sequence
+			corrupted_trajectory = called_from_train*self.args.input_corruption_noise*np.random.randn(*trajectory.shape) + trajectory
+
+			concatenated_traj = self.concat_state_action(corrupted_trajectory, corrupted_action_sequence)		
+			old_concatenated_traj = self.old_concat_state_action(corrupted_trajectory, corrupted_action_sequence)
+
+			# # Concatenate
+			# concatenated_traj = self.concat_state_action(trajectory, action_sequence)
+			# old_concatenated_traj = self.old_concat_state_action(trajectory, action_sequence)
 
 			if self.args.setting=='imitation':
 				action_sequence = RLUtils.resample(data_element['demonstrated_actions'],len(trajectory))
@@ -633,6 +652,12 @@ class PolicyManager_BaseClass():
 
 	def return_wandb_gif(self, gif):
 		return wandb.Video(gif, fps=4, format='gif')
+
+	def corrupt_inputs(self, state_action_trajectory):
+
+		# Pass starred state_action_trajectory.shape as the input to the rand function. 
+		corrupted_state_action_trajectory = self.args.input_corruption_noise*np.random.randn(*state_action_trajectory.shape) + state_action_trajectory
+		return corrupted_state_action_trajectory 
 
 class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
@@ -1210,6 +1235,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		else:
 			sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj = self.collect_inputs(i)				
 			state_action_trajectory = concatenated_traj
+
+		# Corrupt the inputs according to how much input_corruption_noise is set to.	
+		state_action_trajectory = self.corrupt_inputs(state_action_trajectory)
 
 		if state_action_trajectory is not None:
 			
@@ -2451,7 +2479,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		############# (0) #############
 		# Get sample we're going to train on. Single sample as of now.
 		_ , sample_action_seq, concatenated_traj, old_concatenated_traj = self.collect_inputs(i)
-
 				
 		if self.args.batch_size>1: 
 			self.selected_index = 0
@@ -2720,7 +2747,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		if input_dictionary is None:
 			input_dictionary = {}
-			input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], input_dictionary['concatenated_traj'], input_dictionary['old_concatenated_traj'] = self.collect_inputs(i, special_indices=special_indices)
+			input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], input_dictionary['concatenated_traj'], input_dictionary['old_concatenated_traj'] = self.collect_inputs(i, special_indices=special_indices, called_from_train=True)
 			# if not(torch.is_tensor(input_dictionary['old_concatenated_traj'])):
 			input_dictionary['old_concatenated_traj'] = torch.tensor(input_dictionary['old_concatenated_traj']).to(device).float()
 		else:
@@ -2906,7 +2933,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				if i*self.args.batch_size+b>=self.N:
 					break_var = 1
 
-				# Get segmentations.				
+				# Get segmentations.
 				distinct_z_indices = torch.where(variational_dict['latent_b'][:,b])[0].clone().detach().cpu().numpy()
 				# Get distinct z's.
 				distinct_zs = variational_dict['latent_z_indices'][distinct_z_indices, b].clone().detach().cpu().numpy()
@@ -3451,7 +3478,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			self.batch_mask[:self.batch_trajectory_lengths[b], b] = 1.
 
 	# Get batch full trajectory. 
-	def collect_inputs(self, i, get_latents=False, special_indices=None):
+	def collect_inputs(self, i, get_latents=False, special_indices=None, called_from_train=False):
 
 		# Toy Data
 		if self.args.data in ['ContinuousNonZero','DirContNonZero','DeterGoal']:
@@ -3464,9 +3491,15 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				sample_traj, sample_action_seq = self.dataset[i:i+self.args.batch_size]
 				indices = np.arange(i,i+self.args.batch_size)
 				self.dataset_latent_b_labels, self.dataset_latent_z_labels = self.dataset.get_latent_variables(indices)
-				
-			concatenated_traj = self.concat_state_action(sample_traj, sample_action_seq)		
-			old_concatenated_traj = self.old_concat_state_action(sample_traj, sample_action_seq)
+					
+			# If the collect inputs function is being called from the train function, 
+			# Then we should corrupt the inputs based on how much the input_corruption_noise is set to. 
+			# If it's 0., then no corruption. 
+			corrupted_sample_action_seq = called_from_train*self.args.input_corruption_noise*np.random.randn(*sample_action_seq.shape) + sample_action_seq
+			corrupted_sample_traj = called_from_train*self.args.input_corruption_noise*np.random.randn(*sample_traj.shape) + sample_traj
+
+			concatenated_traj = self.concat_state_action(corrupted_sample_traj, corrupted_sample_action_seq)		
+			old_concatenated_traj = self.old_concat_state_action(corrupted_sample_traj, corrupted_sample_action_seq)
 
 			if self.args.data=='DeterGoal':
 				self.conditional_information = np.zeros((self.args.condition_size))
@@ -3522,9 +3555,17 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			# Compute actions.
 			action_sequence = np.diff(batch_trajectory,axis=1)
 
-			# Concatenate
-			concatenated_traj = self.concat_state_action(batch_trajectory, action_sequence)
-			old_concatenated_traj = self.old_concat_state_action(batch_trajectory, action_sequence)
+			# If the collect inputs function is being called from the train function, 
+			# Then we should corrupt the inputs based on how much the input_corruption_noise is set to. 
+			# If it's 0., then no corruption. 
+			corrupted_action_sequence = called_from_train*self.args.input_corruption_noise*np.random.randn(*action_sequence.shape) + action_sequence
+			corrupted_batch_trajectory = called_from_train*self.args.input_corruption_noise*np.random.randn(*batch_trajectory.shape) + batch_trajectory
+
+			concatenated_traj = self.concat_state_action(corrupted_batch_trajectory, corrupted_action_sequence)		
+			old_concatenated_traj = self.old_concat_state_action(corrupted_batch_trajectory, corrupted_action_sequence)
+			# # Concatenate
+			# concatenated_traj = self.concat_state_action(batch_trajectory, action_sequence)
+			# old_concatenated_traj = self.old_concat_state_action(batch_trajectory, action_sequence)
 
 			# Scaling action sequence by some factor.             
 			scaled_action_sequence = self.args.action_scale_factor*action_sequence
@@ -4932,7 +4973,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Phase 1 of training: Don't train discriminator at all, set discriminability loss weight to 0.
 		if counter<self.args.training_phase_size:
 			self.discriminability_loss_weight = 0.
-			self.z_transform_discriminability_loss_weight = 0.
+			self.z_trajectory_discriminability_loss_weight = 0.
 			self.vae_loss_weight = 1.
 			self.training_phase = 1
 			self.skip_vae = 0
@@ -4943,7 +4984,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 			self.vae_loss_weight = self.args.vae_loss_weight
 			self.discriminability_loss_weight = self.args.discriminability_weight
-			self.z_transform_discriminability_loss_weight = self.args.z_transform_discriminability_weight
+			self.z_trajectory_discriminability_loss_weight = self.args.z_trajectory_discriminability_weight
 
 			# if self.args.training_phase_size<=counter and counter<self.args.training_phase_size*2:
 			# 	# self.z_transform_discriminability_loss_weight = self.args.z_transform_discriminability_weights
@@ -5192,10 +5233,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Compute discriminator loss and discriminator prob of right action for logging. 
 			log_dict['Z Discriminator Loss'], log_dict['Z Discriminator Probability'] = self.discriminator_loss, viz_dict['discriminator_probs']
 
-			if self.args.z_transform_discriminator:
-				log_dict['Total Discriminator Loss'], log_dict['Z Transform Discriminator Loss'], log_dict['Z Transform Discriminability Loss'], \
-				log_dict['Z Transform Discriminator Probability'] = self.total_discriminator_loss, self.z_transform_discriminator_loss, \
-					self.z_transform_discriminability_loss, viz_dict['z_transform_discriminator_probs']
+			if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
+				log_dict['Total Discriminator Loss'], log_dict['Z Trajectory Discriminator Loss'], log_dict['Z Trajectory Discriminability Loss'], \
+				log_dict['Z Trajectory Discriminator Probability'] = self.total_discriminator_loss, self.z_trajectory_discriminator_loss, \
+					self.z_trajectory_discriminability_loss, viz_dict['z_trajectory_discriminator_probs']
 
 		# If we are displaying things: 
 		if counter%self.args.display_freq==0:
@@ -5261,7 +5302,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.source_manager.avg_reconstruction_error, self.target_manager.avg_reconstruction_error
 
 			# if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':
-			if self.args.source_domain==self.args.target_domain and self.args.eval_jointtransfer_metrics and counter%self.args.metric_eval_freq==0:
+			if self.args.source_domain==self.args.target_domain and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:
 				# Evaluate metrics and plot them. 
 				# self.evaluate_correspondence_metrics(computed_sets=False)
 				# Actually, we've probably computed trajectory and latent sets. 
@@ -5346,26 +5387,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 	def get_embeddings(self, projection='tsne', computed_sets=False):
 		# Function to visualize source, target, and combined embeddings: 
-
-		# self.N = 100
-		# self.source_latent_zs = np.zeros((self.N,self.args.z_dimensions))
-		# self.target_latent_zs = np.zeros((self.N,self.args.z_dimensions))
-		# self.shared_latent_zs = np.zeros((2*self.N,self.args.z_dimensions))
-
-		# # For N data points:
-		# for i in range(self.N):
-
-		# 	# Get corresponding latent z's of source and target domains.
-		# 	_, source_z, _, _ = self.encode_decode_trajectory(self.source_manager, i)
-		# 	_, target_z, _, _ = self.encode_decode_trajectory(self.target_manager, i)
-
-		# 	if source_z is not None:
-		# 		self.source_latent_zs[i] = source_z.detach().cpu().numpy()
-		# 		self.shared_latent_zs[i] = source_z.detach().cpu().numpy()
-		# 	if target_z is not None:
-		# 		self.target_latent_zs[i] = target_z.detach().cpu().numpy()
-		# 		self.shared_latent_zs[self.N+i] = target_z.detach().cpu().numpy()
-		
+	
 		if computed_sets==False:
 			self.set_z_objects()
 
@@ -5381,6 +5403,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			source_embedded_zs = shared_embedded_zs_p30[:self.N]
 			target_embedded_zs = shared_embedded_zs_p30[self.N:]
 
+			########################################
+			# Shared data point visualization. 
+			########################################
+
 			self.shared_image_p5 = self.plot_embedding(shared_embedded_zs_p5, "Shared_Embedding Perplexity 5", shared=True)	
 			self.shared_image_p10 = self.plot_embedding(shared_embedded_zs_p10, "Shared_Embedding Perplexity 10", shared=True)	
 			self.shared_image_p30 = self.plot_embedding(shared_embedded_zs_p30, "Shared_Embedding Perplexity 30", shared=True)	
@@ -5390,34 +5416,39 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			source_embedded_zs, pca = self.get_transform(self.source_latent_zs, projection)
 			target_embedded_zs = self.transform_zs(self.target_latent_zs, pca)
 			shared_embedded_zs = np.concatenate([source_embedded_zs, target_embedded_zs],axis=0)
+
+			########################################
+			# Shared data point visualization. 
+			########################################
+
 			self.shared_image = self.plot_embedding(shared_embedded_zs, "Shared_Embedding", shared=True)	
+
+		########################################
+		# Single domain data point visualization.
+		########################################
 
 		self.source_image = self.plot_embedding(shared_embedded_zs, "Source_Embedding",viz_domain='source')
 		self.target_image = self.plot_embedding(shared_embedded_zs, "Target_Embedding",viz_domain='target')
-		# self.source_traj_image = self.plot_embedding(shared_embedded_zs, "Source_Embedding", trajectory=True, viz_domain='source')
-		# self.target_traj_image = self.plot_embedding(shared_embedded_zs, "Target_Embedding", trajectory=True, viz_domain='target')
-		self.source_traj_image = self.plot_embedding(source_embedded_zs, "Source_Embedding", trajectory=True, viz_domain='source')
-		self.target_traj_image = self.plot_embedding(target_embedded_zs, "Target_Embedding", trajectory=True, viz_domain='target')
+
+		########################################
+		# Single domain data point visualization with trajectories.
+		########################################
+
+		self.source_traj_image = self.plot_embedding(shared_embedded_zs, "Source_Embedding", trajectory=True, viz_domain='source')
+		self.target_traj_image = self.plot_embedding(shared_embedded_zs, "Target_Embedding", trajectory=True, viz_domain='target')
+		# self.source_traj_image = self.plot_embedding(source_embedded_zs, "Source_Embedding", trajectory=True, viz_domain='source')
+		# self.target_traj_image = self.plot_embedding(target_embedded_zs, "Target_Embedding", trajectory=True, viz_domain='target')
 
 		self.samedomain_shared_embedding_image = None
 
-		# if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':		
-		# if self.args.source_domain==self.args.target_domain:
-		# 	if projection=='tsne':
-		# 		self.samedomain_shared_embedding_image_p5 = self.plot_embedding(shared_embedded_zs_p5, "SameDomain_Shared_Traj_Embedding Perplexity 5", shared=True, trajectory=True)
-		# 		self.samedomain_shared_embedding_image_p10 = self.plot_embedding(shared_embedded_zs_p10, "SameDomain_Shared_Traj_Embedding Perplexity 10", shared=True, trajectory=True)
-		# 		self.samedomain_shared_embedding_image_p30 = self.plot_embedding(shared_embedded_zs_p30, "SameDomain_Shared_Traj_Embedding Perplexity 30", shared=True, trajectory=True)
-
-		# 			return self.source_image, self.target_image, self.shared_image_p5, self.shared_image_p10, self.shared_image_p30, \
-		# 			 self.samedomain_shared_embedding_image_p5, self.samedomain_shared_embedding_image_p10, self.samedomain_shared_embedding_image_p30
-		# 	else:
-		# 		self.samedomain_shared_embedding_image = self.plot_embedding(shared_embedded_zs, "SameDomain_Shared_Traj_Embedding", shared=True, trajectory=True)
-
-		# 		return self.source_image, self.target_image, self.shared_image, self.samedomain_shared_embedding_image
-		
 		if projection=='tsne':
 
 			if self.args.source_domain==self.args.target_domain:
+
+				########################################
+				# Shared data point visualization with trajectories.
+				########################################
+
 				self.samedomain_shared_embedding_image_p5 = self.plot_embedding(shared_embedded_zs_p5, "SameDomain_Shared_Traj_Embedding Perplexity 5", shared=True, trajectory=True)
 				self.samedomain_shared_embedding_image_p10 = self.plot_embedding(shared_embedded_zs_p10, "SameDomain_Shared_Traj_Embedding Perplexity 10", shared=True, trajectory=True)
 				self.samedomain_shared_embedding_image_p30 = self.plot_embedding(shared_embedded_zs_p30, "SameDomain_Shared_Traj_Embedding Perplexity 30", shared=True, trajectory=True)
@@ -5431,6 +5462,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		else:
 			if self.args.source_domain==self.args.target_domain:
+
+				########################################
+				# Shared data point visualization with trajectories.
+				########################################
+
 				self.samedomain_shared_embedding_image = self.plot_embedding(shared_embedded_zs, "SameDomain_Shared_Traj_Embedding", shared=True, trajectory=True)
 			else:
 				self.samedomain_shared_embedding_image = None
@@ -5514,27 +5550,36 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# domain_label = torch.tensor(1-domain).to(device).long().view(1,)
 		domain_label = domain*torch.ones(update_dictionary['discriminator_logprob'].shape[0]*update_dictionary['discriminator_logprob'].shape[1]).to(device).long()
 		self.discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['discriminator_logprob'].view(-1,2), 1-domain_label).mean()
+
+		
 			
 		###########################################################
-		# (1c) Next, compute z_transform discriminability loss.
+		# (1c) Next, compute z_trajectory discriminability loss.
 		###########################################################
+		if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
+			if self.args.z_trajectory_discriminator:
+				traj_domain_label = domain*torch.ones(self.args.batch_size).to(device).long()
+				# Overwrite update_dictionary['z_trajectory_weights']. 
+				update_dictionary['z_trajectory_weights'] = torch.ones(self.args.batch_size).to(device).float()
+			elif self.args.z_transform_discriminator:
+				traj_domain_label = domain_label
 
-		if self.args.z_transform_discriminator:
 			# Set z transform discriminability loss.
-			self.unweighted_z_transform_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['z_transform_discriminator_logprob'].view(-1,2), 1-domain_label)
-			self.masked_z_transform_discriminability_loss = update_dictionary['z_transformation_weights'].view(-1,)*self.unweighted_z_transform_discriminability_loss
+			self.unweighted_z_trajectory_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['z_trajectory_discriminator_logprob'].view(-1,2), 1-traj_domain_label)
+			# self.unweighted_z_trajectory_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['z_trajectory_discriminator_logprob'].view(-1,2), 1-domain_label)
+			self.masked_z_trajectory_discriminability_loss = update_dictionary['z_trajectory_weights'].view(-1,)*self.unweighted_z_trajectory_discriminability_loss
 			# Mask the z transform discriminability loss based on whether or not this particular latent_z, latent_z transformation tuple should be used to train the representation.
-			self.z_transform_discriminability_loss = self.z_transform_discriminability_loss_weight*self.masked_z_transform_discriminability_loss.mean()
+			self.z_trajectory_discriminability_loss = self.z_trajectory_discriminability_loss_weight*self.masked_z_trajectory_discriminability_loss.mean()
 		else:
 			# Set z transform discriminability loss to dummy value.
-			self.z_transform_discriminability_loss = 0.
+			self.z_trajectory_discriminability_loss = 0.
 
 		###########################################################
 		# (1d) Finally, compute total losses. 
 		###########################################################
 
 		# Total encoder loss: 
-		self.total_VAE_loss = self.vae_loss_weight*self.VAE_loss + self.discriminability_loss_weight*self.discriminability_loss + self.z_transform_discriminability_loss
+		self.total_VAE_loss = self.vae_loss_weight*self.VAE_loss + self.discriminability_loss_weight*self.discriminability_loss + self.z_trajectory_discriminability_loss
 
 		if not(self.skip_vae):
 			# Go backward through the generator (encoder / decoder), and take a step. 
@@ -5568,23 +5613,23 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.discriminator_loss = self.negative_log_likelihood_loss_function(discriminator_logprob.view(-1,2), domain_label).mean()
 
 		###########################################################
-		# (2b) Compute Z-transform discriminator loss. 
+		# (2b) Compute Z-trajectory discriminator loss. 
 		###########################################################
 
-		if self.args.z_transform_discriminator:
-			z_transform_discriminator_logprob, z_transform_discriminator_prob = self.z_transform_discriminator(update_dictionary['z_transformations'].detach())
-			self.unmasked_z_transform_discriminator_loss = self.negative_log_likelihood_loss_function(z_transform_discriminator_logprob.view(-1,2), domain_label)
+		if self.args.z_trajectory_discriminator or self.args.z_transform_discriminator:
+			z_trajectory_discriminator_logprob, z_trajectory_discriminator_prob = self.z_trajectory_discriminator.get_probabilities(update_dictionary['z_trajectory'].detach())
+			self.unmasked_z_trajectory_discriminator_loss = self.negative_log_likelihood_loss_function(z_trajectory_discriminator_logprob.view(-1,2), traj_domain_label)
 			# Mask the z transform discriminator loss based on whether or not this particular latent_z, latent_z transformation tuple should be used to train the discriminator.
-			self.unweighted_z_transform_discriminator_loss = (update_dictionary['z_transformation_weights'].view(-1,)*self.unmasked_z_transform_discriminator_loss)
-			self.z_transform_discriminator_loss = self.args.z_transform_discriminator_weight*self.unweighted_z_transform_discriminator_loss.mean()
+			self.unweighted_z_trajectory_discriminator_loss = (update_dictionary['z_trajectory_weights'].view(-1,)*self.unmasked_z_trajectory_discriminator_loss)
+			self.z_trajectory_discriminator_loss = self.args.z_trajectory_discriminator_weight*self.unweighted_z_trajectory_discriminator_loss.mean()
 		else:
-			self.z_transform_discriminator_loss = 0.
+			self.z_trajectory_discriminator_loss = 0.
 
 		###########################################################
 		# (2c) Merge discriminator losses.
 		###########################################################
 
-		self.total_discriminator_loss = self.discriminator_loss + self.z_transform_discriminator_loss
+		self.total_discriminator_loss = self.discriminator_loss + self.z_trajectory_discriminator_loss
 
 		###########################################################
 		# (2d) Now update discriminator(s).
@@ -5594,7 +5639,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Now go backward and take a step.
 			self.total_discriminator_loss.backward()
 			self.discriminator_optimizer.step()
-	
+
 	def run_iteration(self, counter, i):
 
 		# Phases: 
@@ -5702,8 +5747,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 				# Depending on whether we're visualizing the source or target domain
 				if viz_domain=='source':
-					self.shared_trajectory_set = self.source_manager.segmented_trajectory_set
+					embedded_zs = embedded_zs[:(embedded_zs.shape[0]//2)]
+					self.shared_trajectory_set = self.source_manager.segmented_trajectory_set					
 				elif viz_domain=='target':
+					embedded_zs = embedded_zs[(embedded_zs.shape[0]//2):]
 					self.shared_trajectory_set = self.target_manager.segmented_trajectory_set
 			
 			############################################################
@@ -5728,13 +5775,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				ax.scatter(embedded_zs[i,0]+ratio*self.shared_trajectory_set[i][:,0],embedded_zs[i,1]+ratio*self.shared_trajectory_set[i][:,1], \
 					c=colors[i]*color_scaling+range(seg_traj_len),cmap='jet',vmin=color_range_min,vmax=color_range_max,s=15)
 
-
 		############################################################
 		# If we're visualizing just data points in the visualized plots. 
 		############################################################
 
 		else:
-
 			########################################
 			# Create a scatter plot of the embedding.
 			########################################
@@ -5750,11 +5795,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		############################################################
 		# Now make the plot and generate numpy image from it. 
 		############################################################
-
-		# Title. 
 		ax.set_title("{0}".format(title),fontdict={'fontsize':15})
-		fig.canvas.draw()
-		# Grab image.
+		fig.canvas.draw()		
 		width, height = fig.get_size_inches() * fig.get_dpi()
 		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)		
 		image = np.transpose(image, axes=[2,0,1])
@@ -6928,12 +6970,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		super().create_networks()
 
 		# In addition, now create translation model networks.
-		if self.args.residual_translation:
-			# self.forward_translation_model = ResidualContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
-			self.backward_translation_model = ResidualContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
-		else:
-			# self.forward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
-			self.backward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
+		# self.forward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
+		self.backward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
 
 		# Create list of translation models to select from based on source domain.
 		# self.translation_model_list = [self.forward_translation_model, self.backward_translation_model]
@@ -7220,8 +7258,8 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 		# Discriminator
 		self.save_object['Discriminator_Network'] = self.discriminator_network.state_dict()				
 
-		if self.args.z_transform_discriminator:
-			self.save_object['Z_Transform_Discriminator_Network'] = self.z_transform_discriminator.state_dict()
+		if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
+			self.save_object['Z_Trajectory_Discriminator_Network'] = self.z_trajectory_discriminator.state_dict()
 
 		torch.save(self.save_object,os.path.join(self.savedir,"Model_"+suffix))
 
@@ -7237,23 +7275,26 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 		# Discriminator
 		self.discriminator_network.load_state_dict(self.load_object['Discriminator_Network'])
 
-		if self.args.z_transform_discriminator:
-			self.z_transform_discriminator.load_state_dict(self.load_object['Z_Transform_Discriminator_Network'])
+		if self.args.z_trajectory_discriminator:
+			self.z_trajectory_discriminator.load_state_dict(self.load_object['Z_Trajectory_Discriminator_Network'])
 
 	def create_networks(self):
 
 		super().create_networks()
 
-		if self.args.z_transform_discriminator:
-			self.z_transform_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
+		# Z Trajectory discriminator takes precedence.
+		if self.args.z_trajectory_discriminator:
+			self.z_trajectory_discriminator = EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size, args=self.args).to(device)
+		elif self.args.z_transform_discriminator:
+			self.z_trajectory_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
 
 	def create_training_ops(self):
 
 		super().create_training_ops()
 
 		discriminator_opt_params = self.discriminator_network.parameters()
-		if self.args.z_transform_discriminator:
-			discriminator_opt_params = list(discriminator_opt_params) + list(self.z_transform_discriminator.parameters())
+		if self.args.z_trajectory_discriminator or self.args.z_transform_discriminator:
+			discriminator_opt_params = list(discriminator_opt_params) + list(self.z_trajectory_discriminator.parameters())
 		self.discriminator_optimizer = torch.optim.Adam(discriminator_opt_params,lr=self.learning_rate, weight_decay=self.args.regularization_weight)	
 
 	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False):
@@ -7335,13 +7376,21 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 			update_dictionary['discriminator_logprob'], discriminator_prob = self.discriminator_network(update_dictionary['latent_z'])
 
 			# (4b) If we are using a z_transform discriminator.
-			if self.args.z_transform_discriminator:					
+
+			if self.args.z_trajectory_discriminator:
+				# Feed the entire z trajectory to the discriminator.
+				update_dictionary['z_trajectory_discriminator_logprob'], z_trajectory_discriminator_prob = self.z_trajectory_discriminator.get_probabilities(update_dictionary['latent_z'])
+				viz_dict = {'z_trajectory_discriminator_probs': z_trajectory_discriminator_prob[...,domain].detach().cpu().numpy().mean()}
+				update_dictionary['z_trajectory'] = update_dictionary['latent_z']
+
+			elif self.args.z_transform_discriminator:					
 				# Calculate the transformation.
-				update_dictionary['z_transformations'], update_dictionary['z_transformation_weights'] = self.get_z_transformation(update_dictionary['latent_z'], source_var_dict['latent_b'])
-				update_dictionary['z_transform_discriminator_logprob'], z_transform_discriminator_prob = self.z_transform_discriminator(update_dictionary['z_transformations'])
+				update_dictionary['z_transformations'], update_dictionary['z_trajectory_weights'] = self.get_z_transformation(update_dictionary['latent_z'], source_var_dict['latent_b'])
+				update_dictionary['z_trajectory_discriminator_logprob'], z_trajectory_discriminator_prob = self.z_trajectory_discriminator.get_probabilities(update_dictionary['z_transformations'])
+				update_dictionary['z_trajectory'] = update_dictionary['z_transformations']
 				
 				# Add this probability to the dictionary to visualize.
-				viz_dict = {'z_transform_discriminator_probs': z_transform_discriminator_prob[...,domain].detach().cpu().numpy().mean()}
+				viz_dict = {'z_trajectory_discriminator_probs': z_trajectory_discriminator_prob[...,domain].detach().cpu().numpy().mean()}
 			else:
 				viz_dict = {}
 

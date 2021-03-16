@@ -1815,7 +1815,7 @@ class EncoderNetwork(PolicyNetwork_BaseClass):
 	# Policy Network inherits from torch.nn.Module. 
 	# Now we overwrite the init, forward functions. And define anything else that we need. 
 
-	def __init__(self, input_size, hidden_size, output_size, number_subpolicies=4, batch_size=1):
+	def __init__(self, input_size, hidden_size, output_size, number_subpolicies=4, batch_size=1, args=None):
 
 		# Ensures inheriting from torch.nn.Module goes nicely and cleanly. 	
 		super(EncoderNetwork, self).__init__()
@@ -1824,8 +1824,9 @@ class EncoderNetwork(PolicyNetwork_BaseClass):
 		self.hidden_size = hidden_size
 		self.output_size = output_size
 		self.number_subpolicies = number_subpolicies
-		self.num_layers = 5
-		self.batch_size = batch_size
+		self.args = args
+		self.batch_size = self.args.batch_size
+		self.num_layers = self.args.number_layers		
 
 		# Define a bidirectional LSTM now.
 		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers, bidirectional=True, dropout=self.args.dropout)
@@ -2022,14 +2023,18 @@ class ContinuousMLP(torch.nn.Module):
 		self.output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
 		self.relu_activation = torch.nn.ReLU()
 		self.variance_activation_layer = torch.nn.Softplus()
+		self.args = args
 
 	def forward(self, input, greedy=False, action_epsilon=0.0001):
 
-		# Assumes input is Batch_Size x Input_Size.
-		h1 = self.relu_activation(self.input_layer(input))
-		h2 = self.relu_activation(self.hidden_layer(h1))
-		h3 = self.relu_activation(self.hidden_layer(h2))
-		h4 = self.relu_activation(self.hidden_layer(h3))
+		# Assumes input is Batch_Size x Input_Size.			
+		if self.args.small_translation_model:
+			h4 = self.input_layer(input)
+		else:		
+			h1 = self.relu_activation(self.input_layer(input))
+			h2 = self.relu_activation(self.hidden_layer(h1))
+			h3 = self.relu_activation(self.hidden_layer(h2))
+			h4 = self.relu_activation(self.hidden_layer(h3))
 
 		mean_outputs = self.output_layer(h4)
 		variance_outputs = self.variance_activation_layer(self.output_layer(h4))
@@ -2042,7 +2047,10 @@ class ContinuousMLP(torch.nn.Module):
 			# Instead of *sampling* the action from a distribution, construct using mu + sig * eps (random noise).
 			action = mean_outputs + variance_outputs * noise
 
-		return action
+		if self.args.residual_translation:
+			return action+input
+		else:
+			return action
 
 	def reparameterized_get_actions(self, input, greedy=False, action_epsilon=0.0001):
 		return self.forward(input, greedy, action_epsilon)
@@ -2247,29 +2255,3 @@ class ContextDecoder(ContinuousVariationalPolicyNetwork):
 	# 	# context_z_logprobability = self.dists.log_prob(context_zs)		
 	# 	# return context_z_logprobability
 
-class ResidualContinuousMLP(ContinuousMLP):
-
-	def __init__(self, input_size, hidden_size, output_size, args=None, number_layers=4):
-
-		super(ResidualContinuousMLP, self).__init__(input_size, hidden_size, output_size, args=None, number_layers=4)
-
-	def forward(self, input, greedy=False, action_epsilon=0.0001):
-
-		# Assumes input is Batch_Size x Input_Size.
-		h1 = self.relu_activation(self.input_layer(input))
-		h2 = self.relu_activation(self.hidden_layer(h1))
-		h3 = self.relu_activation(self.hidden_layer(h2))
-		h4 = self.relu_activation(self.hidden_layer(h3))
-
-		mean_outputs = self.output_layer(h4)
-		variance_outputs = self.variance_activation_layer(self.output_layer(h4))
-		
-		noise = torch.randn_like(variance_outputs)
-
-		if greedy: 
-			action = mean_outputs
-		else:
-			# Instead of *sampling* the action from a distribution, construct using mu + sig * eps (random noise).
-			action = mean_outputs + variance_outputs * noise
-
-		return action + input
