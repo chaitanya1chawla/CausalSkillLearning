@@ -122,8 +122,8 @@ class PolicyManager_BaseClass():
 			# If the collect inputs function is being called from the train function, 
 			# Then we should corrupt the inputs based on how much the input_corruption_noise is set to. 
 			# If it's 0., then no corruption. 
-			corrupted_sample_action_seq = called_from_train*self.args.input_corruption_noise*np.random.randn(*sample_action_seq.shape) + sample_action_seq
-			corrupted_sample_traj = called_from_train*self.args.input_corruption_noise*np.random.randn(*sample_traj.shape) + sample_traj
+			corrupted_sample_action_seq = self.corrupt_inputs(sample_action_seq)
+			corrupted_sample_traj = self.corrupt_inputs(sample_traj)
 
 			concatenated_traj = self.concat_state_action(corrupted_sample_traj, corrupted_sample_action_seq)		
 			old_concatenated_traj = self.old_concat_state_action(corrupted_sample_traj, corrupted_sample_action_seq)
@@ -180,8 +180,8 @@ class PolicyManager_BaseClass():
 			# If the collect inputs function is being called from the train function, 
 			# Then we should corrupt the inputs based on how much the input_corruption_noise is set to. 
 			# If it's 0., then no corruption. 
-			corrupted_action_sequence = called_from_train*self.args.input_corruption_noise*np.random.randn(*action_sequence.shape) + action_sequence
-			corrupted_trajectory = called_from_train*self.args.input_corruption_noise*np.random.randn(*trajectory.shape) + trajectory
+			corrupted_action_sequence = self.corrupt_inputs(action_sequence)
+			corrupted_trajectory = self.corrupt_inputs(trajectory)
 
 			concatenated_traj = self.concat_state_action(corrupted_trajectory, corrupted_action_sequence)		
 			old_concatenated_traj = self.old_concat_state_action(corrupted_trajectory, corrupted_action_sequence)
@@ -653,11 +653,10 @@ class PolicyManager_BaseClass():
 	def return_wandb_gif(self, gif):
 		return wandb.Video(gif, fps=4, format='gif')
 
-	def corrupt_inputs(self, state_action_trajectory):
-
-		# Pass starred state_action_trajectory.shape as the input to the rand function. 
-		corrupted_state_action_trajectory = self.args.input_corruption_noise*np.random.randn(*state_action_trajectory.shape) + state_action_trajectory
-		return corrupted_state_action_trajectory 
+	def corrupt_inputs(self, input):
+		# 0.1 seems like a good value for the input corruption noise value, that's basically the standard deviation of the Gaussian distribution form which we sample additive noise.
+		corrupted_input = np.random.normal(loc=0.,scale=self.args.input_corruption_noise,size=input.shape) + input
+		return corrupted_input	
 
 class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
@@ -3266,7 +3265,10 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# Since there are just 4 skills used to generate the data, we should evaluate embeddings for all of them. 
 		number_of_datapoints = self.args.batch_size
 		# If we look at consider_labels_from# of these, should find batch_size number of relevant z's.
-		consider_labels_from = 2*number_of_datapoints
+		if self.args.data=='ContinuousNonZero':
+			consider_labels_from = 2*number_of_datapoints
+		elif self.args.data=='DirContNonZero':
+			consider_labels_from = 3*number_of_datapoints
 
 		i=0				
 		indices = np.arange(i,i+consider_labels_from)
@@ -3495,9 +3497,9 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			# If the collect inputs function is being called from the train function, 
 			# Then we should corrupt the inputs based on how much the input_corruption_noise is set to. 
 			# If it's 0., then no corruption. 
-			corrupted_sample_action_seq = called_from_train*self.args.input_corruption_noise*np.random.randn(*sample_action_seq.shape) + sample_action_seq
-			corrupted_sample_traj = called_from_train*self.args.input_corruption_noise*np.random.randn(*sample_traj.shape) + sample_traj
 
+			corrupted_sample_action_seq = self.corrupt_inputs(sample_action_seq)
+			corrupted_sample_traj = self.corrupt_inputs(sample_traj)
 			concatenated_traj = self.concat_state_action(corrupted_sample_traj, corrupted_sample_action_seq)		
 			old_concatenated_traj = self.old_concat_state_action(corrupted_sample_traj, corrupted_sample_action_seq)
 
@@ -3558,8 +3560,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			# If the collect inputs function is being called from the train function, 
 			# Then we should corrupt the inputs based on how much the input_corruption_noise is set to. 
 			# If it's 0., then no corruption. 
-			corrupted_action_sequence = called_from_train*self.args.input_corruption_noise*np.random.randn(*action_sequence.shape) + action_sequence
-			corrupted_batch_trajectory = called_from_train*self.args.input_corruption_noise*np.random.randn(*batch_trajectory.shape) + batch_trajectory
+			corrupted_action_sequence = self.corrupt_inputs(action_sequence)
+			corrupted_batch_trajectory = self.corrupt_inputs(batch_trajectory)
 
 			concatenated_traj = self.concat_state_action(corrupted_batch_trajectory, corrupted_action_sequence)		
 			old_concatenated_traj = self.old_concat_state_action(corrupted_batch_trajectory, corrupted_action_sequence)
@@ -4973,7 +4975,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Phase 1 of training: Don't train discriminator at all, set discriminability loss weight to 0.
 		if counter<self.args.training_phase_size:
 			self.discriminability_loss_weight = 0.
-			self.z_trajectory_discriminability_loss_weight = 0.
+			self.z_trajectory_discriminability_loss_weight = 0.			
 			self.vae_loss_weight = 1.
 			self.training_phase = 1
 			self.skip_vae = 0
@@ -5220,7 +5222,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		log_dict = {'Policy Loglikelihood': self.likelihood_loss, 
 					'Discriminability Loss': self.discriminability_loss,
+					'Unweighted Discriminability Loss': self.unweighted_discriminability_loss,
+					'Total Discriminability Loss': self.total_discriminability_loss,
 					'Encoder KL': self.encoder_KL,
+					'Unweighted VAE Loss': self.unweighted_VAE_loss,
 					'VAE Loss': self.VAE_loss,
 					'Total VAE Loss:': self.total_VAE_loss,
 					'Domain': viz_dict['domain'],
@@ -5232,11 +5237,15 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		if self.training_phase>1:
 			# Compute discriminator loss and discriminator prob of right action for logging. 
 			log_dict['Z Discriminator Loss'], log_dict['Z Discriminator Probability'] = self.discriminator_loss, viz_dict['discriminator_probs']
+			log_dict['Total Discriminator Loss'] = self.total_discriminator_loss
 
 			if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
-				log_dict['Total Discriminator Loss'], log_dict['Z Trajectory Discriminator Loss'], log_dict['Z Trajectory Discriminability Loss'], \
-				log_dict['Z Trajectory Discriminator Probability'] = self.total_discriminator_loss, self.z_trajectory_discriminator_loss, \
-					self.z_trajectory_discriminability_loss, viz_dict['z_trajectory_discriminator_probs']
+				
+				log_dict['Z Trajectory Discriminator Loss'] = self.z_trajectory_discriminator_loss
+				log_dict['Unweighted Z Trajectory Discriminator Loss'] = self.unweighted_z_trajectory_discriminator_loss.mean()
+				log_dict['Z Trajectory Discriminability Loss'] = self.z_trajectory_discriminability_loss
+				log_dict['Z Trajectory Discriminator Probability'] = viz_dict['z_trajectory_discriminator_probs']
+				log_dict['Unweighted Z Trajectory Discriminability Loss'] = self.masked_z_trajectory_discriminability_loss.mean()			
 
 		# If we are displaying things: 
 		if counter%self.args.display_freq==0:
@@ -5538,8 +5547,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Compute VAE loss on the current domain as likelihood plus weighted KL.  
 		self.likelihood_loss = -update_dictionary['loglikelihood'].mean()
 		self.encoder_KL = update_dictionary['kl_divergence'].mean()
-		self.VAE_loss = self.likelihood_loss + self.args.kl_weight*self.encoder_KL
-		
+		self.unweighted_VAE_loss = self.likelihood_loss + self.args.kl_weight*self.encoder_KL
+		self.VAE_loss = self.vae_loss_weight*self.unweighted_VAE_loss
 		###########################################################
 		# (1b) Next, compute discriminability loss.
 		###########################################################
@@ -5549,9 +5558,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# I.e. train encoder to make discriminator maximize likelihood of wrong label.
 		# domain_label = torch.tensor(1-domain).to(device).long().view(1,)
 		domain_label = domain*torch.ones(update_dictionary['discriminator_logprob'].shape[0]*update_dictionary['discriminator_logprob'].shape[1]).to(device).long()
-		self.discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['discriminator_logprob'].view(-1,2), 1-domain_label).mean()
-
-		
+		self.unweighted_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['discriminator_logprob'].view(-1,2), 1-domain_label).mean()
+		self.discriminability_loss = self.discriminability_loss_weight*self.unweighted_discriminability_loss
 			
 		###########################################################
 		# (1c) Next, compute z_trajectory discriminability loss.
@@ -5578,8 +5586,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# (1d) Finally, compute total losses. 
 		###########################################################
 
+		# Total discriminability loss. 
+		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss
+
 		# Total encoder loss: 
-		self.total_VAE_loss = self.vae_loss_weight*self.VAE_loss + self.discriminability_loss_weight*self.discriminability_loss + self.z_trajectory_discriminability_loss
+		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss
 
 		if not(self.skip_vae):
 			# Go backward through the generator (encoder / decoder), and take a step. 
