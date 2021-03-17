@@ -1019,7 +1019,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 	def get_trajectory_segment(self, i):
 
-		if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
+		# if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
+		if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext','DeterGoal']:
 			# Sample trajectory segment from dataset. 
 			sample_traj, sample_action_seq = self.dataset[i]
 
@@ -1160,7 +1161,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# 	# Step in environment with action.
 		# 	# Update inputs with new state and previously executed action. 
 
-		if self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero':
+		if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 			self.state_dim = 2
 			self.rollout_timesteps = 5
 		elif self.args.data=='MIME':
@@ -1320,7 +1321,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		np.set_printoptions(suppress=True,precision=2)
 
-		if self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero':
+		if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 			self.visualize_embedding_space(suffix=suffix)
 
 		if self.args.data=="MIME" or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
@@ -1364,7 +1365,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
 			
 		if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
-			if self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero':
+			if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 				self.state_dim = 2
 				self.rollout_timesteps = 5		
 			if self.args.data=='MIME':
@@ -1496,8 +1497,9 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 	def get_trajectory_segment(self, i):
 	
-		if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
-
+		# if self.args.data=='Continuous' or self.args.data=='ContinuousDir' or self.args.data=='ContinuousNonZero' or self.args.data=='DirContNonZero' or self.args.data=='ContinuousDirNZ' or self.args.data=='GoalDirected' or self.args.data=='Separable':
+		if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext','DeterGoal']:
+			
 			# Sample trajectory segment from dataset. 
 			sample_traj, sample_action_seq = self.dataset[i:i+self.args.batch_size]
 			
@@ -1660,7 +1662,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.traj_length = 5
 		self.conditional_info_size = 6		
 
-		if self.args.data in ['ContinuousNonZero','DirContNonZero']:
+		if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 			self.conditional_info_size = self.args.condition_size
 			self.conditional_viz_env = False
 
@@ -2411,7 +2413,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 	def set_env_conditional_info(self):
 
-		if self.args.data in ['ContinuousNonZero','DirContNonZero']:
+		if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 			self.conditional_information = np.zeros((self.conditional_info_size))
 		else:			
 			obs = self.environment._get_observation()
@@ -2863,7 +2865,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.pretrain_policy_manager.load_all_models(model, only_policy=True)			
 			self.pretrain_policy_manager.visualize_robot_data()			
 
-		elif self.args.data in ['ContinuousNonZero','DirContNonZero']:
+		elif self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 			print("Running visualization of embedding space.")
 			self.assemble_joint_skill_embedding_space()
 			self.visualize_joint_skill_embedding_space()
@@ -3173,7 +3175,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 	def get_skill_visual_in_context(self, traj, segment_start=None, segment_end=None):
 		
-		if self.args.data in ['ContinuousNonZero','DirContNonZero']:
+		if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 
 			# If Toy data, then... 
 			# Generate image of trajectory. 
@@ -3211,7 +3213,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 	def set_context_histogram(self):
 
-		if self.args.data in ['ContinuousNonZero','DirContNonZero']:
+		if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 			# When we're using toy data, can use ground truth z's to create a histogram of the context of a particular z.
 			# Analyze how the z representation changes over the values in this histogram.
 
@@ -3267,7 +3269,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# If we look at consider_labels_from# of these, should find batch_size number of relevant z's.
 		if self.args.data=='ContinuousNonZero':
 			consider_labels_from = 2*number_of_datapoints
-		elif self.args.data=='DirContNonZero':
+		else:
 			consider_labels_from = 3*number_of_datapoints
 
 		i=0				
@@ -3483,7 +3485,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 	def collect_inputs(self, i, get_latents=False, special_indices=None, called_from_train=False):
 
 		# Toy Data
-		if self.args.data in ['ContinuousNonZero','DirContNonZero','DeterGoal']:
+		if self.args.data in ['ContinuousNonZero','DirContNonZero','DeterGoal','ToyContext']:
 
 			# Sample trajectory segment from dataset. 
 			if special_indices is not None:
@@ -5261,7 +5263,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.viz_dictionary['tsne_combined_traj_embeddings_p5'], self.viz_dictionary['tsne_combined_traj_embeddings_p10'], self.viz_dictionary['tsne_combined_traj_embeddings_p30'] = \
 					self.get_embeddings(projection='tsne')
 			
-			if self.args.source_domain in ['ContinuousNonZero','DirContNonZero'] and self.args.target_domain in ['ContinuousNonZero','DirContNonZero']:
+			if self.args.source_domain in ['ContinuousNonZero','DirContNonZero','ToyContext'] and self.args.target_domain in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 				log_dict['TSNE Source Traj Embedding'], log_dict['TSNE Target Traj Embedding'] = \
 					 self.return_wandb_image(self.source_traj_image), self.return_wandb_image(self.target_traj_image)
 
@@ -5278,7 +5280,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.return_wandb_image(self.viz_dictionary['pca_source_embedding']), self.return_wandb_image(self.viz_dictionary['pca_target_embedding']), \
 				self.return_wandb_image(self.viz_dictionary['pca_combined_embeddings'])
 	
-			if self.args.source_domain in ['ContinuousNonZero','DirContNonZero'] and self.args.target_domain in ['ContinuousNonZero','DirContNonZero']:
+			if self.args.source_domain in ['ContinuousNonZero','DirContNonZero','ToyContext'] and self.args.target_domain in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 				
 				log_dict['PCA Combined Trajectory Embeddings'], log_dict['TSNE Combined Trajectory Embeddings Perplexity 5'], \
 					log_dict['TSNE Combined Trajectory Embeddings Perplexity 10'], log_dict['TSNE Combined Trajectory Embeddings Perplexity 30'] = \
@@ -5293,13 +5295,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			if self.viz_dictionary['source_trajectory'] is not None and not(self.args.no_mujoco):
 				# Now actually plot the images.
 
-				if self.args.source_domain in ['ContinuousNonZero','DirContNonZero']:
+				if self.args.source_domain in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 					log_dict['Source Trajectory'], log_dict['Source Reconstruction'] = \
 						self.return_wandb_image(self.viz_dictionary['source_trajectory']), self.return_wandb_image(self.viz_dictionary['source_reconstruction'])
 				else:
 					log_dict['Source Trajectory'], log_dict['Source Reconstruction'] = \
 						self.return_wandb_gif(self.viz_dictionary['source_trajectory']), self.return_wandb_gif(self.viz_dictionary['source_reconstruction'])
-				if self.args.target_domain in ['ContinuousNonZero','DirContNonZero']:
+				if self.args.target_domain in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 					log_dict['Target Trajectory'], log_dict['Target Reconstruction'] = \
 						self.return_wandb_image(self.viz_dictionary['target_trajectory']), self.return_wandb_image(self.viz_dictionary['target_reconstruction'])
 				else:

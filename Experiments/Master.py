@@ -17,14 +17,14 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		args.data = data
 
 	# Define Data Loader.
-	if args.data=='Continuous':
-		dataset = DataLoaders.ContinuousToyDataset(args.datadir)
-	elif args.data=='ContinuousNonZero':
+	if args.data=='ContinuousNonZero':
 		dataset = DataLoaders.ContinuousNonZeroToyDataset(args.datadir, create_dataset_variation=create_dataset_variation)
 	elif args.data=='DeterGoal':
 		dataset = DataLoaders.DeterministicGoalDirectedDataset(args.datadir)			
 	elif args.data=='DirContNonZero':
 		dataset = DataLoaders.ContinuousDirectedNonZeroToyDataset(args.datadir)
+	elif args.data=='ToyContext':
+		dataset = DataLoaders.ToyContextDataset(args.datadir)
 	elif args.data=='MIME':
 		dataset = MIME_DataLoader.MIME_NewDataset(short_traj=args.short_trajectories)
 	elif args.data=='Roboturk':		

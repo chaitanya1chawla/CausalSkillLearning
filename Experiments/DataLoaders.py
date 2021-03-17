@@ -355,4 +355,40 @@ class SeparableDataset(Dataset):
 		return self.G_array[index]
 
 	def get_startconfig(self, index):
+
 		return self.S_array[index]
+
+class ToyContextDataset(Dataset):
+
+	# Class implementing instance of dataset class for toy data. 
+
+	def __init__(self, dataset_directory, create_dataset_variation=False):
+		self.dataset_directory = dataset_directory
+		# For us, this is Research/Code/GraphPlanningNetworks/scripts/DatasetPlanning/CreateDemos/Demos2
+
+		self.x_path = os.path.join(self.dataset_directory,"X_context.npy")
+		self.a_path = os.path.join(self.dataset_directory,"A_context.npy")
+		self.y_path = os.path.join(self.dataset_directory,"Y_context.npy")
+		self.b_path = os.path.join(self.dataset_directory,"B_context.npy")
+
+		self.create_dataset_variation = create_dataset_variation
+		
+		self.X_array = np.load(self.x_path)
+		self.A_array = np.load(self.a_path)
+		self.Y_array = np.load(self.y_path)
+		self.B_array = np.load(self.b_path)
+		
+		if self.create_dataset_variation:
+			self.X_array = np.flip(self.X_array,axis=-1)
+			self.A_array = np.flip(self.A_array,axis=-1)
+
+	def __len__(self):
+		return len(self.X_array)
+
+	def __getitem__(self, index):
+
+		# Return trajectory and action sequence.
+		return self.X_array[index],self.A_array[index]
+
+	def get_latent_variables(self, index):
+		return self.B_array[index],self.Y_array[index]
