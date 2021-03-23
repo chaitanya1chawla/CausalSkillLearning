@@ -23,10 +23,16 @@ start_limit = 10
 start_states = np.array([[-1,-1],[-1,1],[1,-1],[1,1]])*start_limit
 # valid_options = np.array([[2,3],[3,0],[1,2],[0,1]])
 
-option_probabilities = np.array([[0.2,0.7,0.,0.1],
-								 [0.6,0.3,0.1,0.],
-								 [0.,0.2,0.2,0.6],
-								 [0.,0.,0.8,0.2]])
+# option_probabilities = np.array([[0.2,0.7,0.,0.1],
+# 								 [0.6,0.3,0.1,0.],
+# 								 [0.,0.2,0.2,0.6],
+# 								 [0.,0.,0.8,0.2]])
+option_probabilities = np.array([[0.5,0.5,0.,0.],
+								 [0.,0.5,0.5,0.],
+								 [0.25,0.0,0.25,0.5],
+								 [0.,0.,0.,1.]])
+
+
 
 start_noise_limit = 15
 lim = 30

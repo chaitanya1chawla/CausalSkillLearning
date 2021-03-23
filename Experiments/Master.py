@@ -197,6 +197,7 @@ def parse_arguments():
 	parser.add_argument('--reparam',dest='reparam',type=int,default=1)	
 	parser.add_argument('--number_policies',dest='number_policies',type=int,default=4)
 	parser.add_argument('--fix_subpolicy',dest='fix_subpolicy',type=int,default=1)
+	parser.add_argument('--reset_training',dest='reset_training',type=int,default=0,help='Whether to reset subpolicy training for joint training, used mostly to learn contextual representations.')
 	parser.add_argument('--train_only_policy',dest='train_only_policy',type=int,default=0) # Train only the policy network and use a pretrained encoder. This is weird but whatever. 
 	parser.add_argument('--load_latent',dest='load_latent',type=int,default=1) # Whether to load latent policy from model or not.
 	parser.add_argument('--subpolicy_model',dest='subpolicy_model',type=str)
@@ -302,6 +303,9 @@ def parse_arguments():
 	parser.add_argument('--residual_translation',dest='residual_translation',type=int,default=0,help='Whether to use a residual model for translation or just a regular one.')
 	parser.add_argument('--small_translation_model',dest='small_translation_model',type=int,default=0,help='Whether to use a small model for translation or not. Restricts network capacity.')
 	parser.add_argument('--input_corruption_noise',dest='input_corruption_noise',type=float,default=0.,help='How much noise to add to the input to corrupt it. Default no corruption.')
+	parser.add_argument('--equivariance',dest='equivariance',type=int,default=0,help='Whether to implement equivariance objective in (Joint) Fix Embed setting.')
+	parser.add_argument('--equivariance_loss_weight',dest='equivariance_loss_weight',type=float,default=1.,help='WWeight associated with the equivariance loss.')
+
 	# Parameters for contextual training. 
 	parser.add_argument('--mask_fraction',dest='mask_fraction',type=float,default=0.15,help='What fraction of zs to mask in contextual embedding.')
 	parser.add_argument('--context',dest='context',type=int,default=1,help='Whether to implement contextual embedding model or original joint embedding model in Joint Transfer setting.')

@@ -1837,7 +1837,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			if counter<self.training_phase_size:
 				self.training_phase=1
 
-				# Set this variable to 0, and then the first time we encounter training phase 2, we change it to 1. 				
+				# Set this variable to 0, and then the first time we encounter training phase 2, we change it to 1.
 				self.reset_subpolicy_training = 0
 
 			elif self.training_phase_size<=counter and counter<2*self.training_phase_size:
@@ -1846,7 +1846,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 				# If we are encountering training phase 2 for the first time.
 				# if self.reset_subpolicy_training==0 and self.args.setting=='context':
-				if self.reset_subpolicy_training==0:
+				if self.reset_subpolicy_training==0 and self.args.reset_training:
 					self.reset_subpolicy_training = 1
 					
 					# Instead of recreating the optimizer, we can also add the policy network parameters to the optimizer's paramters. 
@@ -5531,6 +5531,19 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		else: 
 			return None, None, None, None
 
+	def compute_equivariance_loss(self, update_dictionary):
+
+		# Equivariance loss is computed as L2 difference between Transformed(Translated(Z_Seq)) and Translated(Transformed(Z_Seq)).
+
+		# First Transform(Translated(Z)).
+		transformed_translated_z = update_dictionary['translated_latent_z'] + update_dictionary['delta_z']
+
+		# Now compute Translated(Transformed(Z)). Remember, this is basically just translated_latent_z rolled. (Ignoring the last timestep, which will be wonky)
+		translated_transformed_z = update_dictionary['translated_latent_z'].roll(-1,dims=0)
+		
+		# Now compute the unweighted_loss.
+		return ((transformed_translated_z - translated_transformed_z)**2).mean()		
+
 	def update_networks(self, domain, policy_manager, update_dictionary):
 
 		#########################################################################
@@ -5583,13 +5596,22 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		else:
 			# Set z transform discriminability loss to dummy value.
 			self.z_trajectory_discriminability_loss = 0.
+		
+		###########################################################
+		# (1d) If active, compute equivariance loss. 
+		###########################################################
+		if self.args.equivariance:
+			self.unweighted_equivariance_loss = self.compute_equivariance_loss(update_dictionary)
+			self.equivariance_loss = self.args.equivariance_loss_weight*self.unweighted_equivariance_loss
+		else:
+			self.equivariance_loss = 0.
 
 		###########################################################
-		# (1d) Finally, compute total losses. 
+		# (1e) Finally, compute total losses. 
 		###########################################################
 
 		# Total discriminability loss. 
-		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss
+		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss + self.equivariance_loss
 
 		# Total encoder loss: 
 		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss
@@ -7017,7 +7039,6 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# self.parameter_list = list(self.forward_translation_model.parameters()) + list(self.backward_translation_model.parameters())
 		self.parameter_list = list(self.backward_translation_model.parameters())
 
-
 		# Now create optimizer for translation models. 
 		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate)
 
@@ -7078,7 +7099,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			latent_z_diff = latent_z[1:]
 
 		# Better way to compute weights is just roll latent_b
-		with torch.no_grad():			
+		with torch.no_grad():
 			latent_z_transformation_weights = latent_b.roll(-1,dims=0)
 			# Zero out last weight, to ignore (z_t, 0) tuple at the end. 
 			if self.args.ignore_last_z_transform:
@@ -7090,7 +7111,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# Now concatenate the z's themselves... 
 		latent_z_transformation_vector = torch.cat([padded_latent_z_diff, latent_z], dim=-1)	
 
-		return latent_z_transformation_vector, latent_z_transformation_weights
+		return latent_z_transformation_vector, latent_z_transformation_weights, padded_latent_z_diff
 		# return latent_z_transformation_vector.view(-1,2*self.args.z_dimensions), latent_z_transformation_weights.view(-1,1)
 
 	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False):
@@ -7182,10 +7203,12 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			####################################
 			# (4b) If we are using a z_transform discriminator.
 			####################################
-
-			if self.args.z_transform_discriminator:					
+			if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator or self.args.equivariance:
 				# Calculate the transformation.
-				update_dictionary['z_transformations'], update_dictionary['z_transformation_weights'] = self.get_z_transformation(update_dictionary['translated_latent_z'], source_var_dict['latent_b'])
+				update_dictionary['z_transformations'], update_dictionary['z_transformation_weights'], update_dictionary['delta_z'] = self.get_z_transformation(update_dictionary['translated_latent_z'], source_var_dict['latent_b'])
+
+				
+
 				update_dictionary['z_transform_discriminator_logprob'], z_transform_discriminator_prob = self.z_transform_discriminator(update_dictionary['z_transformations'])
 
 				# This is only source for now.
@@ -7193,6 +7216,23 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				
 				# Add this probability to the dictionary to visualize.
 				viz_dict = {'z_transform_discriminator_probs': z_transform_discriminator_prob[...,domain].detach().cpu().numpy().mean()}
+						
+
+			# if self.args.z_trajectory_discriminator:
+			# 	# Feed the entire z trajectory to the discriminator.
+			# 	update_dictionary['z_trajectory_discriminator_logprob'], z_trajectory_discriminator_prob = self.z_trajectory_discriminator.get_probabilities(update_dictionary['latent_z'])
+			# 	viz_dict = {'z_trajectory_discriminator_probs': z_trajectory_discriminator_prob[...,domain].detach().cpu().numpy().mean()}
+			# 	update_dictionary['z_trajectory'] = update_dictionary['latent_z']
+
+			# elif self.args.z_transform_discriminator:					
+			# 	# Calculate the transformation.
+			# 	update_dictionary['z_transformations'], update_dictionary['z_trajectory_weights'] = self.get_z_transformation(update_dictionary['latent_z'], source_var_dict['latent_b'])
+			# 	update_dictionary['z_trajectory_discriminator_logprob'], z_trajectory_discriminator_prob = self.z_trajectory_discriminator.get_probabilities(update_dictionary['z_transformations'])
+			# 	update_dictionary['z_trajectory'] = update_dictionary['z_transformations']
+				
+			# 	# Add this probability to the dictionary to visualize.
+			# 	viz_dict = {'z_trajectory_discriminator_probs': z_trajectory_discriminator_prob[...,domain].detach().cpu().numpy().mean()}
+
 			else:
 				viz_dict = {}
 
