@@ -2019,7 +2019,9 @@ class ContinuousMLP(torch.nn.Module):
 		self.output_size = output_size
 
 		self.input_layer = torch.nn.Linear(self.input_size, self.hidden_size)
-		self.hidden_layer = torch.nn.Linear(self.hidden_size, self.hidden_size)
+		self.hidden_layer1 = torch.nn.Linear(self.hidden_size, self.hidden_size)
+		self.hidden_layer2 = torch.nn.Linear(self.hidden_size, self.hidden_size)
+		self.hidden_layer3 = torch.nn.Linear(self.hidden_size, self.hidden_size)
 		self.output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
 		self.relu_activation = torch.nn.ReLU()
 		self.variance_activation_layer = torch.nn.Softplus()
@@ -2032,9 +2034,9 @@ class ContinuousMLP(torch.nn.Module):
 			h4 = self.input_layer(input)
 		else:		
 			h1 = self.relu_activation(self.input_layer(input))
-			h2 = self.relu_activation(self.hidden_layer(h1))
-			h3 = self.relu_activation(self.hidden_layer(h2))
-			h4 = self.relu_activation(self.hidden_layer(h3))
+			h2 = self.relu_activation(self.hidden_layer1(h1))
+			h3 = self.relu_activation(self.hidden_layer2(h2))
+			h4 = self.relu_activation(self.hidden_layer3(h3))
 
 		mean_outputs = self.output_layer(h4)
 		variance_outputs = self.variance_activation_layer(self.output_layer(h4))
@@ -2067,7 +2069,9 @@ class CriticMLP(torch.nn.Module):
 		self.batch_size = 1
 
 		self.input_layer = torch.nn.Linear(self.input_size, self.hidden_size)
-		self.hidden_layer = torch.nn.Linear(self.hidden_size, self.hidden_size)
+		self.hidden_layer1 = torch.nn.Linear(self.hidden_size, self.hidden_size)
+		self.hidden_layer2 = torch.nn.Linear(self.hidden_size, self.hidden_size)
+		self.hidden_layer3 = torch.nn.Linear(self.hidden_size, self.hidden_size)
 		self.output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
 		self.relu_activation = torch.nn.ReLU()
 
@@ -2075,9 +2079,9 @@ class CriticMLP(torch.nn.Module):
 
 		# Assumes input is Batch_Size x Input_Size.
 		h1 = self.relu_activation(self.input_layer(input))
-		h2 = self.relu_activation(self.hidden_layer(h1))
-		h3 = self.relu_activation(self.hidden_layer(h2))
-		h4 = self.relu_activation(self.hidden_layer(h3))
+		h2 = self.relu_activation(self.hidden_layer1(h1))
+		h3 = self.relu_activation(self.hidden_layer2(h2))
+		h4 = self.relu_activation(self.hidden_layer3(h3))
 
 		# Predict critic value for each timestep. 
 		critic_value = self.output_layer(h4)		
@@ -2096,7 +2100,9 @@ class DiscreteMLP(torch.nn.Module):
 		self.args = args 
 
 		self.input_layer = torch.nn.Linear(self.input_size, self.hidden_size)
-		self.hidden_layer = torch.nn.Linear(self.hidden_size, self.hidden_size)
+		self.hidden_layer1 = torch.nn.Linear(self.hidden_size, self.hidden_size)
+		self.hidden_layer2 = torch.nn.Linear(self.hidden_size, self.hidden_size)
+		self.hidden_layer3 = torch.nn.Linear(self.hidden_size, self.hidden_size)
 		self.output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
 		self.relu_activation = torch.nn.ReLU()
 
@@ -2109,9 +2115,9 @@ class DiscreteMLP(torch.nn.Module):
 				
 		# Assumes input is Batch_Size x Input_Size.
 		h1 = self.dropout_layer(self.relu_activation(self.input_layer(input)))
-		h2 = self.dropout_layer(self.relu_activation(self.hidden_layer(h1)))
-		h3 = self.dropout_layer(self.relu_activation(self.hidden_layer(h2)))
-		h4 = self.dropout_layer(self.relu_activation(self.hidden_layer(h3)))
+		h2 = self.dropout_layer(self.relu_activation(self.hidden_layer1(h1)))
+		h3 = self.dropout_layer(self.relu_activation(self.hidden_layer2(h2)))
+		h4 = self.dropout_layer(self.relu_activation(self.hidden_layer3(h3)))
 
 		# Compute preprobability with output layer.
 		preprobability_outputs = self.output_layer(h4)

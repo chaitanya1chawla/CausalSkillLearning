@@ -5619,10 +5619,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		###########################################################
 
 		# Total discriminability loss. 
-		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss + self.equivariance_loss
+		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss 
 
 		# Total encoder loss: 
-		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss
+		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.equivariance_loss
 
 		if not(self.skip_vae):
 			# Go backward through the generator (encoder / decoder), and take a step. 
@@ -7051,7 +7051,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.parameter_list = list(self.backward_translation_model.parameters())
 
 		# Now create optimizer for translation models. 
-		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate)
+		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
 
 		# Set discriminator parameter list. 
 		# self.discriminator_parameter_list = list(self.source_z_discriminator.parameters()) + list(self.target_z_discriminator.parameters())
@@ -7202,6 +7202,12 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# Set this variable, because this is what the discriminator training uses as input. 
 			update_dictionary['detached_latent_z'] = update_dictionary['translated_latent_z'].detach()				
 			
+			# Get the diffs from the original latent z's..
+
+			delta_zs = detached_original_latent_z[1:] - detached_original_latent_z[:-1]
+			# delta_zs = update_dictionary['latent_z'][1:] - update_dictionary['latent_z'][:-1]
+			update_dictionary['delta_z'] = torch.cat([delta_zs, torch.zeros((1,self.args.batch_size,self.args.z_dimensions)).to(device)],dim=0)
+
 			#################################################
 			## (4) Feed latent z's to discriminator, and get discriminator likelihoods. 
 			#################################################
@@ -7215,7 +7221,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			
 			if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator or self.args.equivariance:
 				# Calculate the transformation.
-				update_dictionary['z_transformations'], update_dictionary['z_trajectory_weights'], update_dictionary['delta_z'] = self.get_z_transformation(update_dictionary['translated_latent_z'], source_var_dict['latent_b'])
+				# update_dictionary['z_transformations'], update_dictionary['z_trajectory_weights'], update_dictionary['delta_z'] = self.get_z_transformation(update_dictionary['translated_latent_z'], source_var_dict['latent_b'])
+				update_dictionary['z_transformations'], update_dictionary['z_trajectory_weights'], _ = self.get_z_transformation(update_dictionary['translated_latent_z'], source_var_dict['latent_b'])
 				update_dictionary['z_trajectory_discriminator_logprob'], z_transform_discriminator_prob = self.z_trajectory_discriminator(update_dictionary['z_transformations'])
 				update_dictionary['z_trajectory'] = update_dictionary['z_transformations']
 				
