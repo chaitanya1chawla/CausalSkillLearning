@@ -5249,6 +5249,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				log_dict['Z Trajectory Discriminator Probability'] = viz_dict['z_trajectory_discriminator_probs']
 				log_dict['Unweighted Z Trajectory Discriminability Loss'] = self.masked_z_trajectory_discriminability_loss.mean()			
 
+			if self.args.equivariance and viz_dict['domain']==0:
+				log_dict['Unweighted Z Equivariance Loss'] = self.unweighted_masked_equivariance_loss
+				log_dict['Z Equivariance Loss'] = self.equivariance_loss
+
 		# If we are displaying things: 
 		if counter%self.args.display_freq==0:
 
@@ -5542,7 +5546,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		translated_transformed_z = update_dictionary['translated_latent_z'].roll(-1,dims=0)
 		
 		# Now compute the unweighted_loss.
-		return ((transformed_translated_z - translated_transformed_z)**2).mean()		
+		vector_diff = (transformed_translated_z - translated_transformed_z)
+		return ((vector_diff)**2).mean()
 
 	def update_networks(self, domain, policy_manager, update_dictionary):
 
@@ -5601,8 +5606,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# (1d) If active, compute equivariance loss. 
 		###########################################################
 		if self.args.equivariance:
-			self.unweighted_equivariance_loss = self.compute_equivariance_loss(update_dictionary)
-			self.equivariance_loss = self.args.equivariance_loss_weight*self.unweighted_equivariance_loss
+			self.unweighted_unmasked_equivariance_loss = self.compute_equivariance_loss(update_dictionary)
+			# Now mask by the same temporal masks that we used for the discriminability versions of this idea. 
+			self.unweighted_masked_equivariance_loss = (update_dictionary['z_trajectory_weights'].view(-1,)*self.unweighted_unmasked_equivariance_loss).mean()
+			self.equivariance_loss = self.args.equivariance_loss_weight*self.unweighted_masked_equivariance_loss
+
 		else:
 			self.equivariance_loss = 0.
 
@@ -7022,10 +7030,13 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		if self.args.z_transform_discriminator:
 			# self.source_z_transform_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
-			self.z_transform_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
+			self.z_trajectory_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
 			# self.target_z_transform_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
 
 			# self.z_transform_discriminator_list = [self.source_z_transform_discriminator, self.target_z_transform_discriminator]
+		elif self.args.z_trajectory_discriminator:
+			
+			self.z_trajectory_discriminator = EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size, args=self.args).to(device)
 
 	def create_training_ops(self):
 
@@ -7048,8 +7059,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# 	self.discriminator_parameter_list += list(self.source_z_transform_discriminator.parameters()) + list(self.target_z_transform_discriminator.parameters())
 
 		self.discriminator_parameter_list = list(self.discriminator_network.parameters())
-		if self.args.z_transform_discriminator:
-			self.discriminator_parameter_list += list(self.z_transform_discriminator.parameters())
+		if self.args.z_transform_discriminator or self.arg.z_trajectory_discriminator:
+			self.discriminator_parameter_list += list(self.z_trajectory_discriminator.parameters())
 
 		# Create common optimizer for source, target, and discriminator networks. 
 		self.discriminator_optimizer = torch.optim.Adam(self.discriminator_parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
@@ -7070,9 +7081,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.save_object['z_discriminator'] = self.discriminator_network.state_dict()
 		# self.save_object['source_z_discriminator'] = self.source_z_discriminator.state_dict()
 		# self.save_object['target_z_discriminator'] = self.target_z_discriminator.state_dict()
-		if self.args.z_transform_discriminator:
-			self.save_object['z_transform_discriminator'] = self.z_transform_discriminator.state_dict()
-			# self.save_object['target_z_transform_discriminator'] = self.target_z_transform_discriminator.state_dict()
+		if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:		
+			self.save_object['z_trajectory_discriminator'] = self.z_trajectory_discriminator.state_dict()
+
 		# Overwrite the save from super. 
 		torch.save(self.save_object,os.path.join(self.savedir,"Model_"+suffix))
 
@@ -7084,8 +7095,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.backward_translation_model.load_state_dict(self.load_object['backward_translation_model'])
 		self.discriminator_network.load_state_dict(self.load_object['z_discriminator'])
 
-		if self.args.z_transform_discriminator:
-			self.z_transform_discriminator.load_state_dict(self.load_object['z_transform_discriminator'])
+		if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
+			self.z_trajectory_discriminator.load_state_dict(self.load_object['z_trajectory_discriminator'])
 
 	def get_z_transformation(self, latent_z, latent_b):
 
@@ -7098,7 +7109,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# Instead of computing differences, we're going to copy over the subsequent / succeeding z's into the diff vector, to form a tuple.
 			latent_z_diff = latent_z[1:]
 
-		# Better way to compute weights is just roll latent_b
+		# Better way to compute weights is just roll latent_b		
 		with torch.no_grad():
 			latent_z_transformation_weights = latent_b.roll(-1,dims=0)
 			# Zero out last weight, to ignore (z_t, 0) tuple at the end. 
@@ -7135,41 +7146,40 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 	def run_iteration(self, counter, i):
 		
-		# Phases: 
-		# Phase 1:  Train encoder-decoder for both domains initially, so that discriminator is not fed garbage. 
-		# Phase 2:  Train encoder, decoder for each domain, and discriminator concurrently. 
-
+		#################################################
 		# Algorithm: 
+		#################################################
 		# For every epoch:
 		# 	# For every datapoint: 
 		# 		# 1) Select which domain to use (source or target, i.e. with 50% chance, select either domain).
-		# 		# 2) Get trajectory segments from desired domain. 
-		# 		# 3) Encode trajectory segments into latent z's and compute likelihood of trajectory actions under the decoder.
-		# 		# 4) Feed into discriminator, get likelihood of each domain.
+		# 		# 2) Get trajectory segments from desired domain; Encode trajectory segments into latent z's and compute likelihood of trajectory actions under the decoder.		
+		# 		# 3) If we have selected the domain to translate from, translate the z sequence.
+		# 		# 4) Feed into discriminator, get likelihood of real / translated. 
+		#			# Remember, this mode is slightly different. The discriminator(s) are strictly speaking not differentiating between the domains themselves, 
+		# 			# but original and translated versions of zs in each domain,. 
+		#			# Remember this when selecting discriminator inputs. 
 		# 		# 5) Compute and apply gradient updates. 
+		#		# 6) Update plots. 
+		#################################################
 
-		# Remember to make domain agnostic function calls to encode, feed into discriminator, get likelihoods, etc. 
-
-		####################################
+		#################################################
 		# (0) Setup things like training phases, epsilon values, etc.
-		####################################
+		#################################################
 
 		self.set_iteration(counter)		
 
-		####################################
-		# (1) Select which domain to run on. This is supervision of discriminator.
-		# Remember, this mode is slightly different. The discriminator(s) are strictly speaking not differentiating between the domains themselves, but original and translated versions of zs in each domain,. 
-		# Remember this when selecting discriminator inputs. 
-		####################################
+		#################################################
+		# (1) Select which domain to run on; also supervision of discriminator.
+		#################################################
 
 		# Use same domain across batch for simplicity. 
 		domain = np.random.binomial(1,0.5)
 		self.counter = counter
 		policy_manager = self.get_domain_manager(domain)
 
-		####################################		
+		#################################################	
 		# (2) Get trajectory segment and encode and decode. 
-		####################################
+		#################################################
 
 		update_dictionary = {}
 		source_input_dict, source_var_dict, source_eval_dict = self.encode_decode_trajectory(policy_manager, i)
@@ -7178,75 +7188,53 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		if update_dictionary['latent_z'] is not None:
 
-			####################################
+			#################################################
 			# (3) If domain==Target, translate the latent z(s) to the source domain.
-			####################################
+			#################################################
 
 			detached_original_latent_z = update_dictionary['latent_z'].detach()
 			if domain==1:
 				update_dictionary['translated_latent_z'] = self.translate_latent_z(detached_original_latent_z)
 			else:
-				# Otherwise.... set translated z to latent z, because that's what we're going to feed t the discriminator(s). 
+				# Otherwise.... set translated z to latent z, because that's what we're going to feed to the discriminator(s). 
 				# Detach just to make sure gradients don't pass into the source encoder. 
 				update_dictionary['translated_latent_z'] = detached_original_latent_z
 			# Set this variable, because this is what the discriminator training uses as input. 
 			update_dictionary['detached_latent_z'] = update_dictionary['translated_latent_z'].detach()				
 			
-			####################################
+			#################################################
 			# (4) Feed latent z's to discriminator, and get discriminator likelihoods. 
-			####################################
+			#################################################
 
-			# In the joint transfer case:
-			# This is only source for now.
+			# In the joint transfer case: this is only for one domain.
 			update_dictionary['discriminator_logprob'], discriminator_prob = self.discriminator_network(update_dictionary['translated_latent_z'])
 
-			####################################
+			#################################################
 			# (4b) If we are using a z_transform discriminator.
-			####################################
+			#################################################
+			
 			if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator or self.args.equivariance:
 				# Calculate the transformation.
-				update_dictionary['z_transformations'], update_dictionary['z_transformation_weights'], update_dictionary['delta_z'] = self.get_z_transformation(update_dictionary['translated_latent_z'], source_var_dict['latent_b'])
-
-				
-
-				update_dictionary['z_transform_discriminator_logprob'], z_transform_discriminator_prob = self.z_transform_discriminator(update_dictionary['z_transformations'])
-
-				# This is only source for now.
-				# update_dictionary['z_transform_discriminator_logprob'], z_transform_discriminator_prob = self.source_z_transform_discriminator(update_dictionary['z_transformations'])
+				update_dictionary['z_transformations'], update_dictionary['z_trajectory_weights'], update_dictionary['delta_z'] = self.get_z_transformation(update_dictionary['translated_latent_z'], source_var_dict['latent_b'])
+				update_dictionary['z_trajectory_discriminator_logprob'], z_transform_discriminator_prob = self.z_trajectory_discriminator(update_dictionary['z_transformations'])
+				update_dictionary['z_trajectory'] = update_dictionary['z_transformations']
 				
 				# Add this probability to the dictionary to visualize.
-				viz_dict = {'z_transform_discriminator_probs': z_transform_discriminator_prob[...,domain].detach().cpu().numpy().mean()}
+				viz_dict = {'z_trajectory_discriminator_probs': z_transform_discriminator_prob[...,domain].detach().cpu().numpy().mean()}
 						
-
-			# if self.args.z_trajectory_discriminator:
-			# 	# Feed the entire z trajectory to the discriminator.
-			# 	update_dictionary['z_trajectory_discriminator_logprob'], z_trajectory_discriminator_prob = self.z_trajectory_discriminator.get_probabilities(update_dictionary['latent_z'])
-			# 	viz_dict = {'z_trajectory_discriminator_probs': z_trajectory_discriminator_prob[...,domain].detach().cpu().numpy().mean()}
-			# 	update_dictionary['z_trajectory'] = update_dictionary['latent_z']
-
-			# elif self.args.z_transform_discriminator:					
-			# 	# Calculate the transformation.
-			# 	update_dictionary['z_transformations'], update_dictionary['z_trajectory_weights'] = self.get_z_transformation(update_dictionary['latent_z'], source_var_dict['latent_b'])
-			# 	update_dictionary['z_trajectory_discriminator_logprob'], z_trajectory_discriminator_prob = self.z_trajectory_discriminator.get_probabilities(update_dictionary['z_transformations'])
-			# 	update_dictionary['z_trajectory'] = update_dictionary['z_transformations']
-				
-			# 	# Add this probability to the dictionary to visualize.
-			# 	viz_dict = {'z_trajectory_discriminator_probs': z_trajectory_discriminator_prob[...,domain].detach().cpu().numpy().mean()}
-
 			else:
 				viz_dict = {}
 
-			####################################
+			#################################################
 			# (5) Compute and apply gradient updates. 			
-			####################################
+			#################################################
 
 			self.update_networks(domain, policy_manager, update_dictionary)			
 
-			####################################
+			#################################################
 			# (6) Update Plots. 			
-			####################################
+			#################################################
 
-			# viz_dict = {'domain': domain, 'discriminator_probs': discriminator_prob.squeeze(0).mean(axis=0)[domain].detach().cpu().numpy()}
 			viz_dict['domain'] = domain
 			viz_dict['discriminator_probs'] = discriminator_prob[...,domain].detach().cpu().numpy().mean()
 
