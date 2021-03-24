@@ -5535,7 +5535,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		else: 
 			return None, None, None, None
 
-	def compute_equivariance_loss(self, update_dictionary):
+	def compute_equivariance_loss(self, update_dictionary):	
 
 		# Equivariance loss is computed as L2 difference between Transformed(Translated(Z_Seq)) and Translated(Transformed(Z_Seq)).
 
@@ -7147,7 +7147,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 	def run_iteration(self, counter, i):
 		
 		#################################################
-		# Algorithm: 
+		## Algorithm: 
 		#################################################
 		# For every epoch:
 		# 	# For every datapoint: 
@@ -7163,13 +7163,13 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		#################################################
 
 		#################################################
-		# (0) Setup things like training phases, epsilon values, etc.
+		## (0) Setup things like training phases, epsilon values, etc.
 		#################################################
 
 		self.set_iteration(counter)		
 
 		#################################################
-		# (1) Select which domain to run on; also supervision of discriminator.
+		## (1) Select which domain to run on; also supervision of discriminator.
 		#################################################
 
 		# Use same domain across batch for simplicity. 
@@ -7178,7 +7178,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		policy_manager = self.get_domain_manager(domain)
 
 		#################################################	
-		# (2) Get trajectory segment and encode and decode. 
+		## (2) Get trajectory segment and encode and decode. 
 		#################################################
 
 		update_dictionary = {}
@@ -7189,7 +7189,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		if update_dictionary['latent_z'] is not None:
 
 			#################################################
-			# (3) If domain==Target, translate the latent z(s) to the source domain.
+			## (3) If domain==Target, translate the latent z(s) to the source domain.
 			#################################################
 
 			detached_original_latent_z = update_dictionary['latent_z'].detach()
@@ -7203,14 +7203,14 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			update_dictionary['detached_latent_z'] = update_dictionary['translated_latent_z'].detach()				
 			
 			#################################################
-			# (4) Feed latent z's to discriminator, and get discriminator likelihoods. 
+			## (4) Feed latent z's to discriminator, and get discriminator likelihoods. 
 			#################################################
 
 			# In the joint transfer case: this is only for one domain.
 			update_dictionary['discriminator_logprob'], discriminator_prob = self.discriminator_network(update_dictionary['translated_latent_z'])
 
 			#################################################
-			# (4b) If we are using a z_transform discriminator.
+			## (4b) If we are using a z_transform discriminator.
 			#################################################
 			
 			if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator or self.args.equivariance:
@@ -7226,13 +7226,13 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				viz_dict = {}
 
 			#################################################
-			# (5) Compute and apply gradient updates. 			
+			## (5) Compute and apply gradient updates. 			
 			#################################################
 
 			self.update_networks(domain, policy_manager, update_dictionary)			
 
 			#################################################
-			# (6) Update Plots. 			
+			## (6) Update Plots. 			
 			#################################################
 
 			viz_dict['domain'] = domain
