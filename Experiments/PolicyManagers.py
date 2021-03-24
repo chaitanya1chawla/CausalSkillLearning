@@ -5558,7 +5558,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		#########################################################################
 
 		# Zero out gradients of encoder and decoder (policy).
-		policy_manager.optimizer.zero_grad()		
+		if self.args.setting in ['jointfixembed', 'fixembed']:
+			# If we are in the translation model setting, use self.optimizer rather either source / target policy manager. 
+			self.optimizer.zero_grad()
+		else:
+			policy_manager.optimizer.zero_grad()
 
 		###########################################################
 		# (1a) First, compute reconstruction loss.
@@ -5623,6 +5627,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# Total encoder loss: 
 		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.equivariance_loss
+
 
 		if not(self.skip_vae):
 			# Go backward through the generator (encoder / decoder), and take a step. 
