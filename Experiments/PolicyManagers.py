@@ -5249,7 +5249,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				log_dict['Z Trajectory Discriminator Probability'] = viz_dict['z_trajectory_discriminator_probs']
 				log_dict['Unweighted Z Trajectory Discriminability Loss'] = self.masked_z_trajectory_discriminability_loss.mean()			
 
-			if self.args.equivariance and viz_dict['domain']==0:
+			if self.args.equivariance and viz_dict['domain']==1:
 				log_dict['Unweighted Z Equivariance Loss'] = self.unweighted_masked_equivariance_loss
 				log_dict['Z Equivariance Loss'] = self.equivariance_loss
 
@@ -5331,6 +5331,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					log_dict['Average Corresponding Z Sequence Error'] = self.average_corresponding_z_sequence_error.mean()
 					log_dict['Average Corresponding Z Transition Sequence Error'] = self.average_corresponding_z_transition_sequence_error.mean()
 
+			######################################
+			# Visualize Z Trajectories.
+			######################################
+
+			log_dict['Source Z Trajectory Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_image)
+			log_dict['Target Z Trajectory Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_image)
+
 			# Clean up objects consuming memory. 			
 			self.free_memory()
 		
@@ -5393,12 +5400,48 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.N = self.source_manager.N
 		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed']:
 			self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
-			self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)		
+			self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)
+			# These are the same z's... this object just retains sequence info. Should be able to find some indexing of concatenate...? 
+			self.source_z_trajectory_set = self.source_manager.latent_z_set
+			self.target_z_trajectory_set = self.target_manager.latent_z_set
 		else:
 			self.source_latent_zs = self.source_manager.latent_z_set
 			self.target_latent_zs = self.target_manager.latent_z_set
 
 		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
+
+	def visualize_embedded_z_trajectories(self, shared_z_embedding, z_trajectory_set_object):
+		# Visualize a set of z trajectories over the shared z embedding space.
+
+		# Get the figure and axes objects, so we can overlay images on to this. 
+		fig, ax = self.plot_embedding(shared_z_embedding, "Z Trajectory Image", shared=True, return_fig=True)
+	
+		for i, z_traj in enumerate(z_trajectory_set_object):
+			# First get length of this z_trajectory.
+			z_traj_len = len(z_traj)
+
+			# Should just be able to get the corresponding embedded z by manipulating indices.. 
+			# Assuming len of z_traj is consistent across all elements in z_trajectory_set_object, which would have needed to have been true 
+			# for the concatenate in set_z_objects to work.
+			embedded_z_traj = shared_z_embedding[i*z_traj_len:(i+1)*z_traj_len]
+
+			# Now that we have the embedded trajectory, come up with some plot for it. 
+			ax.scatter(embedded_z_traj[:,0],embedded_z_traj[:,1])
+			diffs = np.diff(embedded_z_traj,axis=0)
+			ax.quiver(embedded_z_traj[:-1,0],embedded_z_traj[:-1,1],diffs[:,0],diffs[:,1],angles='xy',scale_units='xy',scale=1)
+
+		# Re-generate image.
+		fig.canvas.draw()
+		width, height = fig.get_size_inches() * fig.get_dpi()
+		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)		
+		image = np.transpose(image, axes=[2,0,1])
+
+		# Reset plots.
+		ax.clear()
+		fig.clear()
+		plt.close(fig)
+
+		return image	
 
 	def get_embeddings(self, projection='tsne', computed_sets=False):
 		# Function to visualize source, target, and combined embeddings: 
@@ -5413,7 +5456,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# target_embedded_zs, _ = self.get_transform(self.target_latent_zs, projection)
 			shared_embedded_zs_p5, _ = self.get_transform(self.shared_latent_zs, projection, shared=True, perplexity=5)
 			shared_embedded_zs_p10, _ = self.get_transform(self.shared_latent_zs, projection, shared=True, perplexity=10)
-			shared_embedded_zs_p30, _ = self.get_transform(self.shared_latent_zs, projection, shared=True, perplexity=30)
+			shared_embedded_zs_p30, shared_embedded_zs_p30_tsne = self.get_transform(self.shared_latent_zs, projection, shared=True, perplexity=30)
 			shared_embedded_zs = shared_embedded_zs_p30
 			source_embedded_zs = shared_embedded_zs_p30[:self.N]
 			target_embedded_zs = shared_embedded_zs_p30[self.N:]
@@ -5455,6 +5498,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# self.target_traj_image = self.plot_embedding(target_embedded_zs, "Target_Embedding", trajectory=True, viz_domain='target')
 
 		self.samedomain_shared_embedding_image = None
+
+		########################################
+		# Visualizing embedding z trajectories.
+		########################################
+
+		self.source_z_traj_image = self.visualize_embedded_z_trajectories(source_embedded_zs, self.source_z_trajectory_set)
+		self.target_z_traj_image = self.visualize_embedded_z_trajectories(target_embedded_zs, self.target_z_trajectory_set)
 
 		if projection=='tsne':
 
@@ -5573,6 +5623,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.encoder_KL = update_dictionary['kl_divergence'].mean()
 		self.unweighted_VAE_loss = self.likelihood_loss + self.args.kl_weight*self.encoder_KL
 		self.VAE_loss = self.vae_loss_weight*self.unweighted_VAE_loss
+
 		###########################################################
 		# (1b) Next, compute discriminability loss.
 		###########################################################
@@ -5627,7 +5678,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# Total encoder loss: 
 		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.equivariance_loss
-
 
 		if not(self.skip_vae):
 			# Go backward through the generator (encoder / decoder), and take a step. 
@@ -5735,7 +5785,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 			self.update_plots(counter, viz_dict)
 
-	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False, viz_domain=None):	
+	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False, viz_domain=None, return_fig=False):	
 		
 		############################################################
 		# Setting fig size everywhere so that it doesn't go nuts. 
@@ -5850,11 +5900,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		image = np.transpose(image, axes=[2,0,1])
 
 		# Clear figure from memory.
-		ax.clear()
-		fig.clear()
-		plt.close(fig)
+		if return_fig:
+			return fig, ax
+		else:
+			ax.clear()
+			fig.clear()
+			plt.close(fig)
 
-		return image
+			return image
 
 	def compute_neighbors(self, computed_sets=False):
 		
@@ -7010,6 +7063,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p10'])
 			# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p30'])
 
+			# Now plot z trajectories...
+
+
 		wandb.log(log_dict, step=counter)
 
 	def create_networks(self):
@@ -7064,7 +7120,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# 	self.discriminator_parameter_list += list(self.source_z_transform_discriminator.parameters()) + list(self.target_z_transform_discriminator.parameters())
 
 		self.discriminator_parameter_list = list(self.discriminator_network.parameters())
-		if self.args.z_transform_discriminator or self.arg.z_trajectory_discriminator:
+		if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
 			self.discriminator_parameter_list += list(self.z_trajectory_discriminator.parameters())
 
 		# Create common optimizer for source, target, and discriminator networks. 
@@ -7152,7 +7208,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 	def run_iteration(self, counter, i):
 		
 		#################################################
-		## Algorithm: 
+		## Algorithm:
 		#################################################
 		# For every epoch:
 		# 	# For every datapoint: 
