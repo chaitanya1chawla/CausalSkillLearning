@@ -5293,7 +5293,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 			# We are also going to log Ground Truth trajectories and their reconstructions in each of the domains, to make sure our networks are learning. 		
 			# Should be able to use the policy manager's functions to do this.
-			if not(self.args.no_mujoco):
+			if not(self.args.no_mujoco) and self.args.source_domain in ['ContinuousNonZero','ToyContext']:
 				self.viz_dictionary['source_trajectory'], self.viz_dictionary['source_reconstruction'], self.viz_dictionary['target_trajectory'], self.viz_dictionary['target_reconstruction'] = self.get_trajectory_visuals()
 
 			if self.viz_dictionary['source_trajectory'] is not None and not(self.args.no_mujoco):
@@ -5335,8 +5335,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Visualize Z Trajectories.
 			######################################
 
-			log_dict['Source Z Trajectory Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_image)
-			log_dict['Target Z Trajectory Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_image)
+			log_dict['Source Z Trajectory TSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_tsne_image)
+			log_dict['Target Z Trajectory TSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_tsne_image)
+			log_dict['Source Z Trajectory PCA Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_pca_image)
+			log_dict['Target Z Trajectory PCA Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_pca_image)
+
 
 			# Clean up objects consuming memory. 			
 			self.free_memory()
@@ -5404,19 +5407,26 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# These are the same z's... this object just retains sequence info. Should be able to find some indexing of concatenate...? 
 			self.source_z_trajectory_set = self.source_manager.latent_z_set
 			self.target_z_trajectory_set = self.target_manager.latent_z_set
+
 		else:
 			self.source_latent_zs = self.source_manager.latent_z_set
 			self.target_latent_zs = self.target_manager.latent_z_set
 
 		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
 
-	def visualize_embedded_z_trajectories(self, shared_z_embedding, z_trajectory_set_object):
+	def visualize_embedded_z_trajectories(self, domain, shared_z_embedding, z_trajectory_set_object, projection='tsne'):
 		# Visualize a set of z trajectories over the shared z embedding space.
 
 		# Get the figure and axes objects, so we can overlay images on to this. 
-		fig, ax = self.plot_embedding(shared_z_embedding, "Z Trajectory Image", shared=True, return_fig=True)
+		domain_list = ['source','target']
+		viz_domain = domain_list[domain]
+		
+		fig, ax = self.plot_embedding(shared_z_embedding, "Z Trajectory Image {0}".format(projection), return_fig=True, viz_domain=viz_domain)
 	
-		for i, z_traj in enumerate(z_trajectory_set_object):
+		# for i, z_traj in enumerate(z_trajectory_set_object):
+		for i in range(10):
+			z_traj = z_trajectory_set_object[i]	
+		
 			# First get length of this z_trajectory.
 			z_traj_len = len(z_traj)
 
@@ -5426,7 +5436,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			embedded_z_traj = shared_z_embedding[i*z_traj_len:(i+1)*z_traj_len]
 
 			# Now that we have the embedded trajectory, come up with some plot for it. 
-			ax.scatter(embedded_z_traj[:,0],embedded_z_traj[:,1])
+			ax.scatter(embedded_z_traj[:,0],embedded_z_traj[:,1],s=10,c=domain*np.ones(z_traj_len),cmap='jet',vmin=0,vmax=1)
 			diffs = np.diff(embedded_z_traj,axis=0)
 			ax.quiver(embedded_z_traj[:-1,0],embedded_z_traj[:-1,1],diffs[:,0],diffs[:,1],angles='xy',scale_units='xy',scale=1)
 
@@ -5458,8 +5468,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			shared_embedded_zs_p10, _ = self.get_transform(self.shared_latent_zs, projection, shared=True, perplexity=10)
 			shared_embedded_zs_p30, shared_embedded_zs_p30_tsne = self.get_transform(self.shared_latent_zs, projection, shared=True, perplexity=30)
 			shared_embedded_zs = shared_embedded_zs_p30
-			source_embedded_zs = shared_embedded_zs_p30[:self.N]
-			target_embedded_zs = shared_embedded_zs_p30[self.N:]
+			source_embedded_zs = shared_embedded_zs_p30[:len(self.source_latent_zs)]
+			target_embedded_zs = shared_embedded_zs_p30[len(self.source_latent_zs):]
 
 			########################################
 			# Shared data point visualization. 
@@ -5468,6 +5478,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.shared_image_p5 = self.plot_embedding(shared_embedded_zs_p5, "Shared_Embedding Perplexity 5", shared=True)	
 			self.shared_image_p10 = self.plot_embedding(shared_embedded_zs_p10, "Shared_Embedding Perplexity 10", shared=True)	
 			self.shared_image_p30 = self.plot_embedding(shared_embedded_zs_p30, "Shared_Embedding Perplexity 30", shared=True)	
+
+			########################################
+			# Visualizing embedding z trajectories.
+			########################################
+
+			self.source_z_traj_tsne_image = self.visualize_embedded_z_trajectories(0, source_embedded_zs, self.source_z_trajectory_set, projection='tsne')
+			self.target_z_traj_tsne_image = self.visualize_embedded_z_trajectories(1, target_embedded_zs, self.target_z_trajectory_set, projection='tsne')
 
 		elif projection=='pca':
 			# Now fit PCA to source.
@@ -5481,6 +5498,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 			self.shared_image = self.plot_embedding(shared_embedded_zs, "Shared_Embedding", shared=True)	
 
+			########################################
+			# Visualizing embedding z trajectories.
+			########################################
+
+			self.source_z_traj_pca_image = self.visualize_embedded_z_trajectories(0, source_embedded_zs, self.source_z_trajectory_set, projection='pca')			
+			self.target_z_traj_pca_image = self.visualize_embedded_z_trajectories(1, target_embedded_zs, self.target_z_trajectory_set, projection='pca')
+
 		########################################
 		# Single domain data point visualization.
 		########################################
@@ -5492,19 +5516,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Single domain data point visualization with trajectories.
 		########################################
 
-		self.source_traj_image = self.plot_embedding(shared_embedded_zs, "Source_Embedding", trajectory=True, viz_domain='source')
-		self.target_traj_image = self.plot_embedding(shared_embedded_zs, "Target_Embedding", trajectory=True, viz_domain='target')
-		# self.source_traj_image = self.plot_embedding(source_embedded_zs, "Source_Embedding", trajectory=True, viz_domain='source')
-		# self.target_traj_image = self.plot_embedding(target_embedded_zs, "Target_Embedding", trajectory=True, viz_domain='target')
+		if self.args.source_domain in ['ContinuousNonZero','ToyContext']:
+			self.source_traj_image = self.plot_embedding(shared_embedded_zs, "Source_Embedding", trajectory=True, viz_domain='source')
+		if self.args.target_domain in ['ContinuousNonZero','ToyContext']:
+			self.target_traj_image = self.plot_embedding(shared_embedded_zs, "Target_Embedding", trajectory=True, viz_domain='target')
 
 		self.samedomain_shared_embedding_image = None
-
-		########################################
-		# Visualizing embedding z trajectories.
-		########################################
-
-		self.source_z_traj_image = self.visualize_embedded_z_trajectories(source_embedded_zs, self.source_z_trajectory_set)
-		self.target_z_traj_image = self.visualize_embedded_z_trajectories(target_embedded_zs, self.target_z_trajectory_set)
 
 		if projection=='tsne':
 
@@ -5572,9 +5589,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			if self.args.batch_size>1:
 				target_trajectory = target_trajectory[:,0]
 				target_latent_z = target_latent_z[:,0]
-
-			# print("Embedding in Transfer Get Trajectory Visuals.")
-			# embed()
 
 			# Reconstruct using the target domain manager. 
 			_, self.target_trajectory_image, self.target_reconstruction_image = self.target_manager.get_robot_visuals(0, target_latent_z, target_trajectory, return_image=True, return_numpy=True, z_seq=(self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed']))
@@ -5803,7 +5817,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			colors = 0.2*np.ones((embedded_zs.shape[0]))
 			colors[embedded_zs.shape[0]//2:] = 0.8
 		else:
-			colors = 0.2*np.ones((embedded_zs.shape[0]))
+			if viz_domain=='source':
+				colors = 0.2*np.ones((embedded_zs.shape[0]))
+			elif viz_domain=='target':
+				colors = 0.8*np.ones((embedded_zs.shape[0]))
+			else:
+				colors = 0.2*np.ones((embedded_zs.shape[0]))
 
 		############################################################
 		# If we're visualizing trajectories in the visualized plots. 
@@ -5885,8 +5904,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			s = np.ones(embedded_zs.shape[0])*50
 			if viz_domain=='source':
 				s[(embedded_zs.shape[0]//2):] = 1
+				# Set target colors
+				colors[(embedded_zs.shape[0]//2):] = 0.8
 			elif viz_domain=='target':
 				s[:(embedded_zs.shape[0]//2)] = 1
+				# Set source colors
+				colors[:(embedded_zs.shape[0]//2)] = 0.2
 
 			ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors,vmin=0,vmax=1,cmap='jet',s=s)
 		
@@ -6101,8 +6124,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.evaluate_correspondence_metrics()
 
 	def automatic_evaluation(self, e):
-
 		pass
+
+	def check_toy_dataset(self):
+		return self.args.source_domain in ['ContinuousNonZero','ToyContext'] and self.args.target_domain in ['ContinuousNonZero','ToyContext']
 
 class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 
@@ -7048,7 +7073,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 					# self.return_wandb_gif(self.viz_dictionary['target_trajectory']), self.return_wandb_gif(self.viz_dictionary['target_reconstruction'])
 
 			log_dict["TSNE Translated Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transtarget_p30'])
-			log_dict["TSNE Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transtarget_traj_p30'])
+			if self.check_toy_dataset:
+				log_dict["TSNE Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transtarget_traj_p30'])
 
 			log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p05'])
 			log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p10'])
@@ -7056,15 +7082,14 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p05'])
 			# log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p10'])
 			# log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p30'])
-			log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p05'])
-			log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p10'])
-			log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p30'])
-			# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p05'])
-			# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p10'])
-			# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p30'])
 
-			# Now plot z trajectories...
-
+			if self.check_toy_dataset:
+				log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p05'])
+				log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p10'])
+				log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p30'])
+				# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p05'])
+				# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p10'])
+				# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p30'])
 
 		wandb.log(log_dict, step=counter)
 
