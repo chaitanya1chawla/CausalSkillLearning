@@ -183,8 +183,7 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		# to evaluate this distribution (instance)'s log probability with the same sequence length. 
 
 		# if debugging:
-		# 	embed()
-
+			# embed()		
 		covariance_matrix = torch.diag_embed(variance_outputs)
 
 		# Executing distribution creation on CPU and then copying back to GPU.

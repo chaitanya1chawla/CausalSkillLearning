@@ -508,8 +508,8 @@ class PolicyManager_BaseClass():
 			# Start HTML doc. 
 			html_file.write('<html>')
 			html_file.write('<body>')
-			html_file.write('<p> Model: {0}</p>'.format(self.args.name))
-			html_file.write('<p> Average Trajectory Distance: {0}</p>'.format(self.mean_distance))
+			html_file.write('<p> Model: {0}</p>'.format(self.args.name))						
+			# html_file.write('<p> Average Trajectory Distance: {0}</p>'.format(self.mean_distance))
 
 			for i in range(self.N):
 				
@@ -2773,7 +2773,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			####################################
 			
 			eval_likelihood_dict = self.evaluate_loglikelihoods(input_dictionary, variational_dict)
-
+			
 			if self.args.train and train:
 				
 				####################################
@@ -2949,7 +2949,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 					traj_segment = input_dict['sample_traj'][distinct_z_indices[k]:distinct_z_indices[k+1],b]
 					self.segmented_trajectory_set.append(copy.deepcopy(traj_segment))				
 				
-				traj_segment = input_dict['sample_traj'][distinct_z_indices[k+1]:,b]
+				
+				# traj_segment = input_dict['sample_traj'][distinct_z_indices[k+1]:,b]
+				traj_segment = input_dict['sample_traj'][distinct_z_indices[len(distinct_z_indices)-1]:,b]
 				self.segmented_trajectory_set.append(copy.deepcopy(traj_segment))
 
 				self.number_set_elements += 1 
@@ -5200,25 +5202,26 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 	def free_memory(self):
 
-		# Deleting objects from get_trajectory_visuals()
-		del self.source_trajectory_image, self.source_reconstruction_image, self.target_trajectory_image, self.target_reconstruction_image
-
 		# Deleting objects from get_embeddings()
 		del self.source_image, self.target_image, self.shared_image, self.samedomain_shared_embedding_image
 
 		# Deleting copies of objects in update_plots.
 		del self.viz_dictionary
 
-		# Remmoving nested objects. 
-		del self.source_manager.gt_gif_list, self.source_manager.rollout_gif_list, self.target_manager.gt_gif_list, self.target_manager.rollout_gif_list
-		# Setting lists so other functions don't complain.
-		self.source_manager.gt_gif_list = [] 
-		self.source_manager.rollout_gif_list = []
-		self.target_manager.gt_gif_list = []
-		self.target_manager.rollout_gif_list = []
+		# Deleting objects from get_trajectory_visuals()
+		if self.check_toy_dataset():
+			del self.source_trajectory_image, self.source_reconstruction_image, self.target_trajectory_image, self.target_reconstruction_image
 
-		# Remove nested gif objects. 
-		del self.source_manager.ground_truth_gif, self.source_manager.rollout_gif, self.target_manager.ground_truth_gif, self.target_manager.rollout_gif
+			# Removing nested objects. 
+			del self.source_manager.gt_gif_list, self.source_manager.rollout_gif_list, self.target_manager.gt_gif_list, self.target_manager.rollout_gif_list
+			# Setting lists so other functions don't complain.
+			self.source_manager.gt_gif_list = [] 
+			self.source_manager.rollout_gif_list = []
+			self.target_manager.gt_gif_list = []
+			self.target_manager.rollout_gif_list = []
+
+			# Remove nested gif objects. 
+			del self.source_manager.ground_truth_gif, self.source_manager.rollout_gif, self.target_manager.ground_truth_gif, self.target_manager.rollout_gif
 
 	def update_plots(self, counter, viz_dict, log=True):
 
@@ -5296,7 +5299,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			if not(self.args.no_mujoco) and self.args.source_domain in ['ContinuousNonZero','ToyContext']:
 				self.viz_dictionary['source_trajectory'], self.viz_dictionary['source_reconstruction'], self.viz_dictionary['target_trajectory'], self.viz_dictionary['target_reconstruction'] = self.get_trajectory_visuals()
 
-			if self.viz_dictionary['source_trajectory'] is not None and not(self.args.no_mujoco):
+			# if self.viz_dictionary['source_trajectory'] is not None and not(self.args.no_mujoco):
+			if 'source_trajectory' in self.viz_dictionary and not(self.args.no_mujoco):
 				# Now actually plot the images.
 
 				if self.args.source_domain in ['ContinuousNonZero','DirContNonZero','ToyContext']:
@@ -5423,6 +5427,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		
 		fig, ax = self.plot_embedding(shared_z_embedding, "Z Trajectory Image {0}".format(projection), return_fig=True, viz_domain=viz_domain)
 	
+		# embed()
 		# for i, z_traj in enumerate(z_trajectory_set_object):
 		for i in range(10):
 			z_traj = z_trajectory_set_object[i]	
@@ -5438,6 +5443,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Now that we have the embedded trajectory, come up with some plot for it. 
 			ax.scatter(embedded_z_traj[:,0],embedded_z_traj[:,1],s=10,c=domain*np.ones(z_traj_len),cmap='jet',vmin=0,vmax=1)
 			diffs = np.diff(embedded_z_traj,axis=0)
+			
 			ax.quiver(embedded_z_traj[:-1,0],embedded_z_traj[:-1,1],diffs[:,0],diffs[:,1],angles='xy',scale_units='xy',scale=1)
 
 		# Re-generate image.
@@ -7039,7 +7045,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			self.viz_dictionary['tsne_origsource_transtarget_traj_p05'], self.viz_dictionary['tsne_origsource_transtarget_traj_p10'], self.viz_dictionary['tsne_origsource_transtarget_traj_p30'] = \
 				self.get_embeddings(projection='tsne', computed_sets=True)
 		# Also set target traj image
-		self.viz_dictionary['tsne_transtarget_traj_p30'] = self.target_traj_image
+
+		if self.check_toy_dataset():
+			self.viz_dictionary['tsne_transtarget_traj_p30'] = self.target_traj_image
 
 		# Comment out this block because we're not using it. 
 		# ############################################################
@@ -7073,7 +7081,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 					# self.return_wandb_gif(self.viz_dictionary['target_trajectory']), self.return_wandb_gif(self.viz_dictionary['target_reconstruction'])
 
 			log_dict["TSNE Translated Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transtarget_p30'])
-			if self.check_toy_dataset:
+			if self.check_toy_dataset():
 				log_dict["TSNE Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transtarget_traj_p30'])
 
 			log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p05'])
@@ -7083,7 +7091,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p10'])
 			# log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p30'])
 
-			if self.check_toy_dataset:
+			if self.check_toy_dataset():
 				log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p05'])
 				log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p10'])
 				log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p30'])
@@ -7280,7 +7288,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 			detached_original_latent_z = update_dictionary['latent_z'].detach()
 			if domain==1:
-				update_dictionary['translated_latent_z'] = self.translate_latent_z(detached_original_latent_z)
+				update_dictionary['translated_latent_z'] = self.translate_latent_z(detached_original_latent_z)				
 			else:
 				# Otherwise.... set translated z to latent z, because that's what we're going to feed to the discriminator(s). 
 				# Detach just to make sure gradients don't pass into the source encoder. 
@@ -7305,7 +7313,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			## (4b) If we are using a z_transform discriminator.
 			#################################################
 			
-			if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator or self.args.equivariance:
+			if self.args.z_transform_discriminator or self.args.equivariance:
 				# Calculate the transformation.
 				# update_dictionary['z_transformations'], update_dictionary['z_trajectory_weights'], update_dictionary['delta_z'] = self.get_z_transformation(update_dictionary['translated_latent_z'], source_var_dict['latent_b'])
 				update_dictionary['z_transformations'], update_dictionary['z_trajectory_weights'], _ = self.get_z_transformation(update_dictionary['translated_latent_z'], source_var_dict['latent_b'])
@@ -7314,7 +7322,12 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				
 				# Add this probability to the dictionary to visualize.
 				viz_dict = {'z_trajectory_discriminator_probs': z_transform_discriminator_prob[...,domain].detach().cpu().numpy().mean()}
-						
+
+			elif self.args.z_trajectory_discriminator:
+				# Feed the entire z trajectory to the discriminator.
+				update_dictionary['z_trajectory_discriminator_logprob'], z_trajectory_discriminator_prob = self.z_trajectory_discriminator.get_probabilities(update_dictionary['translated_latent_z'])
+				viz_dict = {'z_trajectory_discriminator_probs': z_trajectory_discriminator_prob[...,domain].detach().cpu().numpy().mean()}
+				update_dictionary['z_trajectory'] = update_dictionary['translated_latent_z']
 			else:
 				viz_dict = {}
 
