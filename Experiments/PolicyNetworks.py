@@ -1430,14 +1430,14 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		# If usual variational network, predict b's. 
 		##################################################
 
-		# Here, we initialize these variables anyway so we don't have to change signature.
-		# Damping factor for probabilities to prevent washing out of bias. 
-		variational_b_preprobabilities = self.termination_output_layer(outputs)*self.b_probability_factor
+		if not(self.translation_network):
+			# Damping factor for probabilities to prevent washing out of bias. 
+			variational_b_preprobabilities = self.termination_output_layer(outputs)*self.b_probability_factor
 
-		# Create variables for prior and probabilities.
-		prior_values = torch.zeros_like(variational_b_preprobabilities).to(device).float()
-		variational_b_probabilities = torch.zeros_like(variational_b_preprobabilities).to(device).float()
-		variational_b_logprobabilities = torch.zeros_like(variational_b_preprobabilities).to(device).float()
+			# Create variables for prior and probabilities.
+			prior_values = torch.zeros_like(variational_b_preprobabilities).to(device).float()
+			variational_b_probabilities = torch.zeros_like(variational_b_preprobabilities).to(device).float()
+			variational_b_logprobabilities = torch.zeros_like(variational_b_preprobabilities).to(device).float()
 
 		##################################################
 		# Predict latent z's.
@@ -1581,8 +1581,11 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 			print("Embedding in Variational Network.")
 			embed()		
 
-		return sampled_z_index, sampled_b, variational_b_logprobabilities.squeeze(1), \
-		 variational_z_logprobabilities, variational_b_probabilities.squeeze(1), variational_z_probabilities, kl_divergence, prior_loglikelihood
+		if self.translation_network:
+			return sampled_z_index
+		else:
+			return sampled_z_index, sampled_b, variational_b_logprobabilities.squeeze(1), \
+		 	variational_z_logprobabilities, variational_b_probabilities.squeeze(1), variational_z_probabilities, kl_divergence, prior_loglikelihood
 
 class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNetwork_Batch):
 

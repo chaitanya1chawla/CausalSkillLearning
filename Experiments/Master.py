@@ -302,6 +302,7 @@ def parse_arguments():
 	# parser.add_argument('--reset_subpolicy_training',dest='reset_subpolicy_training',type=int,default=1,help='Whether to reset subpolicy training.')
 	parser.add_argument('--residual_translation',dest='residual_translation',type=int,default=0,help='Whether to use a residual model for translation or just a regular one.')
 	parser.add_argument('--small_translation_model',dest='small_translation_model',type=int,default=0,help='Whether to use a small model for translation or not. Restricts network capacity.')
+	parser.add_argument('--recurrent_translation',dest='recurrent_translation',type=int,default=0,help='Whether to implement a recurrent translation model.')
 	parser.add_argument('--input_corruption_noise',dest='input_corruption_noise',type=float,default=0.,help='How much noise to add to the input to corrupt it. Default no corruption.')
 	parser.add_argument('--equivariance',dest='equivariance',type=int,default=0,help='Whether to implement equivariance objective in (Joint) Fix Embed setting.')
 	parser.add_argument('--equivariance_loss_weight',dest='equivariance_loss_weight',type=float,default=1.,help='WWeight associated with the equivariance loss.')
