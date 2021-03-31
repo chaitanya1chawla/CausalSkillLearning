@@ -1291,9 +1291,11 @@ class ContinuousVariationalPolicyNetwork_ConstrainedBPrior(ContinuousVariational
 
 class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwork_ConstrainedBPrior):
 
-	def __init__(self, input_size, hidden_size, z_dimensions, args, number_layers=4):
+	def __init__(self, input_size, hidden_size, z_dimensions, args, number_layers=4, translation_network=False):
 		
 		super(ContinuousVariationalPolicyNetwork_Batch, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)
+
+		self.translation_network = translation_network
 	
 	def get_prior_value(self, elapsed_t, max_limit=5, batch_size=None):
 
@@ -1406,20 +1408,40 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		####################################
 	
 	# @gpu_profile
-	def forward(self, input, epsilon, new_z_selection=True, batch_size=None, batch_trajectory_lengths=None):
-		
+	def forward(self, input, epsilon, new_z_selection=True, batch_size=None, batch_trajectory_lengths=None, precomputed_b=None):
+
+		##################################################
+		##################### Set A ######################
+		##################################################
+
 		if batch_size is None:
 			batch_size = self.batch_size			
-		# if batch_trajectory_lengths is not None: 
 
-		# print("VAR POL")	
+		##################################################
+		# Pass through base LSTM. 	
+		##################################################
+
 		# Input Format must be: Sequence_Length x Batch_Size x Input_Size. 	
 		format_input = input.view((input.shape[0], batch_size, self.input_size))
 		hidden = None
 		outputs, hidden = self.lstm(format_input)
 
+		##################################################
+		# If usual variational network, predict b's. 
+		##################################################
+
+		# Here, we initialize these variables anyway so we don't have to change signature.
 		# Damping factor for probabilities to prevent washing out of bias. 
 		variational_b_preprobabilities = self.termination_output_layer(outputs)*self.b_probability_factor
+
+		# Create variables for prior and probabilities.
+		prior_values = torch.zeros_like(variational_b_preprobabilities).to(device).float()
+		variational_b_probabilities = torch.zeros_like(variational_b_preprobabilities).to(device).float()
+		variational_b_logprobabilities = torch.zeros_like(variational_b_preprobabilities).to(device).float()
+
+		##################################################
+		# Predict latent z's.
+		##################################################
 
 		# Predict Gaussian means and variances. 
 		if self.args.mean_nonlinearity:
@@ -1428,67 +1450,77 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 			mean_outputs = self.mean_output_layer(outputs)
 		# Still need a softplus activation for variance because needs to be positive. 
 		variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(outputs))+self.variance_activation_bias) + epsilon
+
 		# This should be a SET of distributions. 
 		self.dists = torch.distributions.MultivariateNormal(mean_outputs, torch.diag_embed(variance_outputs))
 
-		# Create variables for prior and probabilities.
-		prior_values = torch.zeros_like(variational_b_preprobabilities).to(device).float()
-		variational_b_probabilities = torch.zeros_like(variational_b_preprobabilities).to(device).float()
-		variational_b_logprobabilities = torch.zeros_like(variational_b_preprobabilities).to(device).float()
+		##################################################
+		##################### Set B ######################
+		##################################################
+				
+		if not(self.translation_network):
 
-		#######################################
-		################ Set B ################
-		#######################################
-		
-		# Set the first b to 1, and the time b was == 1. 		
-		# sampled_b = torch.zeros(input.shape[0]).to(device).int()
-		# Changing to batching.. 
-		sampled_b = torch.zeros(input.shape[0], batch_size).to(device).int()
-		sampled_b[0] = 1
+			##################################################
+			# Initialize b's.
+			##################################################
 
-		prev_time = np.zeros((batch_size))
-		# prev_time = 0
+			# Set the first b to 1, and the time b was == 1. 		
+			# sampled_b = torch.zeros(input.shape[0]).to(device).int()
+			# Changing to batching.. 
+			sampled_b = torch.zeros(input.shape[0], batch_size).to(device).int()
+			sampled_b[0] = 1
 
-		for t in range(1,input.shape[0]):
-			
-			# Compute time since the last b occurred. 			
-			delta_t = t-prev_time
-			
-			# Compute prior value. 
-			# print("SAMPLED B: ", sampled_b[:t])
-			prior_values[t] = self.get_prior_value(delta_t, max_limit=self.args.skill_length, batch_size=batch_size)
+			prev_time = np.zeros((batch_size))
 
-			# Construct probabilities.
-			variational_b_probabilities[t] = self.batch_softmax_layer(variational_b_preprobabilities[t] + prior_values[t])
-			variational_b_logprobabilities[t] = self.batch_logsoftmax_layer(variational_b_preprobabilities[t] + prior_values[t])
+			##################################################
+			# Iterate over time and get b's.
+			##################################################
 
-			############################
-			# Batching versions of implementing hard restriction of selection of B's.
-			############################
+			for t in range(1,input.shape[0]):
+				
+				# Compute time since the last b occurred. 			
+				delta_t = t-prev_time
+				
+				# Compute prior value. 
+				# print("SAMPLED B: ", sampled_b[:t])
+				prior_values[t] = self.get_prior_value(delta_t, max_limit=self.args.skill_length, batch_size=batch_size)
 
-			# CASE 1: If we haven't reached the minimum skill execution time. 
-			condition_1 = torch.tensor((delta_t<self.min_skill_time).astype(int)).to(device)
-			
-			# CASE 2: If execution time is over the minimum skill execution time, but less than the maximum:
-			condition_2 = torch.tensor((delta_t>=self.min_skill_time).astype(int)*(delta_t<self.max_skill_time).astype(int)).to(device)
-			
-			# CASE 3: If we have reached the maximum skill execution time.
-			condition_3 = torch.tensor((delta_t>=self.max_skill_time).astype(int)).to(device)
+				# Construct probabilities.
+				variational_b_probabilities[t] = self.batch_softmax_layer(variational_b_preprobabilities[t] + prior_values[t])
+				variational_b_logprobabilities[t] = self.batch_logsoftmax_layer(variational_b_preprobabilities[t] + prior_values[t])
 
-			sampled_b[t] = condition_1*torch.zeros(1).to(device).float() + (condition_2*self.select_epsilon_greedy_action(variational_b_probabilities[t:t+1], epsilon)).squeeze(0) + \
-				condition_3*torch.ones(1).to(device).float()
+				############################
+				# Batching versions of implementing hard restriction of selection of B's.
+				############################
 
-			# Now if sampled_b[t] ==1, set the prev_time of that batch element to current time t. 
-			# Otherwise, let prev_time stay prev_time.
-			# Maybe a safer way to execute this: 
-			prev_time[(torch.where(sampled_b[t]==1)[0]).cpu().detach().numpy()] = t		
+				# CASE 1: If we haven't reached the minimum skill execution time. 
+				condition_1 = torch.tensor((delta_t<self.min_skill_time).astype(int)).to(device)
+				
+				# CASE 2: If execution time is over the minimum skill execution time, but less than the maximum:
+				condition_2 = torch.tensor((delta_t>=self.min_skill_time).astype(int)*(delta_t<self.max_skill_time).astype(int)).to(device)
+				
+				# CASE 3: If we have reached the maximum skill execution time.
+				condition_3 = torch.tensor((delta_t>=self.max_skill_time).astype(int)).to(device)
 
+				sampled_b[t] = condition_1*torch.zeros(1).to(device).float() + (condition_2*self.select_epsilon_greedy_action(variational_b_probabilities[t:t+1], epsilon)).squeeze(0) + \
+					condition_3*torch.ones(1).to(device).float()
 
-		#######################################
-		################ Set Z ################
-		#######################################
+				# Now if sampled_b[t] ==1, set the prev_time of that batch element to current time t. 
+				# Otherwise, let prev_time stay prev_time.
+				# Maybe a safer way to execute this: 
+				prev_time[(torch.where(sampled_b[t]==1)[0]).cpu().detach().numpy()] = t		
 
-		
+		else:
+			# Here, we didn't need to actually compute b's. So just assign them from precomputed ones. 
+			sampled_b = precomputed_b.detach()
+
+		##################################################
+		##################### Set Z ######################
+		##################################################
+
+		##################################################
+		# Get initial z predictions.
+		##################################################
 		# Now set the z's. If greedy, just return the means. 
 		if epsilon==0.:
 			sampled_z_index = mean_outputs.squeeze(1)
@@ -1508,33 +1540,26 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 			else:
 				sampled_z_index = mean_outputs.squeeze(1)
 		
-		# Modify z's based on whether b was 1 or 0. This part should remain the same.		
+		##################################################
+		# Modify z's based on whether b was 1 or 0.
+		##################################################
+		
 		if new_z_selection:
-			
-			# Set initial b to 1. 
-			sampled_b[0] = 1
+
+			if not(self.translation_network):
+				# Set initial b to 1. 
+				sampled_b[0] = 1
 
 			# Initial z is already trivially set. 
 			for t in range(1,input.shape[0]):
 				# If b_t==0, just use previous z. 
 				# If b_t==1, sample new z. Here, we've cloned this from sampled_z's, so there's no need to do anything. 
-
-				# Replacing this block with a batch friendly version.
-				# if sampled_b[t]==0:
-					# sampled_z_index[t] = sampled_z_index[t-1]		
-				
-				# print("Embedding in batch comp")
-				# embed()
-
-				# Fixing this - the sampled_z_index is supposed to be set to the previous one when sampled_b is 0. 
-				# We had it reversed.
-
-				# sampled_z_index[t, torch.where(sampled_b[t]==1)[0]] = sampled_z_index[t-1, torch.where(sampled_b[t]==1)[0]]
 				sampled_z_index[t, torch.where(sampled_b[t]==0)[0]] = sampled_z_index[t-1, torch.where(sampled_b[t]==0)[0]]
 
-		# print("Embedding in batch variational network forward.")
-		# embed()
-
+		##################################################
+		# Get z probabilities, KL and prior values.
+		##################################################
+				
 		# Also compute logprobabilities of the latent_z's sampled from this net. 
 		if self.args.batch_size>1:
 			variational_z_logprobabilities = self.dists.log_prob(sampled_z_index)
@@ -1678,7 +1703,6 @@ class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNe
 		 variational_z_logprobabilities, variational_b_probabilities, \
 		 variational_z_probabilities, kl_divergence, prior_loglikelihood
 
-# class ContinuousNewContextualVariationalPolicyNetwork(ContinuousContextualVariationalPolicyNetwork):
 class ContinuousNewContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNetwork_Batch):
 	
 	def __init__(self, input_size, hidden_size, z_dimensions, args, number_layers=4):
@@ -2133,134 +2157,4 @@ class DiscreteMLP(torch.nn.Module):
 
 	def get_probabilities(self, input):
 		return self.forward(input)
-
-class ContextDecoder(ContinuousVariationalPolicyNetwork):
-
-	def __init__(self, input_size, hidden_size, z_dimensions, args, number_layers=4):
-
-		# Ensures inheriting from torch.nn.Module goes nicely and cleanly. 	
-		super(ContextDecoder, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)
-		self.z_dimensions = z_dimensions
-
-		self.context_decoder_mlp = ContinuousMLP(z_dimensions, hidden_size, z_dimensions, args=None, number_layers=number_layers)
-
-	# def pad_inputs(self, input_z, total_length):
-
-	# 	# Padding to length total length. 
-	# 	# padded_inputs = torch.zeros((total_length,input_z.shape[]))
-
-	def forward(self, z_vector):
-
-		# This implementation of the ContextDecoder takes in a batch of Z vectors.
-		# It then predicts the logprobability of predicting the correct context Zs for a given input Z. 
-		# Remember, for each element in the batch, we must do this for each Z as the input Z in the z_vector, and for each other Z as the context Z. 
-		# This can be implemented as Batching, since they are all independent anyway. 
-
-		# Assume Z vector is of shape: 
-		# Number_Zs x Batch_Size x Z_Dimensions. 
-
-		# Does this assume constant number of Z's across batches? 
-		# Well... yes? Must pad and mask that as well.
-
-		# Must then treat as... 
-		# 1 Given Z x (Number-of-pairs x Batch_Size) x Z_Dimensions.
-		# Where number-of-pairs is.. Nx(N-1). 
-
-		###################################
-		# (1) First get input_zs, and context_zs, and build a mask.
-		###################################
-		
-		self.number_context_zs = z_vector.shape[0]	
-		
-		# Input_zs are basically just the z_vector reshaped to.. 1 x (Batch_Size x Number_Context_Zs) X Z_Dimensions		
-		input_zs = z_vector.view((1,-1,self.z_dimensions))
-
-		#####################################
-		# (2) In this case, feed input_zs to MLP to evaluate likelihoods of context_zs.
-		#####################################
-
-		# Swap batch and element axes for cdist. 
-		z_vector_transposed = torch.transpose(z_vector, 1, 0)
-
-		# Now feed the input_zs to MLP, and get predictions.
-		# Remember, these are going to be single outputs... but we are going to minimize average distance from context zs.
-		predicted_context_zs = self.context_decoder_mlp(z_vector_transposed)
-
-		# Now make the mask. 
-		mask = (1.-torch.eye(self.number_context_zs)).view(1,self.number_context_zs,self.number_context_zs).repeat(self.batch_size,1,1)
-		
-		# Compute distances.
-		distances = torch.cdist(z_vector_transposed, predicted_context_zs)
-
-		# Now mask distances. 
-		masked_distances = mask*distances
-
-		return masked_distances
-
-	# def forward(self, z_vector):
-
-	# 	# This implementation of the ContextDecoder takes in a batch of Z vectors.
-	# 	# It then predicts the logprobability of predicting the correct context Zs for a given input Z. 
-	# 	# Remember, for each element in the batch, we must do this for each Z as the input Z in the z_vector, and for each other Z as the context Z. 
-	# 	# This can be implemented as Batching, since they are all independent anyway. 
-
-	# 	# Assume Z vector is of shape: 
-	# 	# Number_Zs x Batch_Size x Z_Dimensions. 
-
-	# 	# Does this assume constant number of Z's across batches? 
-	# 	# Well... yes? Must pad and mask that as well.
-
-	# 	# Must then treat as... 
-	# 	# 1 Given Z x (Number-of-pairs x Batch_Size) x Z_Dimensions.
-	# 	# Where number-of-pairs is.. Nx(N-1). 
-
-	# 	###################################
-	# 	# (1) First get input_zs, and context_zs, and build a mask.
-	# 	###################################
-		
-	# 	self.number_context_zs = z_vector.shape[0]	
-		
-	# 	# Input_zs are basically just the z_vector reshaped to.. 1 x (Batch_Size x Number_Context_Zs) X Z_Dimensions		
-	# 	input_zs = z_vector.view((1,-1,self.z_dimensions))
-	# 	# Context_zs are basically z_vector replicated to... Number_Context_Zs**2 x Batch_Size x Z_Dimensions.
-	# 	# (We then mask diagonal / autoregressive pairs later... )
-	# 	context_zs = z_vector.repeat(self.number_context_zs, 1, 1).view((self.number_context_zs,-1,self.z_dimensions))
-
-	# 	# Construct mask as... ones only in off diagonal positions with respect to pairs of Input / Context Z's.
-	# 	mask = torch.ones((self.number_context_zs, self.number_context_zs, self.batch_size, self.z_dimensions)) - \
-	# 		torch.eye(self.number_context_zs).view(self.number_context_zs,self.number_context_zs,1,1).repeat(1,1,self.batch_size,self.z_dimensions)
-
-	# 	# Reshape mask.
-	# 	mask = mask.view(self.number_context_zs,-1,self.z_dimensions)
-
-	# 	# #####################################
-	# 	# #####################################
-	# 	# # In this case, use the LSTM decoder to predict context zs given the input z.
-	# 	# #####################################
-	# 	# #####################################
-
-	# 	# # ###################################
-	# 	# # # (2) Pad input_zs appropriately and build a mask. 
-	# 	# # ###################################
-
-	# 	# # padded_input_zs = self.pad_inputs(input_zs)
-	
-	# 	# ###################################
-	# 	# # (3) Now use input_zs to evaluate likelihood of context_zs. 
-	# 	# ###################################
-	
-	# 	# # Input Format must be: Sequence_Length x Batch_Size x Input_Size. 	
-	# 	# format_input = padded_input_zs.view((padded_input_zs.shape[0], self.batch_size, self.input_size))
-	# 	# hidden = None
-	# 	# outputs, hidden = self.lstm(format_input)
-
-	# 	# mean_outputs = self.mean_output_layer(outputs)
-	# 	# variance_value = 0.05
-	
-	# 	# # Create "distributions" for easy log probability. 
-	# 	# self.dists = torch.distributions.MultivariateNormal(mean_outputs, variance_value*torch.diag_embed(torch.ones_like(mean_outputs)))
-
-	# 	# # Compute and return logprobability of predicting context_zs from the input_zs. 
-	# 	# context_z_logprobability = self.dists.log_prob(context_zs)		
-	# 	# return context_z_logprobability
 
