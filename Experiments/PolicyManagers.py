@@ -2916,6 +2916,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.trajectory_set = []
 		self.segmentation_set = []
 		self.segmented_trajectory_set = []
+		# Also logging latent bs and full latent z trajectory now, because recurrent translation model setting needs it..
+		self.latent_b_set = []
+		self.full_latent_z_trajectory = []
 
 		break_var = 0
 		self.number_set_elements = 0 
@@ -2926,6 +2929,12 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			# (1) Encoder trajectory. 
 			with torch.no_grad():
 				input_dict, variational_dict, _ = self.run_iteration(0, i, return_dicts=True, train=False)
+
+			# Getting latent_b_set and full z traj.
+			# Don't unbatch them yet.
+			if self.args.recurrent_translation:
+				self.latent_b_set.append(variational_dict['latent_b'].clone().detach())
+				self.full_latent_z_trajectory.append(variational_dict['latent_z_indices'].clone().detach())
 
 			# Assuming we're running with batch size>1.
 			for b in range(self.args.batch_size):
@@ -2943,6 +2952,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				self.latent_z_set.append(copy.deepcopy(distinct_zs))
 				self.trajectory_set.append(copy.deepcopy(input_dict['sample_traj'][:,b]))
 				self.segmentation_set.append(copy.deepcopy(distinct_z_indices))
+
 				
 				# Add each trajectory segment to segmented_trajectory_set. 
 				for k in range(len(distinct_z_indices)-1):					
@@ -2957,7 +2967,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				self.number_set_elements += 1 
 
 			if i*self.args.batch_size+b>=self.N or break_var:
+				# print("We're breaking at",self.N,i,i*self.args.batch_size,i*self.args.batch_size+b,len(self.latent_b_set)) 
 				break
+				
 
 		self.avg_reconstruction_error = 0.
 
@@ -4972,7 +4984,19 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.output_size = 2
 		self.learning_rate = self.args.learning_rate
 
+		self.initial_epsilon = self.args.epsilon_from
+		self.final_epsilon = self.args.epsilon_to
+		self.decay_epochs = self.args.epsilon_over
+		self.decay_counter = self.decay_epochs*self.extent
+		self.decay_rate = (self.initial_epsilon-self.final_epsilon)/(self.decay_counter)
+
 	def set_iteration(self, counter):
+
+		# Set epsilon.
+		if counter<self.decay_counter:
+			self.epsilon = self.initial_epsilon-self.decay_rate*counter
+		else:
+			self.epsilon = self.final_epsilon	
 
 		# Based on what phase of training we are in, set discriminability loss weight, etc. 
 		
@@ -5398,8 +5422,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 	def set_z_objects(self):
 		self.state_dim = 2
 
-		# Use source and target policy manager set computing functions, because they can handle batches		
-
+		# Use source and target policy manager set computing functions, because they can handle batches.
 		self.source_manager.get_trajectory_and_latent_sets(get_visuals=False)
 		self.target_manager.get_trajectory_and_latent_sets(get_visuals=False)
 				
@@ -7025,6 +7048,32 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# Now make sure VAE loss weight is set to 0, because we can ignore the reconstruction losses in this setting.
 		self.vae_loss_weight = 0.
 
+	def set_translated_z_sets_recurrent_translation(self):
+
+		# For the recurrent model setting, special translation...
+		# self.target_latent_zs = self.backward_translation_model.forward(torch.tensor(self.original_target_latent_z_set, epsilon=0.0001, precomputed_b=).to(device).float()).detach().cpu().numpy()
+
+		self.translated_z_seq_set = []
+		self.source_z_seq_set = []
+
+		# For how many every batches there are in the latent_b_set, 
+		for k in range(len(self.target_manager.latent_b_set)):
+			
+			# Feed the z sequence to the translation model.
+			translated_z_seq = self.backward_translation_model.forward(self.target_manager.full_latent_z_trajectory[k], epsilon=0.0001, precomputed_b=self.target_manager.latent_b_set[k])
+
+			# Now unbatch and add element to set.
+			for b in range(self.args.batch_size):				
+
+				# Parse elements from target set. 
+				distinct_z_indices = torch.where(self.target_manager.latent_b_set[k][:,b])[0].clone().detach().cpu().numpy()
+				distinct_zs = translated_z_seq[distinct_z_indices, b].clone().detach().cpu().numpy()
+				self.translated_z_seq_set.append(distinct_zs)
+
+				# Also parse elements from source set...
+				distinct_source_zs = self.source_manager.full_latent_z_trajectory[k][distinct_z_indices,b].clone().detach().cpu().numpy()
+				self.source_z_seq_set.append(distinct_source_zs)
+
 	def set_translated_z_sets(self):
 
 		self.viz_dictionary = {}
@@ -7037,7 +7086,14 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		############################################################
 		
 		# First translate the target z's. 
-		self.target_latent_zs = self.backward_translation_model.forward(torch.tensor(self.original_target_latent_z_set).to(device).float()).detach().cpu().numpy()		
+		if self.args.recurrent_translation:
+			# self.target_latent_zs = self.backward_translation_model.forward(torch.tensor(self.original_target_latent_z_set, epsilon=0.0001, precomputed_b=).to(device).float()).detach().cpu().numpy()
+			with torch.no_grad():
+				self.set_translated_z_sets_recurrent_translation()
+				self.source_latent_zs = np.concatenate(self.source_z_seq_set)
+				self.target_latent_zs = np.concatenate(self.translated_z_seq_set)
+		else:
+			self.target_latent_zs = self.backward_translation_model.forward(torch.tensor(self.original_target_latent_z_set).to(device).float()).detach().cpu().numpy()
 		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
 
 		# Get embeddings of source, and backward translated target latent_zs. 			
@@ -7107,8 +7163,14 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		super().create_networks()
 
 		# In addition, now create translation model networks.
-		# self.forward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
-		self.backward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
+
+		if self.args.recurrent_translation:
+			# self.forward_translation_model = ContinuousVariationalPolicyNetwork_Batch(self.args.z_dimensions, self.args.var_hidden_size, self.args.z_dimensions, self.args, number_layers=self.args.var_hidden_size, translation_network=True).to(device)
+			# Create recurrent translation model from variational model template.
+			self.backward_translation_model = ContinuousVariationalPolicyNetwork_Batch(self.args.z_dimensions, self.args.var_hidden_size, self.args.z_dimensions, self.args, number_layers=self.args.var_hidden_size, translation_network=True).to(device)
+		else:
+			# self.forward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
+			self.backward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
 
 		# Create list of translation models to select from based on source domain.
 		# self.translation_model_list = [self.forward_translation_model, self.backward_translation_model]
@@ -7231,11 +7293,14 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		return source_input_dict, source_var_dict, source_eval_dict
 
-	def translate_latent_z(self, latent_z):
+	def translate_latent_z(self, latent_z, latent_b):
 		
-		# Translate Z. 
-		translated_latent_z = self.backward_translation_model.forward(latent_z)	
-
+		# Translate Z. 	
+		if self.args.recurrent_translation:
+			translated_latent_z = self.backward_translation_model.forward(latent_z, epsilon=self.epsilon, precomputed_b=latent_b)
+		else:
+			translated_latent_z = self.backward_translation_model.forward(latent_z, epsilon=self.epsilon)
+	
 		return translated_latent_z
 
 	def run_iteration(self, counter, i):
@@ -7288,11 +7353,12 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 			detached_original_latent_z = update_dictionary['latent_z'].detach()
 			if domain==1:
-				update_dictionary['translated_latent_z'] = self.translate_latent_z(detached_original_latent_z)				
+				update_dictionary['translated_latent_z'] = self.translate_latent_z(detached_original_latent_z, source_var_dict['latent_b'].detach())
 			else:
 				# Otherwise.... set translated z to latent z, because that's what we're going to feed to the discriminator(s). 
 				# Detach just to make sure gradients don't pass into the source encoder. 
 				update_dictionary['translated_latent_z'] = detached_original_latent_z
+
 			# Set this variable, because this is what the discriminator training uses as input. 
 			update_dictionary['detached_latent_z'] = update_dictionary['translated_latent_z'].detach()				
 			

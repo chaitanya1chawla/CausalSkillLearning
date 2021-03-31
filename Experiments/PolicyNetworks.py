@@ -2160,4 +2160,3 @@ class DiscreteMLP(torch.nn.Module):
 
 	def get_probabilities(self, input):
 		return self.forward(input)
-
