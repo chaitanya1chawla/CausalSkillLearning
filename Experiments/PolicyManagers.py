@@ -655,7 +655,10 @@ class PolicyManager_BaseClass():
 
 	def corrupt_inputs(self, input):
 		# 0.1 seems like a good value for the input corruption noise value, that's basically the standard deviation of the Gaussian distribution form which we sample additive noise.
-		corrupted_input = np.random.normal(loc=0.,scale=self.args.input_corruption_noise,size=input.shape) + input
+		if isinstance(input, np.ndarray):
+			corrupted_input = np.random.normal(loc=0.,scale=self.args.input_corruption_noise,size=input.shape) + input
+		else:			
+			corrupted_input = torch.randn_like(input)*self.args.input_corruption_noise + input
 		return corrupted_input	
 
 class PolicyManager_Pretrain(PolicyManager_BaseClass):
@@ -5687,6 +5690,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				traj_domain_label = domain*torch.ones(self.args.batch_size).to(device).long()
 				# Overwrite update_dictionary['z_trajectory_weights']. 
 				update_dictionary['z_trajectory_weights'] = torch.ones(self.args.batch_size).to(device).float()
+			
 			elif self.args.z_transform_discriminator:
 				traj_domain_label = domain_label
 
@@ -7297,7 +7301,12 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		
 		# Translate Z. 	
 		if self.args.recurrent_translation:
-			translated_latent_z = self.backward_translation_model.forward(latent_z, epsilon=self.epsilon, precomputed_b=latent_b)
+			
+			# We need a denoising implementation for the recurrent translation model.
+			corrupted_latent_z = self.corrupt_inputs(latent_z)
+
+			# Use the corrupted_latent_z instead of the original.
+			translated_latent_z = self.backward_translation_model.forward(corrupted_latent_z, epsilon=self.epsilon, precomputed_b=latent_b)
 		else:
 			translated_latent_z = self.backward_translation_model.forward(latent_z, epsilon=self.epsilon)
 	
