@@ -581,26 +581,18 @@ class PolicyManager_BaseClass():
 
 	def visualize_robot_embedding(self, scaled_embedded_zs, gt=False):
 
-		# Create figure and axis objects.
-		# # matplotlib.rcParams['figure.figsize'] = [50, 50]		
-		# matplotlib.rcParams['figure.figsize'] = [20, 20]
+		# Create figure and axis objects
 		matplotlib.rcParams['figure.figsize'] = [8, 8]
-		# matplotlib.rcParams['figure.figsize'] = [4, 4]
-		# # zoom_factor = 0.4
-		# # zoom_factor = 0.15
 		zoom_factor = 0.04
 
-		# # Good low res parameters: 
+		# # # Good low res parameters: 
 		# matplotlib.rcParams['figure.figsize'] = [8, 8]
 		# zoom_factor = 0.04
 
 		# # # Good spaced out highres parameters: 
-		matplotlib.rcParams['figure.figsize'] = [40, 40]
-		# zoom_factor = 0.2
-
-		# # For dense high res:
-		zoom_factor = 0.3
-
+		# matplotlib.rcParams['figure.figsize'] = [40, 40]
+		# zoom_factor = 0.3	
+		
 		fig, ax = plt.subplots()
 
 		# number_samples = 400
@@ -5444,13 +5436,17 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
 
+		
+
 	def visualize_embedded_z_trajectories(self, domain, shared_z_embedding, z_trajectory_set_object, projection='tsne'):
 		# Visualize a set of z trajectories over the shared z embedding space.
 
 		# Get the figure and axes objects, so we can overlay images on to this. 
 		domain_list = ['source','target']
 		viz_domain = domain_list[domain]
-		
+
+		# print("Embed in viz z traj.")
+		# embed()
 		fig, ax = self.plot_embedding(shared_z_embedding, "Z Trajectory Image {0}".format(projection), return_fig=True, viz_domain=viz_domain)
 	
 		# embed()
@@ -5515,6 +5511,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Visualizing embedding z trajectories.
 			########################################
 
+			# Now set using... 
+			# print("Embed in get_embeddings")
+			# embed()
 			self.source_z_traj_tsne_image = self.visualize_embedded_z_trajectories(0, source_embedded_zs, self.source_z_trajectory_set, projection='tsne')
 			self.target_z_traj_tsne_image = self.visualize_embedded_z_trajectories(1, target_embedded_zs, self.target_z_trajectory_set, projection='tsne')
 
@@ -5534,6 +5533,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Visualizing embedding z trajectories.
 			########################################
 
+			self.set_translated_z_sets()
 			self.source_z_traj_pca_image = self.visualize_embedded_z_trajectories(0, source_embedded_zs, self.source_z_trajectory_set, projection='pca')			
 			self.target_z_traj_pca_image = self.visualize_embedded_z_trajectories(1, target_embedded_zs, self.target_z_trajectory_set, projection='pca')
 
@@ -7073,7 +7073,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				distinct_z_indices = torch.where(self.target_manager.latent_b_set[k][:,b])[0].clone().detach().cpu().numpy()
 				distinct_zs = translated_z_seq[distinct_z_indices, b].clone().detach().cpu().numpy()
 				self.translated_z_seq_set.append(distinct_zs)
-
+				
 				# Also parse elements from source set...
 				distinct_source_zs = self.source_manager.full_latent_z_trajectory[k][distinct_z_indices,b].clone().detach().cpu().numpy()
 				self.source_z_seq_set.append(distinct_source_zs)
@@ -7098,6 +7098,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				self.target_latent_zs = np.concatenate(self.translated_z_seq_set)
 		else:
 			self.target_latent_zs = self.backward_translation_model.forward(torch.tensor(self.original_target_latent_z_set).to(device).float()).detach().cpu().numpy()
+
 		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
 
 		# Get embeddings of source, and backward translated target latent_zs. 			
@@ -7308,7 +7309,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# Use the corrupted_latent_z instead of the original.
 			translated_latent_z = self.backward_translation_model.forward(corrupted_latent_z, epsilon=self.epsilon, precomputed_b=latent_b)
 		else:
-			translated_latent_z = self.backward_translation_model.forward(latent_z, epsilon=self.epsilon)
+			translated_latent_z = self.backward_translation_model.forward(latent_z)
 	
 		return translated_latent_z
 
@@ -7415,7 +7416,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			#################################################
 			## (6) Update Plots. 			
 			#################################################
-
+			# print("run iter")
+			# embed()
 			viz_dict['domain'] = domain
 			viz_dict['discriminator_probs'] = discriminator_prob[...,domain].detach().cpu().numpy().mean()
 
