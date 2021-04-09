@@ -1922,7 +1922,7 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		self.input_size = input_size
 		self.hidden_size = hidden_size
 		self.output_size = output_size
-		self.num_layers = 5
+		self.num_layers = self.args.var_number_layers
 		self.batch_size = self.args.batch_size
 
 		# Define a bidirectional LSTM now.

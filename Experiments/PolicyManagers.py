@@ -213,9 +213,10 @@ class PolicyManager_BaseClass():
 		counter = self.args.initial_counter_value
 
 		print("Running MAIN Train function.")
-
+		epoch_time = 0.
+		cum_epoch_time = 0.
 		# For number of training epochs. 
-		for e in range(self.number_epochs): 
+		for e in range(self.number_epochs+1): 
 						
 			self.current_epoch_running = e
 			print("Starting Epoch: ",e)
@@ -244,16 +245,22 @@ class PolicyManager_BaseClass():
 			self.batch_indices_sizes = []
 			# Modifying to make training functions handle batches. 
 			
+			t1 = time.time()
+						
 			for i in range(0,extent,self.args.batch_size):
-
-				print("Epoch: ",e," Trajectory:",i, "Datapoints: ", self.index_list[i])
+				
 				# Probably need to make run iteration handle batch of current index plus batch size.				
 				# with torch.autograd.set_detect_anomaly(True):
-
+				t2 = time.time()
 				self.run_iteration(counter, self.index_list[i])
+				t3 = time.time()
+				print("Epoch:",e,"Trajectory:",str(i).zfill(5), "Datapoints:",str(self.index_list[i]).zfill(5), "Iter Time:",format(t3-t2,".4f"),"PerET:",format(cum_epoch_time/max(e,1),".4f"),"CumET:",format(cum_epoch_time,".4f"),"Extent:",extent)
 
 				counter = counter+1
 				# counter = counter+self.args.batch_size
+			t4 = time.time()
+			epoch_time = t4-t1
+			cum_epoch_time += epoch_time
 
 			if e%self.args.eval_freq==0:
 				self.automatic_evaluation(e)
@@ -290,6 +297,9 @@ class PolicyManager_BaseClass():
 		self.N = 100
 		self.rollout_timesteps = self.args.traj_length
 	
+		#####################################################
+		# Set visualizer object. 
+		#####################################################
 		if self.args.data=='MIME':
 			self.visualizer = BaxterVisualizer()
 			# self.state_dim = 16
@@ -303,19 +313,29 @@ class PolicyManager_BaseClass():
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
+		#####################################################
+		# Get latent z sets.
+		#####################################################
+
 		if not(load_sets):
+
+			#####################################################
+			# Initialize variables.
+			#####################################################
 
 			self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
 			# These are lists because they're variable length individually.
 			self.indices = []
 			self.trajectory_set = []
 			self.trajectory_rollout_set = []		
-
-			model_epoch = int(os.path.split(self.args.model)[1].lstrip("Model_epoch"))
-
 			self.rollout_gif_list = []
 			self.gt_gif_list = []
 
+			#####################################################
+			# Create folder for gifs.
+			#####################################################
+
+			model_epoch = int(os.path.split(self.args.model)[1].lstrip("Model_epoch"))
 			# Create save directory:
 			upper_dir_name = os.path.join(self.args.logdir,self.args.name,"MEval")
 
@@ -328,11 +348,23 @@ class PolicyManager_BaseClass():
 
 			self.max_len = 0
 
-			for i in range(self.N//self.args.batch_size):
-				
-				# (1) Encode trajectory. 
-				latent_z, sample_trajs, _ = self.run_iteration(0, i, return_z=True, and_train=False)
+			#####################################################
+			# Initialize variables.
+			#####################################################
 
+			self.shuffle(self.N//self.args.batch_size)
+			for j in range(self.N//self.args.batch_size):
+				i = self.index_list[j]
+
+				# (1) Encode trajectory. 
+				if self.args.setting in ['learntsub','joint']:
+					input_dict, var_dict, eval_dict = self.run_iteration(0, i, return_dicts=True, train=False)
+					latent_z = var_dict['latent_z_indices']
+					sample_trajs = input_dict['sample_traj']
+				else:
+					latent_z, sample_trajs, _ = self.run_iteration(0, i, return_z=True, and_train=False)
+
+				embed
 				if self.args.batch_size>1:
 
 					# Set the max length if it's less than this batch of trajectories. 
@@ -346,10 +378,19 @@ class PolicyManager_BaseClass():
 						print("Getting visuals for trajectory: ",i*self.args.batch_size+b)
 
 						# Copy z. 
-						self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+						# print("Embed in Visualize Robot Data from,",self.args.setting)
+						# embed()
+
+						if self.args.setting in ['learntsub','joint']:
+							self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+				
+							# Rollout each individual trajectory in this batch.
+							trajectory_rollout = self.get_robot_visuals(i*self.args.batch_size+b, latent_z[:,b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True)
+						else:
+							self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 			
-						# Rollout each individual trajectory in this batch.
-						trajectory_rollout = self.get_robot_visuals(i*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b])
+							# Rollout each individual trajectory in this batch.
+							trajectory_rollout = self.get_robot_visuals(i*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b])
 
 						# Now append this particular sample traj and the rollout into trajectroy and rollout sets.
 						self.trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
@@ -376,6 +417,10 @@ class PolicyManager_BaseClass():
 			# Get MIME embedding for rollout and GT trajectories, with same Z embedding. 
 			embedded_z = self.get_robot_embedding()
 
+		#####################################################
+		# If precomputed sets.
+		#####################################################
+
 		else:
 
 			print("Using Precomputed Latent Set and Embedding.")
@@ -394,9 +439,11 @@ class PolicyManager_BaseClass():
 
 				trajectory_rollout = self.get_robot_visuals(i, self.latent_z_set[i], self.gt_trajectory_set[i])
 
-
-
 			self.indices = range(self.N)
+
+		#####################################################
+		# Save the embeddings in HTML files.
+		#####################################################
 
 		gt_animation_object = self.visualize_robot_embedding(embedded_z, gt=True)
 		rollout_animation_object = self.visualize_robot_embedding(embedded_z, gt=False)
@@ -457,8 +504,10 @@ class PolicyManager_BaseClass():
 		# 1) Feed Z into policy, rollout trajectory. 
 		# print("Embedding in get robot visuals.")
 		# embed()
-		
-		trajectory_rollout = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=trajectory.shape[0], z_seq=z_seq)
+
+		print("Rollout length:", trajectory.shape[0])	
+
+		trajectory_rollout = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq)
 		
 		# 2) Unnormalize data. 
 		if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
@@ -752,6 +801,12 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.final_epsilon = self.args.epsilon_to
 		self.decay_epochs = self.args.epsilon_over
 		self.decay_counter = self.decay_epochs*len(self.dataset)
+		if self.args.kl_schedule:
+			self.kl_increment_epochs = self.args.kl_increment_epochs
+			self.kl_increment_counter = self.kl_increment_epochs*len(self.dataset)
+			self.kl_begin_increment_epochs = self.args.kl_begin_increment_epochs
+			self.kl_begin_increment_counter = self.kl_begin_increment_epochs*len(self.dataset)
+			self.kl_increment_rate = (self.args.final_kl_weight-self.args.initial_kl_weight)/(self.kl_increment_counter)
 
 		# Log-likelihood penalty.
 		self.lambda_likelihood_penalty = self.args.likelihood_penalty
@@ -779,7 +834,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# if self.args.transformer:
 			# 	self.encoder_network = TransformerEncoder(self.input_size, self.hidden_size, self.latent_z_dimensionality, self.args).to(device)
 			# else:
-			self.encoder_network = ContinuousEncoderNetwork(self.input_size, self.hidden_size, self.latent_z_dimensionality, self.args).to(device)		
+			self.encoder_network = ContinuousEncoderNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args).to(device)		
 
 	def create_training_ops(self):
 		# self.negative_log_likelihood_loss_function = torch.nn.NLLLoss()
@@ -827,6 +882,19 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		else:
 			self.epsilon = self.final_epsilon
 
+		# If KL schedule.
+		if self.args.kl_schedule:
+			if counter>self.kl_begin_increment_counter:
+				if (counter-self.kl_begin_increment_counter)<self.kl_increment_counter:
+					self.kl_weight = self.args.initial_kl_weight + self.kl_increment_rate*counter
+				else:
+					self.kl_weight = self.args.final_kl_weight
+			else:
+				self.kl_weight = self.args.initial_kl_weight
+		else:
+			self.kl_weight = self.args.kl_weight
+		
+
 	def visualize_trajectory(self, traj, no_axes=False):
 
 		fig = plt.figure()		
@@ -861,7 +929,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			############
 
 			# Get latent_z set. 
-			self.get_trajectory_and_latent_sets(get_visuals=False)
+			self.get_trajectory_and_latent_sets(get_visuals=True)
+			log_dict['Average Reconstruction Error:'] = self.avg_reconstruction_error
 
 			# Get embeddings for perplexity=5,10,30, and then plot these.
 			# Once we have latent set, get embedding and plot it. 
@@ -1139,7 +1208,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.likelihood_loss = -loglikelihood.mean()
 		self.encoder_KL = encoder_KL.mean()
 
-		self.total_loss = (self.likelihood_loss + self.args.kl_weight*self.encoder_KL)
+		self.total_loss = (self.likelihood_loss + self.kl_weight*self.encoder_KL)
 
 		if self.args.debug:
 			print("Embedding in Update subpolicies.")
@@ -1148,7 +1217,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.total_loss.backward()
 		self.optimizer.step()
 
-	def rollout_visuals(self, i, latent_z=None, return_traj=False):
+	def rollout_visuals(self, i, latent_z=None, return_traj=False, rollout_length=None):
 
 		# Initialize states and latent_z, etc. 
 		# For t in range(number timesteps):
@@ -1165,6 +1234,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		if self.args.data=='Roboturk' or self.args.data=='FullRoboturk' or self.args.data=='OrigRoboturk':
 			self.state_dim = 8
 			self.rollout_timesteps = self.traj_length
+
+		if rollout_length is not None:
+			self.rollout_timesteps = rollout_length
 	
 		start_state = torch.zeros((self.state_dim))
 
@@ -1284,7 +1356,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				# 	print("###################", i)
 				# 	print("Policy loglikelihood:", loglikelihood)
 			
-			print("#########################################")	
+			# print("#########################################")	
 		else: 
 			return None, None, None
 
@@ -1322,7 +1394,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		if self.args.data=="MIME" or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 
 			print("Running Evaluation of State Distances on small test set.")
-			# self.evaluate_metrics()
+			# self.evaluate_metrics()		
 
 			# Only running viz if we're actually pretraining.
 			if self.args.traj_segments:
@@ -1330,6 +1402,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				# self.visualize_robot_data(load_sets=True)
 				self.visualize_robot_data(load_sets=False)
+
+				# Get reconstruction error... 
+				self.get_trajectory_and_latent_sets(get_visuals=True)
+				print("The Average Reconstruction Error is: ", self.avg_reconstruction_error)
 			else:
 				# Create save directory:
 				upper_dir_name = os.path.join(self.args.logdir,self.args.name,"MEval")
@@ -1399,6 +1475,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 						# (2) Now rollout policy.	
 						if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
 							self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
+						elif self.args.setting=='pretrain_sub':							
+							self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True, rollout_length=sample_trajs.shape[0]))
 						else:
 							self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True))
 
@@ -1427,7 +1505,12 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		if get_visuals:
 			self.gt_traj_set_array = np.array(self.gt_trajectory_set)
 			self.trajectory_set = np.array(self.trajectory_set)
-			self.avg_reconstruction_error = (self.gt_traj_set_array-self.trajectory_set).mean()
+
+			# self.avg_reconstruction_error = (self.gt_traj_set_array-self.trajectory_set).mean()
+			self.reconstruction_errors = np.zeros(len(self.gt_traj_set_array))
+			for k in range(len(self.reconstruction_errors)):
+				self.reconstruction_errors[k] = ((self.gt_traj_set_array[k]-self.trajectory_set[k])**2).mean()
+			self.avg_reconstruction_error = self.reconstruction_errors.mean()
 		else:
 			self.avg_reconstruction_error = 0.
 
@@ -2853,9 +2936,28 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.evaluate_metrics()
 
 		# Visualize space if the subpolicy has been trained...
-		if (self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap') and (self.args.fix_subpolicy==0):
+		# Running even with the fix_subpolicy, so that we can evaluate joint reconstruction.
+		# if (self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap') and (self.args.fix_subpolicy==0):
+		if (self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap'):
 			print("Running Visualization on Robot Data.")	
-			self.pretrain_policy_manager = PolicyManager_Pretrain(self.args.number_policies, self.dataset, self.args)
+
+			########################################
+			# Run Joint Eval.
+			########################################
+
+			self.visualize_robot_data()
+
+			########################################
+			# Run Pretrain Eval.
+			########################################
+
+			arg_copy = copy.deepcopy(self.args)
+			args_copy.name += "_Eval_Pretrain"
+			if self.args.batch_size>1:
+				self.pretrain_policy_manager = PolicyManager_BatchPretrain(self.args.number_policies, self.dataset, arg_copy)
+			else:
+				self.pretrain_policy_manager = PolicyManager_Pretrain(self.args.number_policies, self.dataset, arg_copy)
+
 			self.pretrain_policy_manager.setup()
 			self.pretrain_policy_manager.load_all_models(model, only_policy=True)			
 			self.pretrain_policy_manager.visualize_robot_data()			
@@ -2954,7 +3056,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 					traj_segment = input_dict['sample_traj'][distinct_z_indices[k]:distinct_z_indices[k+1],b]
 					self.segmented_trajectory_set.append(copy.deepcopy(traj_segment))				
 				
-				
 				# traj_segment = input_dict['sample_traj'][distinct_z_indices[k+1]:,b]
 				traj_segment = input_dict['sample_traj'][distinct_z_indices[len(distinct_z_indices)-1]:,b]
 				self.segmented_trajectory_set.append(copy.deepcopy(traj_segment))
@@ -2967,7 +3068,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				
 
 		self.avg_reconstruction_error = 0.
-
 
 		# # if self.args.setting=='jointtransfer':
 		# # 	self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
@@ -5435,9 +5535,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.target_latent_zs = self.target_manager.latent_z_set
 
 		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
-
-		
-
+	
 	def visualize_embedded_z_trajectories(self, domain, shared_z_embedding, z_trajectory_set_object, projection='tsne'):
 		# Visualize a set of z trajectories over the shared z embedding space.
 
@@ -5451,7 +5549,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 	
 		# embed()
 		# for i, z_traj in enumerate(z_trajectory_set_object):
-		for i in range(10):
+		for i in range(30):
 			z_traj = z_trajectory_set_object[i]	
 		
 			# First get length of this z_trajectory.
@@ -7416,8 +7514,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			#################################################
 			## (6) Update Plots. 			
 			#################################################
-			# print("run iter")
-			# embed()
+
 			viz_dict['domain'] = domain
 			viz_dict['discriminator_probs'] = discriminator_prob[...,domain].detach().cpu().numpy().mean()
 

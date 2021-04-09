@@ -47,6 +47,7 @@ class Master():
 
 		# Now define policy manager.
 		if self.args.setting=='learntsub' or self.args.setting=='joint':
+			# self.policy_manager = PolicyManager_BatchJoint(self.args.number_policies, self.dataset, self.args)
 			if self.args.batch_size > 1: 
 				self.policy_manager = PolicyManager_BatchJoint(self.args.number_policies, self.dataset, self.args)
 			else:
@@ -240,11 +241,16 @@ def parse_arguments():
 	parser.add_argument('--subpolicy_ratio',dest='subpolicy_ratio',type=float,default=0.01)
 	parser.add_argument('--latentpolicy_ratio',dest='latentpolicy_ratio',type=float,default=0.1)
 	parser.add_argument('--temporal_latentpolicy_ratio',dest='temporal_latentpolicy_ratio',type=float,default=0.)
-	parser.add_argument('--latent_loss_weight',dest='latent_loss_weight',type=float,default=0.1)
-	parser.add_argument('--kl_weight',dest='kl_weight',type=float,default=0.01)
+	parser.add_argument('--latent_loss_weight',dest='latent_loss_weight',type=float,default=0.1)	
 	parser.add_argument('--var_loss_weight',dest='var_loss_weight',type=float,default=1.)
 	parser.add_argument('--prior_weight',dest='prior_weight',type=float,default=0.00001)
 	# parser.add_argument('--context_loss_weight',dest='context_loss_weight',type=float,default=1.,help='Weight of context loss.')
+	parser.add_argument('--kl_weight',dest='kl_weight',type=float,default=0.01,help='KL weight when constant.')
+	parser.add_argument('--kl_schedule',dest='kl_schedule',type=int,default=0,help='Whether to schedule KL weight.')
+	parser.add_argument('--initial_kl_weight',dest='initial_kl_weight',type=float,default=0.0,help='Initial KL weight.')
+	parser.add_argument('--final_kl_weight',dest='final_kl_weight',type=float,default=1.0,help='Initial KL weight.')
+	parser.add_argument('--kl_increment_epochs',dest='kl_increment_epochs',type=int,default=100,help='Number of epochs to increment KL over.')
+	parser.add_argument('--kl_begin_increment_epochs',dest='kl_begin_increment_epochs',type=int,default=100,help='Number of epochs after which to increment KL.')
 	
 	# Cross Domain Skill Transfer parameters. 
 	parser.add_argument('--discriminability_weight',dest='discriminability_weight',type=float,default=1.,help='Weight of discriminability loss in cross domain skill transfer.') 
