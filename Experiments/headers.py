@@ -19,8 +19,10 @@ import matplotlib.pyplot as plt
 import tensorboardX
 from scipy import stats
 from absl import flags
-from memory_profiler import profile
+from memory_profiler import profile as mprofile
+from profilehooks import profile as tprofile
 from pytorch_memlab import profile as gpu_profile
+from line_profiler import LineProfiler
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 

@@ -1408,6 +1408,7 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		####################################
 	
 	# @gpu_profile
+	# @tprofile(immediate=True)
 	def forward(self, input, epsilon, new_z_selection=True, batch_size=None, batch_trajectory_lengths=None, precomputed_b=None):
 
 		##################################################
@@ -1553,8 +1554,11 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 			# Initial z is already trivially set. 
 			for t in range(1,input.shape[0]):
 				# If b_t==0, just use previous z. 
-				# If b_t==1, sample new z. Here, we've cloned this from sampled_z's, so there's no need to do anything. 
+				# If b_t==1, sample new z. Here, we've cloned this from sampled_z's, so there's no need to do anything. 				
 				sampled_z_index[t, torch.where(sampled_b[t]==0)[0]] = sampled_z_index[t-1, torch.where(sampled_b[t]==0)[0]]
+
+			# How to vectorize this op? 
+			# In general, need to spend some time rewriting this entire function.?
 
 		##################################################
 		# Get z probabilities, KL and prior values.

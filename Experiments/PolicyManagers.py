@@ -205,6 +205,7 @@ class PolicyManager_BaseClass():
 		# Shuffled index list is just a flattening of blocks.
 		self.index_list = [b for bs in blocks for b in bs]
 
+	# @tprofile
 	def train(self, model=None):
 
 		if model:
@@ -252,7 +253,20 @@ class PolicyManager_BaseClass():
 				# Probably need to make run iteration handle batch of current index plus batch size.				
 				# with torch.autograd.set_detect_anomaly(True):
 				t2 = time.time()
-				self.run_iteration(counter, self.index_list[i])
+
+				##############################################
+				############### LINE PROFILING ###############
+				##############################################
+
+				profile_iteration = 0 
+				if profile_iteration:
+					self.lp = LineProfiler()
+					self.lp_wrapper = self.lp(self.run_iteration)
+					self.lp_wrapper(counter, self.index_list[i])
+					self.lp.print_stats()
+				else:
+					self.run_iteration(counter, self.index_list[i])
+
 				t3 = time.time()
 				print("Epoch:",e,"Trajectory:",str(i).zfill(5), "Datapoints:",str(self.index_list[i]).zfill(5), "Iter Time:",format(t3-t2,".4f"),"PerET:",format(cum_epoch_time/max(e,1),".4f"),"CumET:",format(cum_epoch_time,".4f"),"Extent:",extent)
 
@@ -701,6 +715,42 @@ class PolicyManager_BaseClass():
 		else:			
 			corrupted_input = torch.randn_like(input)*self.args.input_corruption_noise + input
 		return corrupted_input	
+
+	def initialize_training_batches(self):
+
+		print("Initializing batches to manage GPU memory.")
+		# Set some parameters that we need for the dry run. 
+		extent = len(self.dataset)-self.test_set_size
+		counter = 0
+		self.batch_indices_sizes = []
+		# self.trajectory_lengths = []
+		
+		self.current_epoch_running = -1
+		print("About to run a dry run. ")
+		# Do a dry run of 1 epoch, before we actually start running training. 
+		# This is so that we can figure out the batch of 1 epoch.
+		for i in range(0,extent,self.args.batch_size):		
+			# Dry run iteration. 
+			self.run_iteration(counter, self.index_list[i], skip_iteration=True)
+
+		print("About to find max batch size index.")
+		# Now find maximum batch size iteration. 
+		self.max_batch_size_index = 0
+		self.max_batch_size = 0
+		# traj_lengths = []
+
+		for x in range(len(self.batch_indices_sizes)):
+			if self.batch_indices_sizes[x]['batch_size']>self.max_batch_size:
+				self.max_batch_size = self.batch_indices_sizes[x]['batch_size']
+				self.max_batch_size_index = self.batch_indices_sizes[x]['i']
+					
+		print("About to run max batch size iteration.")
+		print("This batch size is: ", self.max_batch_size)
+		# Now run another epoch, where we only skip iteration if it's the max batch size.
+		for i in range(0,extent,self.args.batch_size):
+			# Skip unless i is ==max_batch_size_index.
+			skip = (i!=self.max_batch_size_index)
+			self.run_iteration(counter, self.index_list[i], skip_iteration=skip)
 
 class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
@@ -2804,6 +2854,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		else:
 			return None, None
 
+	# @tprofile(immediate=True)
 	def run_iteration(self, counter, i, skip_iteration=False, return_dicts=False, special_indices=None, train=True, input_dictionary=None):
 
 		# With learnt discrete subpolicy: 
@@ -2842,9 +2893,19 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			####################################
 
 			variational_dict = {}
-			variational_dict['latent_z_indices'], variational_dict['latent_b'], variational_dict['variational_b_logprobabilities'], variational_dict['variational_z_logprobabilities'], \
-			variational_dict['variational_b_probabilities'], variational_dict['variational_z_probabilities'], variational_dict['kl_divergence'], variational_dict['prior_loglikelihood'] = \
-				self.variational_policy.forward(input_dictionary['old_concatenated_traj'], self.epsilon, batch_trajectory_lengths=self.batch_trajectory_lengths)
+			profile_var_forward = 0
+			if profile_var_forward:
+				# Line profiling
+				self.forward_lp = LineProfiler()
+				self.forward_lp_wrapper = self.forward_lp(self.variational_policy.forward)
+				variational_dict['latent_z_indices'], variational_dict['latent_b'], variational_dict['variational_b_logprobabilities'], variational_dict['variational_z_logprobabilities'], \
+				variational_dict['variational_b_probabilities'], variational_dict['variational_z_probabilities'], variational_dict['kl_divergence'], variational_dict['prior_loglikelihood'] = \
+					self.forward_lp_wrapper(input_dictionary['old_concatenated_traj'], self.epsilon, batch_trajectory_lengths=self.batch_trajectory_lengths)
+				self.forward_lp.print_stats()
+			else:
+				variational_dict['latent_z_indices'], variational_dict['latent_b'], variational_dict['variational_b_logprobabilities'], variational_dict['variational_z_logprobabilities'], \
+				variational_dict['variational_b_probabilities'], variational_dict['variational_z_probabilities'], variational_dict['kl_divergence'], variational_dict['prior_loglikelihood'] = \
+					self.variational_policy.forward(input_dictionary['old_concatenated_traj'], self.epsilon, batch_trajectory_lengths=self.batch_trajectory_lengths)
 			
 			####################################
 			# (4) Evaluate Log Likelihoods of actions and options as "Return" for Variational policy.
@@ -3752,42 +3813,6 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 		return assembled_inputs, subpolicy_inputs, padded_action_seq
 	
-	def initialize_training_batches(self):
-
-		print("Initializing batches to manage GPU memory.")
-		# Set some parameters that we need for the dry run. 
-		extent = len(self.dataset)-self.test_set_size
-		counter = 0
-		self.batch_indices_sizes = []
-		# self.trajectory_lengths = []
-		
-		self.current_epoch_running = -1
-		print("About to run a dry run. ")
-		# Do a dry run of 1 epoch, before we actually start running training. 
-		# This is so that we can figure out the batch of 1 epoch.
-		for i in range(0,extent,self.args.batch_size):		
-			# Dry run iteration. 
-			self.run_iteration(counter, self.index_list[i], skip_iteration=True)
-
-		print("About to find max batch size index.")
-		# Now find maximum batch size iteration. 
-		max_batch_size_index = 0
-		max_batch_size = 0
-		# traj_lengths = []
-
-		for x in range(len(self.batch_indices_sizes)):
-			if self.batch_indices_sizes[x]['batch_size']>max_batch_size:
-				max_batch_size = self.batch_indices_sizes[x]['batch_size']
-				max_batch_size_index = self.batch_indices_sizes[x]['i']
-					
-		print("About to run max batch size iteration.")
-		print("This batch size is: ", max_batch_size)
-		# Now run another epoch, where we only skip iteration if it's the max batch size.
-		for i in range(0,extent,self.args.batch_size):
-			# Skip unless i is ==max_batch_size_index.
-			skip = (i!=max_batch_size_index)
-			self.run_iteration(counter, self.index_list[i], skip_iteration=skip)
-
 	def train(self, model=None):
 
 		# Run some initialization process to manage GPU memory with variable sized batches.
@@ -5344,6 +5369,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 	def update_plots(self, counter, viz_dict, log=True):
 
+		##################################################
+		# Base logging. 
+		##################################################
+
 		log_dict = {'Policy Loglikelihood': self.likelihood_loss, 
 					'Discriminability Loss': self.discriminability_loss,
 					'Unweighted Discriminability Loss': self.unweighted_discriminability_loss,
@@ -5357,6 +5386,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					'Training Discriminator': self.skip_vae, 
 					'Training Embeddings or Translation Models': self.skip_discriminator}
 
+		##################################################
+		# Log discriminator and discriminability losses 
+		##################################################
+		
 		# Plot discriminator values after we've started training it. 
 		if self.training_phase>1:
 			# Compute discriminator loss and discriminator prob of right action for logging. 
@@ -5375,50 +5408,65 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				log_dict['Unweighted Z Equivariance Loss'] = self.unweighted_masked_equivariance_loss
 				log_dict['Z Equivariance Loss'] = self.equivariance_loss
 
+		##################################################
+		# Now visualizing spaces. 
+		##################################################
+
 		# If we are displaying things: 
 		if counter%self.args.display_freq==0:
 
 			self.gt_gif_list = []
 			self.rollout_gif_list = []			
 			self.viz_dictionary = {}
-
-			# Now using both TSNE and PCA. 
+					
+			##################################################
 			# Plot source, target, and shared embeddings via TSNE.
+			##################################################
+
+			# First run get embeddings. 
 			self.viz_dictionary['tsne_source_embedding'], self.viz_dictionary['tsne_target_embedding'], \
 				self.viz_dictionary['tsne_combined_embeddings_p5'], self.viz_dictionary['tsne_combined_embeddings_p10'], self.viz_dictionary['tsne_combined_embeddings_p30'], \
 				self.viz_dictionary['tsne_combined_traj_embeddings_p5'], self.viz_dictionary['tsne_combined_traj_embeddings_p10'], self.viz_dictionary['tsne_combined_traj_embeddings_p30'] = \
 					self.get_embeddings(projection='tsne')
-			
-			if self.args.source_domain in ['ContinuousNonZero','DirContNonZero','ToyContext'] and self.args.target_domain in ['ContinuousNonZero','DirContNonZero','ToyContext']:
+
+			# If toy domain, plot the trajectories over the embeddings.		
+			if self.check_toy_dataset():
 				log_dict['TSNE Source Traj Embedding'], log_dict['TSNE Target Traj Embedding'] = \
 					 self.return_wandb_image(self.source_traj_image), self.return_wandb_image(self.target_traj_image)
 
+			# Add the embeddings to logging dict.
 			log_dict['TSNE Source Embedding'], log_dict['TSNE Target Embedding'], log_dict['TSNE Combined Embedding Perplexity 5'], \
 				log_dict['TSNE Combined Embedding Perplexity 10'], log_dict['TSNE Combined Embedding Perplexity 30'] = \
 					self.return_wandb_image(self.viz_dictionary['tsne_source_embedding']), self.return_wandb_image(self.viz_dictionary['tsne_target_embedding']), \
 					self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p5']), self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p10']), \
 					self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p30'])
 			
+			##################################################
 			# Plot source, target, and shared embeddings via PCA. 
+			##################################################
+
+			# First run get embeddings. 
 			self.viz_dictionary['pca_source_embedding'], self.viz_dictionary['pca_target_embedding'], self.viz_dictionary['pca_combined_embeddings'], self.viz_dictionary['pca_combined_traj_embeddings'] = self.get_embeddings(projection='pca')
 
+			# Add embeddings to logging dict.			
 			log_dict['PCA Source Embedding'], log_dict['PCA Target Embedding'], log_dict['PCA Combined Embedding'] = \
 				self.return_wandb_image(self.viz_dictionary['pca_source_embedding']), self.return_wandb_image(self.viz_dictionary['pca_target_embedding']), \
 				self.return_wandb_image(self.viz_dictionary['pca_combined_embeddings'])
 	
-			if self.args.source_domain in ['ContinuousNonZero','DirContNonZero','ToyContext'] and self.args.target_domain in ['ContinuousNonZero','DirContNonZero','ToyContext']:
-				
+			# If toy domain, add to log dict.
+			if self.check_toy_dataset():				
 				log_dict['PCA Combined Trajectory Embeddings'], log_dict['TSNE Combined Trajectory Embeddings Perplexity 5'], \
 					log_dict['TSNE Combined Trajectory Embeddings Perplexity 10'], log_dict['TSNE Combined Trajectory Embeddings Perplexity 30'] = \
 						self.return_wandb_image(self.viz_dictionary['pca_combined_traj_embeddings']), self.return_wandb_image(self.viz_dictionary['tsne_combined_traj_embeddings_p5']), \
 						self.return_wandb_image(self.viz_dictionary['tsne_combined_traj_embeddings_p10']), self.return_wandb_image(self.viz_dictionary['tsne_combined_traj_embeddings_p30'])
 
+			##################################################
 			# We are also going to log Ground Truth trajectories and their reconstructions in each of the domains, to make sure our networks are learning. 		
-			# Should be able to use the policy manager's functions to do this.
-			if not(self.args.no_mujoco) and self.args.source_domain in ['ContinuousNonZero','ToyContext']:
+			##################################################
+
+			if not(self.args.no_mujoco) and self.check_toy_dataset():
 				self.viz_dictionary['source_trajectory'], self.viz_dictionary['source_reconstruction'], self.viz_dictionary['target_trajectory'], self.viz_dictionary['target_reconstruction'] = self.get_trajectory_visuals()
 
-			# if self.viz_dictionary['source_trajectory'] is not None and not(self.args.no_mujoco):
 			if 'source_trajectory' in self.viz_dictionary and not(self.args.no_mujoco):
 				# Now actually plot the images.
 
@@ -5435,13 +5483,15 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					log_dict['Target Trajectory'], log_dict['Target Reconstruction'] = \
 						self.return_wandb_gif(self.viz_dictionary['target_trajectory']), self.return_wandb_gif(self.viz_dictionary['target_reconstruction'])
 
+			##################################################			
+			# Evaluate metrics and plot them. 
+			##################################################
+
 			# Log Average Reconstruction Error.
 			log_dict['Source Trajectory Reconstruction Error'], log_dict['Target Trajectory Reconstruction Error'] = \
 				self.source_manager.avg_reconstruction_error, self.target_manager.avg_reconstruction_error
 
-			# if self.args.source_domain=='ContinuousNonZero' and self.args.target_domain=='ContinuousNonZero':
-			if self.args.source_domain==self.args.target_domain and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:
-				# Evaluate metrics and plot them. 
+			if self.args.source_domain==self.args.target_domain and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:		
 				# self.evaluate_correspondence_metrics(computed_sets=False)
 				# Actually, we've probably computed trajectory and latent sets. 
 				if counter>0:
@@ -5454,20 +5504,25 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					log_dict['Average Corresponding Z Sequence Error'] = self.average_corresponding_z_sequence_error.mean()
 					log_dict['Average Corresponding Z Transition Sequence Error'] = self.average_corresponding_z_transition_sequence_error.mean()
 
-			######################################
+			##################################################
 			# Visualize Z Trajectories.
-			######################################
+			##################################################
 
-			log_dict['Source Z Trajectory TSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_tsne_image)
-			log_dict['Target Z Trajectory TSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_tsne_image)
+			log_dict['Source Z Trajectory Joint TSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_tsne_image)
+			log_dict['Target Z Trajectory Joint TSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_tsne_image)
 			log_dict['Source Z Trajectory PCA Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_pca_image)
 			log_dict['Target Z Trajectory PCA Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_pca_image)
 
-
+			##################################################			
 			# Clean up objects consuming memory. 			
+			##################################################
+
 			self.free_memory()
 		
+		##################################################
 		# Now log everything. 
+		##################################################
+
 		if log:
 			wandb.log(log_dict, step=counter)
 		else:
@@ -5535,7 +5590,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.target_latent_zs = self.target_manager.latent_z_set
 
 		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
-	
+		self.z_last_set_by = 'set_z_objects'
+
 	def visualize_embedded_z_trajectories(self, domain, shared_z_embedding, z_trajectory_set_object, projection='tsne'):
 		# Visualize a set of z trajectories over the shared z embedding space.
 
@@ -5612,6 +5668,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Now set using... 
 			# print("Embed in get_embeddings")
 			# embed()
+			# self.set_translated_z_sets()
 			self.source_z_traj_tsne_image = self.visualize_embedded_z_trajectories(0, source_embedded_zs, self.source_z_trajectory_set, projection='tsne')
 			self.target_z_traj_tsne_image = self.visualize_embedded_z_trajectories(1, target_embedded_zs, self.target_z_trajectory_set, projection='tsne')
 
@@ -5631,7 +5688,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Visualizing embedding z trajectories.
 			########################################
 
-			self.set_translated_z_sets()
+			# self.set_translated_z_sets()
 			self.source_z_traj_pca_image = self.visualize_embedded_z_trajectories(0, source_embedded_zs, self.source_z_trajectory_set, projection='pca')			
 			self.target_z_traj_pca_image = self.visualize_embedded_z_trajectories(1, target_embedded_zs, self.target_z_trajectory_set, projection='pca')
 
@@ -5639,8 +5696,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Single domain data point visualization.
 		########################################
 
-		self.source_image = self.plot_embedding(shared_embedded_zs, "Source_Embedding",viz_domain='source')
-		self.target_image = self.plot_embedding(shared_embedded_zs, "Target_Embedding",viz_domain='target')
+		self.source_image = self.plot_embedding(shared_embedded_zs,"Source_Embedding",viz_domain='source')
+		self.target_image = self.plot_embedding(shared_embedded_zs,"Target_Embedding",viz_domain='target')
 
 		########################################
 		# Single domain data point visualization with trajectories.
@@ -5883,7 +5940,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.total_discriminator_loss.backward()
 			self.discriminator_optimizer.step()
 
-	def run_iteration(self, counter, i):
+	def run_iteration(self, counter, i, domain=None, special_indices=None):
 
 		# Phases: 
 		# Phase 1:  Train encoder-decoder for both domains initially, so that discriminator is not fed garbage. 
@@ -5905,7 +5962,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# (1) Select which domain to run on. This is supervision of discriminator.
 		# Use same domain across batch for simplicity. 
-		domain = np.random.binomial(1,0.5)
+		if domain is None:
+			domain = np.random.binomial(1,0.5)
 		self.counter = counter
 
 		# (1.5) Get domain policy manager. 
@@ -6259,6 +6317,33 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 	def check_toy_dataset(self):
 		return self.args.source_domain in ['ContinuousNonZero','ToyContext'] and self.args.target_domain in ['ContinuousNonZero','ToyContext']
+
+	def initialize_training_batches(self):
+
+		print("Running Initialize Training Batches for Transfer setting.")
+		# Find out which domain has a bigger batch size. 
+		# Remember to consider: Input: Statex2 x Time x Z dimensions. 
+		# Latent z dimensions are same across both, so sufficient to compare state dims x 2 (i.e. input_size), and time. 
+
+		source_batch_size = self.source_manager.input_size*self.source_manager.max_batch_size
+		target_batch_size = self.target_manager.input_size*self.target_manager.max_batch_size
+
+		# In case of tie, doesn't matter.
+		max_batch_domain = int(target_batch_size<source_batch_size)
+		max_batch_index = self.get_domain_manager(max_batch_domain).max_batch_size_index
+		
+		# Now actually run iteration of the joint transfer / joint embed transfer with these specal indices.
+		counter = 0
+		self.run_iteration(counter, max_batch_index, domain=max_batch_domain)
+
+	def train(self, model=None):
+
+		# Run some initialization process to manage GPU memory with variable sized batches.
+		self.initialize_training_batches()
+
+		# Now run original training function.
+		print("About to run train function.")
+		super().train(model=model)
 
 class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 
@@ -7122,7 +7207,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# Before we initialize anything, set: 
 		self.args.fix_source = 1
 		self.args.fix_target = 1
-
+		self.set_trans_z = 0
 		# Now create two instances of policy managers for each domain. Call them source and target domain policy managers. 
 		self.source_manager = PolicyManager_BatchJoint(number_policies=4, dataset=self.source_dataset, args=self.source_args)
 		self.target_manager = PolicyManager_BatchJoint(number_policies=4, dataset=self.target_dataset, args=self.target_args)
@@ -7140,7 +7225,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.target_manager.setup()
 		self.target_manager.initialize_training_batches()	
 
-		self.translation_model_layers = 2
+		self.translation_model_layers = 4
 		self.args.real_translated_discriminator = 0
 
 	def set_iteration(self, counter):
@@ -7223,6 +7308,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# 	self.viz_dictionary['tsne_transsource_origtarget_traj_p05'], self.viz_dictionary['tsne_transsource_origtarget_traj_p10'], self.viz_dictionary['tsne_transsource_origtarget_traj_p30'] = \
 		# 		self.get_embeddings(projection='tsne', computed_sets=True)
 
+		self.z_last_set_by = 'set_translated_z_sets'
+		self.set_trans_z +=1
+
 	def update_plots(self, counter, viz_dict):
 
 		# Call super update plots for the majority of the work. Call this with log==false to make sure that wandb only logs things we add in this function. 
@@ -7235,13 +7323,21 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		if counter%self.args.display_freq==0:
 			self.set_translated_z_sets()
 
-			# Now actually add image plots.
-			# log_dict['Target Trajectory'], log_dict['Target Reconstruction'] = \
-					# self.return_wandb_gif(self.viz_dictionary['target_trajectory']), self.return_wandb_gif(self.viz_dictionary['target_reconstruction'])
+			##################################################
+			# Visualize Translated Z Trajectories.
+			##################################################
 
-			log_dict["TSNE Translated Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transtarget_p30'])
-			if self.check_toy_dataset():
-				log_dict["TSNE Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transtarget_traj_p30'])
+			self.set_translated_z_sets()
+			log_dict['Source Z Trajectory JointTranslated TSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_tsne_image)
+			log_dict['Target Z Trajectory JointTranslated TSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_tsne_image)
+			# log_dict['Source Z Trajectory JointTranslated PCA Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_pca_image)
+			log_dict['Target Z Trajectory JointTranslated PCA Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_pca_image)
+
+			##################################################
+			# Now log combined source and translated target visualizations, and if we want, target and translated source.
+			##################################################
+
+			log_dict["TSNE Translated Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transtarget_p30'])	
 
 			log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p05'])
 			log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p10'])
@@ -7250,7 +7346,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p10'])
 			# log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p30'])
 
-			if self.check_toy_dataset():
+			if self.check_toy_dataset():					
+				log_dict["TSNE Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transtarget_traj_p30'])
+
 				log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p05'])
 				log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p10'])
 				log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p30'])
@@ -7386,8 +7484,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False):
 
-		# Check if the index is too big. If yes, just sample randomly.
+		# Check if the index is too big. If yes, just sample randomly.		
 		if i >= len(policy_manager.dataset):
+			print("Randomly sampling data point because we extended range.")
 			i = np.random.randint(0, len(policy_manager.dataset))
 
 		# Since the joint training manager nicely lets us get dictionaries, just use it, but remember not to train. 
@@ -7411,7 +7510,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 	
 		return translated_latent_z
 
-	def run_iteration(self, counter, i):
+	def run_iteration(self, counter, i, domain=None):
 		
 		#################################################
 		## Algorithm:
@@ -7440,7 +7539,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		#################################################
 
 		# Use same domain across batch for simplicity. 
-		domain = np.random.binomial(1,0.5)
+		if domain is None:
+			domain = np.random.binomial(1,0.5)
 		self.counter = counter
 		policy_manager = self.get_domain_manager(domain)
 
