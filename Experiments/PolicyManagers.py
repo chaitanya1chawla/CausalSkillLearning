@@ -196,15 +196,6 @@ class PolicyManager_BaseClass():
 
 			return trajectory, action_sequence, concatenated_traj, old_concatenated_traj
 
-	def shuffle(self, extent):
-
-		# Replaces np.random.shuffle(self.index_list) with block based shuffling.
-		index_range = np.arange(0,extent)
-		blocks = [index_range[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
-		np.random.shuffle(blocks)
-		# Shuffled index list is just a flattening of blocks.
-		self.index_list = [b for bs in blocks for b in bs]
-
 	# @tprofile
 	def train(self, model=None):
 
@@ -258,7 +249,8 @@ class PolicyManager_BaseClass():
 				############### LINE PROFILING ###############
 				##############################################
 
-				profile_iteration = 0 
+				# print("Epoch:",e,"Trajectory:",str(i).zfill(5), "Datapoints:",str(self.index_list[i]).zfill(5),"Extent:",extent)
+				profile_iteration = 0 				
 				if profile_iteration:
 					self.lp = LineProfiler()
 					self.lp_wrapper = self.lp(self.run_iteration)
@@ -729,28 +721,77 @@ class PolicyManager_BaseClass():
 		print("About to run a dry run. ")
 		# Do a dry run of 1 epoch, before we actually start running training. 
 		# This is so that we can figure out the batch of 1 epoch.
-		for i in range(0,extent,self.args.batch_size):		
-			# Dry run iteration. 
-			self.run_iteration(counter, self.index_list[i], skip_iteration=True)
+		 
+		self.shuffle(extent,shuffle=False)		
 
-		print("About to find max batch size index.")
-		# Now find maximum batch size iteration. 
-		self.max_batch_size_index = 0
-		self.max_batch_size = 0
-		# traj_lengths = []
+		# Can now skip this entire block, because we've sorted data according to trajectory length.
+		# #########################################################
+		# #########################################################
+		# for i in range(0,extent,self.args.batch_size):		
+		# 	# Dry run iteration. 
+		# 	self.run_iteration(counter, self.index_list[i], skip_iteration=True)
 
-		for x in range(len(self.batch_indices_sizes)):
-			if self.batch_indices_sizes[x]['batch_size']>self.max_batch_size:
-				self.max_batch_size = self.batch_indices_sizes[x]['batch_size']
-				self.max_batch_size_index = self.batch_indices_sizes[x]['i']
+		# print("About to find max batch size index.")
+		# # Now find maximum batch size iteration. 
+		# self.max_batch_size_index = 0
+		# self.max_batch_size = 0
+		# # traj_lengths = []
+
+		# for x in range(len(self.batch_indices_sizes)):
+		# 	if self.batch_indices_sizes[x]['batch_size']>self.max_batch_size:
+		# 		self.max_batch_size = self.batch_indices_sizes[x]['batch_size']
+		# 		self.max_batch_size_index = self.batch_indices_sizes[x]['i']
+		# #########################################################
+		# #########################################################
+
+		self.max_batch_size_index = 0 
+		self.max_batch_size = self.dataset.dataset_trajectory_lengths.max()
 					
 		print("About to run max batch size iteration.")
 		print("This batch size is: ", self.max_batch_size)
-		# Now run another epoch, where we only skip iteration if it's the max batch size.
-		for i in range(0,extent,self.args.batch_size):
-			# Skip unless i is ==max_batch_size_index.
-			skip = (i!=self.max_batch_size_index)
-			self.run_iteration(counter, self.index_list[i], skip_iteration=skip)
+
+		# #########################################################
+		# #########################################################
+		# # Now run another epoch, where we only skip iteration if it's the max batch size.
+		# for i in range(0,extent,self.args.batch_size):
+		# 	# Skip unless i is ==max_batch_size_index.
+		# 	skip = (i!=self.max_batch_size_index)
+		# 	self.run_iteration(counter, self.index_list[i], skip_iteration=skip)
+		# #########################################################
+		# #########################################################
+
+		# Instead of this clumsy iteration, just run iteration with i=0. 
+		self.run_iteration(counter, 0, skip_iteration=0)
+
+	def shuffle(self, extent, shuffle=True):
+		# If we're in a dataset that will have variable sized data.
+		if self.args.data in ['MIME','Roboturk','FullRoboturk','OrigRoboturk']:
+			index_range = np.arange(0,extent)
+
+			# self.sorted_indices = np.argsort(self.dataset.dataset_trajectory_lengths)[::-1][:extent]
+
+			# This just needs to be created if we're in joint setting.
+			# if self.args.setting in ['joint','learntsub']:
+			if isinstance(self, PolicyManager_BatchJoint):
+				self.sorted_indices = np.argsort(self.dataset.dataset_trajectory_lengths)[::-1]
+
+			# blocks = [self.sorted_indices[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
+			blocks = [index_range[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
+			# ublocks = [self.sorted_indices[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
+			if shuffle:
+				np.random.shuffle(blocks)
+			# Shuffled index list is just a flattening of blocks.
+			self.index_list = [b for bs in blocks for b in bs]
+			
+		# If we're in Toy data, doesn't matter, just randomly shuffle. 
+		else:
+			# Replaces np.random.shuffle(self.index_list) with block based shuffling.
+			index_range = np.arange(0,extent)
+			blocks = [index_range[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
+			if shuffle:
+				np.random.shuffle(blocks)
+			# Shuffled index list is just a flattening of blocks.
+			self.index_list = [b for bs in blocks for b in bs]
 
 class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
@@ -944,7 +985,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		else:
 			self.kl_weight = self.args.kl_weight
 		
-
 	def visualize_trajectory(self, traj, no_axes=False):
 
 		fig = plt.figure()		
@@ -2928,7 +2968,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				with torch.no_grad():
 					self.update_plots(counter, i, input_dictionary, variational_dict, eval_likelihood_dict)
 
-				print("#########################################")
+				# print("#########################################")
 
 			if self.args.debug:
 				print("Embedding in Run Iteration.")
@@ -3635,7 +3675,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 		
 	def get_batch_element(self, i):
 		# Make data_element a list of dictionaries. 
-		data_element = np.array([self.dataset[b] for b in range(i,i+self.args.batch_size)])
+		# data_element = np.array([self.dataset[b] for b in range(i,i+self.args.batch_size)])
+		data_element = np.array([self.dataset[b] for b in sorted_indices[i:i+self.args.batch_size]])
 		# for b in range(i,i+self.args.batch_size):	
 		# 	data_element.append(self.dataset[b])
 
@@ -3687,16 +3728,24 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
 
 		elif self.args.data=='MIME' or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
-                       
+					   
 			if self.args.data=='MIME' or self.args.data=='Mocap':
-				data_element = self.dataset[i:i+self.args.batch_size]
+				# data_element = self.dataset[i:i+self.args.batch_size]
+				data_element = self.dataset[self.sorted_indices[i:i+self.args.batch_size]]
+
 			else:
 				data_element = self.get_batch_element(i)
-			
+
 			# Get trajectory lengths across batch, to be able to create masks for losses. 
 			self.batch_trajectory_lengths = np.zeros((self.args.batch_size), dtype=int)
+			minl = 10000
+			maxl = 0
 			for x in range(self.args.batch_size):
-				self.batch_trajectory_lengths[x] = data_element[x]['demo'].shape[0]						
+				self.batch_trajectory_lengths[x] = data_element[x]['demo'].shape[0]
+				maxl = max(maxl,self.batch_trajectory_lengths[x])
+				minl = min(minl,self.batch_trajectory_lengths[x])
+			# print("For this iteration:",maxl-minl,minl,maxl)
+
 			self.max_batch_traj_length = self.batch_trajectory_lengths.max()
 
 			# Create batch object that stores trajectories. 
@@ -5078,37 +5127,37 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.target_args = copy.deepcopy(args)
 		self.target_args.data = self.target_args.target_domain
 		self.target_dataset = target_dataset
-		
+		self.initial_epsilon = self.args.epsilon_from
+		self.final_epsilon = self.args.epsilon_to
+		self.decay_epochs = self.args.epsilon_over
+
 		# Now create two instances of policy managers for each domain. Call them source and target domain policy managers. 
-		if self.args.batch_size>1:
-			self.source_manager = PolicyManager_BatchPretrain(dataset=self.source_dataset, args=self.source_args)
-			self.target_manager = PolicyManager_BatchPretrain(dataset=self.target_dataset, args=self.target_args)		
-		else:
-			self.source_manager = PolicyManager_Pretrain(dataset=self.source_dataset, args=self.source_args)
-			self.target_manager = PolicyManager_Pretrain(dataset=self.target_dataset, args=self.target_args)		
+		if self.args.setting in ['Transfer']:
+			if self.args.batch_size>1:
+				self.source_manager = PolicyManager_BatchPretrain(dataset=self.source_dataset, args=self.source_args)
+				self.target_manager = PolicyManager_BatchPretrain(dataset=self.target_dataset, args=self.target_args)		
+			else:
+				self.source_manager = PolicyManager_Pretrain(dataset=self.source_dataset, args=self.source_args)
+				self.target_manager = PolicyManager_Pretrain(dataset=self.target_dataset, args=self.target_args)		
 
-		self.source_dataset_size = len(self.source_manager.dataset) - self.source_manager.test_set_size
-		self.target_dataset_size = len(self.target_manager.dataset) - self.target_manager.test_set_size
+			self.source_dataset_size = len(self.source_manager.dataset) - self.source_manager.test_set_size
+			self.target_dataset_size = len(self.target_manager.dataset) - self.target_manager.test_set_size
 
-		# Now setup networks for these PolicyManagers. 		
-		self.source_manager.setup()
-		self.target_manager.setup()
+			# Now setup networks for these PolicyManagers. 		
+			self.source_manager.setup()
+			self.target_manager.setup()
 
-		# Now create variables that we need. 
-		self.number_epochs = self.args.epochs
-		self.extent = min(self.source_dataset_size, self.target_dataset_size)		
+			# Now create variables that we need. 
+			self.number_epochs = self.args.epochs
+			self.extent = min(self.source_dataset_size, self.target_dataset_size)		
+			self.decay_counter = self.decay_epochs*self.extent
+			self.decay_rate = (self.initial_epsilon-self.final_epsilon)/(self.decay_counter)
 
 		# Now define other parameters that will be required for the discriminator, etc. 
 		self.input_size = self.args.z_dimensions
 		self.hidden_size = self.args.hidden_size
 		self.output_size = 2
 		self.learning_rate = self.args.learning_rate
-
-		self.initial_epsilon = self.args.epsilon_from
-		self.final_epsilon = self.args.epsilon_to
-		self.decay_epochs = self.args.epsilon_over
-		self.decay_counter = self.decay_epochs*self.extent
-		self.decay_rate = (self.initial_epsilon-self.final_epsilon)/(self.decay_counter)
 
 	def set_iteration(self, counter):
 
@@ -5423,6 +5472,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Plot source, target, and shared embeddings via TSNE.
 			##################################################
 
+			# print("Running embeddings.")
+
 			# First run get embeddings. 
 			self.viz_dictionary['tsne_source_embedding'], self.viz_dictionary['tsne_target_embedding'], \
 				self.viz_dictionary['tsne_combined_embeddings_p5'], self.viz_dictionary['tsne_combined_embeddings_p10'], self.viz_dictionary['tsne_combined_embeddings_p30'], \
@@ -5444,9 +5495,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			##################################################
 			# Plot source, target, and shared embeddings via PCA. 
 			##################################################
-
+			
+			# print("Running embeddings PCA.")
+			
 			# First run get embeddings. 
-			self.viz_dictionary['pca_source_embedding'], self.viz_dictionary['pca_target_embedding'], self.viz_dictionary['pca_combined_embeddings'], self.viz_dictionary['pca_combined_traj_embeddings'] = self.get_embeddings(projection='pca')
+			self.viz_dictionary['pca_source_embedding'], self.viz_dictionary['pca_target_embedding'], self.viz_dictionary['pca_combined_embeddings'], self.viz_dictionary['pca_combined_traj_embeddings'] = self.get_embeddings(projection='pca', computed_sets=True)
 
 			# Add embeddings to logging dict.			
 			log_dict['PCA Source Embedding'], log_dict['PCA Target Embedding'], log_dict['PCA Combined Embedding'] = \
@@ -5605,7 +5658,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 	
 		# embed()
 		# for i, z_traj in enumerate(z_trajectory_set_object):
-		for i in range(30):
+		for i in range(10):
 			z_traj = z_trajectory_set_object[i]	
 		
 			# First get length of this z_trajectory.
@@ -5639,7 +5692,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Function to visualize source, target, and combined embeddings: 
 	
 		if computed_sets==False:
+			# print("Running Set Z Objects")
 			self.set_z_objects()
+			# print("Finish Set Z Objects")
 
 		# Now that the latent sets for both source and target domains are computed: 
 		if projection=='tsne':
@@ -5669,6 +5724,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# print("Embed in get_embeddings")
 			# embed()
 			# self.set_translated_z_sets()
+			# print("Visualizing Z Trajectories")
 			self.source_z_traj_tsne_image = self.visualize_embedded_z_trajectories(0, source_embedded_zs, self.source_z_trajectory_set, projection='tsne')
 			self.target_z_traj_tsne_image = self.visualize_embedded_z_trajectories(1, target_embedded_zs, self.target_z_trajectory_set, projection='tsne')
 
@@ -5712,7 +5768,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		if projection=='tsne':
 
-			if self.args.source_domain==self.args.target_domain:
+			if self.check_toy_dataset():
 
 				########################################
 				# Shared data point visualization with trajectories.
@@ -5730,7 +5786,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.samedomain_shared_embedding_image_p5, self.samedomain_shared_embedding_image_p10, self.samedomain_shared_embedding_image_p30
 
 		else:
-			if self.args.source_domain==self.args.target_domain:
+			if self.check_toy_dataset():
 
 				########################################
 				# Shared data point visualization with trajectories.
@@ -5990,6 +6046,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False, viz_domain=None, return_fig=False):	
 		
+		# print("Running plot embedding", title, viz_domain)
 		############################################################
 		# Setting fig size everywhere so that it doesn't go nuts. 
 		############################################################
@@ -6328,12 +6385,15 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		source_batch_size = self.source_manager.input_size*self.source_manager.max_batch_size
 		target_batch_size = self.target_manager.input_size*self.target_manager.max_batch_size
 
-		# In case of tie, doesn't matter.
-		max_batch_domain = int(target_batch_size<source_batch_size)
-		max_batch_index = self.get_domain_manager(max_batch_domain).max_batch_size_index
-		
+		# In case of tie, doesn't matter. # Actually, not true.
+		# max_batch_domain = int(target_batch_size<source_batch_size)
+		# We forgot that the translation only actually happens when the domain is 1. 
+		max_batch_domain = 1
+		max_batch_index = self.get_domain_manager(max_batch_domain).max_batch_size_index		
+
 		# Now actually run iteration of the joint transfer / joint embed transfer with these specal indices.
 		counter = 0
+		print("Running initializing iteration.")
 		self.run_iteration(counter, max_batch_index, domain=max_batch_domain)
 
 	def train(self, model=None):
@@ -7227,6 +7287,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		self.translation_model_layers = 4
 		self.args.real_translated_discriminator = 0
+		self.decay_counter = self.decay_epochs*self.extent
+		self.decay_rate = (self.initial_epsilon-self.final_epsilon)/(self.decay_counter)
 
 	def set_iteration(self, counter):
 		# First call the set iteration of super. 
@@ -7314,6 +7376,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 	def update_plots(self, counter, viz_dict):
 
 		# Call super update plots for the majority of the work. Call this with log==false to make sure that wandb only logs things we add in this function. 
+		# print("Run Super Plots")
 		log_dict = super().update_plots(counter, viz_dict, log=False)
 
 		############################################################
@@ -7321,13 +7384,14 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		############################################################	
 
 		if counter%self.args.display_freq==0:
-			self.set_translated_z_sets()
+			
 
 			##################################################
 			# Visualize Translated Z Trajectories.
 			##################################################
 
 			self.set_translated_z_sets()
+
 			log_dict['Source Z Trajectory JointTranslated TSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_tsne_image)
 			log_dict['Target Z Trajectory JointTranslated TSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_tsne_image)
 			# log_dict['Source Z Trajectory JointTranslated PCA Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_pca_image)
@@ -7492,7 +7556,6 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# Since the joint training manager nicely lets us get dictionaries, just use it, but remember not to train. 
 		# This does all the steps we need.
 		source_input_dict, source_var_dict, source_eval_dict = policy_manager.run_iteration(self.counter, i, return_dicts=True, train=False)
-
 		return source_input_dict, source_var_dict, source_eval_dict
 
 	def translate_latent_z(self, latent_z, latent_b):
@@ -7506,10 +7569,11 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# Use the corrupted_latent_z instead of the original.
 			translated_latent_z = self.backward_translation_model.forward(corrupted_latent_z, epsilon=self.epsilon, precomputed_b=latent_b)
 		else:
-			translated_latent_z = self.backward_translation_model.forward(latent_z)
+			translated_latent_z = self.backward_translation_model.forward(latent_z, action_epsilon=self.epsilon)
 	
 		return translated_latent_z
 
+	# @gpu_profile_every(1)
 	def run_iteration(self, counter, i, domain=None):
 		
 		#################################################
@@ -7555,6 +7619,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		if update_dictionary['latent_z'] is not None:
 
+			# print('Batch Shape:',source_input_dict['old_concatenated_traj'].shape)
+
 			#################################################
 			## (3) If domain==Target, translate the latent z(s) to the source domain.
 			#################################################
@@ -7571,7 +7637,6 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			update_dictionary['detached_latent_z'] = update_dictionary['translated_latent_z'].detach()				
 			
 			# Get the diffs from the original latent z's..
-
 			delta_zs = detached_original_latent_z[1:] - detached_original_latent_z[:-1]
 			# delta_zs = update_dictionary['latent_z'][1:] - update_dictionary['latent_z'][:-1]
 			update_dictionary['delta_z'] = torch.cat([delta_zs, torch.zeros((1,self.args.batch_size,self.args.z_dimensions)).to(device)],dim=0)
@@ -7618,7 +7683,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			viz_dict['domain'] = domain
 			viz_dict['discriminator_probs'] = discriminator_prob[...,domain].detach().cpu().numpy().mean()
 
-			self.update_plots(counter, viz_dict)	
+			# print("Run update plots.")
+			self.update_plots(counter, viz_dict)
+			# print("Finish update plots.")
 
 class PolicyManager_JointTransfer(PolicyManager_Transfer):
 
@@ -7627,17 +7694,6 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 			
 		# The inherited functions refer to self.args. Also making this to make inheritance go smooth.
 		super(PolicyManager_JointTransfer, self).__init__(args, source_dataset, target_dataset)
-
-		# self.args = args
-
-		# # Before instantiating policy managers of source or target domains; create copies of args with data attribute changed. 		
-		# self.source_args = copy.deepcopy(args)
-		# self.source_args.data = self.source_args.source_domain
-		# self.source_dataset = source_dataset
-
-		# self.target_args = copy.deepcopy(args)
-		# self.target_args.data = self.target_args.target_domain
-		# self.target_dataset = target_dataset
 
 		# Now create two instances of policy managers for each domain. Call them source and target domain policy managers. 
 		self.source_manager = PolicyManager_BatchJoint(number_policies=4, dataset=self.source_dataset, args=self.source_args)
@@ -7655,6 +7711,12 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 		self.source_manager.initialize_training_batches()
 		self.target_manager.setup()
 		self.target_manager.initialize_training_batches()		
+
+		# Now create variables that we need. 
+		self.number_epochs = self.args.epochs
+		self.extent = min(self.source_dataset_size, self.target_dataset_size)		
+		self.decay_counter = self.decay_epochs*self.extent
+		self.decay_rate = (self.initial_epsilon-self.final_epsilon)/(self.decay_counter)
 
 		# # Now define other parameters that will be required for the discriminator, etc. 
 		# self.input_size = self.args.z_dimensions
@@ -7757,7 +7819,7 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 		return latent_z_transformation_vector, latent_z_transformation_weights
 		# return latent_z_transformation_vector.view(-1,2*self.args.z_dimensions), latent_z_transformation_weights.view(-1,1)
 
-	def run_iteration(self, counter, i):
+	def run_iteration(self, counter, i, domain=None):
 
 
 		# Phases: 
@@ -7779,7 +7841,8 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 
 		# (1) Select which domain to run on. This is supervision of discriminator.
 		# Use same domain across batch for simplicity. 
-		domain = np.random.binomial(1,0.5)
+		if domain is None:
+			domain = np.random.binomial(1,0.5)
 		self.counter = counter
 
 		# (1.5) Get domain policy manager. 

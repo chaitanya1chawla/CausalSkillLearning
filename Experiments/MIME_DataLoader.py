@@ -139,13 +139,18 @@ class MIME_NewDataset(Dataset):
 
 			length_threshold = 500
 			self.short_data_list = []
+			self.dataset_trajectory_lengths = []
 			for i in range(self.dataset_length):
 				if self.data_list[i]['demo'].shape[0]<length_threshold:
 					self.short_data_list.append(self.data_list[i])
+					self.dataset_trajectory_lengths.append(self.data_list[i]['demo'].shape[0])
 
 			self.data_list = self.short_data_list
 			self.dataset_length = len(self.data_list)
-			
+			self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)		
+		
+		self.data_list_array = np.array(self.data_list)
+
 	def __len__(self):
 		# Return length of file list. 
 		return self.dataset_length
@@ -153,8 +158,10 @@ class MIME_NewDataset(Dataset):
 	def __getitem__(self, index):
 		# Return n'th item of dataset.
 		# This has already processed everything.
-
-		return self.data_list[index]
+		if isinstance(index,np.ndarray):			
+			return list(self.data_list_array[index])
+		else:
+			return self.data_list[index]
 
 	def compute_statistics(self):
 

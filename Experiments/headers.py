@@ -22,6 +22,7 @@ from absl import flags
 from memory_profiler import profile as mprofile
 from profilehooks import profile as tprofile
 from pytorch_memlab import profile as gpu_profile
+from pytorch_memlab import profile_every as gpu_profile_every
 from line_profiler import LineProfiler
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
