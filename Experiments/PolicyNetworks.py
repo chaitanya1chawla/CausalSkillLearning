@@ -1523,23 +1523,18 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		# Get initial z predictions.
 		##################################################
 		# Now set the z's. If greedy, just return the means. 
-		if epsilon==0.:
+		if epsilon==0. or not(self.args.train):
 			sampled_z_index = mean_outputs.squeeze(1)
 		# If not greedy, then reparameterize. 
 		else:
 			# Whether to use reparametrization trick to retrieve the latent_z's.
-			if self.args.train:
-				noise = torch.randn_like(variance_outputs)
+			noise = torch.randn_like(variance_outputs)
 
-				# Instead of *sampling* the latent z from a distribution, construct using mu + sig * eps (random noise).
-				sampled_z_index = mean_outputs + variance_outputs*noise
-				# Ought to be able to pass gradients through this latent_z now.
+			# Instead of *sampling* the latent z from a distribution, construct using mu + sig * eps (random noise).
+			sampled_z_index = mean_outputs + variance_outputs*noise
+			# Ought to be able to pass gradients through this latent_z now.
 
-				sampled_z_index = sampled_z_index.squeeze(1)
-
-			# If evaluating, greedily get action.
-			else:
-				sampled_z_index = mean_outputs.squeeze(1)
+			sampled_z_index = sampled_z_index.squeeze(1)
 		
 		##################################################
 		# Modify z's based on whether b was 1 or 0.

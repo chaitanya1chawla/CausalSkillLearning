@@ -744,8 +744,12 @@ class PolicyManager_BaseClass():
 		# #########################################################
 		# #########################################################
 
-		self.max_batch_size_index = 0 
-		self.max_batch_size = self.dataset.dataset_trajectory_lengths.max()
+		self.max_batch_size_index = 0
+		if self.args.data in ['ToyContext','ContinuousNonZero']:
+			self.max_batch_size = 'Full'
+		else:
+			self.max_batch_size = self.dataset.dataset_trajectory_lengths.max()
+			
 					
 		print("About to run max batch size iteration.")
 		print("This batch size is: ", self.max_batch_size)
@@ -5583,24 +5587,29 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		
 	def get_transform(self, latent_z_set, projection='tsne', shared=False, perplexity=30):
 
-		if shared:
-			# If this set of z's contains z's from both source and target domains, mean-std normalize them independently. 
-			normed_z = np.zeros_like(latent_z_set)
-			# Normalize source.
-			source_mean = latent_z_set[:self.N].mean(axis=0)
-			source_std = latent_z_set[:self.N].std(axis=0)
-			normed_z[:self.N] = (latent_z_set[:self.N]-source_mean)/source_std
-			# Normalize target.
-			target_mean = latent_z_set[self.N:].mean(axis=0)
-			target_std = latent_z_set[self.N:].std(axis=0)
-			normed_z[self.N:] = (latent_z_set[self.N:]-target_mean)/target_std			
+		# if shared:
+		# 	# If this set of z's contains z's from both source and target domains, mean-std normalize them independently. 
+		# 	normed_z = np.zeros_like(latent_z_set)
+		# 	# Normalize source.
+		# 	source_mean = latent_z_set[:self.N].mean(axis=0)
+		# 	source_std = latent_z_set[:self.N].std(axis=0)
+		# 	normed_z[:self.N] = (latent_z_set[:self.N]-source_mean)/source_std
+		# 	# Normalize target.
+		# 	target_mean = latent_z_set[self.N:].mean(axis=0)
+		# 	target_std = latent_z_set[self.N:].std(axis=0)
+		# 	normed_z[self.N:] = (latent_z_set[self.N:]-target_mean)/target_std			
 
-		else:
-			# Just normalize z's.
-			mean = latent_z_set.mean(axis=0)
-			std = latent_z_set.std(axis=0)
-			normed_z = (latent_z_set-mean)/std
+		# else:
+		# 	# Just normalize z's.
+		# 	mean = latent_z_set.mean(axis=0)
+		# 	std = latent_z_set.std(axis=0)
+		# 	normed_z = (latent_z_set-mean)/std
 		
+		# Just normalize z's.
+		mean = latent_z_set.mean(axis=0)
+		std = latent_z_set.std(axis=0)
+		normed_z = (latent_z_set-mean)/std
+
 		if projection=='tsne':
 			# Use TSNE to project the data:
 			tsne = skl_manifold.TSNE(n_components=2,random_state=0,perplexity=perplexity)
@@ -5655,7 +5664,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# print("Embed in viz z traj.")
 		# embed()
 		fig, ax = self.plot_embedding(shared_z_embedding, "Z Trajectory Image {0}".format(projection), return_fig=True, viz_domain=viz_domain)
-	
+
+		# Add this value to indexing shared_z_embedding, assuming we're actually providing a shared embedding. 		
+		# If source, viz_domain = 0, so don't add anything, but if target, add the length of the soruce_latent_z to skip these.
+		add_value = len(self.source_latent_zs)*domain
+
 		# embed()
 		# for i, z_traj in enumerate(z_trajectory_set_object):
 		for i in range(10):
@@ -5667,7 +5680,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Should just be able to get the corresponding embedded z by manipulating indices.. 
 			# Assuming len of z_traj is consistent across all elements in z_trajectory_set_object, which would have needed to have been true 
 			# for the concatenate in set_z_objects to work.
-			embedded_z_traj = shared_z_embedding[i*z_traj_len:(i+1)*z_traj_len]
+			# embedded_z_traj = shared_z_embedding[i*z_traj_len:(i+1)*z_traj_len]
+			embedded_z_traj = shared_z_embedding[add_value+i*z_traj_len:add_value+(i+1)*z_traj_len]
 
 			# Now that we have the embedded trajectory, come up with some plot for it. 
 			ax.scatter(embedded_z_traj[:,0],embedded_z_traj[:,1],s=10,c=domain*np.ones(z_traj_len),cmap='jet',vmin=0,vmax=1)
@@ -5692,9 +5706,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Function to visualize source, target, and combined embeddings: 
 	
 		if computed_sets==False:
-			# print("Running Set Z Objects")
 			self.set_z_objects()
-			# print("Finish Set Z Objects")
 
 		# Now that the latent sets for both source and target domains are computed: 
 		if projection=='tsne':
@@ -5720,13 +5732,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Visualizing embedding z trajectories.
 			########################################
 
-			# Now set using... 
-			# print("Embed in get_embeddings")
-			# embed()
 			# self.set_translated_z_sets()
-			# print("Visualizing Z Trajectories")
-			self.source_z_traj_tsne_image = self.visualize_embedded_z_trajectories(0, source_embedded_zs, self.source_z_trajectory_set, projection='tsne')
-			self.target_z_traj_tsne_image = self.visualize_embedded_z_trajectories(1, target_embedded_zs, self.target_z_trajectory_set, projection='tsne')
+			# self.source_z_traj_tsne_image = self.visualize_embedded_z_trajectories(0, source_embedded_zs, self.source_z_trajectory_set, projection='tsne')
+			# self.target_z_traj_tsne_image = self.visualize_embedded_z_trajectories(1, target_embedded_zs, self.target_z_trajectory_set, projection='tsne')
+			self.source_z_traj_tsne_image = self.visualize_embedded_z_trajectories(0, shared_embedded_zs_p30, self.source_z_trajectory_set, projection='tsne')
+			self.target_z_traj_tsne_image = self.visualize_embedded_z_trajectories(1, shared_embedded_zs_p30, self.target_z_trajectory_set, projection='tsne')
+
 
 		elif projection=='pca':
 			# Now fit PCA to source.
@@ -5745,9 +5756,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			########################################
 
 			# self.set_translated_z_sets()
-			self.source_z_traj_pca_image = self.visualize_embedded_z_trajectories(0, source_embedded_zs, self.source_z_trajectory_set, projection='pca')			
-			self.target_z_traj_pca_image = self.visualize_embedded_z_trajectories(1, target_embedded_zs, self.target_z_trajectory_set, projection='pca')
-
+			# self.source_z_traj_pca_image = self.visualize_embedded_z_trajectories(0, source_embedded_zs, self.source_z_trajectory_set, projection='pca')
+			# self.target_z_traj_pca_image = self.visualize_embedded_z_trajectories(1, target_embedded_zs, self.target_z_trajectory_set, projection='pca')
+			self.source_z_traj_pca_image = self.visualize_embedded_z_trajectories(0, shared_embedded_zs, self.source_z_trajectory_set, projection='pca')
+			self.target_z_traj_pca_image = self.visualize_embedded_z_trajectories(1, shared_embedded_zs, self.target_z_trajectory_set, projection='pca')
 		########################################
 		# Single domain data point visualization.
 		########################################
@@ -5759,9 +5771,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Single domain data point visualization with trajectories.
 		########################################
 
-		if self.args.source_domain in ['ContinuousNonZero','ToyContext']:
+		if self.check_toy_dataset():
 			self.source_traj_image = self.plot_embedding(shared_embedded_zs, "Source_Embedding", trajectory=True, viz_domain='source')
-		if self.args.target_domain in ['ContinuousNonZero','ToyContext']:
 			self.target_traj_image = self.plot_embedding(shared_embedded_zs, "Target_Embedding", trajectory=True, viz_domain='target')
 
 		self.samedomain_shared_embedding_image = None
@@ -5796,6 +5807,148 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			else:
 				self.samedomain_shared_embedding_image = None
 			return self.source_image, self.target_image, self.shared_image, self.samedomain_shared_embedding_image
+
+	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False, viz_domain=None, return_fig=False):	
+		
+		# print("Running plot embedding", title, viz_domain)
+		############################################################
+		# Setting fig size everywhere so that it doesn't go nuts. 
+		############################################################
+
+		matplotlib.rcParams['figure.figsize'] = [5,5]
+		fig = plt.figure()
+		ax = fig.gca()
+		
+		############################################################
+		# Set colors of embedding plots based on which domain we're plotting.
+		############################################################
+
+		if shared:
+			colors = 0.2*np.ones((embedded_zs.shape[0]))
+			# colors[embedded_zs.shape[0]//2:] = 0.8
+			# TRY REPLACE Z.SHAPE//2 by [len(self.source_latent_zs):]
+			colors[len(self.source_latent_zs):] = 0.8
+		else:
+			if viz_domain=='source':
+				colors = 0.2*np.ones((embedded_zs.shape[0]))
+			elif viz_domain=='target':
+				colors = 0.8*np.ones((embedded_zs.shape[0]))
+			else:
+				colors = 0.2*np.ones((embedded_zs.shape[0]))
+
+		############################################################
+		# If we're visualizing trajectories in the visualized plots. 
+		############################################################
+
+		if trajectory:
+
+			############################################################
+			# If we're in the shared embedding setting, assemble the shared_trajectory_set. 
+			############################################################
+
+			if shared:
+
+				########################################
+				# Create a scatter plot of the embedding.
+				########################################
+
+				self.source_manager.get_trajectory_and_latent_sets()
+				self.target_manager.get_trajectory_and_latent_sets()						
+
+				if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed']:
+					# self.source_manager.trajectory_set = np.array(self.source_manager.trajectory_set)
+					# self.target_manager.trajectory_set = np.array(self.target_manager.trajectory_set)
+					# traj_length = len(self.source_manager.trajectory_set[0,:,0])
+					# Create a shared trajectory set from both individual segmented_trajectory_set(s). 
+					self.shared_trajectory_set = self.source_manager.segmented_trajectory_set+self.target_manager.segmented_trajectory_set					
+				else:
+					# Assemble shared trajectory set. 
+					traj_length = len(self.source_manager.trajectory_set[0,:,0])
+					self.shared_trajectory_set = np.zeros((2*self.N, traj_length, self.source_manager.state_dim))
+					self.shared_trajectory_set[:self.N] = self.source_manager.trajectory_set
+					self.shared_trajectory_set[self.N:] = self.target_manager.trajectory_set		
+
+			else:
+
+				########################################
+				# Otherwise just set the shared_trajectory_set.
+				########################################
+
+				# Depending on whether we're visualizing the source or target domain
+				if viz_domain=='source':
+					# embedded_zs = embedded_zs[:(embedded_zs.shape[0]//2)]
+					embedded_zs = embedded_zs[:len(self.source_latent_zs)]
+					self.shared_trajectory_set = self.source_manager.segmented_trajectory_set					
+				elif viz_domain=='target':
+					# embedded_zs = embedded_zs[(embedded_zs.shape[0]//2):]
+					embedded_zs = embedded_zs[len(self.source_latent_zs):]
+					self.shared_trajectory_set = self.target_manager.segmented_trajectory_set
+			
+			############################################################
+			# Now that we've set the trajectory set, plot the trajectories.
+			############################################################
+
+			# ratio = 0.4
+			# preratio = 0.01
+			preratio = 0.005
+			ratio = (embedded_zs.max()-embedded_zs.min())*preratio
+			color_scaling = 15
+			max_traj_length = 6
+			color_range_min = 0.2*color_scaling
+			color_range_max = 0.8*color_scaling+max_traj_length-1
+
+			# Randomize the order of the plot, so that one domain doesn't overwrite the other in the plot. 
+			random_range = list(range(min(embedded_zs.shape[0],len(self.shared_trajectory_set))))
+			random.shuffle(random_range)
+			
+			for i in random_range:
+				seg_traj_len = len(self.shared_trajectory_set[i])
+				ax.scatter(embedded_zs[i,0]+ratio*self.shared_trajectory_set[i][:,0],embedded_zs[i,1]+ratio*self.shared_trajectory_set[i][:,1], \
+					c=colors[i]*color_scaling+range(seg_traj_len),cmap='jet',vmin=color_range_min,vmax=color_range_max,s=15)
+
+		############################################################
+		# If we're visualizing just data points in the visualized plots. 
+		############################################################
+
+		else:
+			########################################
+			# Create a scatter plot of the embedding.
+			########################################
+
+			s = np.ones(embedded_zs.shape[0])*50
+			if viz_domain=='source':
+				# s[(embedded_zs.shape[0]//2):] = 1
+				# colors[(embedded_zs.shape[0]//2):] = 0.8
+				# TRY REPLACE Z.SHAPE//2 by [len(self.source_latent_zs):]
+				s[len(self.source_latent_zs):] = 1
+				colors[len(self.source_latent_zs):] = 0.8
+			elif viz_domain=='target':				
+				# s[:(embedded_zs.shape[0]//2)] = 1
+				# colors[:(embedded_zs.shape[0])//2] = 0.2
+				# TRY REPLACE Z.SHAPE//2 by [:len(self.source_latent_zs)]
+				s[:len(self.source_latent_zs)] = 1
+				colors[:len(self.source_latent_zs)] = 0.2
+
+			ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors,vmin=0,vmax=1,cmap='jet',s=s)
+		
+		############################################################
+		# Now make the plot and generate numpy image from it. 
+		############################################################
+		ax.set_title("{0}".format(title),fontdict={'fontsize':15})
+		fig.canvas.draw()		
+		width, height = fig.get_size_inches() * fig.get_dpi()
+		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)		
+		image = np.transpose(image, axes=[2,0,1])
+
+		# Clear figure from memory.
+		if return_fig:
+			return fig, ax
+		else:
+			ax.clear()
+			fig.clear()
+			plt.close(fig)
+
+			return image
 
 	def get_trajectory_visuals(self):
 
@@ -6043,140 +6196,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			viz_dict = {'domain': domain, 'discriminator_probs': discriminator_prob[...,domain].detach().cpu().numpy().mean()}
 
 			self.update_plots(counter, viz_dict)
-
-	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False, viz_domain=None, return_fig=False):	
-		
-		# print("Running plot embedding", title, viz_domain)
-		############################################################
-		# Setting fig size everywhere so that it doesn't go nuts. 
-		############################################################
-
-		matplotlib.rcParams['figure.figsize'] = [5,5]
-		fig = plt.figure()
-		ax = fig.gca()
-		
-		############################################################
-		# Set colors of embedding plots based on which domain we're plotting.
-		############################################################
-
-		if shared:
-			colors = 0.2*np.ones((embedded_zs.shape[0]))
-			colors[embedded_zs.shape[0]//2:] = 0.8
-		else:
-			if viz_domain=='source':
-				colors = 0.2*np.ones((embedded_zs.shape[0]))
-			elif viz_domain=='target':
-				colors = 0.8*np.ones((embedded_zs.shape[0]))
-			else:
-				colors = 0.2*np.ones((embedded_zs.shape[0]))
-
-		############################################################
-		# If we're visualizing trajectories in the visualized plots. 
-		############################################################
-
-		if trajectory:
-
-			############################################################
-			# If we're in the shared embedding setting, assemble the shared_trajectory_set. 
-			############################################################
-
-			if shared:
-
-				########################################
-				# Create a scatter plot of the embedding.
-				########################################
-
-				self.source_manager.get_trajectory_and_latent_sets()
-				self.target_manager.get_trajectory_and_latent_sets()						
-
-				if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed']:
-					# self.source_manager.trajectory_set = np.array(self.source_manager.trajectory_set)
-					# self.target_manager.trajectory_set = np.array(self.target_manager.trajectory_set)
-					# traj_length = len(self.source_manager.trajectory_set[0,:,0])
-					# Create a shared trajectory set from both individual segmented_trajectory_set(s). 
-					self.shared_trajectory_set = self.source_manager.segmented_trajectory_set+self.target_manager.segmented_trajectory_set					
-				else:
-					# Assemble shared trajectory set. 
-					traj_length = len(self.source_manager.trajectory_set[0,:,0])
-					self.shared_trajectory_set = np.zeros((2*self.N, traj_length, self.source_manager.state_dim))
-					self.shared_trajectory_set[:self.N] = self.source_manager.trajectory_set
-					self.shared_trajectory_set[self.N:] = self.target_manager.trajectory_set		
-
-			else:
-
-				########################################
-				# Otherwise just set the shared_trajectory_set.
-				########################################
-
-				# Depending on whether we're visualizing the source or target domain
-				if viz_domain=='source':
-					embedded_zs = embedded_zs[:(embedded_zs.shape[0]//2)]
-					self.shared_trajectory_set = self.source_manager.segmented_trajectory_set					
-				elif viz_domain=='target':
-					embedded_zs = embedded_zs[(embedded_zs.shape[0]//2):]
-					self.shared_trajectory_set = self.target_manager.segmented_trajectory_set
-			
-			############################################################
-			# Now that we've set the trajectory set, plot the trajectories.
-			############################################################
-
-			# ratio = 0.4
-			# preratio = 0.01
-			preratio = 0.005
-			ratio = (embedded_zs.max()-embedded_zs.min())*preratio
-			color_scaling = 15
-			max_traj_length = 6
-			color_range_min = 0.2*color_scaling
-			color_range_max = 0.8*color_scaling+max_traj_length-1
-
-			# Randomize the order of the plot, so that one domain doesn't overwrite the other in the plot. 
-			random_range = list(range(min(embedded_zs.shape[0],len(self.shared_trajectory_set))))
-			random.shuffle(random_range)
-			
-			for i in random_range:
-				seg_traj_len = len(self.shared_trajectory_set[i])
-				ax.scatter(embedded_zs[i,0]+ratio*self.shared_trajectory_set[i][:,0],embedded_zs[i,1]+ratio*self.shared_trajectory_set[i][:,1], \
-					c=colors[i]*color_scaling+range(seg_traj_len),cmap='jet',vmin=color_range_min,vmax=color_range_max,s=15)
-
-		############################################################
-		# If we're visualizing just data points in the visualized plots. 
-		############################################################
-
-		else:
-			########################################
-			# Create a scatter plot of the embedding.
-			########################################
-
-			s = np.ones(embedded_zs.shape[0])*50
-			if viz_domain=='source':
-				s[(embedded_zs.shape[0]//2):] = 1
-				# Set target colors
-				colors[(embedded_zs.shape[0]//2):] = 0.8
-			elif viz_domain=='target':
-				s[:(embedded_zs.shape[0]//2)] = 1
-				# Set source colors
-				colors[:(embedded_zs.shape[0]//2)] = 0.2
-
-			ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors,vmin=0,vmax=1,cmap='jet',s=s)
-		
-		############################################################
-		# Now make the plot and generate numpy image from it. 
-		############################################################
-		ax.set_title("{0}".format(title),fontdict={'fontsize':15})
-		fig.canvas.draw()		
-		width, height = fig.get_size_inches() * fig.get_dpi()
-		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)		
-		image = np.transpose(image, axes=[2,0,1])
-
-		# Clear figure from memory.
-		if return_fig:
-			return fig, ax
-		else:
-			ax.clear()
-			fig.clear()
-			plt.close(fig)
-
-			return image
 
 	def compute_neighbors(self, computed_sets=False):
 		
@@ -7385,7 +7404,6 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		if counter%self.args.display_freq==0:
 			
-
 			##################################################
 			# Visualize Translated Z Trajectories.
 			##################################################
@@ -7570,7 +7588,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			translated_latent_z = self.backward_translation_model.forward(corrupted_latent_z, epsilon=self.epsilon, precomputed_b=latent_b)
 		else:
 			translated_latent_z = self.backward_translation_model.forward(latent_z, action_epsilon=self.epsilon)
-	
+		
 		return translated_latent_z
 
 	# @gpu_profile_every(1)
