@@ -1409,7 +1409,7 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 	
 	# @gpu_profile
 	# @tprofile(immediate=True)
-	def forward(self, input, epsilon, new_z_selection=True, batch_size=None, batch_trajectory_lengths=None, precomputed_b=None):
+	def forward(self, input, epsilon, new_z_selection=True, batch_size=None, batch_trajectory_lengths=None, precomputed_b=None, evaluate_z_probability=None):
 
 		##################################################
 		##################### Set A ######################
@@ -1581,10 +1581,16 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 			embed()		
 
 		if self.translation_network:
-			return sampled_z_index
+			if evaluate_z_probability is None:
+				return sampled_z_index
+			else:
+				return self.dists.log_prob(evaluate_z_probability)
 		else:
 			return sampled_z_index, sampled_b, variational_b_logprobabilities.squeeze(1), \
 		 	variational_z_logprobabilities, variational_b_probabilities.squeeze(1), variational_z_probabilities, kl_divergence, prior_loglikelihood
+
+	def get_probabilities(self, input, epsilon, precomputed_b=None, evaluate_value=None):
+		return self.forward(input, epsilon, precomputed_b=precomputed_b, evaluate_z_probability=evaluate_value)
 
 class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNetwork_Batch):
 
@@ -2067,16 +2073,16 @@ class ContinuousMLP(torch.nn.Module):
 			h3 = self.relu_activation(self.hidden_layer2(h2))
 			h4 = self.relu_activation(self.hidden_layer3(h3))
 		
-		mean_outputs = self.mean_output_layer(h4)		
-		variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(h4))+self.variance_activation_bias) + action_epsilon
+		self.mean_outputs = self.mean_output_layer(h4)		
+		self.variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(h4))+self.variance_activation_bias) + action_epsilon
 
-		noise = torch.randn_like(variance_outputs)
+		noise = torch.randn_like(self.variance_outputs)
 			
 		if greedy: 
-			action = mean_outputs
+			action = self.mean_outputs
 		else:
 			# Instead of *sampling* the action from a distribution, construct using mu + sig * eps (random noise).
-			action = mean_outputs + variance_outputs * noise
+			action = self.mean_outputs + self.variance_outputs * noise
 
 		if self.args.residual_translation:
 			return action+input
@@ -2085,6 +2091,17 @@ class ContinuousMLP(torch.nn.Module):
 
 	def reparameterized_get_actions(self, input, greedy=False, action_epsilon=0.0001):
 		return self.forward(input, greedy, action_epsilon)
+
+	def get_probabilities(self, input, evaluate_value, action_epsilon):
+
+		# Run forward to set the variance and mean values. 
+		_ = self.forward(input, action_epsilon=action_epsilon)
+
+		# Create distribution. 
+		self.dists = torch.distributions.MultivariateNormal(self.mean_outputs, torch.diag_embed(self.variance_outputs))
+		
+		# Evaluate logprobability.
+		return self.dists.log_prob(evaluate_value)
 
 class CriticMLP(torch.nn.Module):
 

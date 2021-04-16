@@ -5461,6 +5461,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				log_dict['Unweighted Z Equivariance Loss'] = self.unweighted_masked_equivariance_loss
 				log_dict['Z Equivariance Loss'] = self.equivariance_loss
 
+			if self.args.cross_domain_supervision and viz_dict['domain']==1:
+				log_dict['Unweighted Cross Domain Superivision Loss'] = self.unweighted_masked_cross_domain_supervision_loss.mean()
+				log_dict['Cross Domain Superivision Loss'] = self.cross_domain_supervision_loss
+
 		##################################################
 		# Now visualizing spaces. 
 		##################################################
@@ -6081,14 +6085,28 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.equivariance_loss = 0.
 
 		###########################################################
-		# (1e) Finally, compute total losses. 
+		# (1e) If active, compute cross domain z loss. 
+		###########################################################
+	
+		if self.args.cross_domain_supervision:
+			# Call function to compute this. # This function depends on whether we have a translation model or not.. 
+			self.unweighted_unmasked_cross_domain_supervision_loss = self.compute_cross_domain_supervision_loss(update_dictionary)
+			# Now mask using batch mask.			
+			self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
+			# Now weight.
+			self.cross_domain_supervision_loss = self.args.cross_domain_supervision_loss_weight*self.unweighted_masked_cross_domain_supervision_loss		
+		else:
+			self.cross_domain_supervision_loss = 0.
+
+		###########################################################
+		# (1f) Finally, compute total losses. 
 		###########################################################
 
 		# Total discriminability loss. 
 		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss 
 
 		# Total encoder loss: 
-		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.equivariance_loss
+		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.equivariance_loss + self.cross_domain_supervision_loss
 
 		if not(self.skip_vae):
 			# Go backward through the generator (encoder / decoder), and take a step. 
@@ -7591,6 +7609,20 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		
 		return translated_latent_z
 
+	def compute_cross_domain_supervision_loss(self, update_dictionary):
+
+		# Basically feed in the predicted zs from the translation model, and get likelihoods of the zs from the target domain. 
+		# This can be used as a loss function or as an evaluation metric. 
+		if self.args.recurrent_translation:			
+			unweighted_unmasked_cross_domain_supervision_loss = -self.backward_translation_model.get_probabilities(update_dictionary['translated_latent_z'], epsilon=self.epsilon, precomputed_b=update_dictionary['latent_b'], evaluate_value=update_dictionary['cross_domain_latent_z'])
+		else:
+			unweighted_unmasked_cross_domain_supervision_loss = -self.backward_translation_model.get_probabilities(update_dictionary['translated_latent_z'], action_epsilon=self.epsilon, evaluate_value=update_dictionary['cross_domain_latent_z'])
+
+		# # Clamp these values. 
+		# torch.clamp(unmasked_learnt_subpolicy_loglikelihoods,min=self.args.subpolicy_clamp_value)
+
+		return unweighted_unmasked_cross_domain_supervision_loss
+
 	# @gpu_profile_every(1)
 	def run_iteration(self, counter, i, domain=None):
 		
@@ -7687,6 +7719,21 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				update_dictionary['z_trajectory'] = update_dictionary['translated_latent_z']
 			else:
 				viz_dict = {}
+
+			#################################################
+			## (4c) If we are using cross domain supervision.
+			#################################################
+
+			if self.args.cross_domain_supervision:
+
+				# Get opposite domain policy manager.
+				target_policy_manager = self.get_domain_manager(1-domain)
+				# Feed in trajectory.
+				cross_domain_input_dict, cross_domain_var_dict, cross_domain_eval_dict = self.encode_decode_trajectory(target_policy_manager, i)
+				# Log cross domain latent z in update dictionary. 
+				update_dictionary['cross_domain_latent_z'] = cross_domain_var_dict['latent_z_indices']
+				# also log b's.
+				update_dictionary['latent_b'] = source_var_dict['latent_b']
 
 			#################################################
 			## (5) Compute and apply gradient updates. 			
