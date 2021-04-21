@@ -3109,11 +3109,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# Set N:
 		self.N = 100
 
-		# DEBUG TOY ALIGNMENT....
-		# self.N = 1000
-
-		# Commenting this out now that's its run so we don't accidentally do this. ..
-
 		# We're going to store 3 sets of things. 
 		# (1) The contextual skill embeddings of the latent_z's. 
 		# (2) The full trajectory in which the skill is executed, so we can visualize this skill in context.
@@ -5612,10 +5607,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# 	std = latent_z_set.std(axis=0)
 		# 	normed_z = (latent_z_set-mean)/std
 		
-		# Just normalize z's.
-		mean = latent_z_set.mean(axis=0)
-		std = latent_z_set.std(axis=0)
-		normed_z = (latent_z_set-mean)/std
+		# # Just normalize z's.
+		# mean = latent_z_set.mean(axis=0)
+		# std = latent_z_set.std(axis=0)
+		# normed_z = (latent_z_set-mean)/std
+
+		# ASSUME ALREADY NORMALIZED! 
 
 		if projection=='tsne':
 			# Use TSNE to project the data:
@@ -5649,7 +5646,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.N = self.source_manager.N
 		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed']:
 			self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
-			self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)
+			self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)			
+			# First, normalize the sets.. 
+			self.source_latent_zs = (self.source_latent_zs-self.source_z_mean)/self.source_z_std
+			self.target_latent_zs = (self.target_latent_zs-self.target_z_mean)/self.target_z_std
+
 			# These are the same z's... this object just retains sequence info. Should be able to find some indexing of concatenate...? 
 			self.source_z_trajectory_set = self.source_manager.latent_z_set
 			self.target_z_trajectory_set = self.target_manager.latent_z_set
@@ -5657,6 +5658,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		else:
 			self.source_latent_zs = self.source_manager.latent_z_set
 			self.target_latent_zs = self.target_manager.latent_z_set
+			# First, normalize the sets.. 
+			self.source_latent_zs = (self.source_latent_zs-self.source_z_mean)/self.source_z_std
+			self.target_latent_zs = (self.target_latent_zs-self.target_z_mean)/self.target_z_std
+
 
 		# Try something
 		self.source_latent_zs = self.source_latent_zs[:500]
@@ -6437,13 +6442,15 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		max_batch_domain = 1
 		max_batch_index = self.get_domain_manager(max_batch_domain).max_batch_size_index		
 
+		# Now compute statistics. 
+		self.counter = 0 
+		self.set_iteration(self.counter)
+		self.compute_z_statistics()
+
 		# Now actually run iteration of the joint transfer / joint embed transfer with these specal indices.
 		counter = 0
 		print("Running initializing iteration.")
 		self.run_iteration(counter, max_batch_index, domain=max_batch_domain)
-
-		# Now compute statistics. 
-		self.compute_z_statistics()
 
 	def compute_z_statistics(self):
 
@@ -7440,9 +7447,10 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				self.source_latent_zs = np.concatenate(self.source_z_seq_set)
 				self.target_latent_zs = np.concatenate(self.translated_z_seq_set)
 		else:
-
-			normed_z_input = (torch.tensor(self.original_target_latent_z_set).to(device).float()-self.target_z_mean)/self.target_z_std
-			self.target_latent_zs = self.backward_translation_model.forward(normed_z_input).detach().cpu().numpy()
+			self.target_latent_zs = self.backward_translation_model.forward(torch.tensor(self.original_target_latent_z_set).to(device).float()).detach().cpu().numpy()
+			# Switching to using the source statistics here, because once we start using discriminability,
+			# We want to be normalizing them the same..
+			self.target_latent_zs = (self.target_latent_zs-self.source_z_mean)/self.source_z_std
 
 		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
 
@@ -7645,7 +7653,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		return latent_z_transformation_vector, latent_z_transformation_weights, padded_latent_z_diff
 		# return latent_z_transformation_vector.view(-1,2*self.args.z_dimensions), latent_z_transformation_weights.view(-1,1)
 
-	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False):
+	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False, domain=None):
 
 		# Check if the index is too big. If yes, just sample randomly.		
 		if i >= len(policy_manager.dataset):
@@ -7655,6 +7663,13 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# Since the joint training manager nicely lets us get dictionaries, just use it, but remember not to train. 
 		# This does all the steps we need.
 		source_input_dict, source_var_dict, source_eval_dict = policy_manager.run_iteration(self.counter, i, return_dicts=True, train=False)
+
+		if self.args.z_normalization:
+			if domain==0:
+				source_var_dict['latent_z_indices'] = (source_var_dict['latent_z_indices']-self.source_z_mean)/self.source_z_std
+			else:
+				source_var_dict['latent_z_indices'] = (source_var_dict['latent_z_indices']-self.target_z_mean)/self.target_z_std
+
 		return source_input_dict, source_var_dict, source_eval_dict
 
 	def translate_latent_z(self, latent_z, latent_b):
@@ -7667,11 +7682,12 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 			# Use the corrupted_latent_z instead of the original.
 			translated_latent_z = self.backward_translation_model.forward(corrupted_latent_z, epsilon=self.epsilon, precomputed_b=latent_b)
-		else:
+		else:			
+			translated_latent_z = self.backward_translation_model.forward(latent_z, action_epsilon=self.epsilon)
 
-			normed_z_input = (latent_z - self.target_z_mean)/self.target_z_std
-			translated_latent_z = self.backward_translation_model.forward(normed_z_input, action_epsilon=self.epsilon)
-		
+		# Now normalizing translated latent z. 
+		translated_latent_z = (translated_latent_z-self.source_z_mean)/self.source_z_std
+
 		return translated_latent_z
 
 	def compute_cross_domain_supervision_loss(self, update_dictionary):
@@ -7680,9 +7696,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# This can be used as a loss function or as an evaluation metric. 
 
 		# Gather Z statistics.
-		detached_z = (update_dictionary['latent_z'].detach() - self.target_z_mean)/self.target_z_std
-		cross_domain_z = (update_dictionary['cross_domain_latent_z'] - self.source_z_mean)/self.source_z_std
-		detached_cross_domain_z = cross_domain_z.detach()
+		detached_z = update_dictionary['latent_z'].detach()
+		cross_domain_z = update_dictionary['cross_domain_latent_z'].detach()
 
 		###############################################		
 
@@ -7744,9 +7759,10 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		#################################################
 
 		update_dictionary = {}
-		source_input_dict, source_var_dict, source_eval_dict = self.encode_decode_trajectory(policy_manager, i)
+		source_input_dict, source_var_dict, source_eval_dict = self.encode_decode_trajectory(policy_manager, i, domain=domain)
 		update_dictionary['subpolicy_inputs'], update_dictionary['latent_z'], update_dictionary['loglikelihood'], update_dictionary['kl_divergence'] = \
 			source_eval_dict['subpolicy_inputs'], source_var_dict['latent_z_indices'], source_eval_dict['learnt_subpolicy_loglikelihoods'], source_var_dict['kl_divergence']
+		
 
 		if update_dictionary['latent_z'] is not None:
 
@@ -7810,7 +7826,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				# Get opposite domain policy manager.
 				target_policy_manager = self.get_domain_manager(1-domain)
 				# Feed in trajectory.
-				cross_domain_input_dict, cross_domain_var_dict, cross_domain_eval_dict = self.encode_decode_trajectory(target_policy_manager, i)
+				cross_domain_input_dict, cross_domain_var_dict, cross_domain_eval_dict = self.encode_decode_trajectory(target_policy_manager, i, domain=1-domain)
 				# Log cross domain latent z in update dictionary. 
 				update_dictionary['cross_domain_latent_z'] = cross_domain_var_dict['latent_z_indices']
 				# also log b's.
@@ -8336,4 +8352,3 @@ class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 
 		# Encode decode function: First encodes, takes trajectory segment, and outputs latent z. The latent z is then provided to decoder (along with initial state), and then we get SOURCE domain subpolicy inputs. 
 		# Cross domain decoding function: Takes encoded latent z (and start state), and then rolls out with target decoder. Function returns, target trajectory, action sequence, and TARGET domain subpolicy inputs. 
-
