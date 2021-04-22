@@ -5606,13 +5606,16 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# 	mean = latent_z_set.mean(axis=0)
 		# 	std = latent_z_set.std(axis=0)
 		# 	normed_z = (latent_z_set-mean)/std
-		
-		# # Just normalize z's.
-		# mean = latent_z_set.mean(axis=0)
-		# std = latent_z_set.std(axis=0)
-		# normed_z = (latent_z_set-mean)/std
 
-		# ASSUME ALREADY NORMALIZED! 
+		if self.args.z_normalization:
+			# ASSUME ALREADY NORMALIZED! 
+			normed_z = latent_z_set
+		else:
+			# Just normalize z's.
+			mean = latent_z_set.mean(axis=0)
+			std = latent_z_set.std(axis=0)
+			normed_z = (latent_z_set-mean)/std
+
 
 		if projection=='tsne':
 			# Use TSNE to project the data:
@@ -5648,8 +5651,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
 			self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)			
 			# First, normalize the sets.. 
-			self.source_latent_zs = (self.source_latent_zs-self.source_z_mean)/self.source_z_std
-			self.target_latent_zs = (self.target_latent_zs-self.target_z_mean)/self.target_z_std
+
+			self.source_latent_zs = (self.source_latent_zs-self.source_z_mean.detach().cpu().numpy())/self.source_z_std.detach().cpu().numpy()
+			self.target_latent_zs = (self.target_latent_zs-self.target_z_mean.detach().cpu().numpy())/self.target_z_std.detach().cpu().numpy()
 
 			# These are the same z's... this object just retains sequence info. Should be able to find some indexing of concatenate...? 
 			self.source_z_trajectory_set = self.source_manager.latent_z_set
@@ -5659,8 +5663,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.source_latent_zs = self.source_manager.latent_z_set
 			self.target_latent_zs = self.target_manager.latent_z_set
 			# First, normalize the sets.. 
-			self.source_latent_zs = (self.source_latent_zs-self.source_z_mean)/self.source_z_std
-			self.target_latent_zs = (self.target_latent_zs-self.target_z_mean)/self.target_z_std
+			self.source_latent_zs = (self.source_latent_zs-self.source_z_mean.detach().cpu().numpy())/self.source_z_std.detach().cpu().numpy()
+			self.target_latent_zs = (self.target_latent_zs-self.target_z_mean.detach().cpu().numpy())/self.target_z_std.detach().cpu().numpy()
 
 
 		# Try something
@@ -6467,7 +6471,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		mean_counter = 0
 		
 		if self.args.z_normalization is None:
-			pass
+			self.source_z_std = torch.ones((self.args.z_dimensions)).to(device).float()
+			self.target_z_std = torch.ones((self.args.z_dimensions)).to(device).float()
 		else:
 			print("Computing Z Statistics.")
 			with torch.no_grad():
@@ -6482,11 +6487,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					self.old_source_mean = self.source_z_mean.clone().detach()
 					self.old_target_mean = self.target_z_mean.clone().detach()
 
-					_ , source_var_dict, _ = self.encode_decode_trajectory(self.source_manager, i)
+					_ , source_var_dict, _ = self.encode_decode_trajectory(self.source_manager, i, domain=0, initialize_run=True)
 					self.source_z_mean = self.source_z_mean + (source_var_dict['latent_z_indices'].mean(axis=(0,1)) - self.source_z_mean)/mean_counter
 					self.source_z_var = self.source_z_var + ((source_var_dict['latent_z_indices'].mean(axis=(0,1)) - self.old_source_mean)*(source_var_dict['latent_z_indices'].mean(axis=(0,1))-self.source_z_mean)-self.source_z_var)/mean_counter
 
-					_ , target_var_dict, _ = self.encode_decode_trajectory(self.target_manager, i)
+					_ , target_var_dict, _ = self.encode_decode_trajectory(self.target_manager, i, domain=1, initialize_run=True)
 					self.target_z_mean = self.target_z_mean + (target_var_dict['latent_z_indices'].mean(axis=(0,1)) - self.target_z_mean)/mean_counter
 					self.target_z_var = self.target_z_var + ((target_var_dict['latent_z_indices'].mean(axis=(0,1)) - self.old_target_mean)*(target_var_dict['latent_z_indices'].mean(axis=(0,1))-self.target_z_mean)-self.target_z_var)/mean_counter
 		
@@ -6498,6 +6503,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.joint_z_var = ((self.source_z_var+self.source_z_mean**2) + (self.target_z_var+self.target_z_mean**2))/2 - self.joint_z_mean**2
 
 			self.joint_z_std = torch.sqrt(self.joint_z_var)		
+
+		if self.args.z_normalization=='global':
+
+			self.source_z_mean = self.joint_z_mean
+			self.target_z_mean = self.joint_z_mean
+			self.source_z_std = self.joint_z_std
+			self.target_z_std = self.joint_z_std
 		
 	def train(self, model=None):
 
@@ -7450,7 +7462,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			self.target_latent_zs = self.backward_translation_model.forward(torch.tensor(self.original_target_latent_z_set).to(device).float()).detach().cpu().numpy()
 			# Switching to using the source statistics here, because once we start using discriminability,
 			# We want to be normalizing them the same..
-			self.target_latent_zs = (self.target_latent_zs-self.source_z_mean)/self.source_z_std
+			self.target_latent_zs = (self.target_latent_zs-self.source_z_mean.detach().cpu().numpy())/self.source_z_std.detach().cpu().numpy()
 
 		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
 
@@ -7653,7 +7665,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		return latent_z_transformation_vector, latent_z_transformation_weights, padded_latent_z_diff
 		# return latent_z_transformation_vector.view(-1,2*self.args.z_dimensions), latent_z_transformation_weights.view(-1,1)
 
-	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False, domain=None):
+	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False, domain=None, initialize_run=False):
 
 		# Check if the index is too big. If yes, just sample randomly.		
 		if i >= len(policy_manager.dataset):
@@ -7664,7 +7676,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# This does all the steps we need.
 		source_input_dict, source_var_dict, source_eval_dict = policy_manager.run_iteration(self.counter, i, return_dicts=True, train=False)
 
-		if self.args.z_normalization:
+		if self.args.z_normalization and not(initialize_run):
 			if domain==0:
 				source_var_dict['latent_z_indices'] = (source_var_dict['latent_z_indices']-self.source_z_mean)/self.source_z_std
 			else:

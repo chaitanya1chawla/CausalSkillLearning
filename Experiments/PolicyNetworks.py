@@ -2052,7 +2052,7 @@ class ContinuousMLP(torch.nn.Module):
 		self.input_layer = torch.nn.Linear(self.input_size, self.hidden_size)
 		self.hidden_layer1 = torch.nn.Linear(self.hidden_size, self.hidden_size)
 		self.hidden_layer2 = torch.nn.Linear(self.hidden_size, self.hidden_size)
-		self.hidden_layer3 = torch.nn.Linear(self.hidden_size, self.hidden_size)		
+		self.hidden_layer3 = torch.nn.Linear(self.hidden_size, self.hidden_size)	
 		self.mean_output_layer = torch.nn.Linear(self.hidden_size,self.output_size)
 		self.variances_output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
 		self.variance_factor = 0.01
@@ -2066,15 +2066,16 @@ class ContinuousMLP(torch.nn.Module):
 
 		# Assumes input is Batch_Size x Input_Size.			
 		if self.args.small_translation_model:
-			h4 = self.input_layer(input)
+			final_layer = self.input_layer(input)
 		else:		
 			h1 = self.relu_activation(self.input_layer(input))
 			h2 = self.relu_activation(self.hidden_layer1(h1))
 			h3 = self.relu_activation(self.hidden_layer2(h2))
 			h4 = self.relu_activation(self.hidden_layer3(h3))
+			final_layer = h4
 		
-		self.mean_outputs = self.mean_output_layer(h4)		
-		self.variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(h4))+self.variance_activation_bias) + action_epsilon
+		self.mean_outputs = self.mean_output_layer(final_layer)		
+		self.variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(final_layer))+self.variance_activation_bias) + action_epsilon
 
 		noise = torch.randn_like(self.variance_outputs)
 			
