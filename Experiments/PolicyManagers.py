@@ -6102,6 +6102,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		###########################################################
 		# (1d) If active, compute equivariance loss. 
 		###########################################################
+		
 		if self.args.equivariance:
 			self.unweighted_unmasked_equivariance_loss = self.compute_equivariance_loss(update_dictionary)
 			# Now mask by the same temporal masks that we used for the discriminability versions of this idea. 
@@ -6990,12 +6991,12 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# Encode decode function: First encodes, takes trajectory segment, and outputs latent z. The latent z is then provided to decoder (along with initial state), and then we get SOURCE domain subpolicy inputs. 
 		# Cross domain decoding function: Takes encoded latent z (and start state), and then rolls out with target decoder. Function returns, target trajectory, action sequence, and TARGET domain subpolicy inputs. 
 
-class PolicyManager_FixEmbedCycleConTransfer(PolicyManager_CycleConsistencyTransfer):
+class PolicyManager_FixEmbedCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 	
 	# Inherit from cycle con transfer. 
 	def __init__(self, args=None, source_dataset=None, target_dataset=None):
 
-		super(PolicyManager_FixEmbedCycleConTransfer, self).__init__(args, source_dataset, target_dataset)
+		super(PolicyManager_FixEmbedCycleTransfer, self).__init__(args, source_dataset, target_dataset)
 
 		# if self.args.source_model is not None:
 		# 	self.source_manager.load_all_models(self.args.source_model)
@@ -7431,7 +7432,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# Now make sure VAE loss weight is set to 0, because we can ignore the reconstruction losses in this setting.
 		self.vae_loss_weight = 0.
 
-	def set_translated_z_sets_recurrent_translation(self):
+	def set_translated_z_sets_recurrent_translation(self, domain=1):
 
 		# For the recurrent model setting, special translation...
 		# self.target_latent_zs = self.backward_translation_model.forward(torch.tensor(self.original_target_latent_z_set, epsilon=0.0001, precomputed_b=).to(device).float()).detach().cpu().numpy()
@@ -7458,7 +7459,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				distinct_source_zs = self.source_manager.full_latent_z_trajectory[k][distinct_z_indices,b].clone().detach().cpu().numpy()
 				self.source_z_seq_set.append(distinct_source_zs)
 
-	def set_translated_z_sets(self):
+	def set_translated_z_sets(self, domain=1):
 
 		self.viz_dictionary = {}
 		# First copy sets so we don't accidentally perform in-place operations on any of the computed sets.
@@ -7466,53 +7467,63 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.original_source_latent_z_set = copy.deepcopy(self.source_latent_zs)
 		self.original_target_latent_z_set = copy.deepcopy(self.target_latent_zs)
 
-		############################################################
-		# First use original source latent set, and translated target latent set. 		
-		############################################################
-		
-		# First translate the target z's. 
-		if self.args.recurrent_translation:
-			# self.target_latent_zs = self.backward_translation_model.forward(torch.tensor(self.original_target_latent_z_set, epsilon=0.0001, precomputed_b=).to(device).float()).detach().cpu().numpy()
-			with torch.no_grad():
-				self.set_translated_z_sets_recurrent_translation()
-				self.source_latent_zs = np.concatenate(self.source_z_seq_set)
-				self.target_latent_zs = np.concatenate(self.translated_z_seq_set)
+		if domain==1:
+			############################################################
+			# Use original source latent set, and translated target latent set. 		
+			############################################################
+			
+			# First translate the target z's. 
+			if self.args.recurrent_translation:
+				# self.target_latent_zs = self.backward_translation_model.forward(torch.tensor(self.original_target_latent_z_set, epsilon=0.0001, precomputed_b=).to(device).float()).detach().cpu().numpy()
+				with torch.no_grad():
+					self.set_translated_z_sets_recurrent_translation()
+					self.source_latent_zs = np.concatenate(self.source_z_seq_set)
+					self.target_latent_zs = np.concatenate(self.translated_z_seq_set)
+			else:						
+				self.target_latent_zs = self.backward_translation_model.forward(torch.tensor(self.original_target_latent_z_set).to(device).float()).detach().cpu().numpy()
+
+			self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
+
+			# Get embeddings of source, and backward translated target latent_zs. 			
+			_ , self.viz_dictionary['tsne_transtarget_p30'], self.viz_dictionary['tsne_origsource_transtarget_p05'], self.viz_dictionary['tsne_origsource_transtarget_p10'], self.viz_dictionary['tsne_origsource_transtarget_p30'], \
+				self.viz_dictionary['tsne_origsource_transtarget_traj_p05'], self.viz_dictionary['tsne_origsource_transtarget_traj_p10'], self.viz_dictionary['tsne_origsource_transtarget_traj_p30'] = \
+					self.get_embeddings(projection='tsne', computed_sets=True)
+			# Also set target traj image
+
+			if self.check_toy_dataset():
+				self.viz_dictionary['tsne_transtarget_traj_p30'] = self.target_traj_image
 		else:
-			self.target_latent_zs = self.backward_translation_model.forward(torch.tensor(self.original_target_latent_z_set).to(device).float()).detach().cpu().numpy()
-			# Switching to using the source statistics here, because once we start using discriminability,
-			# We want to be normalizing them the same..
-			self.target_latent_zs = (self.target_latent_zs-self.source_z_mean.detach().cpu().numpy())/self.source_z_std.detach().cpu().numpy()
+			
+			############################################################
+			# Now use original target latent set, and translated source latent set. 
+			############################################################
 
-		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
+			# First translate the target z's. 
+			# ASSUME WE AREN'T USING RECURRENT TRANSLATION
+			if self.args.recurrent_translation:				
+				with torch.no_grad():
+					self.set_translated_z_sets_recurrent_translation(domain=domain)
+					self.source_latent_zs = np.concatenate(self.translated_z_seq_set)
+					self.target_latent_zs = np.concatenate(self.target_z_seq_set)
+			else:						
+				self.source_latent_zs = self.forward_translation_model.forward(torch.tensor(self.original_source_latent_z_set).to(device).float()).detach().cpu().numpy()
 
-		# Get embeddings of source, and backward translated target latent_zs. 			
-		_ , self.viz_dictionary['tsne_transtarget_p30'], self.viz_dictionary['tsne_origsource_transtarget_p05'], self.viz_dictionary['tsne_origsource_transtarget_p10'], self.viz_dictionary['tsne_origsource_transtarget_p30'], \
-			self.viz_dictionary['tsne_origsource_transtarget_traj_p05'], self.viz_dictionary['tsne_origsource_transtarget_traj_p10'], self.viz_dictionary['tsne_origsource_transtarget_traj_p30'] = \
-				self.get_embeddings(projection='tsne', computed_sets=True)
-		# Also set target traj image
+			self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
 
-		if self.check_toy_dataset():
-			self.viz_dictionary['tsne_transtarget_traj_p30'] = self.target_traj_image
+			# # Get embeddings of forward translated source, and original target latent_zs. 	
+			# ############################################################
+			self.viz_dictionary['tsne_transsource_p30'] , _ , self.viz_dictionary['tsne_transsource_origtarget_p05'], self.viz_dictionary['tsne_transsource_origtarget_p10'], self.viz_dictionary['tsne_transsource_origtarget_p30'], \
+				self.viz_dictionary['tsne_transsource_origtarget_traj_p05'], self.viz_dictionary['tsne_transsource_origtarget_traj_p10'], self.viz_dictionary['tsne_transsource_origtarget_traj_p30'] = \
+					self.get_embeddings(projection='tsne', computed_sets=True)
 
-		# Comment out this block because we're not using it. 
-		# ############################################################
-		# # Now use original target latent set, and translated source latent set. 
-
-		# # Now reset the target latent zs, and translate the source latent zs.
-		# self.target_latent_zs = copy.deepcopy(self.original_target_latent_zs)
-		# self.source_latent_zs = self.forward_translation_model.forward(torch.tensor(self.original_source_latent_z_set).to(device).float()).detach().cpu().numpy()
-		# self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
-
-		# # Get embeddings of forward translated source, and original target latent_zs. 	
-		# ############################################################
-		# _ , _ , self.viz_dictionary['tsne_transsource_origtarget_p05'], self.viz_dictionary['tsne_transsource_origtarget_p10'], self.viz_dictionary['tsne_transsource_origtarget_p30'], \
-		# 	self.viz_dictionary['tsne_transsource_origtarget_traj_p05'], self.viz_dictionary['tsne_transsource_origtarget_traj_p10'], self.viz_dictionary['tsne_transsource_origtarget_traj_p30'] = \
-		# 		self.get_embeddings(projection='tsne', computed_sets=True)
+			# Also set target traj image
+			if self.check_toy_dataset():
+				self.viz_dictionary['tsne_transsource_traj_p30'] = self.source_traj_image
 
 		self.z_last_set_by = 'set_translated_z_sets'
 		self.set_trans_z +=1
 
-	def update_plots(self, counter, viz_dict):
+	def update_plots(self, counter, viz_dict, log=False):
 
 		# Call super update plots for the majority of the work. Call this with log==false to make sure that wandb only logs things we add in this function. 
 		# print("Run Super Plots")
@@ -7558,7 +7569,10 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p10'])
 				# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p30'])
 
-		wandb.log(log_dict, step=counter)
+		if log:
+			wandb.log(log_dict, step=counter)
+		else:
+			return log_dict
 
 	def create_networks(self):
 		
@@ -7577,6 +7591,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		# Create list of translation models to select from based on source domain.
 		# self.translation_model_list = [self.forward_translation_model, self.backward_translation_model]
+		
+		# Create fake list now, that references the backward translation model... since this should only be used when domain = 1
+		self.translation_model_list = [None, self.backward_translation_model]
 
 		# Instead of single z discriminator, require two different z discriminators. 
 		# Just use the self.discriminator_network for now.
@@ -7703,8 +7720,10 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		return source_input_dict, source_var_dict, source_eval_dict
 
-	def translate_latent_z(self, latent_z, latent_b):
+	def translate_latent_z(self, latent_z, latent_b, domain=1):
 		
+		# Here, domain is the domain they're translating "FROM"
+
 		# Translate Z. 	
 		if self.args.recurrent_translation:
 			
@@ -7712,16 +7731,16 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			corrupted_latent_z = self.corrupt_inputs(latent_z)
 
 			# Use the corrupted_latent_z instead of the original.
-			translated_latent_z = self.backward_translation_model.forward(corrupted_latent_z, epsilon=self.translated_z_epsilon, precomputed_b=latent_b)
+			translated_latent_z = self.translation_model_list[domain].forward(corrupted_latent_z, epsilon=self.translated_z_epsilon, precomputed_b=latent_b)
 		else:			
-			translated_latent_z = self.backward_translation_model.forward(latent_z, action_epsilon=self.translated_z_epsilon)
+			translated_latent_z = self.translation_model_list[domain].forward(corrupted_latent_z, epsilon=self.translated_z_epsilon)
 
 		# Now normalizing translated latent z. 
 		translated_latent_z = (translated_latent_z-self.source_z_mean)/self.source_z_std
 
 		return translated_latent_z
 
-	def compute_cross_domain_supervision_loss(self, update_dictionary):
+	def compute_cross_domain_supervision_loss(self, update_dictionary, domain=1):
 
 		# Basically feed in the predicted zs from the translation model, and get likelihoods of the zs from the target domain. 
 		# This can be used as a loss function or as an evaluation metric. 
@@ -7730,12 +7749,12 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		detached_z = update_dictionary['latent_z'].detach()
 		cross_domain_z = update_dictionary['cross_domain_latent_z'].detach()
 
-		###############################################		
-
+		###############################################	
+		
 		if self.args.recurrent_translation:	
-			unweighted_unmasked_cross_domain_supervision_loss = -self.backward_translation_model.get_probabilities(detached_z, epsilon=self.translated_z_epsilon, precomputed_b=update_dictionary['latent_b'], evaluate_value=cross_domain_z)
+			unweighted_unmasked_cross_domain_supervision_loss = - self.translation_model_list[domain].get_probabilities(detached_z, epsilon=self.translated_z_epsilon, precomputed_b=update_dictionary['latent_b'], evaluate_value=cross_domain_z)
 		else:
-			unweighted_unmasked_cross_domain_supervision_loss = -self.backward_translation_model.get_probabilities(detached_z, action_epsilon=self.translated_z_epsilon, evaluate_value=cross_domain_z)
+			unweighted_unmasked_cross_domain_supervision_loss = - self.translation_model_list[domain].get_probabilities(detached_z, action_epsilon=self.translated_z_epsilon, evaluate_value=cross_domain_z)
 
 		###############################################
 
@@ -7877,15 +7896,13 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			viz_dict['domain'] = domain
 			viz_dict['discriminator_probs'] = discriminator_prob[...,domain].detach().cpu().numpy().mean()
 
-			# print("Run update plots.")
 			self.update_plots(counter, viz_dict)
-			# print("Finish update plots.")
 
-class PolicyManager_JointFixEmbedCycleConTransfer(PolicyManager_JointFixEmbedTransfer):
+class PolicyManager_JointFixEmbedCycleTransfer(PolicyManager_JointFixEmbedTransfer):
 
 	def __init__(self, args=None, source_dataset=None, target_dataset=None):
 
-		super(PolicyManager_JointFixEmbedCycleConTransfer, self).__init__(args, source_dataset, target_dataset)
+		super(PolicyManager_JointFixEmbedCycleTransfer, self).__init__(args, source_dataset, target_dataset)
 
 	def create_networks(self):
 		
@@ -7958,6 +7975,194 @@ class PolicyManager_JointFixEmbedCycleConTransfer(PolicyManager_JointFixEmbedTra
 
 		# # Create common optimizer for source, target, and discriminator networks. 
 		# self.discriminator_optimizer = torch.optim.Adam(self.discriminator_parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
+
+	def save_all_models(self, suffix):
+
+		self.logdir = os.path.join(self.args.logdir, self.args.name)
+		self.savedir = os.path.join(self.logdir,"saved_models")
+		if not(os.path.isdir(self.savedir)):
+			os.mkdir(self.savedir)
+
+		self.save_object = {}
+
+		self.save_object['forward_translation_model'] = self.forward_translation_model.state_dict()
+		self.save_object['backward_translation_model'] = self.backward_translation_model.state_dict()
+
+		self.save_object['source_z_discriminator'] = self.source_z_discriminator.state_dict()
+		self.save_object['target_z_discriminator'] = self.target_z_discriminator.state_dict()
+		
+		if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:		
+			self.save_object['source_z_trajectory_discriminator'] = self.z_trajectory_discriminator.state_dict()
+			self.save_object['target_z_trajectory_discriminator'] = self.z_trajectory_discriminator.state_dict()
+
+		# Overwrite the save from super. 
+		torch.save(self.save_object,os.path.join(self.savedir,"Model_"+suffix))
+
+	def load_all_models(self, path):
+		self.load_object = torch.load(path)
+
+		# Load translation model.
+		self.forward_translation_model.load_state_dict(self.load_object['forward_translation_model'])
+		self.backward_translation_model.load_state_dict(self.load_object['backward_translation_model'])
+
+		self.source_discriminator_network.load_state_dict(self.load_object['source_z_discriminator'])
+		self.target_discriminator_network.load_state_dict(self.load_object['target_z_discriminator'])
+
+		if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
+			self.source_z_trajectory_discriminator.load_state_dict(self.load_object['source_z_trajectory_discriminator'])
+			self.target_z_trajectory_discriminator.load_state_dict(self.load_object['target_z_trajectory_discriminator'])
+
+	def update_plots(self, counter, viz_dict):
+
+		# Call super update plots for the majority of the work. Call this with log==false to make sure that wandb only logs things we add in this function. 
+		log_dict = super().update_plots(counter, viz_dict, log=False)
+		domain= viz_dict['domain']
+
+		############################################################
+		# Now implement visualization of original latent set and translated z space in both directions. 
+		############################################################	
+
+		if counter%self.args.display_freq==0:
+			
+			##################################################
+			# Visualize Translated Z Trajectories.
+			##################################################
+
+			self.set_translated_z_sets(domain=domain)
+
+			log_dict['Source Z Trajectory JointTranslated TSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_tsne_image)
+			log_dict['Target Z Trajectory JointTranslated TSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_tsne_image)
+			log_dict['Source Z Trajectory JointTranslated PCA Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_pca_image)
+			# log_dict['Target Z Trajectory JointTranslated PCA Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_pca_image)
+
+			##################################################
+			# Now log combined source and translated target visualizations, and if we want, target and translated source.
+			##################################################
+
+			log_dict["TSNE Translated Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transtarget_p30'])	
+
+			# log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p05'])
+			# log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p10'])
+			# log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p30'])
+			log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p05'])
+			log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p10'])
+			log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p30'])
+
+			if self.check_toy_dataset():					
+				log_dict["TSNE Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transtarget_traj_p30'])
+
+				# log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p05'])
+				# log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p10'])
+				# log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p30'])
+				log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p05'])
+				log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p10'])
+				log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p30'])
+
+		if log:
+			wandb.log(log_dict, step=counter)
+		else:
+			return log_dict
+
+	def update_networks(self):
+
+	def run_iteration(self, counter, i, domain=None):
+
+		#################################################
+		## Algorithm:
+		#################################################
+		# For every epoch:
+		# 	# For every datapoint: 
+		# 		# 0) Setup things like training phases, epsilon values, etc.
+		# 		# 1) Select which domain to use (source or target, i.e. with 50% chance, select either domain).
+		# 		# 2) Get batch of trajectories from desired domain; Encode trajectories into sequence of latent z's and compute likelihood of trajectory actions under the decoder.		
+		# 		# 3) (If supervised) Get the sequence of latent z's this batch of trajectories is encoded as under the target domain encoder. 
+		# 		# 4) Translate this sequence of latent z's to the target domain. 
+		# 		# 5) Back-translate the translated latent z's to the source domain.
+		# 		# 6) Feed into discriminator, get likelihood of real / translated. 
+		#			# Remember, this mode is slightly different. The discriminator(s) are strictly speaking not differentiating between the domains themselves, 
+		# 			# but original and translated versions of zs in each domain,. Remember this when selecting discriminator inputs. 		
+		# 		# 7) Compute and apply gradient updates. 
+		#		# 8) Update plots. 
+		#################################################
+
+		#################################################
+		## (0) Setup things like training phases, epsilon values, etc.
+		#################################################
+
+		self.set_iteration(counter)		
+
+		#################################################
+		## (1) Select which domain to run on; also supervision of discriminator.
+		#################################################
+
+		# Use same domain across batch for simplicity. 
+		if domain is None:
+			domain = np.random.binomial(1,0.5)
+			
+		self.counter = counter
+		policy_manager = self.get_domain_manager(domain)
+
+		#################################################	
+		## (2) Get batch of trajectories, encode and decode.
+		#################################################
+
+		update_dictionary = {}
+		source_input_dict, source_var_dict, source_eval_dict = self.encode_decode_trajectory(policy_manager, i, domain=domain)
+		update_dictionary['subpolicy_inputs'], update_dictionary['latent_z'], update_dictionary['loglikelihood'], update_dictionary['kl_divergence'] = \
+			source_eval_dict['subpolicy_inputs'], source_var_dict['latent_z_indices'], source_eval_dict['learnt_subpolicy_loglikelihoods'], source_var_dict['kl_divergence']
+		
+		if update_dictionary['latent_z'] is not None:
+			
+			#################################################	
+			## (3) (If supervised) Get target sequence of latent z's of this batch of trajectories.
+			#################################################
+
+			if self.args.cross_domain_supervision:
+
+				# Get opposite domain policy manager.
+				target_policy_manager = self.get_domain_manager(1-domain)
+				# Feed in trajectory.
+				cross_domain_input_dict, cross_domain_var_dict, cross_domain_eval_dict = self.encode_decode_trajectory(target_policy_manager, i, domain=1-domain)
+				# Log cross domain latent z in update dictionary. 
+				update_dictionary['cross_domain_latent_z'] = cross_domain_var_dict['latent_z_indices']
+				# also log b's.
+				update_dictionary['latent_b'] = source_var_dict['latent_b']
+
+			#################################################	
+			## (4) Translate this sequence of latent z's to the target domain. 
+			#################################################
+
+			# Set this variable, because this is what the discriminator training uses as input. 
+			update_dictionary['detached_latent_z'] = update_dictionary['latent_z'].detach()
+			update_dictionary['detached_translated_latent_z'] = update_dictionary['translated_latent_z'].detach()
+			update_dictionary['translated_latent_z'] = self.translate_latent_z(update_dictionary['detached_latent_z'] , source_var_dict['latent_b'].detach(), domain=domain)
+
+			#################################################	
+			## (5) Back-translate the translated latent z's to the source domain.
+			#################################################
+
+			update_dictionary['backtranslated_latent_z'] = self.translate_latent_z(update_dictionary['translated_latent_z'] , source_var_dict['latent_b'].detach(), domain=1-domain)
+
+			#################################################	
+			## (6) Feed into discriminator, get likelihood of real / translated. 
+			#################################################
+
+			# Skip for now.
+			 
+			#################################################
+			## (7) Compute and apply gradient updates. 			
+			#################################################
+			
+			self.update_networks(domain, policy_manager, update_dictionary)			
+
+			#################################################
+			## (8) Update Plots. 			
+			#################################################
+			
+			viz_dict['domain'] = domain
+			viz_dict['discriminator_probs'] = discriminator_prob[...,domain].detach().cpu().numpy().mean()
+
+			self.update_plots(counter, viz_dict)
 
 class PolicyManager_JointTransfer(PolicyManager_Transfer):
 
@@ -8462,3 +8667,4 @@ class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 
 		# Encode decode function: First encodes, takes trajectory segment, and outputs latent z. The latent z is then provided to decoder (along with initial state), and then we get SOURCE domain subpolicy inputs. 
 		# Cross domain decoding function: Takes encoded latent z (and start state), and then rolls out with target decoder. Function returns, target trajectory, action sequence, and TARGET domain subpolicy inputs. 
+

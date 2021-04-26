@@ -92,6 +92,8 @@ class Master():
 				self.policy_manager = PolicyManager_FixEmbedCycleConTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 			elif self.args.setting=='jointfixembed':
 				self.policy_manager = PolicyManager_JointFixEmbedTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
+			elif self.args.setting=='jointfixcycle':
+				self.policy_manager = PolicyManager_JointFixEmbedCycleTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 			elif self.args.setting=='jointtransfer':
 				self.policy_manager = PolicyManager_JointTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 			elif self.args.setting=='jointcycletransfer':
@@ -106,7 +108,7 @@ class Master():
 
 	def run(self):
 		if self.args.setting in ['pretrain_sub','pretrain_prior','imitation','baselineRL','downstreamRL',\
-			'transfer','cycle_transfer','jointtransfer','fixembed','jointcycletransfer', 'jointfixembed']:
+			'transfer','cycle_transfer','jointtransfer','fixembed','jointcycletransfer', 'jointfixembed', 'jointfixcycle']:
 			if self.args.train:
 				if self.args.model:
 					self.policy_manager.train(self.args.model)
