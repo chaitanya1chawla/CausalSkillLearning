@@ -2075,7 +2075,8 @@ class ContinuousMLP(torch.nn.Module):
 			final_layer = h4
 		
 		self.mean_outputs = self.mean_output_layer(final_layer)		
-		self.variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(final_layer))+self.variance_activation_bias) + action_epsilon
+		# self.variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(final_layer))+self.variance_activation_bias) + action_epsilon
+		self.variance_outputs = 0.05*torch.ones_like(self.mean_outputs).to(device).float()
 
 		noise = torch.randn_like(self.variance_outputs)
 			

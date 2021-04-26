@@ -358,19 +358,21 @@ class PolicyManager_BaseClass():
 			# Initialize variables.
 			#####################################################
 
-			self.shuffle(self.N//self.args.batch_size)
+			self.shuffle(len(self.dataset)-self.test_set_size)
 			for j in range(self.N//self.args.batch_size):
 				i = self.index_list[j]
 
 				# (1) Encode trajectory. 
 				if self.args.setting in ['learntsub','joint']:
+					print("Embed in viz robot data")
+					
 					input_dict, var_dict, eval_dict = self.run_iteration(0, i, return_dicts=True, train=False)
 					latent_z = var_dict['latent_z_indices']
 					sample_trajs = input_dict['sample_traj']
 				else:
 					latent_z, sample_trajs, _ = self.run_iteration(0, i, return_z=True, and_train=False)
 
-				embed
+				
 				if self.args.batch_size>1:
 
 					# Set the max length if it's less than this batch of trajectories. 
@@ -379,24 +381,24 @@ class PolicyManager_BaseClass():
 
 					for b in range(self.args.batch_size):
 						
-						self.indices.append(i*self.args.batch_size+b)
+						self.indices.append(j*self.args.batch_size+b)
 						print("#########################################")	
-						print("Getting visuals for trajectory: ",i*self.args.batch_size+b)
+						print("Getting visuals for trajectory: ",i,j*self.args.batch_size+b)
 
 						# Copy z. 
 						# print("Embed in Visualize Robot Data from,",self.args.setting)
 						# embed()
 
 						if self.args.setting in ['learntsub','joint']:
-							self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 				
 							# Rollout each individual trajectory in this batch.
-							trajectory_rollout = self.get_robot_visuals(i*self.args.batch_size+b, latent_z[:,b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True)
+							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:,b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True)
 						else:
-							self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 			
 							# Rollout each individual trajectory in this batch.
-							trajectory_rollout = self.get_robot_visuals(i*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b])
+							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b])
 
 						# Now append this particular sample traj and the rollout into trajectroy and rollout sets.
 						self.trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
@@ -405,7 +407,7 @@ class PolicyManager_BaseClass():
 				else:
 
 					print("#########################################")	
-					print("Getting visuals for trajectory: ",i)
+					print("Getting visuals for trajectory: ",j,i)
 
 					if latent_z is not None:
 						self.indices.append(i)
@@ -413,7 +415,7 @@ class PolicyManager_BaseClass():
 						if len(sample_trajs)>self.max_len:
 							self.max_len = len(sample_trajs)
 						# Copy z. 
-						self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())
+						self.latent_z_set[j] = copy.deepcopy(latent_z.detach().cpu().numpy())
 
 						trajectory_rollout = self.get_robot_visuals(i, latent_z, sample_trajs)								
 
@@ -765,7 +767,7 @@ class PolicyManager_BaseClass():
 		# #########################################################
 
 		# Instead of this clumsy iteration, just run iteration with i=0. 
-		self.run_iteration(counter, 0, skip_iteration=0)
+		self.run_iteration(counter, 0, skip_iteration=0, train=False)
 
 	def shuffle(self, extent, shuffle=True):
 		# If we're in a dataset that will have variable sized data.
@@ -2332,7 +2334,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# Averaging until penultimate timestep.
 		learnt_subpolicy_loglikelihoods = self.batch_mask*unmasked_learnt_subpolicy_loglikelihoods
-		learnt_subpolicy_loglikelihood = learnt_subpolicy_loglikelihoods[:-1].mean()
+		# learnt_subpolicy_loglikelihood = learnt_subpolicy_loglikelihoods[:-1].mean()
+		learnt_subpolicy_loglikelihood = learnt_subpolicy_loglikelihoods[:-1].sum()/(self.batch_mask[:-1].sum())
 
 		###########################
 		# Compute Latent policy loglikelihood values. 
@@ -2376,7 +2379,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			# First mask the latent_z_temporal_logprobs. 			
 			unmasked_latent_z_temporal_logprobabilities = latent_z_logprobabilities[:-1]*self.args.latentpolicy_ratio
 			latent_z_temporal_logprobabilities = self.batch_mask[:-1]*unmasked_latent_z_temporal_logprobabilities
-			latent_z_logprobability = latent_z_temporal_logprobabilities.mean()
+			# latent_z_logprobability = latent_z_temporal_logprobabilities.mean()
+			latent_z_logprobability = latent_z_temporal_logprobabilities.sum()/(self.batch_mask[:-1].sum())
 			latent_z_probabilities = None			
 
 		# LATENT LOGLIKELIHOOD is defined as: 
@@ -2393,7 +2397,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			
 		unmasked_latent_b_temporal_logprobabilities = latent_b_logprobabilities.take(latent_b.long())[:-1]
 		latent_b_temporal_logprobabilities = self.batch_mask[:-1]*unmasked_latent_b_temporal_logprobabilities
-		latent_b_logprobability = latent_b_temporal_logprobabilities.mean()
+		# latent_b_logprobability = latent_b_temporal_logprobabilities.mean()
+		latent_b_logprobability = latent_b_temporal_logprobabilities.sum()/(self.batch_mask[:-1].sum())
 		latent_loglikelihood += latent_b_logprobability
 		latent_loglikelihood += latent_z_logprobability
 
@@ -2530,7 +2535,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		if self.baseline is None:
 			self.baseline = torch.zeros_like(baseline_target.mean()).to(device).float()
 		else:
-			self.baseline = (self.beta_decay*self.baseline)+(1.-self.beta_decay)*baseline_target.mean()
+			# self.baseline = (self.beta_decay*self.baseline)+(1.-self.beta_decay)*baseline_target.mean()
+			self.baseline = (self.beta_decay*self.baseline)+(1.-self.beta_decay)*(baseline_target.sum()/(self.batch_mask[:-1].sum()))
 			
 		# Remember, no need to mask this with batch_mask, because it's just derived from temporal_loglikelihoods and variational_b_loss, which are already masked.
 		self.reinforce_variational_loss = self.variational_loss*(baseline_target-self.baseline)
@@ -2539,7 +2545,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# Losses from latent policy and subpolicy into variational network for the latent_z's, the reinforce loss on the latent_b's, and the KL divergence. 
 		# But since we don't need to additional compute the gradients from latent and subpolicy into variational network, just set the variational loss to reinforce + KL.
 		# self.total_variational_loss = (self.reinforce_variational_loss.sum() + self.args.kl_weight*kl_divergence.squeeze(1).sum()).sum()
-		self.total_variational_loss = (self.reinforce_variational_loss + self.args.kl_weight*kl_divergence.squeeze(1)).mean()
+		
+		# self.total_variational_loss = (self.reinforce_variational_loss + self.args.kl_weight*kl_divergence.squeeze(1)).mean()
+		self.total_variational_loss = (self.reinforce_variational_loss + self.args.kl_weight*kl_divergence.squeeze(1)).sum()/(self.batch_mask[:-1].sum())
 
 		######################################################
 		# Set other losses, subpolicy, latent, and prior.
@@ -2549,14 +2557,17 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.subpolicy_loss = (-learnt_subpolicy_loglikelihood).mean()
 
 		# Get prior losses. 
-		self.prior_loss = (-self.args.prior_weight*prior_loglikelihood).mean()
+		# self.prior_loss = (-self.args.prior_weight*prior_loglikelihood).mean()
+		self.prior_loss = (-self.args.prior_weight*prior_loglikelihood).sum()/(self.batch_mask[:-1].sum())
 
 		# Reweight latent loss.
-		self.total_weighted_latent_loss = (self.args.latent_loss_weight*self.total_latent_loss).mean()
+		# self.total_weighted_latent_loss = (self.args.latent_loss_weight*self.total_latent_loss).mean()
+		self.total_weighted_latent_loss = (self.args.latent_loss_weight*self.total_latent_loss).sum()/(self.batch_mask[:-1].sum())
 
 		################################################
 		# Setting total loss based on phase of training.
 		################################################
+
 
 		# IF PHASE ONE: 
 		if self.training_phase==1:
@@ -5668,8 +5679,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 
 		# Try something
-		self.source_latent_zs = self.source_latent_zs[:500]
-		self.target_latent_zs = self.target_latent_zs[:500]
+		# self.source_latent_zs = self.source_latent_zs[:500]
+		# self.target_latent_zs = self.target_latent_zs[:500]
 
 		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
 		self.z_last_set_by = 'set_z_objects'
@@ -6109,7 +6120,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Call function to compute this. # This function depends on whether we have a translation model or not.. 
 			self.unweighted_unmasked_cross_domain_supervision_loss = self.compute_cross_domain_supervision_loss(update_dictionary)
 			# Now mask using batch mask.			
-			self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
+			# self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
+			self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(policy_manager.batch_mask.sum())
 			# Now weight.
 			self.cross_domain_supervision_loss = self.args.cross_domain_supervision_loss_weight*self.unweighted_masked_cross_domain_supervision_loss		
 		else:
@@ -6124,7 +6136,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss 
 
 		# Total encoder loss: 
-		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.equivariance_loss + self.cross_domain_supervision_loss
+		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.equivariance_loss + self.cross_domain_supervision_loss	
 
 		if not(self.skip_vae):
 			# Go backward through the generator (encoder / decoder), and take a step. 
@@ -7383,6 +7395,11 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.args.fix_source = 1
 		self.args.fix_target = 1
 		self.set_trans_z = 0
+
+		# Set source noise to very close to 0...
+		# self.source_args.epsilon_from = 0.02
+		# self.source_args.epsilon_to = 0.01
+
 		# Now create two instances of policy managers for each domain. Call them source and target domain policy managers. 
 		self.source_manager = PolicyManager_BatchJoint(number_policies=4, dataset=self.source_dataset, args=self.source_args)
 		self.target_manager = PolicyManager_BatchJoint(number_policies=4, dataset=self.target_dataset, args=self.target_args)
@@ -7404,6 +7421,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.args.real_translated_discriminator = 0
 		self.decay_counter = self.decay_epochs*self.extent
 		self.decay_rate = (self.initial_epsilon-self.final_epsilon)/(self.decay_counter)
+
+		self.translated_z_epsilon = 0.01
 
 	def set_iteration(self, counter):
 		# First call the set iteration of super. 
@@ -7693,9 +7712,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			corrupted_latent_z = self.corrupt_inputs(latent_z)
 
 			# Use the corrupted_latent_z instead of the original.
-			translated_latent_z = self.backward_translation_model.forward(corrupted_latent_z, epsilon=self.epsilon, precomputed_b=latent_b)
+			translated_latent_z = self.backward_translation_model.forward(corrupted_latent_z, epsilon=self.translated_z_epsilon, precomputed_b=latent_b)
 		else:			
-			translated_latent_z = self.backward_translation_model.forward(latent_z, action_epsilon=self.epsilon)
+			translated_latent_z = self.backward_translation_model.forward(latent_z, action_epsilon=self.translated_z_epsilon)
 
 		# Now normalizing translated latent z. 
 		translated_latent_z = (translated_latent_z-self.source_z_mean)/self.source_z_std
@@ -7714,9 +7733,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		###############################################		
 
 		if self.args.recurrent_translation:	
-			unweighted_unmasked_cross_domain_supervision_loss = -self.backward_translation_model.get_probabilities(detached_z, epsilon=self.epsilon, precomputed_b=update_dictionary['latent_b'], evaluate_value=cross_domain_z)
+			unweighted_unmasked_cross_domain_supervision_loss = -self.backward_translation_model.get_probabilities(detached_z, epsilon=self.translated_z_epsilon, precomputed_b=update_dictionary['latent_b'], evaluate_value=cross_domain_z)
 		else:
-			unweighted_unmasked_cross_domain_supervision_loss = -self.backward_translation_model.get_probabilities(detached_z, action_epsilon=self.epsilon, evaluate_value=cross_domain_z)
+			unweighted_unmasked_cross_domain_supervision_loss = -self.backward_translation_model.get_probabilities(detached_z, action_epsilon=self.translated_z_epsilon, evaluate_value=cross_domain_z)
 
 		###############################################
 
@@ -7763,6 +7782,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# Use same domain across batch for simplicity. 
 		if domain is None:
 			domain = np.random.binomial(1,0.5)
+			
 		self.counter = counter
 		policy_manager = self.get_domain_manager(domain)
 
@@ -7793,7 +7813,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				update_dictionary['translated_latent_z'] = detached_original_latent_z
 
 			# Set this variable, because this is what the discriminator training uses as input. 
-			update_dictionary['detached_latent_z'] = update_dictionary['translated_latent_z'].detach()				
+			update_dictionary['detached_latent_z'] = update_dictionary['translated_latent_z'].detach()
 			
 			# Get the diffs from the original latent z's..
 			delta_zs = detached_original_latent_z[1:] - detached_original_latent_z[:-1]
@@ -7847,19 +7867,97 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			#################################################
 			## (5) Compute and apply gradient updates. 			
 			#################################################
-
+			
 			self.update_networks(domain, policy_manager, update_dictionary)			
 
 			#################################################
 			## (6) Update Plots. 			
 			#################################################
-
+			
 			viz_dict['domain'] = domain
 			viz_dict['discriminator_probs'] = discriminator_prob[...,domain].detach().cpu().numpy().mean()
 
 			# print("Run update plots.")
 			self.update_plots(counter, viz_dict)
 			# print("Finish update plots.")
+
+class PolicyManager_JointFixEmbedCycleConTransfer(PolicyManager_JointFixEmbedTransfer):
+
+	def __init__(self, args=None, source_dataset=None, target_dataset=None):
+
+		super(PolicyManager_JointFixEmbedCycleConTransfer, self).__init__(args, source_dataset, target_dataset)
+
+	def create_networks(self):
+		
+		 # Call super create networks, to create all the necessary networks. 
+		super().create_networks()
+
+		# In addition, now create translation model networks.
+
+		if self.args.recurrent_translation:
+			# Create recurrent translation model from variational model template.
+			self.forward_translation_model = ContinuousVariationalPolicyNetwork_Batch(self.args.z_dimensions, self.args.var_hidden_size, self.args.z_dimensions, self.args, number_layers=self.args.var_hidden_size, translation_network=True).to(device)
+			self.backward_translation_model = ContinuousVariationalPolicyNetwork_Batch(self.args.z_dimensions, self.args.var_hidden_size, self.args.z_dimensions, self.args, number_layers=self.args.var_hidden_size, translation_network=True).to(device)
+		else:
+			self.forward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
+			self.backward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
+
+		# Create list of translation models to select from based on source domain.
+		self.translation_model_list = [self.forward_translation_model, self.backward_translation_model]
+
+		# # Instead of single z discriminator, require two different z discriminators. 
+		# # Just use the self.discriminator_network for now.
+		# self.source_z_discriminator = DiscreteMLP(self.args.z_dimensions, self.hidden_size, 2, args=self.args).to(device)
+		# self.target_z_discriminator = DiscreteMLP(self.args.z_dimensions, self.hidden_size, 2, args=self.args).to(device)
+		
+		# For now, don't use discriminators.... 
+		# # Create lists of discriminators. 
+		# # self.discriminator_list = [self.source_discriminator, self.target_discriminator]
+		# self.z_discriminator_list = [self.source_z_discriminator, self.target_z_discriminator]
+
+		# if self.args.z_transform_discriminator:
+		# 	self.source_z_trajectory_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
+		# 	self.target_z_trajectory_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
+
+		# 	# self.z_trajectory_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
+		# 	self.z_trajectory_discriminator_list = [self.source_z_trajectory_discriminator, self.target_z_trajectory_discriminator]
+
+		# elif self.args.z_trajectory_discriminator:
+			
+		# 	self.source_z_trajectory_discriminator = EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size, args=self.args).to(device)
+		# 	self.target_z_trajectory_discriminator = EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size, args=self.args).to(device)
+
+		# 	# self.z_trajectory_discriminator = EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size, args=self.args).to(device)
+		# 	self.z_trajectory_discriminator_list = [self.source_z_trajectory_discriminator, self.target_z_trajectory_discriminator]
+
+	def create_training_ops(self):
+
+		# Don't actually call super().create_training_ops(),
+		# Because this creates optimizers with source and target encoder decoder parameters in the optimizer. 
+
+		# Instead, create other things here. 
+		self.negative_log_likelihood_loss_function = torch.nn.NLLLoss(reduction='none')
+
+		# Set regular parameter list. 
+		self.parameter_list = list(self.forward_translation_model.parameters()) + list(self.backward_translation_model.parameters())
+		# self.parameter_list = list(self.backward_translation_model.parameters())
+
+		# Now create optimizer for translation models. 
+		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
+
+		# For now, don't use discriminators.... 
+		
+		# # Set discriminator parameter list. 
+		# self.discriminator_parameter_list = list(self.source_z_discriminator.parameters()) + list(self.target_z_discriminator.parameters())
+		# # if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
+		# 	self.discriminator_parameter_list += list(self.source_z_trajectory_discriminator.parameters()) + list(self.target_z_trajectory_discriminator.parameters())
+
+		# # self.discriminator_parameter_list = list(self.discriminator_network.parameters())
+		# # if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
+		# # 	self.discriminator_parameter_list += list(self.z_trajectory_discriminator.parameters())
+
+		# # Create common optimizer for source, target, and discriminator networks. 
+		# self.discriminator_optimizer = torch.optim.Adam(self.discriminator_parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
 
 class PolicyManager_JointTransfer(PolicyManager_Transfer):
 
