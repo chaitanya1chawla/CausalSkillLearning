@@ -8166,7 +8166,7 @@ class PolicyManager_JointFixEmbedCycleTransfer(PolicyManager_JointFixEmbedTransf
 			# self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
 			self.unweighted_masked_cycle_cdsl = (policy_manager.batch_mask*self.unweighted_unmasked_cycle_cdsl).sum()/(policy_manager.batch_mask.sum())
 			# Now weight.
-			self.cycle_cross_domain_supervision_loss = self.args.cross_domain_supervision_loss_weight*self.unweighted_masked_cycle_cdsl
+			self.cycle_cross_domain_supervision_loss = self.args.cycle_cross_domain_supervision_loss_weight*self.unweighted_masked_cycle_cdsl
 		else:
 			self.unweighted_unmasked_cycle_cdsl = 0.
 			self.cycle_cross_domain_supervision_loss = 0.
@@ -8179,7 +8179,7 @@ class PolicyManager_JointFixEmbedCycleTransfer(PolicyManager_JointFixEmbedTransf
 		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss 
 
 		# Total encoder loss: 
-		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.cross_domain_supervision_loss	
+		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.cross_domain_supervision_loss	+ self.cycle_cross_domain_supervision_loss
 
 		if not(self.skip_vae):
 			# Go backward through the generator (encoder / decoder), and take a step. 

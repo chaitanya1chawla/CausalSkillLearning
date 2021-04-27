@@ -316,6 +316,7 @@ def parse_arguments():
 	parser.add_argument('--equivariance_loss_weight',dest='equivariance_loss_weight',type=float,default=1.,help='Weight associated with the equivariance loss.')
 	parser.add_argument('--cross_domain_supervision',dest='cross_domain_supervision',type=int,default=0,help='Whether to use cross domain supervision when operating in pair of same domains.')
 	parser.add_argument('--cross_domain_supervision_loss_weight',dest='cross_domain_supervision_loss_weight',type=float,default=0.,help='Weight associated with the cross domain supervision loss.')
+	parser.add_argument('--cycle_cross_domain_supervision_loss_weight',dest='cycle_cross_domain_supervision_loss_weight',type=float,default=0.,help='Weight associated with the cycle cross domain supervision loss.')
 	parser.add_argument('--z_normalization',dest='z_normalization',type=str,default=None,choices=[None, 'global','ind'],help='What normalization to use for zs.')
 
 	# Parameters for contextual training. 
