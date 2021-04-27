@@ -75,7 +75,7 @@ class Master():
 		elif self.args.setting=='imitation':
 			self.policy_manager = PolicyManager_Imitation(self.args.number_policies, self.dataset, self.args)
 
-		elif self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed']:
+		elif self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle']:
 		
 			source_dataset = return_dataset(self.args, data=self.args.source_domain)
 			target_dataset = return_dataset(self.args, data=self.args.target_domain)
