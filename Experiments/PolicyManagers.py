@@ -5682,8 +5682,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 
 		# Try something
-		# self.source_latent_zs = self.source_latent_zs[:500]
-		# self.target_latent_zs = self.target_latent_zs[:500]
+		self.source_latent_zs = self.source_latent_zs[:500]
+		self.target_latent_zs = self.target_latent_zs[:500]
+
+		# Copy sets so we don't accidentally perform in-place operations on any of the computed sets.
+		self.original_source_latent_z_set = copy.deepcopy(self.source_latent_zs)
+		self.original_target_latent_z_set = copy.deepcopy(self.target_latent_zs)
 
 		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
 		self.z_last_set_by = 'set_z_objects'
@@ -7465,10 +7469,10 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 	def set_translated_z_sets(self, domain=1):
 
 		self.viz_dictionary = {}
-		# First copy sets so we don't accidentally perform in-place operations on any of the computed sets.
-		# Have we.. set these sets? 
-		self.original_source_latent_z_set = copy.deepcopy(self.source_latent_zs)
-		self.original_target_latent_z_set = copy.deepcopy(self.target_latent_zs)
+
+		# No need to copy these sets over, they have been set in set_z_objects. Not changing them here ensures we're not messing around.
+		self.source_latent_zs = copy.deepcopy(self.original_source_latent_z_set)
+		self.target_latent_zs = copy.deepcopy(self.original_target_latent_z_set)
 
 		if domain==1:
 			############################################################
@@ -7500,7 +7504,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			############################################################
 			# Now use original target latent set, and translated source latent set. 
 			############################################################
-
+			
 			# First translate the target z's. 
 			# ASSUME WE AREN'T USING RECURRENT TRANSLATION
 			if self.args.recurrent_translation:				
