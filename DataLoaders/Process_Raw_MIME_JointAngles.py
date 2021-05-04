@@ -3,6 +3,7 @@ from IPython import embed
 import itertools
 
 basepath = '/data1/tanmayshankar/MIME_FullDataset'
+datapath = '~/Research/Code/Data/Datasets/MIME/'
 os.chdir(basepath)
 
 # Utility funcs
@@ -26,8 +27,7 @@ def resample(original_trajectory, desired_number_timepoints):
 joint_names = None 
 downsample_frequency = 20
 # Set joint names. 
-joint_names = ['right_s0', 'right_s1', 'right_e0', 'right_e1', 'right_w0', 'right_w1', 'right_w2', 'left_s0', 'left_s1', 'left_e0', 'left_e1', 'left_w0', 'left_w1', 'left_w2']
-	
+joint_names = ['left_s0', 'left_s1', 'left_e0', 'left_e1', 'left_w0', 'left_w1', 'left_w2', 'right_s0', 'right_s1', 'right_e0', 'right_e1', 'right_w0', 'right_w1', 'right_w2']
 
 # # Per task, concatenate trajectories and grippers. 
 # for i in range(20):
@@ -116,3 +116,4 @@ np.save("GlobalDataElementListofLists.npy",np.array(global_data_element_list))
 
 # Merge list of lists
 np.save("GlobalDataElementArray.npy",np.array(list(itertools.chain.from_iterable(global_data_element_list))))
+# np.save(os.path.join(datapath,"MIMEDataArray.npy"),np.array(list(itertools.chain.from_iterable(global_data_element_list))))

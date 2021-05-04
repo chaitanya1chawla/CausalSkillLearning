@@ -169,6 +169,7 @@ class BaxterVisualizer():
 			self.state[:7] = joint_pose[7:14]
 			# Now left hand. 
 			self.state[7:] = joint_pose[:7]
+			
 		# Set the joint angles magically. 
 		self.environment.set_robot_joint_positions(self.state)
 
