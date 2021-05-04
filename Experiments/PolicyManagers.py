@@ -1850,8 +1850,10 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length
 
 			# Create Baxter visualizer for MIME data
-			# self.visualizer = BaxterVisualizer.MujocoVisualizer()
-			self.visualizer = BaxterVisualizer()
+
+			if not(self.args.no_mujoco):
+				# self.visualizer = BaxterVisualizer.MujocoVisualizer()
+				self.visualizer = BaxterVisualizer()
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/MIME/MIME_Orig_Mean.npy")
@@ -1873,7 +1875,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.output_size = self.state_size
 			self.traj_length = self.args.traj_length
 
-			self.visualizer = SawyerVisualizer()
+			if not(self.args.no_mujoco):
+				self.visualizer = SawyerVisualizer()
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/Roboturk/Roboturk_Mean.npy")
@@ -2085,7 +2088,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 				return self.visualizer.visualize_joint_trajectory(unnorm_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_{1}.gif".format(i,suffix), return_and_save=True, additional_info=animation_object)
 			else:
-				return self.visualizer.visualize_joint_trajectory(unnorm_trajectory, return_gif=True, segmentations=segmentations)
+				if not(self.args.no_mujoco):
+					return self.visualizer.visualize_joint_trajectory(unnorm_trajectory, return_gif=True, segmentations=segmentations)
 		else:
 			return self.visualize_2D_trajectory(trajectory)
 
@@ -2911,7 +2915,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		else:
 			return None, None
 
-	# @tprofile(immediate=True)
+	@tprofile(immediate=True)
 	def run_iteration(self, counter, i, skip_iteration=False, return_dicts=False, special_indices=None, train=True, input_dictionary=None):
 
 		# With learnt discrete subpolicy: 
@@ -7903,7 +7907,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			viz_dict['domain'] = domain
 			viz_dict['discriminator_probs'] = discriminator_prob[...,domain].detach().cpu().numpy().mean()
 
-			self.update_plots(counter, viz_dict)
+			self.update_plots(counter, viz_dict, log=True)
 
 class PolicyManager_JointFixEmbedCycleTransfer(PolicyManager_JointFixEmbedTransfer):
 
@@ -8273,6 +8277,29 @@ class PolicyManager_JointFixEmbedCycleTransfer(PolicyManager_JointFixEmbedTransf
 
 		return unweighted_unmasked_cycle_cdsl
 
+	def compute_cross_domain_supervision_loss(self, update_dictionary, domain=1):
+
+		# Basically feed in the predicted zs from the translation model, and get likelihoods of the zs from the target domain. 
+		# This can be used as a loss function or as an evaluation metric. 
+
+		# Gather Z statistics.
+		detached_z = update_dictionary['latent_z'].detach()
+		cross_domain_z = update_dictionary['cross_domain_latent_z'].detach()
+
+		###############################################	
+
+		# Forward CDSL
+		forward_cdsl = - self.translation_model_list[domain].get_probabilities(detached_z, action_epsilon=self.translated_z_epsilon, evaluate_value=cross_domain_z)
+		# Backward CDSL		
+		backward_cdsl = - self.translation_model_list[1-domain].get_probabilities(cross_domain_z, action_epsilon=self.translated_z_epsilon, evaluate_value=detached_z)
+		
+		###############################################
+
+		# Compute symmetric CDSL
+		unweighted_unmasked_cross_domain_supervision_loss = forward_cdsl + backward_cdsl
+
+		return unweighted_unmasked_cross_domain_supervision_loss
+	
 	def run_iteration(self, counter, i, domain=None):
 
 		#################################################
@@ -8298,7 +8325,7 @@ class PolicyManager_JointFixEmbedCycleTransfer(PolicyManager_JointFixEmbedTransf
 		#################################################
 
 		self.set_iteration(counter)		
-
+		
 		#################################################
 		## (1) Select which domain to run on; also supervision of discriminator.
 		#################################################
