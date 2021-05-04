@@ -91,7 +91,7 @@ joint_names = ['right_s0', 'right_s1', 'right_e0', 'right_e1', 'right_w0', 'righ
 # 		right_gripper = resample(right_gripper, desired_trajectory_length).reshape(-1,1)
 
 # 		# Now create dictionary element. 
-# 		data_element['trajectory'] = np.concatenate([joint_angle_trajectory,left_gripper,right_gripper],axis=1)
+# 		data_element['demo'] = np.concatenate([joint_angle_trajectory,left_gripper,right_gripper],axis=1)
 # 		data_element['is_valid'] = int(np.linalg.norm(np.diff(joint_angle_trajectory,axis=0),axis=1).max() < 1.0)
 
 # 		# Now append to a task level list.

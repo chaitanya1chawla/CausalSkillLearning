@@ -125,11 +125,14 @@ class MIME_NewDataset(Dataset):
 		self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
 
 		# Load the entire set of trajectories. 
-
-		if isinstance(self, MIME_NewDataset)):
-			self.original_data_list = np.load(os.path.join(self.dataset_directory, "Data_List.npy"),allow_pickle=True)
-		elif isinstance(self, MIME_NewMetaDataset)):
-			self.original_data_list = np.load(os.path.join(self.dataset_directory, "MIMEDataArray.npy"),allow_pickle=True)
+		
+		self.file = "Data_List.npy"
+		self.key = 'demo'
+		if isinstance(self, MIME_NewMetaDataset):
+			# This is not an elif condition, because the first always evaluates to true...		
+			self.file = "MIMEDataArray.npy"
+		
+		self.original_data_list = np.load(os.path.join(self.dataset_directory, self.file),allow_pickle=True)			
 		self.original_dataset_length = len(self.original_data_list)
 
 		# Now only selecting valid datapoints.
@@ -146,9 +149,9 @@ class MIME_NewDataset(Dataset):
 			self.short_data_list = []
 			self.dataset_trajectory_lengths = []
 			for i in range(self.dataset_length):
-				if self.data_list[i]['demo'].shape[0]<length_threshold:
+				if self.data_list[i][self.key].shape[0]<length_threshold:
 					self.short_data_list.append(self.data_list[i])
-					self.dataset_trajectory_lengths.append(self.data_list[i]['demo'].shape[0])
+					self.dataset_trajectory_lengths.append(self.data_list[i][self.key].shape[0])
 
 			self.data_list = self.short_data_list
 			self.dataset_length = len(self.data_list)
@@ -163,6 +166,7 @@ class MIME_NewDataset(Dataset):
 	def __getitem__(self, index):
 		# Return n'th item of dataset.
 		# This has already processed everything.
+
 		if isinstance(index,np.ndarray):			
 			return list(self.data_list_array[index])
 		else:
@@ -244,12 +248,6 @@ class MIME_NewMetaDataset(MIME_NewDataset):
 
 		super(MIME_NewMetaDataset, self).__init__(split=split, short_traj=short_traj)
 
-	def __getitem__(self, index):
-
-		element = super().__getitem__(index)
-
-		embed()
-		
 class MIME_Dataloader_Tester(unittest.TestCase):
 	
 	def test_MIMEdataloader(self):
