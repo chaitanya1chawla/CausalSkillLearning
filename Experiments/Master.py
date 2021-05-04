@@ -25,8 +25,10 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = DataLoaders.ContinuousDirectedNonZeroToyDataset(args.datadir)
 	elif args.data=='ToyContext':
 		dataset = DataLoaders.ToyContextDataset(args.datadir)
-	elif args.data=='MIME':
+	elif args.data=='OldMIME':
 		dataset = MIME_DataLoader.MIME_NewDataset(short_traj=args.short_trajectories)
+	elif args.data=='MIME':
+		dataset = MIME_DataLoader.MIME_NewMetaDataset(short_traj=args.short_trajectories)
 	elif args.data=='Roboturk':		
 		dataset = Roboturk_DataLoader.Roboturk_NewSegmentedDataset(args)
 	elif args.data=='OrigRoboturk':

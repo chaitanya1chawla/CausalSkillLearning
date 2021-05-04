@@ -120,11 +120,16 @@ class MIME_Dataset(Dataset):
 class MIME_NewDataset(Dataset):
 
 	def __init__(self, split='all', short_traj=False):
+
 		# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
 		self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
 
 		# Load the entire set of trajectories. 
-		self.original_data_list = np.load(os.path.join(self.dataset_directory, "Data_List.npy"),allow_pickle=True)
+
+		if isinstance(self, MIME_NewDataset)):
+			self.original_data_list = np.load(os.path.join(self.dataset_directory, "Data_List.npy"),allow_pickle=True)
+		elif isinstance(self, MIME_NewMetaDataset)):
+			self.original_data_list = np.load(os.path.join(self.dataset_directory, "MIMEDataArray.npy"),allow_pickle=True)
 		self.original_dataset_length = len(self.original_data_list)
 
 		# Now only selecting valid datapoints.
@@ -233,6 +238,18 @@ class MIME_NewDataset(Dataset):
 		np.save("MIME_Orig_Vel_Min.npy", vel_min_value)
 		np.save("MIME_Orig_Vel_Max.npy", vel_max_value)
 
+class MIME_NewMetaDataset(MIME_NewDataset):
+
+	def __init__(self, split='all', short_traj=False):
+
+		super(MIME_NewMetaDataset, self).__init__(split=split, short_traj=short_traj)
+
+	def __getitem__(self, index):
+
+		element = super().__getitem__(index)
+
+		embed()
+		
 class MIME_Dataloader_Tester(unittest.TestCase):
 	
 	def test_MIMEdataloader(self):
