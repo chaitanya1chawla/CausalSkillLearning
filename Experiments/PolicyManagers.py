@@ -209,6 +209,7 @@ class PolicyManager_BaseClass():
 		print("Running MAIN Train function.")
 		epoch_time = 0.
 		cum_epoch_time = 0.
+
 		# For number of training epochs. 
 		for e in range(self.number_epochs+1): 
 						
@@ -222,6 +223,10 @@ class PolicyManager_BaseClass():
 				print("Embedding in Outer Train Function.")
 				embed()
 
+			# np.random.shuffle(self.index_list)
+			self.shuffle(extent)
+			self.batch_indices_sizes = []
+			# Modifying to make training functions handle batches. 
 			# For every item in the epoch:
 			if self.args.setting=='imitation':
 				extent = self.dataset.get_number_task_demos(self.demo_task_index)
@@ -234,11 +239,6 @@ class PolicyManager_BaseClass():
 				else:
 					extent = len(self.dataset)-self.test_set_size
 
-			# np.random.shuffle(self.index_list)
-			self.shuffle(extent)
-			self.batch_indices_sizes = []
-			# Modifying to make training functions handle batches. 
-			
 			t1 = time.time()
 						
 			for i in range(0,extent,self.args.batch_size):
@@ -778,10 +778,12 @@ class PolicyManager_BaseClass():
 		extent = len(self.dataset)
 		index_range = np.arange(0,extent)
 
-		print("Starting task based shuffling")
+		# print("Starting task based shuffling")
 		# Implement task ID based shuffling / batching here... 
 		self.task_id_map = -np.ones(extent,dtype=int)
-		self.task_id_count = np.zeros(self.args.number_of_tasks, dtype=int)
+		self.task_id_count = np.zeros(self.args.number_of_tasks, dtype=int)		
+		
+
 		for k in range(extent):
 			self.task_id_map[k] = self.dataset[k]['task_id']
 		for k in range(self.args.number_of_tasks):
@@ -813,7 +815,9 @@ class PolicyManager_BaseClass():
 		# Create blocks..
 		# Strategy - create blocks from each task ID using task_count, and then just add in more trajectories at random to make it a full batch (if needed).		
 		
-		blocks = []
+		self.task_based_shuffling_blocks = []
+		self.index_task_id_map = []
+		# blocks = []
 		task_blocks = []
 		counter = 0	
 
@@ -837,13 +841,15 @@ class PolicyManager_BaseClass():
 					j += 1				
 
 				# Append this block to the block list. 
-				blocks.append(block)
+				if shuffle:
+					np.random.shuffle(block)
+				self.task_based_shuffling_blocks.append(block)
+				self.index_task_id_map.append(k)
 
 			# Now that we don't have an entire batch to add. 			
 			# Get number of samples we need to add, and check if we need to add at all. 
 			number_of_samples = self.args.batch_size-(self.task_id_count[k]-j)
 			
-			print("NS:",k,j,number_of_samples)
 
 			if number_of_samples>0:
 				# Set pool to sample from. 
@@ -867,10 +873,18 @@ class PolicyManager_BaseClass():
 				# Now add randomly sampled elements.
 				[block.append(self.concatenated_task_id_sorted_indices[v]) for v in samples]
 
+				if shuffle:
+					np.random.shuffle(block)
+
 				# Finally append block to block list. 
-				blocks.append(block)
+				self.task_based_shuffling_blocks.append(block)
+				self.index_task_id_map.append(k)
 
 		#######################################################################
+		# New extent...
+		self.extent = len(np.concatenate(self.task_based_shuffling_blocks))
+		# self.new_index_task_id_map = np.zeros(self.extent//32,dtype=int)
+		print("Embedding in task based shuffling")				
 
 	def trajectory_length_based_shuffling(self, extent, shuffle=True):
 		
@@ -893,12 +907,14 @@ class PolicyManager_BaseClass():
 	def shuffle(self, extent, shuffle=True):
 		# If we're in a dataset that will have variable sized data.
 		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk']:
-			index_range = np.arange(0,extent)
-
 			if self.args.task_discriminability:
 				self.task_based_shuffling(extent=extent,shuffle=shuffle)				
+				
+				# Also create an index list to shuffle the order of blocks that we observe...
+				self.index_list = np.arange(0,self.extent)				
+				np.random.shuffle(self.index_list)
 			else:
-				self.trajectory_length_based_shuffling(extent=extent,shuffle=shuffle)
+				self.trajectory_length_based_shuffling(extent=extent,shuffle=shuffle)		
 			
 		# If we're in Toy data, doesn't matter, just randomly shuffle. 
 		else:
@@ -3048,6 +3064,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		if input_dictionary is None:
 			input_dictionary = {}
 			input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], input_dictionary['concatenated_traj'], input_dictionary['old_concatenated_traj'] = self.collect_inputs(i, special_indices=special_indices, called_from_train=True)
+			if self.args.task_discriminability:
+				input_dictionary['sample_task_id'] = self.input_task_id
+
 			# if not(torch.is_tensor(input_dictionary['old_concatenated_traj'])):
 			input_dictionary['old_concatenated_traj'] = torch.tensor(input_dictionary['old_concatenated_traj']).to(device).float()
 		else:
@@ -3064,6 +3083,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			variational_dict = {}
 			profile_var_forward = 0
+			
 			if profile_var_forward:
 				# Line profiling
 				self.forward_lp = LineProfiler()
@@ -3862,10 +3882,17 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 		elif self.args.data in ['MIME','OldMIME'] or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 					   
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
-				# data_element = self.dataset[i:i+self.args.batch_size]
 
+				if self.args.task_discriminability:
 
-				data_element = self.dataset[self.sorted_indices[i:i+self.args.batch_size]]
+					# Don't really need to use digitize, we need to digitize with respect to .. 0, 32, 64, ... 8448. 
+					# So.. just use... //32
+					bucket = i//32
+					data_element = self.dataset[np.array(self.task_based_shuffling_blocks[bucket])]
+					self.input_task_id = self.index_task_id_map[bucket]					
+				else:
+					# data_element = self.dataset[i:i+self.args.batch_size]
+					data_element = self.dataset[self.sorted_indices[i:i+self.args.batch_size]]
 
 			else:
 				data_element = self.get_batch_element(i)
@@ -3950,7 +3977,6 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				
 				# Figure f we should be implementing.. same task ID stuff... probably more important to do smart batching of trjaectory lengths? 
 				# What will this need? Maybe... making references to the discriminators? And then calling forward on them? 
-
 
 			return batch_trajectory.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
 			
@@ -5607,6 +5633,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				log_dict['Unweighted Cross Domain Superivision Loss'] = self.unweighted_masked_cross_domain_supervision_loss.mean()
 				log_dict['Cross Domain Superivision Loss'] = self.cross_domain_supervision_loss
 
+			if self.args.task_discriminability:
+
+				log_dict['Unweighted Task Discriminability Loss'] = self.unweighted_task_discriminability_loss.mean()
+				log_dict['Task Discriminability Loss'] = self.task_discriminability_loss
+				log_dict['Task Discriminator Loss'] = self.task_discriminator_loss
+				log_dict['Unweighted Task Discriminator Loss'] = self.unweighted_task_discriminator_loss.mean()
+
 		##################################################
 		# Now visualizing spaces. 
 		##################################################
@@ -6338,7 +6371,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		###########################################################
 		
 		if self.args.task_discriminability:
-			task_discriminator_logprob, _ = self.task_discriminators[source_input_dict['batch_task_id']].get_probabilities(update_dictionary['translated_latent_z'].detach())
+			task_discriminator_logprob, _ = self.task_discriminators[source_input_dict['sample_task_id']].get_probabilities(update_dictionary['translated_latent_z'].detach())
 			self.unweighted_task_discriminator_loss = self.negative_log_likelihood_loss_function(task_discriminator_logprob.view(-1,2), traj_domain_label)
 			self.task_discriminator_loss = self.args.task_discriminator_weight*self.unweighted_task_discriminator_loss.mean()
 		else:
@@ -8060,7 +8093,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			if self.args.task_discriminability:
 
 				# Feed in the source latent z's into the appropriate task discriminatory (based on batch task ID, source_input_dict['batch_task_id'] ). 
-				update_dictionary['task_discriminator_logprob'], update_dictionary['task_discriminator_prob'] = self.task_discriminators[source_input_dict['batch_task_id']].get_probabilities(update_dictionary['translated_latent_z'])
+				update_dictionary['task_discriminator_logprob'], update_dictionary['task_discriminator_prob'] = self.task_discriminators[source_input_dict['sample_task_id']].get_probabilities(update_dictionary['translated_latent_z'])
 
 			#################################################
 			## (5) Compute and apply gradient updates. 			
