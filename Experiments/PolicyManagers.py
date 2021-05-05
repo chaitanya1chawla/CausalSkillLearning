@@ -6265,11 +6265,26 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.cross_domain_supervision_loss = 0.
 
 		###########################################################
-		# (1f) Finally, compute total losses. 
+		# (1f) If active, compute task discriminability loss.
+		###########################################################
+
+		if self.args.task_discriminability:
+			# Set the same kind of label we used in z_trajectory_discriminability..
+			traj_domain_label = domain*torch.ones(self.args.batch_size).to(device).long()
+			# Create an NLL based on task_discriminator_logprobs...
+			self.unweighted_task_discriminability = self.negative_log_likelihood_loss_function(update_dictionary['task_discriminator_logprob'].view(-1,2), 1-traj_domain_label)
+			# Weight and average.
+			self.task_discriminability_loss = self.args.task_discriminability_loss_weight*self.unweighted_task_discriminability_loss.mean()
+		else:
+			self.unweighted_task_discriminability_loss = 0.
+			self.task_discriminability_loss = 0.
+
+		###########################################################
+		# (1g) Finally, compute total losses. 
 		###########################################################
 
 		# Total discriminability loss. 
-		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss 
+		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss + self.task_discriminability_loss
 
 		# Total encoder loss: 
 		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.equivariance_loss + self.cross_domain_supervision_loss	
@@ -6319,13 +6334,25 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.z_trajectory_discriminator_loss = 0.
 
 		###########################################################
-		# (2c) Merge discriminator losses.
+		# (2c) Compute Task-Discriminator loss.
+		###########################################################
+		
+		if self.args.task_discriminability:
+			task_discriminator_logprob, _ = self.task_discriminators[source_input_dict['batch_task_id']].get_probabilities(update_dictionary['translated_latent_z'].detach())
+			self.unweighted_task_discriminator_loss = self.negative_log_likelihood_loss_function(task_discriminator_logprob.view(-1,2), traj_domain_label)
+			self.task_discriminator_loss = self.args.task_discriminator_weight*self.unweighted_task_discriminator_loss.mean()
+		else:
+			self.unweighted_task_discriminator_loss = 0.
+			self.task_discriminator_loss = 0.
+
+		###########################################################
+		# (2d) Merge discriminator losses.
 		###########################################################
 
-		self.total_discriminator_loss = self.discriminator_loss + self.z_trajectory_discriminator_loss
+		self.total_discriminator_loss = self.discriminator_loss + self.z_trajectory_discriminator_loss + self.task_discriminator_loss
 
 		###########################################################
-		# (2d) Now update discriminator(s).
+		# (2e) Now update discriminator(s).
 		###########################################################
 
 		if not(self.skip_discriminator):
@@ -7749,6 +7776,10 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			
 			self.z_trajectory_discriminator = EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size, args=self.args).to(device)
 
+		# If we're using task based discriminability
+		if self.args.task_discriminability:
+			self.task_discriminators = [EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size, args=self.args).to(device) for k in range(self.args.number_of_tasks)]
+
 	def create_training_ops(self):
 
 		# Don't actually call super().create_training_ops(),
@@ -7772,6 +7803,10 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.discriminator_parameter_list = list(self.discriminator_network.parameters())
 		if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
 			self.discriminator_parameter_list += list(self.z_trajectory_discriminator.parameters())
+
+		if self.args.task_discriminability:
+			for k in range(self.args.number_of_tasks):
+				self.discriminator_parameter_list += list(self.task_discriminators[k].parameters())
 
 		# Create common optimizer for source, target, and discriminator networks. 
 		self.discriminator_optimizer = torch.optim.Adam(self.discriminator_parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
@@ -8018,6 +8053,15 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				# also log b's.
 				update_dictionary['latent_b'] = source_var_dict['latent_b']
 			
+			#################################################
+			## (4d) If we are using task based discriminability.
+			#################################################
+
+			if self.args.task_discriminability:
+
+				# Feed in the source latent z's into the appropriate task discriminatory (based on batch task ID, source_input_dict['batch_task_id'] ). 
+				update_dictionary['task_discriminator_logprob'], update_dictionary['task_discriminator_prob'] = self.task_discriminators[source_input_dict['batch_task_id']].get_probabilities(update_dictionary['translated_latent_z'])
+
 			#################################################
 			## (5) Compute and apply gradient updates. 			
 			#################################################
