@@ -321,6 +321,10 @@ def parse_arguments():
 	parser.add_argument('--cycle_cross_domain_supervision_loss_weight',dest='cycle_cross_domain_supervision_loss_weight',type=float,default=0.,help='Weight associated with the cycle cross domain supervision loss.')
 	parser.add_argument('--z_normalization',dest='z_normalization',type=str,default=None,choices=[None, 'global','ind'],help='What normalization to use for zs.')
 
+	# Task ID based discriminability
+	parser.add_argument('--task_discriminability',dest='task_discriminability',type=int,default=0,help='Whether or not to implement task based discriminability.')
+	parser.add_argument('--number_of_tasks',dest='number_of_tasks',type=int,default=0,help='Number of tasks to be considered in task based discriminability.')
+
 	# Parameters for contextual training. 
 	parser.add_argument('--mask_fraction',dest='mask_fraction',type=float,default=0.15,help='What fraction of zs to mask in contextual embedding.')
 	parser.add_argument('--context',dest='context',type=int,default=1,help='Whether to implement contextual embedding model or original joint embedding model in Joint Transfer setting.')

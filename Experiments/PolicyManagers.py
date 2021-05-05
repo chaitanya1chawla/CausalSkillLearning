@@ -771,25 +771,134 @@ class PolicyManager_BaseClass():
 		# Instead of this clumsy iteration, just run iteration with i=0. 
 		self.run_iteration(counter, 0, skip_iteration=0, train=False)
 
+	def task_based_shuffling(self, extent, shuffle=True):
+		
+		#######################################################################
+
+		extent = len(self.dataset)
+		index_range = np.arange(0,extent)
+
+		print("Starting task based shuffling")
+		# Implement task ID based shuffling / batching here... 
+		self.task_id_map = -np.ones(extent,dtype=int)
+		self.task_id_count = np.zeros(self.args.number_of_tasks, dtype=int)
+		for k in range(extent):
+			self.task_id_map[k] = self.dataset[k]['task_id']
+		for k in range(self.args.number_of_tasks):
+			self.task_id_count[k] = (self.task_id_map==k).sum()
+		self.cummulative_count = np.concatenate([np.zeros(1,dtype=int),np.cumsum(self.task_id_count)])
+
+		#######################################################################
+		# Now that we have an index map and a count of how many demonstrations there are in each task..
+	
+		#######################################################################
+		# Create blocks. 
+		# Best way to perform smart batching is perhaps to sort all indices within a task ID. 
+		# Next thing to do is to block up the sorted list.
+		# As before, add elements to blocks to ensure it's a full batch.
+		#######################################################################
+		
+		# Get list of indices in each task sorted in decreasing order according to trajectory length for smart batching.
+		task_sorted_indices_collection = []			
+		for k in range(self.args.number_of_tasks):				
+			# task_sorted_indices = np.argsort(self.dataset.dataset_trajectory_lengths[self.cummulative_count[k]:self.cummulative_count[k+1]])[::-1]
+			task_sorted_indices = np.argsort(self.dataset.dataset_trajectory_lengths[self.cummulative_count[k]:self.cummulative_count[k+1]])[::-1]+self.cummulative_count[k]
+			task_sorted_indices_collection.append(task_sorted_indices)
+		
+		# Concatenate this into array. 
+		# This allows us to use existing blocking code, and just directly index into this! 
+		self.concatenated_task_id_sorted_indices = np.concatenate(task_sorted_indices_collection)
+
+		#######################################################################
+		# Create blocks..
+		# Strategy - create blocks from each task ID using task_count, and then just add in more trajectories at random to make it a full batch (if needed).		
+		
+		blocks = []
+		task_blocks = []
+		counter = 0	
+
+		# We're going to create blocks, then pick one of the blocks, maybe based on which bucket the index falls into?
+		for k in range(self.args.number_of_tasks):
+			
+			j = 0			 		
+
+			# While we have an entire batch left to add. 
+			while j < self.task_id_count[k]-self.args.batch_size:
+				# Add a whole batch.
+				block = []
+
+				while len(block)<self.args.batch_size:				
+
+					# # Append index to block..
+					# block.append(self.cummulative_count[k]+j)
+					# Append TASK SORTED INDEX to block..
+					block.append(self.concatenated_task_id_sorted_indices[self.cummulative_count[k]+j])
+
+					j += 1				
+
+				# Append this block to the block list. 
+				blocks.append(block)
+
+			# Now that we don't have an entire batch to add. 			
+			# Get number of samples we need to add, and check if we need to add at all. 
+			number_of_samples = self.args.batch_size-(self.task_id_count[k]-j)
+			
+			print("NS:",k,j,number_of_samples)
+
+			if number_of_samples>0:
+				# Set pool to sample from. 
+				# end_index = -1 if (k+1 >= self.args.number_of_tasks) else k+1
+				# random_sample_pool = np.arange(self.cummulative_count[k],self.cummulative_count[end_index])
+				random_sample_pool = np.arange(self.cummulative_count[k],self.cummulative_count[k+1])
+
+				# Randomly sample the required number of datapoints. 
+				samples = np.random.randint(self.cummulative_count[k],high=self.cummulative_count[k+1],size=number_of_samples)
+				
+				# Create last block. 
+				block = []
+				# # Add original elements. 
+				# [block.append(v) for v in np.arange(self.cummulative_count[k]+j, self.cummulative_count[k+1])]
+				# # Now add randomly sampled elements.
+				# [block.append(v) for v in samples]
+
+				# Append TASK SORTED INDEX to block..
+				# Add original elements. 				
+				[block.append(self.concatenated_task_id_sorted_indices[v]) for v in np.arange(self.cummulative_count[k]+j, self.cummulative_count[k+1])]				
+				# Now add randomly sampled elements.
+				[block.append(self.concatenated_task_id_sorted_indices[v]) for v in samples]
+
+				# Finally append block to block list. 
+				blocks.append(block)
+
+		#######################################################################
+
+	def trajectory_length_based_shuffling(self, extent, shuffle=True):
+		
+		index_range = np.arange(0,extent)
+		# This just needs to be created if we're in joint setting.
+		# if self.args.setting in ['joint','learntsub']:
+		if isinstance(self, PolicyManager_BatchJoint):
+			self.sorted_indices = np.argsort(self.dataset.dataset_trajectory_lengths)[::-1]
+
+		# Actually just uses sorted_indices...
+
+		# blocks = [self.sorted_indices[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
+		blocks = [index_range[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
+		# ublocks = [self.sorted_indices[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
+		if shuffle:
+			np.random.shuffle(blocks)
+		# Shuffled index list is just a flattening of blocks.
+		self.index_list = [b for bs in blocks for b in bs]
+
 	def shuffle(self, extent, shuffle=True):
 		# If we're in a dataset that will have variable sized data.
 		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk']:
 			index_range = np.arange(0,extent)
 
-			# self.sorted_indices = np.argsort(self.dataset.dataset_trajectory_lengths)[::-1][:extent]
-
-			# This just needs to be created if we're in joint setting.
-			# if self.args.setting in ['joint','learntsub']:
-			if isinstance(self, PolicyManager_BatchJoint):
-				self.sorted_indices = np.argsort(self.dataset.dataset_trajectory_lengths)[::-1]
-
-			# blocks = [self.sorted_indices[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
-			blocks = [index_range[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
-			# ublocks = [self.sorted_indices[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
-			if shuffle:
-				np.random.shuffle(blocks)
-			# Shuffled index list is just a flattening of blocks.
-			self.index_list = [b for bs in blocks for b in bs]
+			if self.args.task_discriminability:
+				self.task_based_shuffling(extent=extent,shuffle=shuffle)				
+			else:
+				self.trajectory_length_based_shuffling(extent=extent,shuffle=shuffle)
 			
 		# If we're in Toy data, doesn't matter, just randomly shuffle. 
 		else:
@@ -3664,8 +3773,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 	def __init__(self, number_policies=4, dataset=None, args=None):
 
-		super(PolicyManager_BatchJoint, self).__init__(number_policies, dataset, args)
-
+		super(PolicyManager_BatchJoint, self).__init__(number_policies, dataset, args)		
 	def create_networks(self):
 
 		# Create instances of networks. 
@@ -3716,6 +3824,9 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 	# Get batch full trajectory. 
 	def collect_inputs(self, i, get_latents=False, special_indices=None, called_from_train=False):
 
+		# print("# Debug task ID batching")
+		# embed()
+
 		# Toy Data
 		if self.args.data in ['ContinuousNonZero','DirContNonZero','DeterGoal','ToyContext']:
 
@@ -3752,6 +3863,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 					   
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 				# data_element = self.dataset[i:i+self.args.batch_size]
+
+
 				data_element = self.dataset[self.sorted_indices[i:i+self.args.batch_size]]
 
 			else:
@@ -3827,6 +3940,17 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				self.max_batch_traj_length = self.batch_trajectory_lengths.max()
 
 				return batch_trajectory, scaled_action_sequence, concatenated_traj, old_concatenated_traj
+
+			# If we're using task based discriminability. 
+			if self.args.task_discriminability:
+				# Set the task ID's. 
+				self.batch_task_ids = np.zeros((self.args.batch_size), dtype=int)
+				for k in range(self.args.batch_size):
+					self.batch_task_ids[k] = data_element[k]['task_id']
+				
+				# Figure f we should be implementing.. same task ID stuff... probably more important to do smart batching of trjaectory lengths? 
+				# What will this need? Maybe... making references to the discriminators? And then calling forward on them? 
+
 
 			return batch_trajectory.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
 			
