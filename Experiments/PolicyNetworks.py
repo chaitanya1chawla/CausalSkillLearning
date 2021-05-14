@@ -1292,7 +1292,7 @@ class ContinuousVariationalPolicyNetwork_ConstrainedBPrior(ContinuousVariational
 class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwork_ConstrainedBPrior):
 
 	def __init__(self, input_size, hidden_size, z_dimensions, args, number_layers=4, translation_network=False):
-		
+
 		super(ContinuousVariationalPolicyNetwork_Batch, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)
 
 		self.translation_network = translation_network
@@ -2058,9 +2058,11 @@ class ContinuousMLP(torch.nn.Module):
 		self.variance_factor = 0.01
 		self.variance_activation_bias = 0.
 
-		self.relu_activation = torch.nn.ReLU()
+		self.relu_activation = torch.nn.ReLU()		
 		self.variance_activation_layer = torch.nn.Softplus()
 		self.args = args
+
+		self.dropout_layer = torch.nn.Dropout(self.args.mlp_dropout)
 		
 	def forward(self, input, greedy=False, action_epsilon=0.0001):
 
@@ -2068,10 +2070,10 @@ class ContinuousMLP(torch.nn.Module):
 		if self.args.small_translation_model:
 			final_layer = self.input_layer(input)
 		else:		
-			h1 = self.relu_activation(self.input_layer(input))
-			h2 = self.relu_activation(self.hidden_layer1(h1))
-			h3 = self.relu_activation(self.hidden_layer2(h2))
-			h4 = self.relu_activation(self.hidden_layer3(h3))
+			h1 = self.dropout_layer(self.relu_activation(self.input_layer(input)))
+			h2 = self.dropout_layer(self.relu_activation(self.hidden_layer1(h1)))
+			h3 = self.dropout_layer(self.relu_activation(self.hidden_layer2(h2)))
+			h4 = self.dropout_layer(self.relu_activation(self.hidden_layer3(h3)))
 			final_layer = h4
 		
 		self.mean_outputs = self.mean_output_layer(final_layer)		
@@ -2154,7 +2156,7 @@ class DiscreteMLP(torch.nn.Module):
 		self.output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
 		self.relu_activation = torch.nn.ReLU()
 
-		self.dropout_layer = torch.nn.Dropout(self.args.dropout)
+		self.dropout_layer = torch.nn.Dropout(self.args.mlp_dropout)
 
 		self.batch_logsoftmax_layer = torch.nn.LogSoftmax(dim=2)
 		self.batch_softmax_layer = torch.nn.Softmax(dim=2)		

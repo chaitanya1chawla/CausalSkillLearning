@@ -207,6 +207,7 @@ class PolicyManager_BaseClass():
 		counter = self.args.initial_counter_value
 
 		print("Running MAIN Train function.")
+
 		epoch_time = 0.
 		cum_epoch_time = 0.
 
@@ -223,9 +224,6 @@ class PolicyManager_BaseClass():
 				print("Embedding in Outer Train Function.")
 				embed()
 
-			# np.random.shuffle(self.index_list)
-			self.shuffle(extent)
-			self.batch_indices_sizes = []
 			# Modifying to make training functions handle batches. 
 			# For every item in the epoch:
 			if self.args.setting=='imitation':
@@ -238,6 +236,13 @@ class PolicyManager_BaseClass():
 					extent = self.args.debugging_datapoints
 				else:
 					extent = len(self.dataset)-self.test_set_size
+
+			# np.random.shuffle(self.index_list)
+			self.shuffle(extent)
+			self.batch_indices_sizes = []
+
+			if self.args.task_discriminability:
+				extent = self.extent
 
 			t1 = time.time()
 						
@@ -360,7 +365,8 @@ class PolicyManager_BaseClass():
 			# Initialize variables.
 			#####################################################
 
-			self.shuffle(len(self.dataset)-self.test_set_size)
+			self.shuffle(len(self.dataset)-self.test_set_size, shuffle=True)
+
 			for j in range(self.N//self.args.batch_size):
 				i = self.index_list[j]
 
@@ -725,7 +731,7 @@ class PolicyManager_BaseClass():
 		print("About to run a dry run. ")
 		# Do a dry run of 1 epoch, before we actually start running training. 
 		# This is so that we can figure out the batch of 1 epoch.
-		 
+		 		
 		self.shuffle(extent,shuffle=False)		
 
 		# Can now skip this entire block, because we've sorted data according to trajectory length.
@@ -775,7 +781,8 @@ class PolicyManager_BaseClass():
 		
 		#######################################################################
 
-		extent = len(self.dataset)
+		# Initialize extent as self.extent
+		extent = self.extent
 		index_range = np.arange(0,extent)
 
 		# print("Starting task based shuffling")
@@ -905,14 +912,29 @@ class PolicyManager_BaseClass():
 		self.index_list = [b for bs in blocks for b in bs]
 
 	def shuffle(self, extent, shuffle=True):
+
+		# if isinstance(self, PolicyManager_BatchJoint):
+		# 	print("########### Running shuffle from Batch Joint")
+		# # if isinstance(self, PolicyManager_JointFixEmbedTransfer):
+		# if isinstance(self, PolicyManager_Transfer):
+		# 	print("########### Running shuffle from Transfer PM")
+
 		# If we're in a dataset that will have variable sized data.
 		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk']:
 			if self.args.task_discriminability:
-				self.task_based_shuffling(extent=extent,shuffle=shuffle)				
+
+				# If we're in the BatchJoint setting, actually run task_based_shuffling.
+				if isinstance(self, PolicyManager_BatchJoint):						
+					if not(self.already_shuffled):
+						self.task_based_shuffling(extent=extent,shuffle=shuffle)				
+						self.already_shuffled = 1				
 				
+				# if isinstance(self, PolicyManager_Transfer):
+
 				# Also create an index list to shuffle the order of blocks that we observe...
 				self.index_list = np.arange(0,self.extent)				
 				np.random.shuffle(self.index_list)
+
 			else:
 				self.trajectory_length_based_shuffling(extent=extent,shuffle=shuffle)		
 			
@@ -1961,7 +1983,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.output_size = 2					
 		self.number_layers = self.args.number_layers
 		self.traj_length = 5
-		self.conditional_info_size = 6		
+		self.conditional_info_size = 6
+		
 
 		if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 			self.conditional_info_size = self.args.condition_size
@@ -2055,6 +2078,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# Per step decay. 
 		self.decay_rate = (self.initial_epsilon-self.final_epsilon)/(self.decay_counter)
+		self.extent = len(self.dataset)
+		self.already_shuffled = 0
 
 	def create_networks(self):
 		if self.args.discrete_z:
@@ -3040,7 +3065,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		else:
 			return None, None
 
-	# @tprofile(immediate=True)
 	def run_iteration(self, counter, i, skip_iteration=False, return_dicts=False, special_indices=None, train=True, input_dictionary=None):
 
 		# With learnt discrete subpolicy: 
@@ -3794,6 +3818,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 	def __init__(self, number_policies=4, dataset=None, args=None):
 
 		super(PolicyManager_BatchJoint, self).__init__(number_policies, dataset, args)		
+
 	def create_networks(self):
 
 		# Create instances of networks. 
@@ -5329,6 +5354,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.hidden_size = self.args.hidden_size
 		self.output_size = 2
 		self.learning_rate = self.args.learning_rate
+		self.already_shuffled = 0
 
 	def set_iteration(self, counter):
 
@@ -5375,6 +5401,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			modulo_phase = completed_alternating_training_phases%(self.args.discriminator_phase_size+self.args.generator_phase_size)
 			# If we haven't yet completed the right number of generator (discriminator) phase sizes is done, train the generator (discriminator). 
 			train_generator = modulo_phase<self.args.generator_phase_size
+	
+			# Now switching to training the discriminator first, because in the case where we're using a translation model, discriminator is useless for first GPS number of phases. 
+			# This causes losses to blow up. In the case where we're optimizing represeentations directly, the representations are already trained to reconstruct purely in training phase 1, before this alteranting stuff. 
+			train_discriminator = modulo_phase<self.args.discriminator_phase_size
+			train_generator = 1-train_discriminator
 
 			if train_generator:
 				print("Training VAE.")
@@ -5624,9 +5655,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				log_dict['Z Trajectory Discriminator Probability'] = viz_dict['z_trajectory_discriminator_probs']
 				log_dict['Unweighted Z Trajectory Discriminability Loss'] = self.masked_z_trajectory_discriminability_loss.mean()			
 
-			if self.args.equivariance and viz_dict['domain']==1:
-				log_dict['Unweighted Z Equivariance Loss'] = self.unweighted_masked_equivariance_loss
-				log_dict['Z Equivariance Loss'] = self.equivariance_loss
+			# if self.args.equivariance and viz_dict['domain']==1:
+			# 	log_dict['Unweighted Z Equivariance Loss'] = self.unweighted_masked_equivariance_loss
+			# 	log_dict['Z Equivariance Loss'] = self.equivariance_loss
 
 			if self.args.cross_domain_supervision and (viz_dict['domain']==1 or self.args.setting=='jointfixcycle'):
 				# If cycle, plot cdsl in both directions.
@@ -5639,6 +5670,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				log_dict['Task Discriminability Loss'] = self.task_discriminability_loss
 				log_dict['Task Discriminator Loss'] = self.task_discriminator_loss
 				log_dict['Unweighted Task Discriminator Loss'] = self.unweighted_task_discriminator_loss.mean()
+				log_dict['Task Discriminator Domain Probability'] = viz_dict['task_discriminator_probs']
 
 		##################################################
 		# Now visualizing spaces. 
@@ -6194,19 +6226,19 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		else: 
 			return None, None, None, None
 
-	def compute_equivariance_loss(self, update_dictionary):	
+	# def compute_equivariance_loss(self, update_dictionary):	
 
-		# Equivariance loss is computed as L2 difference between Transformed(Translated(Z_Seq)) and Translated(Transformed(Z_Seq)).
+	# 	# Equivariance loss is computed as L2 difference between Transformed(Translated(Z_Seq)) and Translated(Transformed(Z_Seq)).
 
-		# First Transform(Translated(Z)).
-		transformed_translated_z = update_dictionary['translated_latent_z'] + update_dictionary['delta_z']
+	# 	# First Transform(Translated(Z)).
+	# 	transformed_translated_z = update_dictionary['translated_latent_z'] + update_dictionary['delta_z']
 
-		# Now compute Translated(Transformed(Z)). Remember, this is basically just translated_latent_z rolled. (Ignoring the last timestep, which will be wonky)
-		translated_transformed_z = update_dictionary['translated_latent_z'].roll(-1,dims=0)
+	# 	# Now compute Translated(Transformed(Z)). Remember, this is basically just translated_latent_z rolled. (Ignoring the last timestep, which will be wonky)
+	# 	translated_transformed_z = update_dictionary['translated_latent_z'].roll(-1,dims=0)
 		
-		# Now compute the unweighted_loss.
-		vector_diff = (transformed_translated_z - translated_transformed_z)
-		return ((vector_diff)**2).mean()
+	# 	# Now compute the unweighted_loss.
+	# 	vector_diff = (transformed_translated_z - translated_transformed_z)
+	# 	return ((vector_diff)**2).mean()
 
 	def update_networks(self, domain, policy_manager, update_dictionary):
 
@@ -6267,18 +6299,18 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Set z transform discriminability loss to dummy value.
 			self.z_trajectory_discriminability_loss = 0.
 		
-		###########################################################
-		# (1d) If active, compute equivariance loss. 
-		###########################################################
+		# ###########################################################
+		# # (1d) If active, compute equivariance loss. 
+		# ###########################################################
 		
-		if self.args.equivariance:
-			self.unweighted_unmasked_equivariance_loss = self.compute_equivariance_loss(update_dictionary)
-			# Now mask by the same temporal masks that we used for the discriminability versions of this idea. 
-			self.unweighted_masked_equivariance_loss = (update_dictionary['z_trajectory_weights'].view(-1,)*self.unweighted_unmasked_equivariance_loss).mean()
-			self.equivariance_loss = self.args.equivariance_loss_weight*self.unweighted_masked_equivariance_loss
+		# if self.args.equivariance:
+		# 	self.unweighted_unmasked_equivariance_loss = self.compute_equivariance_loss(update_dictionary)
+		# 	# Now mask by the same temporal masks that we used for the discriminability versions of this idea. 
+		# 	self.unweighted_masked_equivariance_loss = (update_dictionary['z_trajectory_weights'].view(-1,)*self.unweighted_unmasked_equivariance_loss).mean()
+		# 	self.equivariance_loss = self.args.equivariance_loss_weight*self.unweighted_masked_equivariance_loss
 
-		else:
-			self.equivariance_loss = 0.
+		# else:
+		# 	self.equivariance_loss = 0.
 
 		###########################################################
 		# (1e) If active, compute cross domain z loss. 
@@ -6305,7 +6337,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Set the same kind of label we used in z_trajectory_discriminability..
 			traj_domain_label = domain*torch.ones(self.args.batch_size).to(device).long()
 			# Create an NLL based on task_discriminator_logprobs...
-			self.unweighted_task_discriminability = self.negative_log_likelihood_loss_function(update_dictionary['task_discriminator_logprob'].view(-1,2), 1-traj_domain_label)
+			self.unweighted_task_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['task_discriminator_logprob'].view(-1,2), 1-traj_domain_label)
 			# Weight and average.
 			self.task_discriminability_loss = self.args.task_discriminability_loss_weight*self.unweighted_task_discriminability_loss.mean()
 		else:
@@ -6320,7 +6352,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss + self.task_discriminability_loss
 
 		# Total encoder loss: 
-		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.equivariance_loss + self.cross_domain_supervision_loss	
+		# self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.equivariance_loss + self.cross_domain_supervision_loss	
+		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.cross_domain_supervision_loss	
 
 		if not(self.skip_vae):
 			# Go backward through the generator (encoder / decoder), and take a step. 
@@ -6371,7 +6404,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		###########################################################
 		
 		if self.args.task_discriminability:
-			task_discriminator_logprob, _ = self.task_discriminators[source_input_dict['sample_task_id']].get_probabilities(update_dictionary['translated_latent_z'].detach())
+			task_discriminator_logprob, _ = self.task_discriminators[update_dictionary['sample_task_id']].get_probabilities(update_dictionary['translated_latent_z'].detach())
 			self.unweighted_task_discriminator_loss = self.negative_log_likelihood_loss_function(task_discriminator_logprob.view(-1,2), traj_domain_label)
 			self.task_discriminator_loss = self.args.task_discriminator_weight*self.unweighted_task_discriminator_loss.mean()
 		else:
@@ -7812,7 +7845,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# If we're using task based discriminability
 		if self.args.task_discriminability:
 			self.task_discriminators = [EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size, args=self.args).to(device) for k in range(self.args.number_of_tasks)]
-
+			
 	def create_training_ops(self):
 
 		# Don't actually call super().create_training_ops(),
@@ -7972,6 +8005,219 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# If task ID is similar, minimize representation distance, but if task ID is different, maximize representation distance up to some threshold.
 		pass
 
+	def update_networks(self, domain, policy_manager, update_dictionary):
+
+		#########################################################################
+		# If we're implementing a regular GAN (as opposed to a Wasserstein GAN), just use super.update_networks.
+		#########################################################################	
+
+		if not(self.args.wasserstein_gan):
+			super().update_networks(domain, policy_manager, update_dictionary)
+			return
+		
+		#########################################################################
+		# Here, implement Wasserstein GAN style objective! 
+		#########################################################################
+
+		#########################################################################				
+		# (1) First, update the representation based on discriminability.
+		#########################################################################
+
+		# Since we are in the translation model setting, use self.optimizer rather either source / target policy manager. 
+		self.optimizer.zero_grad()
+
+		###########################################################
+		# (1a) First, compute reconstruction loss.
+		###########################################################
+
+		# Compute VAE loss on the current domain as likelihood plus weighted KL.  
+		self.likelihood_loss = 0.
+		self.encoder_KL = 0.
+		self.unweighted_VAE_loss = 0.
+		self.VAE_loss = self.vae_loss_weight*self.unweighted_VAE_loss
+
+		###########################################################
+		# (1b) Next, compute discriminability loss.
+		###########################################################
+
+		# # Compute discriminability loss for encoder (implicitly ignores decoder).
+		# # Pretend the label was the opposite of what it is, and train the encoder to make the discriminator think this was what was true. 
+		# # I.e. train encoder to make discriminator maximize likelihood of wrong label.
+		# # domain_label = torch.tensor(1-domain).to(device).long().view(1,)
+		# domain_label = domain*torch.ones(update_dictionary['discriminator_logprob'].shape[0]*update_dictionary['discriminator_logprob'].shape[1]).to(device).long()
+		# self.unweighted_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['discriminator_logprob'].view(-1,2), 1-domain_label).mean()
+		# self.discriminability_loss = self.discriminability_loss_weight*self.unweighted_discriminability_loss
+			
+		# Wasserstein GAN loss.
+		# For wasserstein GAN loss, the translation model is expected to maximize: E_{z \sim p(z)} [D(G(z))], or minimize... E_{z \sim p(z)} [ - D(G(z))]
+		# Basically just multiply with - domain here... 
+		self.unweighted_discriminability_loss = -domain*update_dictionary['discriminator_prob'][...,domain].mean()
+		self.discriminability_loss = self.discriminability_loss_weight*self.unweighted_discriminability_loss
+
+		###########################################################
+		# (1c) Next, compute z_trajectory discriminability loss.
+		###########################################################
+		if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
+			if self.args.z_trajectory_discriminator:
+				traj_domain_label = domain*torch.ones(self.args.batch_size).to(device).long()
+				# Overwrite update_dictionary['z_trajectory_weights']. 
+				update_dictionary['z_trajectory_weights'] = torch.ones(self.args.batch_size).to(device).float()
+			
+			elif self.args.z_transform_discriminator:
+				traj_domain_label = domain_label
+
+			# Set z transform discriminability loss.
+			self.unweighted_z_trajectory_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['z_trajectory_discriminator_logprob'].view(-1,2), 1-traj_domain_label)
+			# self.unweighted_z_trajectory_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['z_trajectory_discriminator_logprob'].view(-1,2), 1-domain_label)
+			self.masked_z_trajectory_discriminability_loss = update_dictionary['z_trajectory_weights'].view(-1,)*self.unweighted_z_trajectory_discriminability_loss
+			# Mask the z transform discriminability loss based on whether or not this particular latent_z, latent_z transformation tuple should be used to train the representation.
+			self.z_trajectory_discriminability_loss = self.z_trajectory_discriminability_loss_weight*self.masked_z_trajectory_discriminability_loss.mean()
+		else:
+			# Set z transform discriminability loss to dummy value.
+			self.unweighted_z_trajectory_discriminability_loss = 0.
+			self.z_trajectory_discriminability_loss = 0.
+
+		# ###########################################################
+		# # (1d) If active, compute equivariance loss. 
+		# ###########################################################
+		
+		# if self.args.equivariance:
+		# 	self.unweighted_unmasked_equivariance_loss = self.compute_equivariance_loss(update_dictionary)
+		# 	# Now mask by the same temporal masks that we used for the discriminability versions of this idea. 
+		# 	self.unweighted_masked_equivariance_loss = (update_dictionary['z_trajectory_weights'].view(-1,)*self.unweighted_unmasked_equivariance_loss).mean()
+		# 	self.equivariance_loss = self.args.equivariance_loss_weight*self.unweighted_masked_equivariance_loss
+
+		# else:
+		# 	self.equivariance_loss = 0.
+
+		###########################################################
+		# (1e) If active, compute cross domain z loss. 
+		###########################################################
+	
+		# Remember, the cross domain gt supervision loss should only be active when... trnaslating, i.e. when we have domain==1.
+		if self.args.cross_domain_supervision and domain==1:
+			# Call function to compute this. # This function depends on whether we have a translation model or not.. 
+			self.unweighted_unmasked_cross_domain_supervision_loss = self.compute_cross_domain_supervision_loss(update_dictionary)
+			# Now mask using batch mask.			
+			# self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
+			self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(policy_manager.batch_mask.sum())
+			# Now weight.
+			self.cross_domain_supervision_loss = self.args.cross_domain_supervision_loss_weight*self.unweighted_masked_cross_domain_supervision_loss		
+		else:
+			self.unweighted_masked_cross_domain_supervision_loss = 0.
+			self.cross_domain_supervision_loss = 0.
+
+		###########################################################
+		# (1f) If active, compute task discriminability loss.
+		###########################################################
+
+		if self.args.task_discriminability:
+			# Set the same kind of label we used in z_trajectory_discriminability..
+			traj_domain_label = domain*torch.ones(self.args.batch_size).to(device).long()
+			# Create an NLL based on task_discriminator_logprobs...
+			self.unweighted_task_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['task_discriminator_logprob'].view(-1,2), 1-traj_domain_label)
+			# Weight and average.
+			self.task_discriminability_loss = self.args.task_discriminability_loss_weight*self.unweighted_task_discriminability_loss.mean()
+		else:
+			self.unweighted_task_discriminability_loss = 0.
+			self.task_discriminability_loss = 0.
+
+		###########################################################
+		# (1g) Finally, compute total losses. 
+		###########################################################
+
+		# Total discriminability loss. 
+		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss + self.task_discriminability_loss
+
+		# Total encoder loss: 
+		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.cross_domain_supervision_loss	
+
+		if not(self.skip_vae):
+			# Go backward through the generator (encoder / decoder), and take a step. 
+			self.total_VAE_loss.backward()
+
+			# If we are in the translation model setting, use self.optimizer rather either source / target policy manager. 
+			self.optimizer.step()
+
+		#########################################################################
+		# (2) Next, update the discriminator based on Wasserstein GAN loss.
+		#########################################################################
+
+		# Zero gradients of discriminator(s).
+		self.discriminator_optimizer.zero_grad()
+
+		###########################################################
+		# (2a) Compute Z-discriminator loss.
+		###########################################################
+
+		# If we tried to zero grad the discriminator and then use NLL loss on it again, Pytorch would cry about going backward through a part of the graph that we already \ 
+		# went backward through. Instead, just pass things through the discriminator again, but this time detaching latent_z. 
+		discriminator_logprob, discriminator_prob = self.discriminator_network(update_dictionary['detached_latent_z'])
+
+		# Compute discriminator loss for discriminator. 
+		# self.discriminator_loss = self.negative_log_likelihood_loss_function(discriminator_logprob.squeeze(1), torch.tensor(domain).to(device).long().view(1,))		
+		self.discriminator_loss = self.negative_log_likelihood_loss_function(discriminator_logprob.view(-1,2), domain_label).mean()
+
+		# Wasserstein GAN loss.
+		# Here, domain label should just determine sign of loss.. and we have every element of the batch is the same domain.
+		# In this case... generated / translated z's (when domain==1) have to have +ve loss, and when domain==0, loss should be -ve. 
+		# This is described by.. 2*(domain-0.5) 
+		# This is only for .. backward translation... 
+		self.discriminator_loss = ((domain-0.5)*2) * discriminator_prob[...,domain].mean()
+
+
+		###########################################################
+		# (2b) Compute Z-trajectory discriminator loss. 
+		###########################################################
+
+		if self.args.z_trajectory_discriminator or self.args.z_transform_discriminator:
+			z_trajectory_discriminator_logprob, z_trajectory_discriminator_prob = self.z_trajectory_discriminator.get_probabilities(update_dictionary['z_trajectory'].detach())
+			self.unmasked_z_trajectory_discriminator_loss = self.negative_log_likelihood_loss_function(z_trajectory_discriminator_logprob.view(-1,2), traj_domain_label)
+			# Mask the z transform discriminator loss based on whether or not this particular latent_z, latent_z transformation tuple should be used to train the discriminator.
+			self.unweighted_z_trajectory_discriminator_loss = (update_dictionary['z_trajectory_weights'].view(-1,)*self.unmasked_z_trajectory_discriminator_loss)
+			self.z_trajectory_discriminator_loss = self.args.z_trajectory_discriminator_weight*self.unweighted_z_trajectory_discriminator_loss.mean()
+		else:
+			self.unweighted_z_trajectory_discriminator_loss = 0.
+			self.z_trajectory_discriminator_loss = 0.
+
+		###########################################################
+		# (2c) Compute Task-Discriminator loss.
+		###########################################################
+		
+		if self.args.task_discriminability:
+			task_discriminator_logprob, _ = self.task_discriminators[update_dictionary['sample_task_id']].get_probabilities(update_dictionary['translated_latent_z'].detach())
+			self.unweighted_task_discriminator_loss = self.negative_log_likelihood_loss_function(task_discriminator_logprob.view(-1,2), traj_domain_label)
+			self.task_discriminator_loss = self.args.task_discriminator_weight*self.unweighted_task_discriminator_loss.mean()
+		else:
+			self.unweighted_task_discriminator_loss = 0.
+			self.task_discriminator_loss = 0.
+
+		###########################################################
+		# (2d) Compute Discriminator Gradient Penalty
+		###########################################################
+
+		if self.args.gradient_penalty:
+			self.unweighted_discriminator_wasserstein_gradient_penalty = 0.
+			self.discriminator_wasserstein_gradient_penalty = self.args.gradient_penalty_weight*self.unweighted_discriminator_wasserstein_gradient_penalty
+		else:
+			self.unweighted_discriminator_wasserstein_gradient_penalty = 0.
+			self.discriminator_wasserstein_gradient_penalty = self.args.gradient_penalty_weight*self.unweighted_discriminator_wasserstein_gradient_penalty
+
+		###########################################################
+		# (2e) Merge discriminator losses.
+		###########################################################
+
+		self.total_discriminator_loss = self.discriminator_loss + self.z_trajectory_discriminator_loss + self.task_discriminator_loss + self.discriminator_wasserstein_gradient_penalty
+
+		###########################################################
+		# (2f) Now update discriminator(s).
+		###########################################################
+
+		if not(self.skip_discriminator):
+			# Now go backward and take a step.
+			self.total_discriminator_loss.backward()
+			self.discriminator_optimizer.step()
+
 	# @gpu_profile_every(1)
 	def run_iteration(self, counter, i, domain=None):
 		
@@ -8016,7 +8262,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		source_input_dict, source_var_dict, source_eval_dict = self.encode_decode_trajectory(policy_manager, i, domain=domain)
 		update_dictionary['subpolicy_inputs'], update_dictionary['latent_z'], update_dictionary['loglikelihood'], update_dictionary['kl_divergence'] = \
 			source_eval_dict['subpolicy_inputs'], source_var_dict['latent_z_indices'], source_eval_dict['learnt_subpolicy_loglikelihoods'], source_var_dict['kl_divergence']
-		
+		if self.args.task_discriminability:
+			update_dictionary['sample_task_id'] = source_input_dict['sample_task_id']
 
 		if update_dictionary['latent_z'] is not None:
 
@@ -8037,17 +8284,14 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# Set this variable, because this is what the discriminator training uses as input. 
 			update_dictionary['detached_latent_z'] = update_dictionary['translated_latent_z'].detach()
 			
-			# Get the diffs from the original latent z's..
-			delta_zs = detached_original_latent_z[1:] - detached_original_latent_z[:-1]
-			# delta_zs = update_dictionary['latent_z'][1:] - update_dictionary['latent_z'][:-1]
-			update_dictionary['delta_z'] = torch.cat([delta_zs, torch.zeros((1,self.args.batch_size,self.args.z_dimensions)).to(device)],dim=0)
-
 			#################################################
 			## (4) Feed latent z's to discriminator, and get discriminator likelihoods. 
 			#################################################
 
 			# In the joint transfer case: this is only for one domain.
-			update_dictionary['discriminator_logprob'], discriminator_prob = self.discriminator_network(update_dictionary['translated_latent_z'])
+			# update_dictionary['discriminator_logprob'], discriminator_prob = self.discriminator_network(update_dictionary['translated_latent_z'])
+			# Log the probability as well (haha)
+			update_dictionary['discriminator_logprob'], update_dictionary['discriminator_prob'] = self.discriminator_network(update_dictionary['translated_latent_z'])
 
 			#################################################
 			## (4b) If we are using a z_transform discriminator.
@@ -8055,7 +8299,6 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			
 			if self.args.z_transform_discriminator or self.args.equivariance:
 				# Calculate the transformation.
-				# update_dictionary['z_transformations'], update_dictionary['z_trajectory_weights'], update_dictionary['delta_z'] = self.get_z_transformation(update_dictionary['translated_latent_z'], source_var_dict['latent_b'])
 				update_dictionary['z_transformations'], update_dictionary['z_trajectory_weights'], _ = self.get_z_transformation(update_dictionary['translated_latent_z'], source_var_dict['latent_b'])
 				update_dictionary['z_trajectory_discriminator_logprob'], z_transform_discriminator_prob = self.z_trajectory_discriminator(update_dictionary['z_transformations'])
 				update_dictionary['z_trajectory'] = update_dictionary['z_transformations']
@@ -8106,7 +8349,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			#################################################
 			
 			viz_dict['domain'] = domain
-			viz_dict['discriminator_probs'] = discriminator_prob[...,domain].detach().cpu().numpy().mean()
+			viz_dict['discriminator_probs'] = update_dictionary['discriminator_prob'][...,domain].detach().cpu().numpy().mean()
+			if self.args.task_discriminability:
+				viz_dict['task_discriminator_probs'] = update_dictionary['task_discriminator_prob'][...,domain].detach().cpu().numpy().mean()
 
 			self.update_plots(counter, viz_dict, log=True)
 
