@@ -2064,23 +2064,38 @@ class ContinuousMLP(torch.nn.Module):
 
 		self.dropout_layer = torch.nn.Dropout(self.args.mlp_dropout)
 		
+		if self.args.batch_norm:
+			self.batch_norm_layer1 = torch.nn.BatchNorm1d(self.hidden_size)
+			self.batch_norm_layer2 = torch.nn.BatchNorm1d(self.hidden_size)
+			self.batch_norm_layer3 = torch.nn.BatchNorm1d(self.hidden_size)
+			self.batch_norm_layer4 = torch.nn.BatchNorm1d(self.hidden_size)
+
+
 	def forward(self, input, greedy=False, action_epsilon=0.0001):
 
 		# Assumes input is Batch_Size x Input_Size.			
 		if self.args.small_translation_model:
 			final_layer = self.input_layer(input)
-		else:		
-			h1 = self.dropout_layer(self.relu_activation(self.input_layer(input)))
-			h2 = self.dropout_layer(self.relu_activation(self.hidden_layer1(h1)))
-			h3 = self.dropout_layer(self.relu_activation(self.hidden_layer2(h2)))
-			h4 = self.dropout_layer(self.relu_activation(self.hidden_layer3(h3)))
+		else:
+
+			if self.args.batch_norm:
+				h1 = self.dropout_layer(self.relu_activation(self.batch_norm_layer1(self.input_layer(input))))
+				h2 = self.dropout_layer(self.relu_activation(self.batch_norm_layer2(self.hidden_layer1(h1))))
+				h3 = self.dropout_layer(self.relu_activation(self.batch_norm_layer3(self.hidden_layer2(h2))))
+				h4 = self.dropout_layer(self.relu_activation(self.batch_norm_layer4(self.hidden_layer3(h3))))
+			else:
+				h1 = self.dropout_layer(self.relu_activation(self.input_layer(input)))
+				h2 = self.dropout_layer(self.relu_activation(self.hidden_layer1(h1)))
+				h3 = self.dropout_layer(self.relu_activation(self.hidden_layer2(h2)))
+				h4 = self.dropout_layer(self.relu_activation(self.hidden_layer3(h3)))
+
 			final_layer = h4
 		
 		self.mean_outputs = self.mean_output_layer(final_layer)		
-		# self.variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(final_layer))+self.variance_activation_bias) + action_epsilon
+		self.variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(final_layer))+self.variance_activation_bias) + action_epsilon
 
-		self.variance_value = 1e-5
-		self.variance_outputs = self.variance_value*torch.ones_like(self.mean_outputs).to(device).float()
+		# self.variance_value = 1e-5
+		# self.variance_outputs = self.variance_value*torch.ones_like(self.mean_outputs).to(device).float()
 
 		noise = torch.randn_like(self.variance_outputs)
 			
@@ -2129,13 +2144,26 @@ class CriticMLP(torch.nn.Module):
 		self.relu_activation = torch.nn.ReLU()
 		self.dropout_layer = torch.nn.Dropout(self.args.mlp_dropout)
 
+		if self.args.batch_norm:
+			self.batch_norm_layer1 = torch.nn.BatchNorm1d(self.hidden_size)
+			self.batch_norm_layer2 = torch.nn.BatchNorm1d(self.hidden_size)
+			self.batch_norm_layer3 = torch.nn.BatchNorm1d(self.hidden_size)
+			self.batch_norm_layer4 = torch.nn.BatchNorm1d(self.hidden_size)
+
+
 	def forward(self, input, greedy=False, action_epsilon=0.0001):
 
 		# Assumes input is Batch_Size x Input_Size.
-		h1 = self.dropout_layer(self.relu_activation(self.input_layer(input)))
-		h2 = self.dropout_layer(self.relu_activation(self.hidden_layer1(h1)))
-		h3 = self.dropout_layer(self.relu_activation(self.hidden_layer2(h2)))
-		h4 = self.dropout_layer(self.relu_activation(self.hidden_layer3(h3)))
+		if self.args.batch_norm:
+			h1 = self.dropout_layer(self.relu_activation(self.batch_norm_layer1(self.input_layer(input))))
+			h2 = self.dropout_layer(self.relu_activation(self.batch_norm_layer2(self.hidden_layer1(h1))))
+			h3 = self.dropout_layer(self.relu_activation(self.batch_norm_layer3(self.hidden_layer2(h2))))
+			h4 = self.dropout_layer(self.relu_activation(self.batch_norm_layer4(self.hidden_layer3(h3))))
+		else:
+			h1 = self.dropout_layer(self.relu_activation(self.input_layer(input)))
+			h2 = self.dropout_layer(self.relu_activation(self.hidden_layer1(h1)))
+			h3 = self.dropout_layer(self.relu_activation(self.hidden_layer2(h2)))
+			h4 = self.dropout_layer(self.relu_activation(self.hidden_layer3(h3)))
 
 		# Predict critic value for each timestep. 
 		critic_value = self.output_layer(h4)		
@@ -2165,13 +2193,27 @@ class DiscreteMLP(torch.nn.Module):
 		self.batch_logsoftmax_layer = torch.nn.LogSoftmax(dim=2)
 		self.batch_softmax_layer = torch.nn.Softmax(dim=2)		
 
+
+		if self.args.batch_norm:
+			self.batch_norm_layer1 = torch.nn.BatchNorm1d(self.hidden_size)
+			self.batch_norm_layer2 = torch.nn.BatchNorm1d(self.hidden_size)
+			self.batch_norm_layer3 = torch.nn.BatchNorm1d(self.hidden_size)
+			self.batch_norm_layer4 = torch.nn.BatchNorm1d(self.hidden_size)
+
+
 	def forward(self, input):
 				
 		# Assumes input is Batch_Size x Input_Size.
-		h1 = self.dropout_layer(self.relu_activation(self.input_layer(input)))
-		h2 = self.dropout_layer(self.relu_activation(self.hidden_layer1(h1)))
-		h3 = self.dropout_layer(self.relu_activation(self.hidden_layer2(h2)))
-		h4 = self.dropout_layer(self.relu_activation(self.hidden_layer3(h3)))
+		if self.args.batch_norm:
+			h1 = self.dropout_layer(self.relu_activation(self.batch_norm_layer1(self.input_layer(input))))
+			h2 = self.dropout_layer(self.relu_activation(self.batch_norm_layer2(self.hidden_layer1(h1))))
+			h3 = self.dropout_layer(self.relu_activation(self.batch_norm_layer3(self.hidden_layer2(h2))))
+			h4 = self.dropout_layer(self.relu_activation(self.batch_norm_layer4(self.hidden_layer3(h3))))
+		else:
+			h1 = self.dropout_layer(self.relu_activation(self.input_layer(input)))
+			h2 = self.dropout_layer(self.relu_activation(self.hidden_layer1(h1)))
+			h3 = self.dropout_layer(self.relu_activation(self.hidden_layer2(h2)))
+			h4 = self.dropout_layer(self.relu_activation(self.hidden_layer3(h3)))
 
 		# Compute preprobability with output layer.
 		preprobability_outputs = self.output_layer(h4)

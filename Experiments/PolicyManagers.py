@@ -906,8 +906,8 @@ class PolicyManager_BaseClass():
 			self.sorted_indices = np.argsort(self.dataset.dataset_trajectory_lengths)[::-1]
 
 			# BIAS SORTED INDICES AWAY FROM SUPER LONG TRAJECTORIES... 
-			# self.traj_len_bias = 3000
-			# self.sorted_indices = self.sorted_indices[self.traj_len_bias:]
+			self.traj_len_bias = 3000
+			self.sorted_indices = self.sorted_indices[self.traj_len_bias:]
 			
 		# Actually just uses sorted_indices...		
 
@@ -6396,10 +6396,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# If "translating" source domain z., 
 		if domain==0:
-			self.unweighted_identity_translation_loss = self.compute_identity_loss(domain, policy_manager, update_dictionary)
-			self.identity_translation_loss = self.args.identity_translation_loss_weight*self.unweighted_identity_translation_loss
+			self.unweighted_identity_translation_loss = self.compute_identity_loss(update_dictionary)			
 		else:
-			self.identity_translation_loss = 0.
+			self.unweighted_identity_translation_loss = 0.
+		self.identity_translation_loss = self.args.identity_translation_loss_weight*self.unweighted_identity_translation_loss
 
 		###########################################################
 		# (1h) Finally, compute total losses. 
@@ -7814,6 +7814,13 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# print("Run Super Plots")
 		log_dict = super().update_plots(counter, viz_dict, log=False)
 
+		# Also log identity loss..
+		log_dict['Unweighted Identity Translation Loss'] = self.unweighted_identity_translation_loss 
+		log_dict['Identity Translation Loss'] = self.identity_translation_loss
+		if self.args.gradient_penalty:
+			log_dict['Unweighted Wasserstein Gradient Penalty'] = self.unweighted_wasserstein_gradient_penalty
+			log_dict['Wasserstein Gradient Penalty'] = self.wasserstein_gradient_penalty
+
 		############################################################
 		# Now implement visualization of original latent set and translated z space in both directions. 
 		############################################################	
@@ -7916,8 +7923,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.parameter_list = list(self.backward_translation_model.parameters())
 
 		# Now create optimizer for translation models. 
-		# self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
-		self.optimizer = torch.optim.RMSprop(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
+		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
+		# self.optimizer = torch.optim.RMSprop(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
 
 		# Set discriminator parameter list. 
 		# self.discriminator_parameter_list = list(self.source_z_discriminator.parameters()) + list(self.target_z_discriminator.parameters())
@@ -7933,8 +7940,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				self.discriminator_parameter_list += list(self.task_discriminators[k].parameters())
 
 		# Create common optimizer for source, target, and discriminator networks. 
-		# self.discriminator_optimizer = torch.optim.Adam(self.discriminator_parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
-		self.discriminator_optimizer = torch.optim.RMSprop(self.discriminator_parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
+		self.discriminator_optimizer = torch.optim.Adam(self.discriminator_parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
+		# self.discriminator_optimizer = torch.optim.RMSprop(self.discriminator_parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
 
 	def save_all_models(self, suffix):
 
@@ -8204,10 +8211,10 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		# If "translating" source domain z., 
 		if domain==0:
-			self.unweighted_identity_translation_loss = self.compute_identity_loss()
-			self.identity_translation_loss = self.args.identity_translation_loss_weight*self.unweighted_identity_translation_loss
+			self.unweighted_identity_translation_loss = self.compute_identity_loss(update_dictionary)			
 		else:
-			self.identity_translation_loss = 0.
+			self.unweighted_identity_translation_loss = 0.
+		self.identity_translation_loss = self.args.identity_translation_loss_weight*self.unweighted_identity_translation_loss
 
 		###########################################################
 		# (1h) Finally, compute total losses. 

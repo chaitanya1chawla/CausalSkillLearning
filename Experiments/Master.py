@@ -186,6 +186,7 @@ def parse_arguments():
 	parser.add_argument('--var_hidden_size',dest='var_hidden_size',type=int,default=64)
 	parser.add_argument('--dropout',dest='dropout',type=float,default=0.,help='Whether to set dropout.') 
 	parser.add_argument('--mlp_dropout',dest='mlp_dropout',type=float,default=0.,help='Whether to set dropout.') 
+	parser.add_argument('--batch_norm',dest='batch_norm',type=int,default=0,help='Whether to use batch norm.')
 	parser.add_argument('--environment',dest='environment',type=str,default='SawyerLift') # Defines robosuite environment for RL.
 	
 	# Data parameters. 
@@ -329,7 +330,7 @@ def parse_arguments():
 	parser.add_argument('--gradient_penalty_weight',dest='gradient_penalty_weight',type=float,default=10.,help='Relative weight of the Wasserstein discriminator gradient penalty.')
 	parser.add_argument('--wasserstein_discriminator_clipping',dest='wasserstein_discriminator_clipping',type=int,default=0,help='Whether to apply clipping of discriminator parameters.')
 	parser.add_argument('--wasserstein_discriminator_clipping_value',dest='wasserstein_discriminator_clipping_value',type=float,default=0.01,help='Value to apply clipping of discriminator parameters.')
-	parser.add_argument('--identity_translation_loss_weight',dest='identity_translation_loss_weight',type=float,default=10,help='Weight associated with th e regularization of translation model to identity for source zs.')
+	parser.add_argument('--identity_translation_loss_weight',dest='identity_translation_loss_weight',type=float,default=1,help='Weight associated with th e regularization of translation model to identity for source zs.')
 
 	# Task ID based discriminability
 	parser.add_argument('--task_discriminability',dest='task_discriminability',type=int,default=0,help='Whether or not to implement task based discriminability.')
