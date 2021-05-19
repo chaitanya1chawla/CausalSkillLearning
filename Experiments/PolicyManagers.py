@@ -906,8 +906,9 @@ class PolicyManager_BaseClass():
 			self.sorted_indices = np.argsort(self.dataset.dataset_trajectory_lengths)[::-1]
 
 			# BIAS SORTED INDICES AWAY FROM SUPER LONG TRAJECTORIES... 
-			self.traj_len_bias = 3000
-			self.sorted_indices = self.sorted_indices[self.traj_len_bias:]
+			# self.traj_len_bias = 3000
+			# self.sorted_indices = self.sorted_indices[self.traj_len_bias:]
+			
 		# Actually just uses sorted_indices...		
 
 		# blocks = [self.sorted_indices[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
@@ -3939,6 +3940,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			self.batch_trajectory_lengths = np.zeros((self.args.batch_size), dtype=int)
 			minl = 10000
 			maxl = 0
+			
 			for x in range(self.args.batch_size):
 				self.batch_trajectory_lengths[x] = data_element[x]['demo'].shape[0]
 				maxl = max(maxl,self.batch_trajectory_lengths[x])
@@ -3978,15 +3980,20 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 						# Setting task ID too.		
 						self.conditional_information[:,-self.number_tasks+data_element['task-id']] = 1.
 				else:
-					pass
-					# #####################################################################	
-					# # Set a batch element here..				
-					# batch_conditional_information = np.zeros((self.args.batch_size, self.max_batch_traj_length, self.conditional_info_size))
-					# for x in range(self.args.batch_size):
-					# 	batch_conditional_information[x,:self.batch_trajectory_lengths[x],:self.cond_robot_state_size] = data_element[x]['robot-state']
-					# 	batch_conditional_information[x,:self.batch_trajectory_lengths[x],self.cond_robot_state_size:self.cond_robot_state_size+object_states.shape[-1]] = data_element[x]['object-state']
-					# 	batch_conditional_information[x,:self.batch_trajectory_lengths[x],-self.number_tasks+data_element['task-id']] = 1.
-					# #####################################################################
+
+					#####################################################################	
+					# Set a batch element here..				
+					batch_conditional_information = np.zeros((self.args.batch_size, self.max_batch_traj_length, self.conditional_info_size))
+					for x in range(self.args.batch_size):
+
+						if data_element[x]['is_valid']:
+
+							batch_conditional_information[x,:self.batch_trajectory_lengths[x],:self.cond_robot_state_size] = data_element[x]['robot-state']						
+							batch_conditional_information[x,:self.batch_trajectory_lengths[x],self.cond_robot_state_size:self.cond_robot_state_size+data_element[x]['object-state'].shape[-1]] = data_element[x]['object-state']						
+							batch_conditional_information[x,:self.batch_trajectory_lengths[x],-self.number_tasks+data_element[x]['task-id']] = 1.
+ 
+					self.conditional_information = np.zeros((self.conditional_info_size))
+					#####################################################################
 
 			# Compute actions.
 			action_sequence = np.diff(batch_trajectory,axis=1)
@@ -6271,6 +6278,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 	# 	vector_diff = (transformed_translated_z - translated_transformed_z)
 	# 	return ((vector_diff)**2).mean()
 
+	def compute_identity_loss(self, update_dictionary):
+
+		# Feed latent z into translation model, force outputs to be unchanged..
+		# Remember, this is only called with domain = 0 here. Here update_dictionary['detached_latent_z'] corresponds to the original source z.
+		self.translated_source_z = self.backward_translation_model.forward(update_dictionary['detached_latent_z'])
+		unweighted_identity_translation_loss = ((self.translated_source_z - update_dictionary['detached_latent_z'])**2).mean()
+		return unweighted_identity_translation_loss		
+
 	def update_networks(self, domain, policy_manager, update_dictionary):
 
 		#########################################################################
@@ -6376,11 +6391,22 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.task_discriminability_loss = 0.
 
 		###########################################################
-		# (1g) Finally, compute total losses. 
+		# (1g) Compute identity losses.
+		###########################################################
+
+		# If "translating" source domain z., 
+		if domain==0:
+			self.unweighted_identity_translation_loss = self.compute_identity_loss(domain, policy_manager, update_dictionary)
+			self.identity_translation_loss = self.args.identity_translation_loss_weight*self.unweighted_identity_translation_loss
+		else:
+			self.identity_translation_loss = 0.
+
+		###########################################################
+		# (1h) Finally, compute total losses. 
 		###########################################################
 
 		# Total discriminability loss. 
-		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss + self.task_discriminability_loss
+		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss + self.task_discriminability_loss + self.identity_translation_loss
 
 		# Total encoder loss: 
 		# self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.equivariance_loss + self.cross_domain_supervision_loss	
@@ -8173,11 +8199,22 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			self.task_discriminability_loss = 0.
 
 		###########################################################
-		# (1g) Finally, compute total losses. 
+		# (1g) Compute identity losses.
+		###########################################################
+
+		# If "translating" source domain z., 
+		if domain==0:
+			self.unweighted_identity_translation_loss = self.compute_identity_loss()
+			self.identity_translation_loss = self.args.identity_translation_loss_weight*self.unweighted_identity_translation_loss
+		else:
+			self.identity_translation_loss = 0.
+
+		###########################################################
+		# (1h) Finally, compute total losses. 
 		###########################################################
 
 		# Total discriminability loss. 
-		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss + self.task_discriminability_loss
+		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss + self.task_discriminability_loss + self.identity_translation_loss
 
 		# Total encoder loss: 
 		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.cross_domain_supervision_loss	
