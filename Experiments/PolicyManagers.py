@@ -91,7 +91,7 @@ class PolicyManager_BaseClass():
 		self.writer.export_scalars_to_json("./all_scalars.json")
 		self.writer.close()
 
-	def collect_inputs(self, i, get_latents=False, special_indices=None):
+	def collect_inputs(self, i, get_latents=False, special_indices=None, called_from_train=False):	
 
 		if self.args.data=='DeterGoal':
 			
@@ -230,12 +230,17 @@ class PolicyManager_BaseClass():
 				extent = self.dataset.get_number_task_demos(self.demo_task_index)
 			# if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed' or self.args.setting=='jointtransfer':
 			if self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle']:
-				extent = self.extent
+				if self.args.debugging_datapoints>-1:
+					extent = self.args.debugging_datapoints
+					self.extent = self.args.debugging_datapoints
+				else:
+					extent = self.extent
 			else:
 				if self.args.debugging_datapoints>-1:				
 					extent = self.args.debugging_datapoints
 				else:
 					extent = len(self.dataset)-self.test_set_size
+			
 
 			# np.random.shuffle(self.index_list)
 			self.shuffle(extent)
@@ -759,8 +764,7 @@ class PolicyManager_BaseClass():
 			self.max_batch_size = 'Full'
 		else:
 			self.max_batch_size = self.dataset.dataset_trajectory_lengths.max()
-			
-					
+								
 		print("About to run max batch size iteration.")
 		print("This batch size is: ", self.max_batch_size)
 
@@ -901,7 +905,10 @@ class PolicyManager_BaseClass():
 		if isinstance(self, PolicyManager_BatchJoint):
 			self.sorted_indices = np.argsort(self.dataset.dataset_trajectory_lengths)[::-1]
 
-		# Actually just uses sorted_indices...
+			# BIAS SORTED INDICES AWAY FROM SUPER LONG TRAJECTORIES... 
+			self.traj_len_bias = 3000
+			self.sorted_indices = self.sorted_indices[self.traj_len_bias:]
+		# Actually just uses sorted_indices...		
 
 		# blocks = [self.sorted_indices[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
 		blocks = [index_range[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
@@ -921,6 +928,8 @@ class PolicyManager_BaseClass():
 
 		# If we're in a dataset that will have variable sized data.
 		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk']:
+	
+
 			if self.args.task_discriminability:
 
 				# If we're in the BatchJoint setting, actually run task_based_shuffling.
@@ -934,10 +943,13 @@ class PolicyManager_BaseClass():
 				# Also create an index list to shuffle the order of blocks that we observe...
 				self.index_list = np.arange(0,self.extent)				
 				np.random.shuffle(self.index_list)
-
+						
 			else:
 				self.trajectory_length_based_shuffling(extent=extent,shuffle=shuffle)		
 			
+				
+
+
 		# If we're in Toy data, doesn't matter, just randomly shuffle. 
 		else:
 			# Replaces np.random.shuffle(self.index_list) with block based shuffling.
@@ -3277,7 +3289,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# Embed distinct latent_z's.
 
 		# Set N:
-		self.N = 100
+		# self.N = 100
+		self.N = 10	
 
 		# We're going to store 3 sets of things. 
 		# (1) The contextual skill embeddings of the latent_z's. 
@@ -3314,6 +3327,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				# If we've computed enough z's, break at the end of this batch.
 				if i*self.args.batch_size+b>=self.N:
 					break_var = 1
+					break
 
 				# Get segmentations.
 				distinct_z_indices = torch.where(variational_dict['latent_b'][:,b])[0].clone().detach().cpu().numpy()
@@ -3324,7 +3338,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				self.latent_z_set.append(copy.deepcopy(distinct_zs))
 				self.trajectory_set.append(copy.deepcopy(input_dict['sample_traj'][:,b]))
 				self.segmentation_set.append(copy.deepcopy(distinct_z_indices))
-
 				
 				# Add each trajectory segment to segmented_trajectory_set. 
 				for k in range(len(distinct_z_indices)-1):					
@@ -3850,7 +3863,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 	def get_batch_element(self, i):
 		# Make data_element a list of dictionaries. 
 		# data_element = np.array([self.dataset[b] for b in range(i,i+self.args.batch_size)])
-		data_element = np.array([self.dataset[b] for b in sorted_indices[i:i+self.args.batch_size]])
+		data_element = np.array([self.dataset[b] for b in self.sorted_indices[i:i+self.args.batch_size]])
 		# for b in range(i,i+self.args.batch_size):	
 		# 	data_element.append(self.dataset[b])
 
@@ -3947,19 +3960,33 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			# Set condiitonal information. 
 			if self.args.data in ['MIME','OldMIME']:
 				self.conditional_information = np.zeros((self.conditional_info_size))				
-			elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
-				robot_states = data_element['robot-state']
-				object_states = data_element['object-state']
 
-				self.conditional_information = np.zeros((self.conditional_info_size))
-				# Don't set this if pretraining / baseline.
-				if self.args.setting=='learntsub' or self.args.setting=='imitation':
-					self.conditional_information = np.zeros((len(trajectory),self.conditional_info_size))
-					self.conditional_information[:,:self.cond_robot_state_size] = robot_states
-					# Doing this instead of self.cond_robot_state_size: because the object_states size varies across demonstrations.
-					self.conditional_information[:,self.cond_robot_state_size:self.cond_robot_state_size+object_states.shape[-1]] = object_states	
-					# Setting task ID too.		
-					self.conditional_information[:,-self.number_tasks+data_element['task-id']] = 1.
+			elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
+
+				if self.args.batch_size==1:
+					robot_states = data_element['robot-state']
+					object_states = data_element['object-state']
+
+					self.conditional_information = np.zeros((self.conditional_info_size))
+					
+					# Don't set this if pretraining / baseline.
+					if self.args.setting=='learntsub' or self.args.setting=='imitation':
+						self.conditional_information = np.zeros((len(trajectory),self.conditional_info_size))
+						self.conditional_information[:,:self.cond_robot_state_size] = robot_states
+						# Doing this instead of self.cond_robot_state_size: because the object_states size varies across demonstrations.
+						self.conditional_information[:,self.cond_robot_state_size:self.cond_robot_state_size+object_states.shape[-1]] = object_states	
+						# Setting task ID too.		
+						self.conditional_information[:,-self.number_tasks+data_element['task-id']] = 1.
+				else:
+					pass
+					# #####################################################################	
+					# # Set a batch element here..				
+					# batch_conditional_information = np.zeros((self.args.batch_size, self.max_batch_traj_length, self.conditional_info_size))
+					# for x in range(self.args.batch_size):
+					# 	batch_conditional_information[x,:self.batch_trajectory_lengths[x],:self.cond_robot_state_size] = data_element[x]['robot-state']
+					# 	batch_conditional_information[x,:self.batch_trajectory_lengths[x],self.cond_robot_state_size:self.cond_robot_state_size+object_states.shape[-1]] = data_element[x]['object-state']
+					# 	batch_conditional_information[x,:self.batch_trajectory_lengths[x],-self.number_tasks+data_element['task-id']] = 1.
+					# #####################################################################
 
 			# Compute actions.
 			action_sequence = np.diff(batch_trajectory,axis=1)
@@ -5431,7 +5458,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		if self.args.setting=='jointcycletransfer':
 			self.discriminator_network = EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size).to(device)
 		else:
-			self.discriminator_network = DiscreteMLP(self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
+			if self.args.wasserstein_gan or self.args.lsgan:
+				# Implement discriminator as a critic, rather than an actualy classifier network.
+				self.discriminator_network = CriticMLP(self.input_size, self.hidden_size, 1, args=self.args).to(device)
+			else:
+				self.discriminator_network = DiscreteMLP(self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
 
 	def create_training_ops(self):
 
@@ -5854,6 +5885,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				
 		# Now assemble them into local variables.
 		self.N = self.source_manager.N
+
 		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle']:
 			self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
 			self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)			
@@ -5873,10 +5905,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.source_latent_zs = (self.source_latent_zs-self.source_z_mean.detach().cpu().numpy())/self.source_z_std.detach().cpu().numpy()
 			self.target_latent_zs = (self.target_latent_zs-self.target_z_mean.detach().cpu().numpy())/self.target_z_std.detach().cpu().numpy()
 
-
 		# Try something
-		self.source_latent_zs = self.source_latent_zs[:500]
-		self.target_latent_zs = self.target_latent_zs[:500]
+		self.source_latent_zs = self.source_latent_zs[:min(500,len(self.source_latent_zs))]
+		self.target_latent_zs = self.target_latent_zs[:min(500,len(self.target_latent_zs))]
 
 		# Copy sets so we don't accidentally perform in-place operations on any of the computed sets.
 		self.original_source_latent_z_set = copy.deepcopy(self.source_latent_zs)
@@ -7859,7 +7890,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.parameter_list = list(self.backward_translation_model.parameters())
 
 		# Now create optimizer for translation models. 
-		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
+		# self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
+		self.optimizer = torch.optim.RMSprop(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
 
 		# Set discriminator parameter list. 
 		# self.discriminator_parameter_list = list(self.source_z_discriminator.parameters()) + list(self.target_z_discriminator.parameters())
@@ -7875,7 +7907,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				self.discriminator_parameter_list += list(self.task_discriminators[k].parameters())
 
 		# Create common optimizer for source, target, and discriminator networks. 
-		self.discriminator_optimizer = torch.optim.Adam(self.discriminator_parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
+		# self.discriminator_optimizer = torch.optim.Adam(self.discriminator_parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
+		self.discriminator_optimizer = torch.optim.RMSprop(self.discriminator_parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
 
 	def save_all_models(self, suffix):
 
@@ -8011,12 +8044,16 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# If we're implementing a regular GAN (as opposed to a Wasserstein GAN), just use super.update_networks.
 		#########################################################################	
 
-		if not(self.args.wasserstein_gan):
-			super().update_networks(domain, policy_manager, update_dictionary)
-			return
-		
+		if self.args.wasserstein_gan or self.args.lsgan:
+			self.alternate_gan_update(domain, policy_manager, update_dictionary)
+		else:		
+			# Regular GAN update.
+			super().update_networks(domain, policy_manager, update_dictionary)		
+
+	def alternate_gan_update(self, domain, policy_manager, update_dictionary):
+	
 		#########################################################################
-		# Here, implement Wasserstein GAN style objective! 
+		# Here, implement Wasserstein GAN or LSGAN style objective! 
 		#########################################################################
 
 		#########################################################################				
@@ -8048,10 +8085,23 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# self.unweighted_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['discriminator_logprob'].view(-1,2), 1-domain_label).mean()
 		# self.discriminability_loss = self.discriminability_loss_weight*self.unweighted_discriminability_loss
 			
-		# Wasserstein GAN loss.
-		# For wasserstein GAN loss, the translation model is expected to maximize: E_{z \sim p(z)} [D(G(z))], or minimize... E_{z \sim p(z)} [ - D(G(z))]
-		# Basically just multiply with - domain here... 
-		self.unweighted_discriminability_loss = -domain*update_dictionary['discriminator_prob'][...,domain].mean()
+		if self.args.wasserstein_gan:
+			# Wasserstein GAN loss.
+			# For wasserstein GAN loss, the translation model is expected to maximize: E_{z \sim p(z)} [D(G(z))], or minimize... E_{z \sim p(z)} [ - D(G(z))]
+			# Basically just multiply with - domain here... 
+			# self.unweighted_discriminability_loss = -domain*update_dictionary['discriminator_prob'][...,domain].mean()
+
+			# Moving to implementing the discriminator as a critic network rather than a classifier.
+			# Still using discriminator "prob" as dictionary key. 
+			self.unweighted_discriminability_loss = -domain*update_dictionary['discriminator_prob'].mean()
+
+		elif self.args.lsgan:
+			# LSGAN Discriminability loss.
+			# Discriminability loss only active when domain = 1.
+			self.unweighted_discriminability_loss = domain*((update_dictionary['discriminator_prob']-domain)**2).mean()
+		
+
+		# In either case, weight the discirminability loss.
 		self.discriminability_loss = self.discriminability_loss_weight*self.unweighted_discriminability_loss
 
 		###########################################################
@@ -8152,19 +8202,22 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		# If we tried to zero grad the discriminator and then use NLL loss on it again, Pytorch would cry about going backward through a part of the graph that we already \ 
 		# went backward through. Instead, just pass things through the discriminator again, but this time detaching latent_z. 
-		discriminator_logprob, discriminator_prob = self.discriminator_network(update_dictionary['detached_latent_z'])
+		discriminator_prob = self.discriminator_network(update_dictionary['detached_latent_z'])
 
-		# Compute discriminator loss for discriminator. 
-		# self.discriminator_loss = self.negative_log_likelihood_loss_function(discriminator_logprob.squeeze(1), torch.tensor(domain).to(device).long().view(1,))		
-		self.discriminator_loss = self.negative_log_likelihood_loss_function(discriminator_logprob.view(-1,2), domain_label).mean()
+		if self.args.wasserstein_gan:
+		
+			# Wasserstein GAN loss.
+			# Here, domain label should just determine sign of loss.. and we have every element of the batch is the same domain.
+			# In this case... generated / translated z's (when domain==1) have to have +ve loss, and when domain==0, loss should be -ve. 
+			# This is described by.. 2*(domain-0.5) 
+			# This is only for .. backward translation... 
+			# self.discriminator_loss = ((domain-0.5)*2) * discriminator_prob[...,domain].mean()
 
-		# Wasserstein GAN loss.
-		# Here, domain label should just determine sign of loss.. and we have every element of the batch is the same domain.
-		# In this case... generated / translated z's (when domain==1) have to have +ve loss, and when domain==0, loss should be -ve. 
-		# This is described by.. 2*(domain-0.5) 
-		# This is only for .. backward translation... 
-		self.discriminator_loss = ((domain-0.5)*2) * discriminator_prob[...,domain].mean()
-
+			# Moving to implementing the discriminator as a critic network rather than as a classifier.
+			self.discriminator_loss = ((domain-0.5)*2) * discriminator_prob.mean()
+		elif self.args.lsgan:		
+			# LSGAN Discriminator loss.
+			self.discriminator_loss = ((update_dictionary['discriminator_prob'] - (1-domain))**2).mean()
 
 		###########################################################
 		# (2b) Compute Z-trajectory discriminator loss. 
@@ -8197,17 +8250,16 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		###########################################################
 
 		if self.args.gradient_penalty:
-			self.unweighted_discriminator_wasserstein_gradient_penalty = 0.
-			self.discriminator_wasserstein_gradient_penalty = self.args.gradient_penalty_weight*self.unweighted_discriminator_wasserstein_gradient_penalty
+			self.unweighted_wasserstein_gradient_penalty = self.compute_wasserstein_gradient_penalty(domain, update_dictionary)
 		else:
-			self.unweighted_discriminator_wasserstein_gradient_penalty = 0.
-			self.discriminator_wasserstein_gradient_penalty = self.args.gradient_penalty_weight*self.unweighted_discriminator_wasserstein_gradient_penalty
+			self.unweighted_wasserstein_gradient_penalty = 0.
+		self.wasserstein_gradient_penalty = self.args.gradient_penalty_weight*self.unweighted_wasserstein_gradient_penalty
 
 		###########################################################
 		# (2e) Merge discriminator losses.
 		###########################################################
 
-		self.total_discriminator_loss = self.discriminator_loss + self.z_trajectory_discriminator_loss + self.task_discriminator_loss + self.discriminator_wasserstein_gradient_penalty
+		self.total_discriminator_loss = self.discriminator_loss + self.z_trajectory_discriminator_loss + self.task_discriminator_loss + self.wasserstein_gradient_penalty
 
 		###########################################################
 		# (2f) Now update discriminator(s).
@@ -8217,6 +8269,90 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# Now go backward and take a step.
 			self.total_discriminator_loss.backward()
 			self.discriminator_optimizer.step()
+
+			if self.args.wasserstein_discriminator_clipping:
+				for param in self.discriminator_parameter_list:
+					param.data.clamp_(min=-self.args.wasserstein_discriminator_clipping_value,max=self.args.wasserstein_discriminator_clipping_value)
+
+	def compute_wasserstein_gradient_penalty(self, domain, update_dictionary):
+		# Compute gradient penalty:
+
+		# Using https://github.com/EmilienDupont/wgan-gp/blob/master/training.py#L100 as a reference. 
+
+		# 1) Get source and translated target input z's. 
+		# 2) Compute interpolation of the source and translated target input z's. 
+		#	# 2a) For interpolation compute which of the z's is the smaller one, (after reshape), sample an appropraite number of zs from the smaller domain. 
+		# 	# 2b) Pad the smaller z with those randomly sampled z's. 
+		# 	# 2c) Add the padded zs with the larger z set. 
+		# 3) Feed interpolated z's into the discriminator. 
+		# 4) Compute gradient of discriminator output with respect to inputs. 
+		# 5) Compute norm of gradients.
+		# 6) Feed back as penalty. 
+
+		# 0) Setting this penalty to 0 when the domain is source domain, because we're not translating here.
+		if domain==0:			
+			gradient_penalty = 0
+			return gradient_penalty
+
+		# 1) Get source and translated target z's. 
+		# Sample a random batch of z's cross domain, so we can enforce a gradient penalty. 
+		with torch.no_grad():
+			# Get opposite domain policy manager.
+			target_policy_manager = self.get_domain_manager(1-domain)
+			# Feed in trajectory.
+			# Instead of i, use randomly sampled batch. 
+			# 
+			if self.args.debugging_datapoints>-1:
+				index = np.random.randint(0, self.args.debugging_datapoints)
+			else:
+				index = np.random.randint(0, self.extent)
+			
+			cross_domain_input_dict, cross_domain_var_dict, cross_domain_eval_dict = self.encode_decode_trajectory(target_policy_manager, index, domain=1-domain)
+			
+			# Log cross domain latent z in update dictionary. 
+			source_latent_z = cross_domain_var_dict['latent_z_indices']
+
+		translated_target_zs = update_dictionary['translated_latent_z'].detach()
+
+		# 2) Compute interpolation of the source and translated target input z's. 
+		#	# 2a) For interpolation compute which of the z's is the smaller one, (after reshape), sample an appropraite number of zs from the smaller domain. 
+		z_sets = [source_latent_z.view(-1,self.args.z_dimensions), translated_target_zs.view(-1,self.args.z_dimensions)]
+		# if source_latent_z.view(-1,self.args.z_dimensions).shape[0] < .shape[0]:
+		if z_sets[0].shape[0]<z_sets[1].shape[0]:
+			# Source is smaller. 
+			smaller_zs = 0
+		else:
+			smaller_zs = 1
+
+		# First find out how many extra z samples we need. 
+		number_of_z_samples = z_sets[1-smaller_zs].shape[0]-z_sets[smaller_zs].shape[0]
+		# Now draw these extra z samples.		
+		indices = torch.randint(0,high=z_sets[smaller_zs].shape[0],size=(number_of_z_samples,)).to(device)
+		extra_z_samples = z_sets[smaller_zs][indices]
+		
+		# 	# 2b) Padding the smaller z set with the randomly sampled zs.
+		padded_smaller_set = torch.cat([z_sets[smaller_zs],extra_z_samples])
+		
+		#	# 2c) Adding via interp.
+		interpolation_alpha = np.random.uniform()
+		interpolated_zs = (interpolation_alpha*padded_smaller_set + (1.-interpolation_alpha)*z_sets[1-smaller_zs]).detach()
+		interpolated_zs_with_grads = torch.autograd.Variable(interpolated_zs, requires_grad=True)
+
+		# 3) Feeding interpolated z's into the discriminator.
+		interpolated_discriminator_probabilities = self.discriminator_network(interpolated_zs_with_grads)
+
+		# 4) Compute gradient of discriminator output with respect to inputs. 
+		gradients = torch.autograd.grad(outputs=interpolated_discriminator_probabilities, inputs=interpolated_zs_with_grads,
+                               grad_outputs=torch.ones(interpolated_discriminator_probabilities.size()).to(device),
+                               create_graph=True, retain_graph=True)[0]
+
+		# 5) Compute norm of gradients.
+		gradient_norm = torch.sqrt( (gradients**2).sum(dim=1) + 1e-6)
+		gradient_penalty = ((gradient_norm - 1) ** 2).mean()
+	
+
+		# 6) Feed back as penalty
+		return gradient_penalty
 
 	# @gpu_profile_every(1)
 	def run_iteration(self, counter, i, domain=None):
@@ -8291,7 +8427,11 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# In the joint transfer case: this is only for one domain.
 			# update_dictionary['discriminator_logprob'], discriminator_prob = self.discriminator_network(update_dictionary['translated_latent_z'])
 			# Log the probability as well (haha)
-			update_dictionary['discriminator_logprob'], update_dictionary['discriminator_prob'] = self.discriminator_network(update_dictionary['translated_latent_z'])
+
+			if self.args.wasserstein_gan or self.args.lsgan:
+				update_dictionary['discriminator_prob'] = self.discriminator_network(update_dictionary['translated_latent_z'])
+			else:
+				update_dictionary['discriminator_logprob'], update_dictionary['discriminator_prob'] = self.discriminator_network(update_dictionary['translated_latent_z'])
 
 			#################################################
 			## (4b) If we are using a z_transform discriminator.
@@ -8349,7 +8489,12 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			#################################################
 			
 			viz_dict['domain'] = domain
-			viz_dict['discriminator_probs'] = update_dictionary['discriminator_prob'][...,domain].detach().cpu().numpy().mean()
+			
+			if self.args.wasserstein_gan or self.args.lsgan:
+				viz_dict['discriminator_probs'] = update_dictionary['discriminator_prob'].detach().cpu().numpy().mean()
+			else:
+				viz_dict['discriminator_probs'] = update_dictionary['discriminator_prob'][...,domain].detach().cpu().numpy().mean()
+
 			if self.args.task_discriminability:
 				viz_dict['task_discriminator_probs'] = update_dictionary['task_discriminator_prob'][...,domain].detach().cpu().numpy().mean()
 

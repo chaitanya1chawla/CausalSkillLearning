@@ -324,8 +324,11 @@ def parse_arguments():
 
 	# Wasserstein GAN
 	parser.add_argument('--wasserstein_gan',dest='wasserstein_gan',type=int,default=0,help='Whether to implement Wasserstein GAN or not.')
+	parser.add_argument('--lsgan',dest='lsgan',type=int,default=0,help='Whether to implement LSGAN or not.')
 	parser.add_argument('--gradient_penalty',dest='gradient_penalty',type=int,default=0,help='Whether to implement Wasserstein GAN gradient penalty or not.')
 	parser.add_argument('--gradient_penalty_weight',dest='gradient_penalty_weight',type=float,default=10.,help='Relative weight of the Wasserstein discriminator gradient penalty.')
+	parser.add_argument('--wasserstein_discriminator_clipping',dest='wasserstein_discriminator_clipping',type=int,default=0,help='Whether to apply clipping of discriminator parameters.')
+	parser.add_argument('--wasserstein_discriminator_clipping_value',dest='wasserstein_discriminator_clipping_value',type=float,default=0.01,help='Value to apply clipping of discriminator parameters.')
 
 	# Task ID based discriminability
 	parser.add_argument('--task_discriminability',dest='task_discriminability',type=int,default=0,help='Whether or not to implement task based discriminability.')

@@ -335,6 +335,9 @@ class Roboturk_FullDataset(Roboturk_Dataset):
 		# print("Orig:", len(data_element['demo']),"New length:",resample_length)
 
 		self.kernel_bandwidth = self.args.smoothing_kernel_bandwidth
+		
+		# Trivially adding task ID to data element.
+		data_element['task_id'] = task_index
 
 		if resample_length<=1 or data_element['robot-state'].shape[0]<=1:
 			data_element['is_valid'] = False			
@@ -409,7 +412,8 @@ class Roboturk_NewSegmentedDataset(Dataset):
 
 		super(Roboturk_NewSegmentedDataset, self).__init__()
 		
-		self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'
+		# self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'
+		self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/Roboturk/'
 		self.args = args
 		# Require a task list. 
 		# The task name is needed for setting the environment, rendering. 
@@ -451,6 +455,20 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		# # gripper_open = [0.0115, -0.0115]
 		# # gripper_closed = [-0.020833, 0.020833]
 
+
+		# Get dataset trajectory lengths for smart batching
+		self.dataset_trajectory_lengths = np.zeros(self.total_length)
+		for index in range(self.total_length):
+			# Get bucket that index falls into based on num_demos array. 
+			task_index = np.searchsorted(self.cummulative_num_demos, index, side='right')-1
+			
+			# Decide task ID, and new index modulo num_demos.
+			# Subtract number of demonstrations in cumsum until then, and then 				
+			new_index = index-self.cummulative_num_demos[max(task_index,0)]		
+			data_element = self.files[task_index][new_index]
+
+			self.dataset_trajectory_lengths[index] = len(data_element['demo'])
+
 	def __len__(self):
 		return self.total_length
 
@@ -477,7 +495,7 @@ class Roboturk_NewSegmentedDataset(Dataset):
 			data_element['is_valid'] = False			
 		else:
 			data_element['is_valid'] = True
-
+			
 			if self.args.smoothen:
 				data_element['demo'] = gaussian_filter1d(data_element['demo'],self.kernel_bandwidth,axis=0,mode='nearest')
 				data_element['robot-state'] = gaussian_filter1d(data_element['robot-state'],self.kernel_bandwidth,axis=0,mode='nearest')
@@ -486,6 +504,8 @@ class Roboturk_NewSegmentedDataset(Dataset):
 
 			data_element['environment-name'] = self.environment_names[task_index]
 			data_element['task-id'] = task_index
+			# Trivially adding task ID to data element.
+			data_element['task_id'] = task_index
 
 			if self.args.ds_freq>1:
 				data_element['demo'] = resample(data_element['demo'], resample_length)

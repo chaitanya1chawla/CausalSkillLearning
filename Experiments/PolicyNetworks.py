@@ -2078,7 +2078,9 @@ class ContinuousMLP(torch.nn.Module):
 		
 		self.mean_outputs = self.mean_output_layer(final_layer)		
 		# self.variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(final_layer))+self.variance_activation_bias) + action_epsilon
-		self.variance_outputs = 0.05*torch.ones_like(self.mean_outputs).to(device).float()
+
+		self.variance_value = 1e-5
+		self.variance_outputs = self.variance_value*torch.ones_like(self.mean_outputs).to(device).float()
 
 		noise = torch.randn_like(self.variance_outputs)
 			
@@ -2117,6 +2119,7 @@ class CriticMLP(torch.nn.Module):
 		self.hidden_size = hidden_size
 		self.output_size = output_size
 		self.batch_size = 1
+		self.args = args
 
 		self.input_layer = torch.nn.Linear(self.input_size, self.hidden_size)
 		self.hidden_layer1 = torch.nn.Linear(self.hidden_size, self.hidden_size)
@@ -2124,14 +2127,15 @@ class CriticMLP(torch.nn.Module):
 		self.hidden_layer3 = torch.nn.Linear(self.hidden_size, self.hidden_size)
 		self.output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
 		self.relu_activation = torch.nn.ReLU()
+		self.dropout_layer = torch.nn.Dropout(self.args.mlp_dropout)
 
-	def forward(self, input):
+	def forward(self, input, greedy=False, action_epsilon=0.0001):
 
 		# Assumes input is Batch_Size x Input_Size.
-		h1 = self.relu_activation(self.input_layer(input))
-		h2 = self.relu_activation(self.hidden_layer1(h1))
-		h3 = self.relu_activation(self.hidden_layer2(h2))
-		h4 = self.relu_activation(self.hidden_layer3(h3))
+		h1 = self.dropout_layer(self.relu_activation(self.input_layer(input)))
+		h2 = self.dropout_layer(self.relu_activation(self.hidden_layer1(h1)))
+		h3 = self.dropout_layer(self.relu_activation(self.hidden_layer2(h2)))
+		h4 = self.dropout_layer(self.relu_activation(self.hidden_layer3(h3)))
 
 		# Predict critic value for each timestep. 
 		critic_value = self.output_layer(h4)		
