@@ -28,7 +28,7 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	elif args.data=='OldMIME':
 		dataset = MIME_DataLoader.MIME_NewDataset(short_traj=args.short_trajectories)
 	elif args.data=='MIME':
-		dataset = MIME_DataLoader.MIME_NewMetaDataset(short_traj=args.short_trajectories)
+		dataset = MIME_DataLoader.MIME_NewMetaDataset(short_traj=args.short_trajectories, traj_length_threshold=args.dataset_traj_length_limit)
 	elif args.data=='Roboturk':		
 		dataset = Roboturk_DataLoader.Roboturk_NewSegmentedDataset(args)
 	elif args.data=='OrigRoboturk':
@@ -187,6 +187,7 @@ def parse_arguments():
 	parser.add_argument('--dropout',dest='dropout',type=float,default=0.,help='Whether to set dropout.') 
 	parser.add_argument('--mlp_dropout',dest='mlp_dropout',type=float,default=0.,help='Whether to set dropout.') 
 	parser.add_argument('--batch_norm',dest='batch_norm',type=int,default=0,help='Whether to use batch norm.')
+	parser.add_argument('--leaky_relu',dest='leaky_relu',type=int,default=0,help='Whether to use leaky relu (or just vanilla relu).')
 	parser.add_argument('--environment',dest='environment',type=str,default='SawyerLift') # Defines robosuite environment for RL.
 	
 	# Data parameters. 
@@ -210,6 +211,7 @@ def parse_arguments():
 	parser.add_argument('--subpolicy_model',dest='subpolicy_model',type=str)
 	parser.add_argument('--traj_length',dest='traj_length',type=int,default=10)
 	parser.add_argument('--short_trajectories',dest='short_trajectories',type=int,default=0,help='Whether to restrict training to short trajectories, to massively save GPU memory.')
+	parser.add_argument('--dataset_traj_length_limit',dest='dataset_traj_length_limit',type=int,default=500,help='Value to restrict dataset size to.')
 	parser.add_argument('--skill_length',dest='skill_length',type=int,default=5)
 	parser.add_argument('--var_skill_length',dest='var_skill_length',type=int,default=1)
 
@@ -260,6 +262,7 @@ def parse_arguments():
 	
 	# Cross Domain Skill Transfer parameters. 
 	parser.add_argument('--discriminability_weight',dest='discriminability_weight',type=float,default=1.,help='Weight of discriminability loss in cross domain skill transfer.') 
+	parser.add_argument('--discriminator_weight',dest='discriminator_weight',type=float,default=1.,help='Weight of z discriminator loss.')
 	parser.add_argument('--vae_loss_weight',dest='vae_loss_weight',type=float,default=1.,help='Weight of VAE loss in cross domain skill transfer.') 	
 	parser.add_argument('--alternating_phase_size',dest='alternating_phase_size',type=int,default=2000, help='Size of alternating training phases.')
 	parser.add_argument('--discriminator_phase_size',dest='discriminator_phase_size',type=int,default=2,help='Factor by which to train discriminator more than generator.')
@@ -270,7 +273,7 @@ def parse_arguments():
 	parser.add_argument('--z_transform_discriminator',dest='z_transform_discriminator',type=int,default=0,help='Whether to use z transform discriminators.')
 	parser.add_argument('--z_trajectory_discriminator',dest='z_trajectory_discriminator',type=int,default=0,help='Whether to use z trajectory discriminators.')
 	parser.add_argument('--z_trajectory_discriminability_weight',dest='z_trajectory_discriminability_weight',type=float,default=1.,help='Weight of z trajectory discriminability loss.')
-	parser.add_argument('--z_trajectory_discriminator_weight',dest='z_trajectory_discriminator_weight',type=float,default=1.,help='Weight of z trajectory discriminator loss.')
+	parser.add_argument('--z_trajectory_discriminator_weight',dest='z_trajectory_discriminator_weight',type=float,default=1.,help='Weight of z trajectory discriminator loss.')	
 	parser.add_argument('--max_viz_trajs',dest='max_viz_trajs',type=int,default=5,help='How many trajectories to visualize.')
 	parser.add_argument('--z_transform_or_tuple',dest='z_transform_or_tuple',type=int,default=0,help='Whether to use the z transform or z tuples.')	
 	parser.add_argument('--ignore_last_z_transform',dest='ignore_last_z_transform',type=int,default=0,help='Whether to ignore or last z transform.')
@@ -330,7 +333,7 @@ def parse_arguments():
 	parser.add_argument('--gradient_penalty_weight',dest='gradient_penalty_weight',type=float,default=10.,help='Relative weight of the Wasserstein discriminator gradient penalty.')
 	parser.add_argument('--wasserstein_discriminator_clipping',dest='wasserstein_discriminator_clipping',type=int,default=0,help='Whether to apply clipping of discriminator parameters.')
 	parser.add_argument('--wasserstein_discriminator_clipping_value',dest='wasserstein_discriminator_clipping_value',type=float,default=0.01,help='Value to apply clipping of discriminator parameters.')
-	parser.add_argument('--identity_translation_loss_weight',dest='identity_translation_loss_weight',type=float,default=1,help='Weight associated with th e regularization of translation model to identity for source zs.')
+	parser.add_argument('--identity_translation_loss_weight',dest='identity_translation_loss_weight',type=float,default=0.1,help='Weight associated with th e regularization of translation model to identity for source zs.')
 
 	# Task ID based discriminability
 	parser.add_argument('--task_discriminability',dest='task_discriminability',type=int,default=0,help='Whether or not to implement task based discriminability.')

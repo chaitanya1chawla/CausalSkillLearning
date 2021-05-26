@@ -2057,10 +2057,15 @@ class ContinuousMLP(torch.nn.Module):
 		self.variances_output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
 		self.variance_factor = 0.01
 		self.variance_activation_bias = 0.
-
-		self.relu_activation = torch.nn.ReLU()		
-		self.variance_activation_layer = torch.nn.Softplus()
 		self.args = args
+
+		if self.args.leaky_relu:			
+			self.relu_activation = torch.nn.LeakyReLU()
+		else:
+			self.relu_activation = torch.nn.ReLU()
+
+		self.variance_activation_layer = torch.nn.Softplus()
+		
 
 		self.dropout_layer = torch.nn.Dropout(self.args.mlp_dropout)
 		
@@ -2078,11 +2083,19 @@ class ContinuousMLP(torch.nn.Module):
 			final_layer = self.input_layer(input)
 		else:
 
-			if self.args.batch_norm:
-				h1 = self.dropout_layer(self.relu_activation(self.batch_norm_layer1(self.input_layer(input))))
-				h2 = self.dropout_layer(self.relu_activation(self.batch_norm_layer2(self.hidden_layer1(h1))))
-				h3 = self.dropout_layer(self.relu_activation(self.batch_norm_layer3(self.hidden_layer2(h2))))
-				h4 = self.dropout_layer(self.relu_activation(self.batch_norm_layer4(self.hidden_layer3(h3))))
+			if self.args.batch_norm:		
+				s1 = input.shape[0]
+				if len(input.shape)==3:					
+					s2 = input.shape[1]				
+				else:
+					s2 = 1
+
+				h1 = self.dropout_layer(self.relu_activation(self.batch_norm_layer1( self.input_layer(input).view(-1,self.hidden_size) ).view(s1, s2, self.hidden_size) ))
+				h2 = self.dropout_layer(self.relu_activation(self.batch_norm_layer2( self.hidden_layer1(h1).view(-1,self.hidden_size) ).view(s1, s2, self.hidden_size) ))
+				h3 = self.dropout_layer(self.relu_activation(self.batch_norm_layer3( self.hidden_layer2(h2).view(-1,self.hidden_size) ).view(s1, s2, self.hidden_size) ))
+				h4 = self.dropout_layer(self.relu_activation(self.batch_norm_layer4( self.hidden_layer3(h3).view(-1,self.hidden_size) ).view(s1, s2, self.hidden_size) ))
+				h4 = h4.squeeze(1)
+
 			else:
 				h1 = self.dropout_layer(self.relu_activation(self.input_layer(input)))
 				h2 = self.dropout_layer(self.relu_activation(self.hidden_layer1(h1)))
@@ -2141,7 +2154,12 @@ class CriticMLP(torch.nn.Module):
 		self.hidden_layer2 = torch.nn.Linear(self.hidden_size, self.hidden_size)
 		self.hidden_layer3 = torch.nn.Linear(self.hidden_size, self.hidden_size)
 		self.output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
-		self.relu_activation = torch.nn.ReLU()
+
+		if self.args.leaky_relu:			
+			self.relu_activation = torch.nn.LeakyReLU()
+		else:
+			self.relu_activation = torch.nn.ReLU()
+
 		self.dropout_layer = torch.nn.Dropout(self.args.mlp_dropout)
 
 		if self.args.batch_norm:
@@ -2154,11 +2172,19 @@ class CriticMLP(torch.nn.Module):
 	def forward(self, input, greedy=False, action_epsilon=0.0001):
 
 		# Assumes input is Batch_Size x Input_Size.
-		if self.args.batch_norm:
-			h1 = self.dropout_layer(self.relu_activation(self.batch_norm_layer1(self.input_layer(input))))
-			h2 = self.dropout_layer(self.relu_activation(self.batch_norm_layer2(self.hidden_layer1(h1))))
-			h3 = self.dropout_layer(self.relu_activation(self.batch_norm_layer3(self.hidden_layer2(h2))))
-			h4 = self.dropout_layer(self.relu_activation(self.batch_norm_layer4(self.hidden_layer3(h3))))
+		if self.args.batch_norm:		
+			s1 = input.shape[0]
+			if len(input.shape)==3:					
+				s2 = input.shape[1]				
+			else:
+				s2 = 1
+
+			h1 = self.dropout_layer(self.relu_activation(self.batch_norm_layer1( self.input_layer(input).view(-1,self.hidden_size) ).view(s1, s2, self.hidden_size) ))
+			h2 = self.dropout_layer(self.relu_activation(self.batch_norm_layer2( self.hidden_layer1(h1).view(-1,self.hidden_size) ).view(s1, s2, self.hidden_size) ))
+			h3 = self.dropout_layer(self.relu_activation(self.batch_norm_layer3( self.hidden_layer2(h2).view(-1,self.hidden_size) ).view(s1, s2, self.hidden_size) ))
+			h4 = self.dropout_layer(self.relu_activation(self.batch_norm_layer4( self.hidden_layer3(h3).view(-1,self.hidden_size) ).view(s1, s2, self.hidden_size) ))
+			h4 = h4.squeeze(1)
+
 		else:
 			h1 = self.dropout_layer(self.relu_activation(self.input_layer(input)))
 			h2 = self.dropout_layer(self.relu_activation(self.hidden_layer1(h1)))
@@ -2186,7 +2212,11 @@ class DiscreteMLP(torch.nn.Module):
 		self.hidden_layer2 = torch.nn.Linear(self.hidden_size, self.hidden_size)
 		self.hidden_layer3 = torch.nn.Linear(self.hidden_size, self.hidden_size)
 		self.output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
-		self.relu_activation = torch.nn.ReLU()
+
+		if self.args.leaky_relu:			
+			self.relu_activation = torch.nn.LeakyReLU()
+		else:
+			self.relu_activation = torch.nn.ReLU()
 
 		self.dropout_layer = torch.nn.Dropout(self.args.mlp_dropout)
 
@@ -2200,15 +2230,22 @@ class DiscreteMLP(torch.nn.Module):
 			self.batch_norm_layer3 = torch.nn.BatchNorm1d(self.hidden_size)
 			self.batch_norm_layer4 = torch.nn.BatchNorm1d(self.hidden_size)
 
-
 	def forward(self, input):
 				
 		# Assumes input is Batch_Size x Input_Size.
-		if self.args.batch_norm:
-			h1 = self.dropout_layer(self.relu_activation(self.batch_norm_layer1(self.input_layer(input))))
-			h2 = self.dropout_layer(self.relu_activation(self.batch_norm_layer2(self.hidden_layer1(h1))))
-			h3 = self.dropout_layer(self.relu_activation(self.batch_norm_layer3(self.hidden_layer2(h2))))
-			h4 = self.dropout_layer(self.relu_activation(self.batch_norm_layer4(self.hidden_layer3(h3))))
+		if self.args.batch_norm:		
+			s1 = input.shape[0]
+			if len(input.shape)==3:					
+				s2 = input.shape[1]				
+			else:
+				s2 = 1
+
+			h1 = self.dropout_layer(self.relu_activation(self.batch_norm_layer1( self.input_layer(input).view(-1,self.hidden_size) ).view(s1, s2, self.hidden_size) ))
+			h2 = self.dropout_layer(self.relu_activation(self.batch_norm_layer2( self.hidden_layer1(h1).view(-1,self.hidden_size) ).view(s1, s2, self.hidden_size) ))
+			h3 = self.dropout_layer(self.relu_activation(self.batch_norm_layer3( self.hidden_layer2(h2).view(-1,self.hidden_size) ).view(s1, s2, self.hidden_size) ))
+			h4 = self.dropout_layer(self.relu_activation(self.batch_norm_layer4( self.hidden_layer3(h3).view(-1,self.hidden_size) ).view(s1, s2, self.hidden_size) ))
+			h4 = h4.squeeze(1)
+
 		else:
 			h1 = self.dropout_layer(self.relu_activation(self.input_layer(input)))
 			h2 = self.dropout_layer(self.relu_activation(self.hidden_layer1(h1)))
