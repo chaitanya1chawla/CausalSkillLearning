@@ -123,6 +123,8 @@ class MIME_NewDataset(Dataset):
 
 		# 
 		self.args = args
+
+		embed()
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
 			self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
