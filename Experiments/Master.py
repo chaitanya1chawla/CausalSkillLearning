@@ -26,9 +26,9 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	elif args.data=='ToyContext':
 		dataset = DataLoaders.ToyContextDataset(args.datadir)
 	elif args.data=='OldMIME':
-		dataset = MIME_DataLoader.MIME_NewDataset(short_traj=args.short_trajectories)
+		dataset = MIME_DataLoader.MIME_NewDataset(args, short_traj=args.short_trajectories)
 	elif args.data=='MIME':
-		dataset = MIME_DataLoader.MIME_NewMetaDataset(short_traj=args.short_trajectories, traj_length_threshold=args.dataset_traj_length_limit)
+		dataset = MIME_DataLoader.MIME_NewMetaDataset(args, short_traj=args.short_trajectories, traj_length_threshold=args.dataset_traj_length_limit)
 	elif args.data=='Roboturk':		
 		dataset = Roboturk_DataLoader.Roboturk_NewSegmentedDataset(args)
 	elif args.data=='OrigRoboturk':
@@ -157,7 +157,8 @@ def parse_arguments():
 	parser = argparse.ArgumentParser(description='Learning Skills from Demonstrations')
 
 	# Setup training. 
-	parser.add_argument('--datadir', dest='datadir',type=str,default='../../Data/Datasets/ContData/')
+	# parser.add_argument('--datadir', dest='datadir',type=str,default='../../Data/Datasets/ContData/')
+	parser.add_argument('--datadir', dest='datadir',type=str,default=None)
 	parser.add_argument('--train',dest='train',type=int,default=0)
 	parser.add_argument('--debug',dest='debug',type=int,default=0)
 	parser.add_argument('--notes',dest='notes',type=str)
