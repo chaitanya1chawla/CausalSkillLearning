@@ -12,6 +12,7 @@ import TFLogger, DMP, RLUtils
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
+torch.set_printoptions(sci_mode=False, precision=2)
 
 class PolicyManager_BaseClass():
 
@@ -5884,14 +5885,18 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# 	std = latent_z_set.std(axis=0)
 		# 	normed_z = (latent_z_set-mean)/std
 
-		if self.args.z_normalization:
-			# ASSUME ALREADY NORMALIZED! 
-			normed_z = latent_z_set
-		else:
-			# Just normalize z's.
-			mean = latent_z_set.mean(axis=0)
-			std = latent_z_set.std(axis=0)
-			normed_z = (latent_z_set-mean)/std
+		# if self.args.z_normalization:
+		# 	# ASSUME ALREADY NORMALIZED! 
+		# 	normed_z = latent_z_set
+		# else:
+		# 	# Just normalize z's.
+		# 	mean = latent_z_set.mean(axis=0)
+		# 	std = latent_z_set.std(axis=0)
+		# 	normed_z = (latent_z_set-mean)/std
+
+		# DON'T NORMALIZE THESE SPACES
+		# Different STD dev for different dims is weird
+		normed_z = latent_z_set	
 
 		if projection=='tsne':
 			# Use TSNE to project the data:
@@ -6444,11 +6449,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		###########################################################
 
 		# Total discriminability loss. 
-		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss + self.task_discriminability_loss + self.identity_translation_loss
+		self.total_discriminability_loss = self.discriminability_loss + self.z_trajectory_discriminability_loss + self.task_discriminability_loss 
 
 		# Total encoder loss: 
 		# self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.equivariance_loss + self.cross_domain_supervision_loss	
-		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.cross_domain_supervision_loss	
+		self.total_VAE_loss = self.VAE_loss + self.total_discriminability_loss + self.cross_domain_supervision_loss	+ self.identity_translation_loss
 
 		if not(self.skip_vae):
 			# Go backward through the generator (encoder / decoder), and take a step. 
@@ -8137,6 +8142,16 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		detached_z = update_dictionary['latent_z'].detach()
 		cross_domain_z = update_dictionary['cross_domain_latent_z'].detach()
 
+		# # TRYING Z NORMALIZATION THING! 
+		# if self.args.z_normalization is None:
+		
+		# 	concat_zs = torch.cat([detached_z,cross_domain_z])
+		# 	z_mean = concat_zs.mean(dim=0)
+		# 	z_std = concat_zs.std(dim=0)
+		# 	normed_zs = (concat_zs-z_mean)/z_std
+		# 	detached_z = normed_zs[:detached_z.shape[0]]
+		# 	cross_domain_z = normed_zs[detached_z.shape[0]:]
+			
 		###############################################	
 		
 		if self.args.recurrent_translation:	

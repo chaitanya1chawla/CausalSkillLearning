@@ -2066,8 +2066,9 @@ class ContinuousMLP(torch.nn.Module):
 
 		self.variance_activation_layer = torch.nn.Softplus()
 		
-
-		self.dropout_layer = torch.nn.Dropout(self.args.mlp_dropout)
+		# self.dropout_layer = torch.nn.Dropout(self.args.mlp_dropout)
+		# Don't use dropout for now...
+		self.dropout_layer = torch.nn.Dropout(self.args.dropout)
 		
 		if self.args.batch_norm:
 			self.batch_norm_layer1 = torch.nn.BatchNorm1d(self.hidden_size)
@@ -2108,6 +2109,7 @@ class ContinuousMLP(torch.nn.Module):
 		self.variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(final_layer))+self.variance_activation_bias) + action_epsilon
 
 		# self.variance_value = 1e-5
+		# self.variance_value = 0.05
 		# self.variance_outputs = self.variance_value*torch.ones_like(self.mean_outputs).to(device).float()
 
 		noise = torch.randn_like(self.variance_outputs)

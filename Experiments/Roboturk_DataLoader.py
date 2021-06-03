@@ -491,7 +491,7 @@ class Roboturk_NewSegmentedDataset(Dataset):
 
 		self.kernel_bandwidth = self.args.smoothing_kernel_bandwidth
 
-		if resample_length<=1 or index==4900 or index==537:
+		if resample_length<=1 or (index==4900 or index==537):
 			data_element['is_valid'] = False			
 		else:
 			data_element['is_valid'] = True
