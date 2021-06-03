@@ -119,10 +119,16 @@ class MIME_Dataset(Dataset):
 
 class MIME_NewDataset(Dataset):
 
-	def __init__(self, split='all', short_traj=False, traj_length_threshold=500):
+	def __init__(self, args, split='all', short_traj=False, traj_length_threshold=500):
 
-		# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
-		self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
+		# 
+		self.args = args		
+
+		if self.args.datadir is None:
+			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
+			self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
+		else:
+			self.dataset_directory = self.args.datadir
 
 		# Load the entire set of trajectories. 
 		
@@ -244,9 +250,9 @@ class MIME_NewDataset(Dataset):
 
 class MIME_NewMetaDataset(MIME_NewDataset):
 
-	def __init__(self, split='all', short_traj=False, traj_length_threshold=500):
+	def __init__(self, args, split='all', short_traj=False, traj_length_threshold=500):
 
-		super(MIME_NewMetaDataset, self).__init__(split=split, short_traj=short_traj, traj_length_threshold=traj_length_threshold)
+		super(MIME_NewMetaDataset, self).__init__(args, split=split, short_traj=short_traj, traj_length_threshold=traj_length_threshold)
 
 class MIME_Dataloader_Tester(unittest.TestCase):
 	
