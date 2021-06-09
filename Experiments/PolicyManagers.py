@@ -5449,11 +5449,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			train_generator = 1-train_discriminator
 
 			if train_generator:
-				print("Training VAE.")
+				# print("Training VAE.")
 				self.skip_discriminator = 1
 				self.skip_vae = 0
 			else:
-				print("Training Discriminator.")
+				# print("Training Discriminator.")
 				self.skip_discriminator = 0
 				self.skip_vae = 1
 			
@@ -5707,6 +5707,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			if self.args.cross_domain_supervision and (viz_dict['domain']==1 or self.args.setting=='jointfixcycle'):
 				# If cycle, plot cdsl in both directions.
 				log_dict['Unweighted Cross Domain Superivision Loss'] = self.unweighted_masked_cross_domain_supervision_loss.mean()
+				# Now zero out if we want to use partial supervision..
+				log_dict['Datapoint Masked Cross Domain Supervision Loss'] = self.datapoint_masked_cross_domain_supervised_loss
 				log_dict['Cross Domain Superivision Loss'] = self.cross_domain_supervision_loss
 
 			if self.args.task_discriminability:
@@ -6413,8 +6415,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Now mask using batch mask.			
 			# self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
 			self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(policy_manager.batch_mask.sum())
-			# Now weight.
-			self.cross_domain_supervision_loss = self.args.cross_domain_supervision_loss_weight*self.unweighted_masked_cross_domain_supervision_loss		
+			# Now zero out if we want to use partial supervision..
+			self.datapoint_masked_cross_domain_supervised_loss = self.supervised_datapoints_multiplier*self.unweighted_masked_cross_domain_supervision_loss
+			# Now weight.			
+			self.cross_domain_supervision_loss = self.args.cross_domain_supervision_loss_weight*self.datapoint_masked_cross_domain_supervised_loss
 		else:
 			self.unweighted_masked_cross_domain_supervision_loss = 0.
 			self.cross_domain_supervision_loss = 0.
@@ -7755,12 +7759,25 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		self.translated_z_epsilon = 0.01
 
-	def set_iteration(self, counter):
+	def set_iteration(self, counter, i=0):
 		# First call the set iteration of super. 
 		super().set_iteration(counter)
 
 		# Now make sure VAE loss weight is set to 0, because we can ignore the reconstruction losses in this setting.
 		self.vae_loss_weight = 0.
+
+		# Check if i is less than the number of supervised datapoints.
+		# If it is, then set the supervised_datapoints_multiplier to 1, otherwise set it to 0. to make sure the supervised loss isn't used for these datapoints..
+		if self.args.number_of_supervised_datapoints == -1:
+			# If fully supervised case..
+			self.supervised_datapoints_multiplier = 1. 
+		else:
+			if i<self.args.number_of_supervised_datapoints:
+				self.supervised_datapoints_multiplier = 1. 
+			else:
+				self.supervised_datapoints_multiplier = 0.
+			
+		# print("Iter: ", i, "Sup L W:", self.supervised_datapoints_multiplier)
 
 	def set_translated_z_sets_recurrent_translation(self, domain=1):
 
@@ -7952,6 +7969,13 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				# log_dict["DENSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['densne_transsource_origtarget_traj_p10'])
 				# log_dict["DENSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['densne_transsource_origtarget_traj_p30'])
 
+			###################################################
+			# Compute Aggregate CDSL
+			###################################################
+
+			self.compute_aggregate_supervised_loss()
+			# Now log the aggergate CDSL
+			log_dict['Aggregated Supervised Z Error'] = self.aggregate_cdsl_value
 
 		if log:
 			wandb.log(log_dict, step=counter)
@@ -8134,6 +8158,24 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		return translated_latent_z
 
+	def compute_aggregate_supervised_loss(self, domain=1):
+
+		# # Well technically shouldn't ahve to run this..
+		# self.set_z_objects()
+		
+		# Aggregate CDSL value
+		self.aggregate_cdsl_stat = 0.
+
+		eval_ind_range = np.arange(0,len(self.original_source_latent_z_set),self.args.batch_size)
+		eval_ind_range = np.append(eval_ind_range,len(self.original_source_latent_z_set))
+		for k, v in enumerate(eval_ind_range[:-1]):
+			with torch.no_grad():
+				detached_z = torch.tensor(self.original_target_latent_z_set[v:eval_ind_range[k+1]]).to(device)
+				cross_domain_z = torch.tensor(self.original_source_latent_z_set[v:eval_ind_range[k+1]]).to(device)
+				self.aggregate_cdsl_stat += (self.translation_model_list[domain].get_probabilities(detached_z, action_epsilon=self.translated_z_epsilon, evaluate_value=cross_domain_z)**2).sum()
+
+		self.aggregate_cdsl_value = torch.sqrt(self.aggregate_cdsl_stat/len(self.original_source_latent_z_set)).detach().cpu().numpy()
+
 	def compute_cross_domain_supervision_loss(self, update_dictionary, domain=1):
 
 		# Basically feed in the predicted zs from the translation model, and get likelihoods of the zs from the target domain. 
@@ -8286,8 +8328,10 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# Now mask using batch mask.			
 			# self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
 			self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(policy_manager.batch_mask.sum())
-			# Now weight.
-			self.cross_domain_supervision_loss = self.args.cross_domain_supervision_loss_weight*self.unweighted_masked_cross_domain_supervision_loss		
+			# Now zero out if we want to use partial supervision..
+			self.datapoint_masked_cross_domain_supervised_loss = self.supervised_datapoints_multiplier*self.unweighted_masked_cross_domain_supervision_loss
+			# Now weight.			
+			self.cross_domain_supervision_loss = self.args.cross_domain_supervision_loss_weight*self.datapoint_masked_cross_domain_supervised_loss
 		else:
 			self.unweighted_masked_cross_domain_supervision_loss = 0.
 			self.cross_domain_supervision_loss = 0.
@@ -8523,7 +8567,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		## (0) Setup things like training phases, epsilon values, etc.
 		#################################################
 
-		self.set_iteration(counter)		
+		self.set_iteration(counter, i)		
 
 		#################################################
 		## (1) Select which domain to run on; also supervision of discriminator.
