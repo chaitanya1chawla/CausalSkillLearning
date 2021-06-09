@@ -2048,16 +2048,23 @@ class ContinuousMLP(torch.nn.Module):
 		self.input_size = input_size
 		self.hidden_size = hidden_size
 		self.output_size = output_size
+		self.args = args
 
 		self.input_layer = torch.nn.Linear(self.input_size, self.hidden_size)
 		self.hidden_layer1 = torch.nn.Linear(self.hidden_size, self.hidden_size)
 		self.hidden_layer2 = torch.nn.Linear(self.hidden_size, self.hidden_size)
 		self.hidden_layer3 = torch.nn.Linear(self.hidden_size, self.hidden_size)	
-		self.mean_output_layer = torch.nn.Linear(self.hidden_size,self.output_size)
-		self.variances_output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
+		
+		if self.args.small_translation_model:
+			self.mean_output_layer = torch.nn.Linear(self.input_size,self.output_size)
+			self.variances_output_layer = torch.nn.Linear(self.input_size,self.output_size)
+		else:
+			self.mean_output_layer = torch.nn.Linear(self.hidden_size,self.output_size)
+			self.variances_output_layer = torch.nn.Linear(self.hidden_size, self.output_size)
+
 		self.variance_factor = 0.01
 		self.variance_activation_bias = 0.
-		self.args = args
+		
 
 		if self.args.leaky_relu:			
 			self.relu_activation = torch.nn.LeakyReLU()
@@ -2081,7 +2088,11 @@ class ContinuousMLP(torch.nn.Module):
 
 		# Assumes input is Batch_Size x Input_Size.			
 		if self.args.small_translation_model:
-			final_layer = self.input_layer(input)
+			# final_layer = self.input_layer(input)
+			# Special input to output layer.. 
+			self.mean_outputs = self.mean_output_layer(input)		
+			self.variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(input))+self.variance_activation_bias) + action_epsilon
+
 		else:
 
 			if self.args.batch_norm:		
@@ -2105,12 +2116,12 @@ class ContinuousMLP(torch.nn.Module):
 
 			final_layer = h4
 		
-		self.mean_outputs = self.mean_output_layer(final_layer)		
-		self.variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(final_layer))+self.variance_activation_bias) + action_epsilon
+			self.mean_outputs = self.mean_output_layer(final_layer)		
+			self.variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(final_layer))+self.variance_activation_bias) + action_epsilon
 
 		# self.variance_value = 1e-5
-		# self.variance_value = 0.05
-		# self.variance_outputs = self.variance_value*torch.ones_like(self.mean_outputs).to(device).float()
+		self.variance_value = 0.05
+		self.variance_outputs = self.variance_value*torch.ones_like(self.mean_outputs).to(device).float()
 
 		noise = torch.randn_like(self.variance_outputs)
 			
