@@ -629,10 +629,11 @@ class PolicyManager_BaseClass():
 
 	def get_robot_embedding(self, return_tsne_object=False, perplexity=None):
 
-		# Mean and variance normalize z.
-		mean = self.latent_z_set.mean(axis=0)
-		std = self.latent_z_set.std(axis=0)
-		normed_z = (self.latent_z_set-mean)/std
+		# # Mean and variance normalize z.
+		# mean = self.latent_z_set.mean(axis=0)
+		# std = self.latent_z_set.std(axis=0)
+		# normed_z = (self.latent_z_set-mean)/std
+		normed_z = self.latent_z_set
 
 		if perplexity is None:
 			perplexity = self.args.perplexity
