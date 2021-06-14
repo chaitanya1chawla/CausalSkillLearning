@@ -5675,10 +5675,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		##################################################
 
 		log_dict = {'Policy Loglikelihood': self.likelihood_loss, 
-					'Discriminability Loss': self.discriminability_loss,
-					'Unweighted Discriminability Loss': self.unweighted_discriminability_loss,
-					'Total Discriminability Loss': self.total_discriminability_loss,
-					'Encoder KL': self.encoder_KL,
+					'Encoder KL': self.encoder_KL,				
 					'Unweighted VAE Loss': self.unweighted_VAE_loss,
 					'VAE Loss': self.VAE_loss,
 					'Total VAE Loss:': self.total_VAE_loss,
@@ -5686,6 +5683,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					'Training Phase': self.training_phase, 
 					'Training Discriminator': self.skip_vae, 
 					'Training Embeddings or Translation Models': self.skip_discriminator}
+		
+		if self.args.setting is not in ['densityjointtransfer']:
+			log_dict['Discriminability Loss'] = self.discriminability_loss
+			log_dict['Unweighted Discriminability Loss'] = self.unweighted_discriminability_loss
+			log_dict['Total Discriminability Loss'] = self.total_discriminability_loss
 
 		##################################################
 		# Log discriminator and discriminability losses 
@@ -5693,21 +5695,32 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		
 		# Plot discriminator values after we've started training it. 
 		if self.training_phase>1:
-			# Compute discriminator loss and discriminator prob of right action for logging. 
-			log_dict['Z Discriminator Loss'], log_dict['Z Discriminator Probability'] = self.discriminator_loss, viz_dict['discriminator_probs']
-			log_dict['Total Discriminator Loss'] = self.total_discriminator_loss
 
-			if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
-				
-				log_dict['Z Trajectory Discriminator Loss'] = self.z_trajectory_discriminator_loss
-				log_dict['Unweighted Z Trajectory Discriminator Loss'] = self.unweighted_z_trajectory_discriminator_loss.mean()
-				log_dict['Z Trajectory Discriminability Loss'] = self.z_trajectory_discriminability_loss
-				log_dict['Z Trajectory Discriminator Probability'] = viz_dict['z_trajectory_discriminator_probs']
-				log_dict['Unweighted Z Trajectory Discriminability Loss'] = self.masked_z_trajectory_discriminability_loss.mean()			
+			if self.args.setting is not in ['densityjointtransfer']:
 
-			# if self.args.equivariance and viz_dict['domain']==1:
-			# 	log_dict['Unweighted Z Equivariance Loss'] = self.unweighted_masked_equivariance_loss
-			# 	log_dict['Z Equivariance Loss'] = self.equivariance_loss
+				# Compute discriminator loss and discriminator prob of right action for logging. 
+				log_dict['Z Discriminator Loss'], log_dict['Z Discriminator Probability'] = self.discriminator_loss, viz_dict['discriminator_probs']
+				log_dict['Total Discriminator Loss'] = self.total_discriminator_loss
+
+				if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
+					
+					log_dict['Z Trajectory Discriminator Loss'] = self.z_trajectory_discriminator_loss
+					log_dict['Unweighted Z Trajectory Discriminator Loss'] = self.unweighted_z_trajectory_discriminator_loss.mean()
+					log_dict['Z Trajectory Discriminability Loss'] = self.z_trajectory_discriminability_loss
+					log_dict['Z Trajectory Discriminator Probability'] = viz_dict['z_trajectory_discriminator_probs']
+					log_dict['Unweighted Z Trajectory Discriminability Loss'] = self.masked_z_trajectory_discriminability_loss.mean()			
+
+				# if self.args.equivariance and viz_dict['domain']==1:
+				# 	log_dict['Unweighted Z Equivariance Loss'] = self.unweighted_masked_equivariance_loss
+				# 	log_dict['Z Equivariance Loss'] = self.equivariance_loss
+
+				if self.args.task_discriminability:
+
+					log_dict['Unweighted Task Discriminability Loss'] = self.unweighted_task_discriminability_loss.mean()
+					log_dict['Task Discriminability Loss'] = self.task_discriminability_loss
+					log_dict['Task Discriminator Loss'] = self.task_discriminator_loss
+					log_dict['Unweighted Task Discriminator Loss'] = self.unweighted_task_discriminator_loss.mean()
+					log_dict['Task Discriminator Domain Probability'] = viz_dict['task_discriminator_probs']
 
 			if self.args.cross_domain_supervision and (viz_dict['domain']==1 or self.args.setting=='jointfixcycle'):
 				# If cycle, plot cdsl in both directions.
@@ -5715,14 +5728,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				# Now zero out if we want to use partial supervision..
 				log_dict['Datapoint Masked Cross Domain Supervision Loss'] = self.datapoint_masked_cross_domain_supervised_loss
 				log_dict['Cross Domain Superivision Loss'] = self.cross_domain_supervision_loss
-
-			if self.args.task_discriminability:
-
-				log_dict['Unweighted Task Discriminability Loss'] = self.unweighted_task_discriminability_loss.mean()
-				log_dict['Task Discriminability Loss'] = self.task_discriminability_loss
-				log_dict['Task Discriminator Loss'] = self.task_discriminator_loss
-				log_dict['Unweighted Task Discriminator Loss'] = self.unweighted_task_discriminator_loss.mean()
-				log_dict['Task Discriminator Domain Probability'] = viz_dict['task_discriminator_probs']
 
 		##################################################
 		# Now visualizing spaces. 
@@ -5856,7 +5861,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 			log_dict['Source Z Trajectory JointSourceTranslated DENSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_densne_image)
 			log_dict['Target Z Trajectory JointSourceTranslated DENSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_densne_image)
-
 
 			##################################################			
 			# Clean up objects consuming memory. 			
@@ -9526,27 +9530,30 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		# 	# 2) Feed these input datapoints into the source domain encoder and get source encoding z. 
 		#	# 3) Add Z to Source Z Set. 
 		# 4) Build GMM with centers around the N Source Z set Z's.
+	
+		# Remember, for the setting where we have a translation model that translates from TARGET to SOURCe domains (i.e. a backward translation model). 
+		# We probably want to evaluate a batch_of_TARGET values, given the source GMM values.
 
-		self.number_of_components = 10000
-
-		# Actually get Z's. Hopefully this goes over representative proportion of dataset.
-		self.source_manager.get_trajectory_and_latent_sets(get_visuals=False, N=500)
-		self.target_manager.get_trajectory_and_latent_sets(get_visuals=False, N=500)
+		# Don't actually get z's this here.. Just use the source latent z's...
+		# Just make sure we run this after the set_translated_z_sets function is called..
+		# # Actually get Z's. Hopefully this goes over representative proportion of dataset.
+		# self.source_manager.get_trajectory_and_latent_sets(get_visuals=False)
+		# self.target_manager.get_trajectory_and_latent_sets(get_visuals=False)
 		
 		###################################
 		# Create GMM
 		self.gmm_variance_value = 0.2
 		# Assumes self.source_z_GMM_component_means is of shape self.number_of_components x self.number of z dimensions.
-		self.gmm_means = torch.tensor(self.source_z_GMM_component_means).to(device)
+		self.gmm_means = torch.tensor(self.source_latent_zs).to(device)
 		self.gmm_variances = self.gmm_variance_value*torch.ones_like(self.gmm_means).to(device)
 		
-		self.mixture_distribution = torch.distributions.Categorical(torch.ones(self.number_of_components).to(device))
+		self.mixture_distribution = torch.distributions.Categorical(torch.ones(self.gmm_means.shape[0]).to(device))
 		self.component_distribution = torch.distributions.Independent(torch.distributions.Normal(self.gmm_means,self.gmm_variances),1)
 		self.GMM = torch.distributions.MixtureSameFamily(self.mixture_distribution, self.component_distribution)
 
 		# Can now query this GMM for differentiable probability estimate as: 
 		# self.GMM.log_prob(batch_of_values)
-				
+
 	def run_iteration(self, counter, i, domain=None):
 		
 		# Overall algorithm.
