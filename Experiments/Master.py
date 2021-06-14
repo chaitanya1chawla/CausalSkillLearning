@@ -80,7 +80,7 @@ class Master():
 		elif self.args.setting=='imitation':
 			self.policy_manager = PolicyManager_Imitation(self.args.number_policies, self.dataset, self.args)
 
-		elif self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle']:
+		elif self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer']:
 		
 			source_dataset = return_dataset(self.args, data=self.args.source_domain)
 			target_dataset = return_dataset(self.args, data=self.args.target_domain)
@@ -103,6 +103,9 @@ class Master():
 				self.policy_manager = PolicyManager_JointTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 			elif self.args.setting=='jointcycletransfer':
 				self.policy_manager = PolicyManager_JointCycleTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
+			elif self.args.setting=='densityjointtransfer':
+				self.policy_manager = PolicyManager_DensityJointTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
+				
 
 		if self.args.debug:
 			print("Embedding in Master.")
@@ -113,7 +116,7 @@ class Master():
 
 	def run(self):
 		if self.args.setting in ['pretrain_sub','pretrain_prior','imitation','baselineRL','downstreamRL',\
-			'transfer','cycle_transfer','jointtransfer','fixembed','jointcycletransfer', 'jointfixembed', 'jointfixcycle']:
+			'transfer','cycle_transfer','jointtransfer','fixembed','jointcycletransfer', 'jointfixembed', 'jointfixcycle','densityjointtransfer']:
 			if self.args.train:
 				if self.args.model:
 					self.policy_manager.train(self.args.model)
