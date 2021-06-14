@@ -3282,8 +3282,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			print("Embedding in Evaluate.")
 			embed()
 
-	def get_trajectory_and_latent_sets(self, get_visuals=False):
-		self.get_latent_trajectory_segmentation_sets()
+	def get_trajectory_and_latent_sets(self, get_visuals=False, N=None):
+		self.get_latent_trajectory_segmentation_sets(N=N)
 
 	def get_latent_trajectory_segmentation_sets(self, N=None): 
 
@@ -9526,15 +9526,15 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		#	# 3) Add Z to Source Z Set. 
 		# 4) Build GMM with centers around the N Source Z set Z's.
 
-
 		self.number_of_components = 10000
 
 		# Actually get Z's. Hopefully this goes over representative proportion of dataset.
-		self.source_manager.get_trajectory_and_latent_sets(get_visuals=False, N=self.number_of_components)	
+		self.source_manager.get_trajectory_and_latent_sets(get_visuals=False, N=500)
+		self.target_manager.get_trajectory_and_latent_sets(get_visuals=False, N=500)
 		
 		###################################
 		# Create GMM
-		self.gmm_variance_value = 5.
+		self.gmm_variance_value = 0.2
 		# Assumes self.source_z_GMM_component_means is of shape self.number_of_components x self.number of z dimensions.
 		self.gmm_means = torch.tensor(self.source_z_GMM_component_means).to(device)
 		self.gmm_variances = self.gmm_variance_value*torch.ones_like(self.gmm_means).to(device)
