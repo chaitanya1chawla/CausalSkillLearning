@@ -9602,7 +9602,7 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		self.set_iteration(counter)
 		
 		# (3), (4), (5a) Get input datapoint from target domain. One directional in this case.
-		source_input_dict, source_var_dict, source_eval_dict = self.encode_decode_trajectory(self.target_policy_manager, i)
+		source_input_dict, source_var_dict, source_eval_dict = self.encode_decode_trajectory(self.target_manager, i)
 		update_dictionary['subpolicy_inputs'], update_dictionary['latent_z'], update_dictionary['loglikelihood'], update_dictionary['kl_divergence'] = \
 			source_eval_dict['subpolicy_inputs'], source_var_dict['latent_z_indices'], source_eval_dict['learnt_subpolicy_loglikelihoods'], source_var_dict['kl_divergence']
 
@@ -9613,7 +9613,7 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(i, update_dictionary)
 
 		# 6) Compute gradients of objective and then update networks / policies.
-		self.update_dictionary(1, self.target_policy_manager, update_dictionary)
+		self.update_dictionary(1, self.target_manager, update_dictionary)
 		
 	def train(self, model=None):
 
