@@ -5697,7 +5697,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					'Training Discriminator': self.skip_vae, 
 					'Training Embeddings or Translation Models': self.skip_discriminator}
 		
-		if self.args.setting is not in ['densityjointtransfer']:
+		if self.args.setting not in ['densityjointtransfer']:
 			log_dict['Discriminability Loss'] = self.discriminability_loss
 			log_dict['Unweighted Discriminability Loss'] = self.unweighted_discriminability_loss
 			log_dict['Total Discriminability Loss'] = self.total_discriminability_loss
@@ -5709,7 +5709,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Plot discriminator values after we've started training it. 
 		if self.training_phase>1:
 
-			if self.args.setting is not in ['densityjointtransfer']:
+			if self.args.setting not in ['densityjointtransfer']:
 
 				# Compute discriminator loss and discriminator prob of right action for logging. 
 				log_dict['Z Discriminator Loss'], log_dict['Z Discriminator Probability'] = self.discriminator_loss, viz_dict['discriminator_probs']
@@ -5741,6 +5741,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				# Now zero out if we want to use partial supervision..
 				log_dict['Datapoint Masked Cross Domain Supervision Loss'] = self.datapoint_masked_cross_domain_supervised_loss
 				log_dict['Cross Domain Superivision Loss'] = self.cross_domain_supervision_loss
+
+			if self.args.setting in ['densityjointtransfer']:
+				log_dict['Unweighted Cross Domain Density Loss'] = self.unweighted_masked_cross_domain_density_loss.mean()
+				log_dict['Cross Domain Density Loss'] = self.cross_domain_density_loss.mean()
+
+				
 
 		##################################################
 		# Now visualizing spaces. 
@@ -9488,9 +9494,9 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		# Does this need to be masked? 
 		self.unweighted_unmasked_cross_domain_density_loss = update_dictionary['cross_domain_density_loss']
 		# Mask..
-		self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_density_loss).sum()/(policy_manager.batch_mask.sum())
+		self.unweighted_masked_cross_domain_density_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_density_loss).sum()/(policy_manager.batch_mask.sum())
 		# Weight this loss.
-		self.cross_domain_density_loss = self.cross_domain_density_loss_weight*self.unweighted_masked_cross_domain_density_loss
+		self.cross_domain_density_loss = self.args.cross_domain_density_loss_weight*self.unweighted_masked_cross_domain_density_loss
 
 		###########################################################
 		# (1c) If active, compute cross domain z loss. 
@@ -9499,7 +9505,7 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		# Remember, the cross domain gt supervision loss should only be active when... trnaslating, i.e. when we have domain==1.
 		if self.args.cross_domain_supervision and domain==1:
 			# Call function to compute this. # This function depends on whether we have a translation model or not.. 
-			self.unweighted_unmasked_cross_domain_supervision_loss = update_dictionary['cross_domain_supervised_loss']
+			self.unweighted_unmasked_cross_domain_supervision_loss = update_dictionary['cross_domain_supervised_loss'].mean(dim=-1)
 			# Now mask using batch mask.			
 			# self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
 			self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(policy_manager.batch_mask.sum())
@@ -9539,11 +9545,19 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		# self.source_manager.get_trajectory_and_latent_sets(get_visuals=False)
 		# self.target_manager.get_trajectory_and_latent_sets(get_visuals=False)
 		
+
+
 		###################################
 		# Create GMM
-		self.gmm_variance_value = 0.2
-		# Assumes self.source_z_GMM_component_means is of shape self.number_of_components x self.number of z dimensions.
-		self.gmm_means = torch.tensor(self.source_latent_zs).to(device)
+		###################################
+
+		# Earlier we were not computing source latent z set because we were assuming it was already computed, but if preprocessing step once, we can't really assume this..
+		self.source_manager.get_trajectory_and_latent_sets(get_visuals=False)
+		# This should be fixed now..
+		self.gmm_means = torch.tensor(np.concatenate(self.source_manager.latent_z_set)).to(device)
+		# self.gmm_means = torch.tensor(self.source_latent_zs).to(device)
+		
+		self.gmm_variance_value = 0.2		
 		self.gmm_variances = self.gmm_variance_value*torch.ones_like(self.gmm_means).to(device)
 		
 		self.mixture_distribution = torch.distributions.Categorical(torch.ones(self.gmm_means.shape[0]).to(device))
@@ -9553,13 +9567,10 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		# Can now query this GMM for differentiable probability estimate as: 
 		# self.GMM.log_prob(batch_of_values)
 
-	# REMEMBER, need to implement computing supervised loss for this setting, because we we aren't using a trnaslation model
-	# Must also handle translated z set ...
-
-	def compute_density_based_loss(update_dictionary):
+	def compute_density_based_loss(self, update_dictionary):
 		return - self.GMM.log_prob(update_dictionary['latent_z'])
 
-	def compute_cross_domain_supervision_loss(self, update_dictionary):
+	def compute_cross_domain_supervision_loss(self, i, update_dictionary):
 
 		# Basically feed in the predicted zs from the translation model, and get likelihoods of the zs from the target domain. 
 		# This can be used as a loss function or as an evaluation metric. 
@@ -9568,7 +9579,7 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		# detached_z = update_dictionary['latent_z'].detach()
 		# cross_domain_z = update_dictionary['cross_domain_latent_z'].detach()
 
-		cross_domain_input_dict, cross_domain_var_dict, cross_domain_eval_dict = self.encode_decode_trajectory(self.source_policy_manager, i)
+		cross_domain_input_dict, cross_domain_var_dict, cross_domain_eval_dict = self.encode_decode_trajectory(self.source_manager, i)
 		# Log cross domain latent z in update dictionary. 
 		update_dictionary['cross_domain_latent_z'] = cross_domain_var_dict['latent_z_indices']
 
@@ -9603,6 +9614,7 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		
 		# (3), (4), (5a) Get input datapoint from target domain. One directional in this case.
 		source_input_dict, source_var_dict, source_eval_dict = self.encode_decode_trajectory(self.target_manager, i)
+		update_dictionary = {}
 		update_dictionary['subpolicy_inputs'], update_dictionary['latent_z'], update_dictionary['loglikelihood'], update_dictionary['kl_divergence'] = \
 			source_eval_dict['subpolicy_inputs'], source_var_dict['latent_z_indices'], source_eval_dict['learnt_subpolicy_loglikelihoods'], source_var_dict['kl_divergence']
 
@@ -9613,15 +9625,15 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(i, update_dictionary)
 
 		# 6) Compute gradients of objective and then update networks / policies.
-		self.update_dictionary(1, self.target_manager, update_dictionary)
+		self.update_networks(1, self.target_manager, update_dictionary)
 		
 	def train(self, model=None):
 
+		# Run preprocessing step that sets up z sets for GMM likeihood evaluation. 
+		self.preprocessing_step()		
+
 		# Run some initialization process to manage GPU memory with variable sized batches.
 		self.initialize_training_batches()
-
-		# Run preprocessing step that sets up z sets for GMM likeihood evaluation. 
-		self.preprocesssing_step()		
 
 		# Now run original training function.
 		print("About to run train function.")
