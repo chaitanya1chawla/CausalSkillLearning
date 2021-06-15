@@ -5402,7 +5402,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.learning_rate = self.args.learning_rate
 		self.already_shuffled = 0
 
-	def set_iteration(self, counter):
+	def set_iteration(self, counter, i=0):
 
 		# Set epsilon.
 		if counter<self.decay_counter:
@@ -5467,6 +5467,19 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.source_manager.set_epoch(counter)
 		self.target_manager.set_epoch(counter)
 
+		# Check if i is less than the number of supervised datapoints.
+		# If it is, then set the supervised_datapoints_multiplier to 1, otherwise set it to 0. to make sure the supervised loss isn't used for these datapoints..
+		if self.args.number_of_supervised_datapoints == -1:
+			# If fully supervised case..
+			self.supervised_datapoints_multiplier = 1. 
+		else:
+			if i<self.args.number_of_supervised_datapoints:
+				self.supervised_datapoints_multiplier = 1. 
+			else:
+				self.supervised_datapoints_multiplier = 0.
+			
+		# print("Iter: ", i, "Sup L W:", self.supervised_datapoints_multiplier)
+	
 	def create_networks(self):
 
 		# Call create networks from each of the policy managers. 
@@ -7775,19 +7788,6 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# Now make sure VAE loss weight is set to 0, because we can ignore the reconstruction losses in this setting.
 		self.vae_loss_weight = 0.
 
-		# Check if i is less than the number of supervised datapoints.
-		# If it is, then set the supervised_datapoints_multiplier to 1, otherwise set it to 0. to make sure the supervised loss isn't used for these datapoints..
-		if self.args.number_of_supervised_datapoints == -1:
-			# If fully supervised case..
-			self.supervised_datapoints_multiplier = 1. 
-		else:
-			if i<self.args.number_of_supervised_datapoints:
-				self.supervised_datapoints_multiplier = 1. 
-			else:
-				self.supervised_datapoints_multiplier = 0.
-			
-		# print("Iter: ", i, "Sup L W:", self.supervised_datapoints_multiplier)
-
 	def set_translated_z_sets_recurrent_translation(self, domain=1):
 
 		# For the recurrent model setting, special translation...
@@ -8556,7 +8556,6 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# 6) Feed back as penalty
 		return gradient_penalty
 
-	# @gpu_profile_every(1)
 	def run_iteration(self, counter, i, domain=None):
 		
 		#################################################
@@ -9457,7 +9456,9 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 
 		super().create_training_ops()
 
-	def update_plots(self):			
+	def update_plots(self):
+
+		pass
 
 	def update_networks(self, domain, policy_manager, update_dictionary):		
 
@@ -9498,7 +9499,7 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		# Remember, the cross domain gt supervision loss should only be active when... trnaslating, i.e. when we have domain==1.
 		if self.args.cross_domain_supervision and domain==1:
 			# Call function to compute this. # This function depends on whether we have a translation model or not.. 
-			self.unweighted_unmasked_cross_domain_supervision_loss = - update_dictionary['cross_domain_supervised_likelihood']
+			self.unweighted_unmasked_cross_domain_supervision_loss = update_dictionary['cross_domain_supervised_loss']
 			# Now mask using batch mask.			
 			# self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
 			self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(policy_manager.batch_mask.sum())
@@ -9567,8 +9568,14 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		# detached_z = update_dictionary['latent_z'].detach()
 		# cross_domain_z = update_dictionary['cross_domain_latent_z'].detach()
 
-		return unweighted_unmasked_cross_domain_supervision_loss
+		cross_domain_input_dict, cross_domain_var_dict, cross_domain_eval_dict = self.encode_decode_trajectory(self.source_policy_manager, i)
+		# Log cross domain latent z in update dictionary. 
+		update_dictionary['cross_domain_latent_z'] = cross_domain_var_dict['latent_z_indices']
 
+		# Compute the Cross Domain Loss.. here, maybe should just be L2 loss.
+		unweighted_unmasked_cross_domain_supervision_loss = ((update_dictionary['cross_domain_latent_z'] - update_dictionary['latent_z'])**2)
+		
+		return unweighted_unmasked_cross_domain_supervision_loss
 
 	def run_iteration(self, counter, i, domain=None):
 		
@@ -9603,7 +9610,7 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		update_dictionary['cross_domain_density_loss'] = self.compute_density_based_loss(update_dictionary)
 		
 		# 5c) Compute supervised loss..
-		update_dictionary['cross_domain_supervised_likelihood'] = self.compute_cross_domain_supervision_loss(update_dictionary)
+		update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(i, update_dictionary)
 
 		# 6) Compute gradients of objective and then update networks / policies.
 		self.update_dictionary(1, self.target_policy_manager, update_dictionary)
