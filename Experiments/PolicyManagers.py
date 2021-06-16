@@ -9535,15 +9535,22 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		target_z_tensor = torch.tensor(self.target_latent_zs).to(device)
 		
 		# Get log probabilities
-		log_probs = self.GMM.log_prob(target_z_tensor)		
-		
+		log_probs = self.GMM.log_prob(target_z_tensor).detach().cpu().numpy()
+		color_scale = 400
+
+		# print("Embedding in update plots of dnesity based thing..")		
+		colors = np.concatenate([color_scale*np.ones_like(log_probs), log_probs])
 		# Embed and transform - just the target_z_tensor? 
 		# Do this with just the perplexity set to 30 for now.. 
-		tsne_embedded_zs , _ = self.get_transform(self.target_latent_zs)
-		densne_embedded_zs , _ = self.get_transform(self.target_latent_zs, projection='densne')
 
-		tsne_image = self.plot_density_embedding(tsne_embedded_zs, log_probs, "Density Coded TSNE Embeddings.")
-		densne_image = self.plot_density_embedding(densne_embedded_zs, log_probs, "Density Coded DENSNE Embeddings.")
+		tsne_embedded_zs , _ = self.get_transform(self.shared_latent_zs)
+		densne_embedded_zs , _ = self.get_transform(self.shared_latent_zs, projection='densne')
+
+		# tsne_embedded_zs , _ = self.get_transform(self.target_latent_zs)
+		# densne_embedded_zs , _ = self.get_transform(self.target_latent_zs, projection='densne')
+
+		tsne_image = self.plot_density_embedding(tsne_embedded_zs, colors, "Density Coded TSNE Embeddings.")
+		densne_image = self.plot_density_embedding(densne_embedded_zs, colors, "Density Coded DENSNE Embeddings.")
 
 		##################################################
 		# Now add to wandb log_dict.
@@ -9557,15 +9564,19 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		else:
 			return log_dict
 
-	def plot_density_embedding(embedded_zs, log_probs, title):
+	def plot_density_embedding(self, embedded_zs, colors, title):
 
 		# Now visualize TSNE image
 		matplotlib.rcParams['figure.figsize'] = [5,5]
 		fig = plt.figure()
 		ax = fig.gca()
 		
-		ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=log_probs)
-		ax.colorbar()		
+		im = ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors, cmap='jet',edgecolors='k')
+
+		from mpl_toolkits.axes_grid1 import make_axes_locatable
+		divider = make_axes_locatable(ax)
+		cax = divider.append_axes('right', size='5%', pad=0.05)
+		fig.colorbar(im, cax=cax, orientation='vertical')		
 
 		############################################################
 		# Now make the plot and generate numpy image from it. 
