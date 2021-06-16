@@ -5500,7 +5500,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# print("FINALLY RUNNING CREATE TRAIN OPS")
 		# # Call create training ops from each of the policy managers. Need these optimizers, because the encoder-decoders get a different loss than the discriminator. 
-		if self.args.setting in ['jointtransfer','jointfixembed','jointfixcycle']:
+		if self.args.setting in ['jointtransfer','jointfixembed','jointfixcycle','densityjointtransfer']:
 			self.source_manager.learning_rate = self.args.transfer_learning_rate
 			self.target_manager.learning_rate = self.args.transfer_learning_rate
 
@@ -9292,7 +9292,7 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 	def create_training_ops(self):
 
 		super().create_training_ops()
-
+		
 		discriminator_opt_params = self.discriminator_network.parameters()
 		if self.args.z_trajectory_discriminator or self.args.z_transform_discriminator:
 			discriminator_opt_params = list(discriminator_opt_params) + list(self.z_trajectory_discriminator.parameters())
@@ -9454,13 +9454,13 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		self.target_manager.policy_network.load_state_dict(self.load_object['Target_Policy_Network'])
 		self.target_manager.variational_policy.load_state_dict(self.load_object['Target_Encoder_Network'])
 
-	def create_networks(self):
+	# def create_networks(self):
 
-		super().create_networks()
+	# 	super().create_networks()
 
-	def create_training_ops(self):
+	# def create_training_ops(self):
 
-		super().create_training_ops()
+	# 	super().create_training_ops()
 
 	def update_networks(self, domain, policy_manager, update_dictionary):		
 
@@ -9571,7 +9571,7 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		fig = plt.figure()
 		ax = fig.gca()
 		
-		im = ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors, cmap='jet',edgecolors='k')
+		im = ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors,edgecolors='k')
 
 		from mpl_toolkits.axes_grid1 import make_axes_locatable
 		divider = make_axes_locatable(ax)
