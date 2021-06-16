@@ -5681,7 +5681,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Remove nested gif objects. 
 			del self.source_manager.ground_truth_gif, self.source_manager.rollout_gif, self.target_manager.ground_truth_gif, self.target_manager.rollout_gif
 
-	def update_plots(self, counter, viz_dict, log=True):
+	def update_plots(self, counter, viz_dict=None, log=True):
 
 		##################################################
 		# Base logging. 
@@ -5746,7 +5746,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				log_dict['Unweighted Cross Domain Density Loss'] = self.unweighted_masked_cross_domain_density_loss.mean()
 				log_dict['Cross Domain Density Loss'] = self.cross_domain_density_loss.mean()
 
-				
+
 
 		##################################################
 		# Now visualizing spaces. 
@@ -9462,10 +9462,6 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 
 		super().create_training_ops()
 
-	def update_plots(self):
-
-		pass
-
 	def update_networks(self, domain, policy_manager, update_dictionary):		
 
 		#########################################################################
@@ -9526,7 +9522,62 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		# Go backward through the generator (encoder / decoder), and take a step. 
 		self.total_VAE_loss.backward()
 		policy_manager.optimizer.step()
+
+	def update_plots(self, counter, viz_dict=None, log=True):
+
+		log_dict = super().update_plots(counter, viz_dict, log=False)
+
+		##################################################
+		# Plot density coded embeddings. 
+		##################################################
+
+		# Now just use target_latent_zs..
+		target_z_tensor = torch.tensor(self.target_latent_zs).to(device)
 		
+		# Get log probabilities
+		log_probs = self.GMM.log_prob(target_z_tensor)		
+		
+		# Embed and transform - just the target_z_tensor? 
+		# Do this with just the perplexity set to 30 for now.. 
+		tsne_embedded_zs , _ = self.get_transform(self.target_latent_zs)
+		densne_embedded_zs , _ = self.get_transform(self.target_latent_zs, projection='densne')
+
+		tsne_image = self.plot_density_embedding(tsne_embedded_zs, log_probs, "Density Coded TSNE Embeddings.")
+		densne_image = self.plot_density_embedding(densne_embedded_zs, log_probs, "Density Coded DENSNE Embeddings.")
+
+		##################################################
+		# Now add to wandb log_dict.
+		##################################################
+
+		log_dict['Density Coded TSNE Embeddings Perp30'] = self.return_wandb_image(tsne_image)
+		log_dict['Density Coded DENSNE Embeddings Perp30'] = self.return_wandb_image(densne_image)
+
+		if log:
+			wandb.log(log_dict, step=counter)
+		else:
+			return log_dict
+
+	def plot_density_embedding(embedded_zs, log_probs, title):
+
+		# Now visualize TSNE image
+		matplotlib.rcParams['figure.figsize'] = [5,5]
+		fig = plt.figure()
+		ax = fig.gca()
+		
+		ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=log_probs)
+		ax.colorbar()		
+
+		############################################################
+		# Now make the plot and generate numpy image from it. 
+		############################################################
+		ax.set_title("{0}".format(title),fontdict={'fontsize':15})
+		fig.canvas.draw()		
+		width, height = fig.get_size_inches() * fig.get_dpi()
+		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)		
+		image = np.transpose(image, axes=[2,0,1])
+
+		return image
+
 	def preprocessing_step(self):
 
 		# Overall algorithm.
@@ -9627,6 +9678,11 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		# 6) Compute gradients of objective and then update networks / policies.
 		self.update_networks(1, self.target_manager, update_dictionary)
 		
+		# 7) Update plots. 
+		viz_dict = {}
+		viz_dict['domain'] = domain
+		self.update_plots(counter, viz_dict, log=True)
+
 	def train(self, model=None):
 
 		# Run preprocessing step that sets up z sets for GMM likeihood evaluation. 
