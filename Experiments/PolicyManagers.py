@@ -9536,7 +9536,7 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		
 		# Get log probabilities
 		log_probs = self.GMM.log_prob(target_z_tensor).detach().cpu().numpy()
-		color_scale = 400
+		color_scale = 50
 
 		# print("Embedding in update plots of dnesity based thing..")		
 		colors = np.concatenate([color_scale*np.ones_like(log_probs), log_probs])
