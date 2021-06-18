@@ -5686,9 +5686,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		##################################################
 		# Plot density visualizations. Both directions?
 		##################################################
-
-		if counter>0:
-			log_dict = self.construct_density_embeddings(log_dict)
+	
+		log_dict = self.construct_density_embeddings(log_dict)
 
 		if self.args.source_domain==self.args.target_domain and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:		
 			log_dict['Forward GMM Density'], log_dict['Reverse GMM Density'] = self.compute_aggregate_GMM_densities()
@@ -6584,7 +6583,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.total_discriminator_loss.backward()
 			self.discriminator_optimizer.step()
 
-	def run_iteration(self, counter, i, domain=None, special_indices=None):
+	def run_iteration(self, counter, i, domain=None, special_indices=None, skip_viz=False):
 
 		# Phases: 
 		# Phase 1:  Train encoder-decoder for both domains initially, so that discriminator is not fed garbage. 
@@ -6630,7 +6629,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# viz_dict = {'domain': domain, 'discriminator_probs': discriminator_prob.squeeze(0).mean(axis=0)[domain].detach().cpu().numpy()}
 			viz_dict = {'domain': domain, 'discriminator_probs': discriminator_prob[...,domain].detach().cpu().numpy().mean()}
 
-			self.update_plots(counter, viz_dict)
+			if not(skip_viz):
+				self.update_plots(counter, viz_dict)
 
 	def compute_neighbors(self, computed_sets=False):
 		
@@ -6853,7 +6853,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Now actually run iteration of the joint transfer / joint embed transfer with these specal indices.
 		counter = 0
 		print("Running initializing iteration.")
-		self.run_iteration(counter, max_batch_index, domain=max_batch_domain)
+		self.run_iteration(counter, max_batch_index, domain=max_batch_domain, skip_viz=True)
 
 	def compute_z_statistics(self):
 
@@ -7424,7 +7424,7 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 			self.tf_logger.scalar_summary('Real Translated Discriminability Loss', self.weighted_real_translated_loss.mean(), counter)
 			self.tf_logger.scalar_summary('Real Translated Discriminator Loss', self.real_translated_discriminator_loss.mean(), counter)
 
-	def run_iteration(self, counter, i):
+	def run_iteration(self, counter, i, skip_viz=False):
 
 		# Phases: 
 		# Phase 1:  Train encoder-decoder for both domains initially, so that discriminator is not fed garbage. 
@@ -7503,7 +7503,8 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		# (5) Accumulate and plot statistics of training.
 		####################################
 		
-		self.update_plots(counter, dictionary)
+		if not(skip_viz):
+			self.update_plots(counter, dictionary)
 
 		# Encode decode function: First encodes, takes trajectory segment, and outputs latent z. The latent z is then provided to decoder (along with initial state), and then we get SOURCE domain subpolicy inputs. 
 		# Cross domain decoding function: Takes encoded latent z (and start state), and then rolls out with target decoder. Function returns, target trajectory, action sequence, and TARGET domain subpolicy inputs. 
@@ -7854,7 +7855,7 @@ class PolicyManager_FixEmbedCycleTransfer(PolicyManager_CycleConsistencyTransfer
 			self.tf_logger.image_summary("TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10", [self.translated_viz_dictionary['tsne_transsource_origtarget_traj_p10']], counter)
 			self.tf_logger.image_summary("TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30", [self.translated_viz_dictionary['tsne_transsource_origtarget_traj_p30']], counter)
 
-	def run_iteration(self, counter, i):
+	def run_iteration(self, counter, i, skip_viz=False):
 
 		####################################
 		# (0) Setup things like training phases, epsilon values, etc.
@@ -7901,7 +7902,8 @@ class PolicyManager_FixEmbedCycleTransfer(PolicyManager_CycleConsistencyTransfer
 		# (5) Accumulate and plot statistics of training.
 		####################################
 		
-		self.update_plots(counter, dictionary)
+		if not(skip_viz):
+			self.update_plots(counter, dictionary)
 
 class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
@@ -8720,7 +8722,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# 6) Feed back as penalty
 		return gradient_penalty
 
-	def run_iteration(self, counter, i, domain=None):
+	def run_iteration(self, counter, i, domain=None, skip_viz=False):
 		
 		#################################################
 		## Algorithm:
@@ -8863,7 +8865,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			if self.args.task_discriminability:
 				viz_dict['task_discriminator_probs'] = update_dictionary['task_discriminator_prob'][...,domain].detach().cpu().numpy().mean()
 
-			self.update_plots(counter, viz_dict, log=True)
+			if not(skip_viz):
+				self.update_plots(counter, viz_dict, log=True)
 
 class PolicyManager_JointFixEmbedCycleTransfer(PolicyManager_JointFixEmbedTransfer):
 
@@ -9259,7 +9262,7 @@ class PolicyManager_JointFixEmbedCycleTransfer(PolicyManager_JointFixEmbedTransf
 
 		return unweighted_unmasked_cross_domain_supervision_loss
 	
-	def run_iteration(self, counter, i, domain=None):
+	def run_iteration(self, counter, i, domain=None, skip_viz=False):
 
 		#################################################
 		## Algorithm:
@@ -9361,7 +9364,8 @@ class PolicyManager_JointFixEmbedCycleTransfer(PolicyManager_JointFixEmbedTransf
 			# viz_dict['discriminator_probs'] = discriminator_prob[...,domain].detach().cpu().numpy().mean()
 			viz_dict['discriminator_probs'] = None
 
-			self.update_plots(counter, viz_dict, log=True)
+			if not(skip_viz):
+				self.update_plots(counter, viz_dict, log=True)
 
 class PolicyManager_JointTransfer(PolicyManager_Transfer):
 
@@ -9506,7 +9510,7 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 		# Still need to use this setting to do.. optimizer management etc.
 		# Also to prevent detaching to z's., because the translation model.... is not what we want to give gradients to? 
 			
-	def run_iteration(self, counter, i, domain=None):
+	def run_iteration(self, counter, i, domain=None, skip_viz=False):
 
 
 		# Phases: 
@@ -9576,7 +9580,8 @@ class PolicyManager_JointTransfer(PolicyManager_Transfer):
 			viz_dict['domain'] = domain
 			viz_dict['discriminator_probs'] = discriminator_prob[...,domain].detach().cpu().numpy().mean()
 
-			self.update_plots(counter, viz_dict)
+			if not(skip_viz):
+				self.update_plots(counter, viz_dict)
 
 class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 
@@ -9753,7 +9758,7 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		
 		return unweighted_unmasked_cross_domain_supervision_loss
 	
-	def run_iteration(self, counter, i, domain=None):
+	def run_iteration(self, counter, i, domain=None, skip_viz=False):
 		
 		# Overall algorithm.
 		# Preprocessing
@@ -9795,7 +9800,9 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		# 7) Update plots. 
 		viz_dict = {}
 		viz_dict['domain'] = domain
-		self.update_plots(counter, viz_dict, log=True)
+
+		if not(skip_viz):
+			self.update_plots(counter, viz_dict, log=True)
 
 	# def train(self, model=None):
 
@@ -10018,7 +10025,7 @@ class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 
 		return dictionary
 
-	def run_iteration(self, counter, i):
+	def run_iteration(self, counter, i, skip_viz=False):
 
 		# Phases: 
 		# Phase 1:  Train encoder-decoder for both domains initially, so that discriminator is not fed garbage. 
@@ -10104,7 +10111,8 @@ class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 		# (5) Accumulate and plot statistics of training.
 		####################################
 		
-		self.update_plots(counter, dictionary)
+		if not(skip_viz):
+			self.update_plots(counter, dictionary)
 
 		# Encode decode function: First encodes, takes trajectory segment, and outputs latent z. The latent z is then provided to decoder (along with initial state), and then we get SOURCE domain subpolicy inputs. 
 		# Cross domain decoding function: Takes encoded latent z (and start state), and then rolls out with target decoder. Function returns, target trajectory, action sequence, and TARGET domain subpolicy inputs. 
