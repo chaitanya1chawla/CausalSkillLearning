@@ -5735,7 +5735,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					log_dict['Unweighted Task Discriminator Loss'] = self.unweighted_task_discriminator_loss.mean()
 					log_dict['Task Discriminator Domain Probability'] = viz_dict['task_discriminator_probs']
 
-			if self.args.cross_domain_supervision and (viz_dict['domain']==1 or self.args.setting=='jointfixcycle'):
+			if self.args.cross_domain_supervision and (viz_dict['domain']==1 or self.args.setting in ['jointfixcycle','densityjointtransfer']):
 				# If cycle, plot cdsl in both directions.
 				log_dict['Unweighted Cross Domain Superivision Loss'] = self.unweighted_masked_cross_domain_supervision_loss.mean()
 				# Now zero out if we want to use partial supervision..
@@ -5825,6 +5825,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					self.return_wandb_image(self.viz_dictionary['densne_combined_embeddings_p30'])
 			
 			##################################################
+			# Plot density visualizations. Both directions?
+			##################################################
+
+			log_dict = self.construct_density_embeddings(log_dict)
+
+			##################################################
 			# We are also going to log Ground Truth trajectories and their reconstructions in each of the domains, to make sure our networks are learning. 		
 			##################################################
 
@@ -5856,17 +5862,21 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.source_manager.avg_reconstruction_error, self.target_manager.avg_reconstruction_error
 
 			if self.args.source_domain==self.args.target_domain and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:		
-				# self.evaluate_correspondence_metrics(computed_sets=False)
-				# Actually, we've probably computed trajectory and latent sets. 
+				# # self.evaluate_correspondence_metrics(computed_sets=False)
+				# # Actually, we've probably computed trajectory and latent sets. 
 				if counter>0:
-					self.evaluate_correspondence_metrics()
+				# 	self.evaluate_correspondence_metrics()
 
-					log_dict['Source To Target Translation Trajectory Error'] = self.source_target_trajectory_distance
-					log_dict['Target To Source Translation Trajectory Error'] = self.target_source_trajectory_distance
-					log_dict['Source To Target Translation Trajectory Normalized Error'] = self.source_target_trajectory_normalized_distance
-					log_dict['Target To Source Translation Trajectory Normalized Error'] = self.target_source_trajectory_normalized_distance
-					log_dict['Average Corresponding Z Sequence Error'] = self.average_corresponding_z_sequence_error.mean()
-					log_dict['Average Corresponding Z Transition Sequence Error'] = self.average_corresponding_z_transition_sequence_error.mean()
+				# 	log_dict['Source To Target Translation Trajectory Error'] = self.source_target_trajectory_distance
+				# 	log_dict['Target To Source Translation Trajectory Error'] = self.target_source_trajectory_distance
+				# 	log_dict['Source To Target Translation Trajectory Normalized Error'] = self.source_target_trajectory_normalized_distance
+				# 	log_dict['Target To Source Translation Trajectory Normalized Error'] = self.target_source_trajectory_normalized_distance
+				# 	log_dict['Average Corresponding Z Sequence Error'] = self.average_corresponding_z_sequence_error.mean()
+				# 	log_dict['Average Corresponding Z Transition Sequence Error'] = self.average_corresponding_z_transition_sequence_error.mean()
+
+					log_dict['Forward GMM Density'], log_dict['Reverse GMM Density'] = self.compute_aggregate_GMM_densities()
+					log_dict['Aggregate Chamfer Loss'] = self.compute_aggregate_chamfer_loss()
+
 
 			##################################################
 			# Visualize Z Trajectories.
@@ -6449,6 +6459,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.cross_domain_supervision_loss = self.args.cross_domain_supervision_loss_weight*self.datapoint_masked_cross_domain_supervised_loss
 		else:
 			self.unweighted_masked_cross_domain_supervision_loss = 0.
+			self.datapoint_masked_cross_domain_supervised_loss = 0.
 			self.cross_domain_supervision_loss = 0.
 
 		###########################################################
@@ -6885,11 +6896,142 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.target_z_mean = self.joint_z_mean
 			self.source_z_std = self.joint_z_std
 			self.target_z_std = self.joint_z_std
+	
+	def compute_aggregate_chamfer_loss(self):
 		
+		with torch.no_grad():
+			chamfer_loss = chamfer_distance(torch.tensor(self.source_latent_zs).to(device).unsqueeze(0), torch.tensor(self.target_latent_zs).to(device).unsqueeze(0))[0]
+		return chamfer_loss.detach().cpu().numpy()
+
+	def construct_density_embeddings(self, log_dict):
+
+		##################################################
+		# Plot density coded embeddings. 
+		##################################################
+		
+		# Evaluate log_probs of target..
+		log_probs = self.query_GMM_density(evaluation_domain=0, point_set=self.target_latent_zs)
+		color_scale = 50
+
+		# print("Embedding in update plots of dnesity based thing..")		
+		colors = np.concatenate([color_scale*np.ones_like(log_probs), log_probs])
+		# Embed and transform - just the target_z_tensor? 
+		# Do this with just the perplexity set to 30 for now.. 
+
+		tsne_embedded_zs , _ = self.get_transform(self.shared_latent_zs)
+		densne_embedded_zs , _ = self.get_transform(self.shared_latent_zs, projection='densne')
+		pca_embedded_zs , _ = self.get_transform(self.shared_latent_zs, projection='pca')
+
+		# tsne_embedded_zs , _ = self.get_transform(self.target_latent_zs)
+		# densne_embedded_zs , _ = self.get_transform(self.target_latent_zs, projection='densne')
+
+		tsne_image = self.plot_density_embedding(tsne_embedded_zs, colors, "Density Coded TSNE Embeddings.")
+		densne_image = self.plot_density_embedding(densne_embedded_zs, colors, "Density Coded DENSNE Embeddings.")
+		pca_image = self.plot_density_embedding(pca_embedded_zs, colors, "Density Coded PCA Embeddings.")
+
+		##################################################
+		# Now add to wandb log_dict.
+		##################################################
+
+		log_dict['Density Coded TSNE Embeddings Perp30'] = self.return_wandb_image(tsne_image)
+		log_dict['Density Coded DENSNE Embeddings Perp30'] = self.return_wandb_image(densne_image)
+		log_dict['Density Coded PCA Embeddings'] = self.return_wandb_image(pca_image)
+
+		return log_dict
+
+	def plot_density_embedding(self, embedded_zs, colors, title):
+
+		# Now visualize TSNE image
+		matplotlib.rcParams['figure.figsize'] = [5,5]
+		fig = plt.figure()
+		ax = fig.gca()
+		
+		im = ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors,edgecolors='k')
+
+		from mpl_toolkits.axes_grid1 import make_axes_locatable
+		divider = make_axes_locatable(ax)
+		cax = divider.append_axes('right', size='5%', pad=0.05)
+		fig.colorbar(im, cax=cax, orientation='vertical')		
+
+		############################################################
+		# Now make the plot and generate numpy image from it. 
+		############################################################
+		ax.set_title("{0}".format(title),fontdict={'fontsize':15})
+		fig.canvas.draw()		
+		width, height = fig.get_size_inches() * fig.get_dpi()
+		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)		
+		image = np.transpose(image, axes=[2,0,1])
+
+		return image
+
+	def setup_GMM(self):
+
+		self.GMM_list = [self.create_GMM(evaluation_domain=0), self.create_GMM(evaluation_domain=1)]		
+
+	def compute_aggregate_GMM_densities(self):
+
+		# May need to batch this, depending on memory. 
+		forward_density = self.query_GMM_density(evaluation_domain=0, point_set=self.target_latent_zs).mean()
+		reverse_density = self.query_GMM_density(evaluation_domain=1, point_set=self.source_latent_zs).mean()
+
+		return forward_density.detach().cpu().numpy(), reverse_density.detach().cpu().numpy()
+
+	def query_GMM_density(self, evaluation_domain=0, point_set=None):
+
+		return self.GMM_list[evaluation_domain].log_prob(torch.tensor(point_set).to(device))
+
+	def create_GMM(self, evaluation_domain=0):
+
+
+		# Overall algorithm.
+		# Preprocessing
+		# 1) For N samples of datapoints from the source domain. 
+		# 	# 2) Feed these input datapoints into the source domain encoder and get source encoding z. 
+		#	# 3) Add Z to Source Z Set. 
+		# 4) Build GMM with centers around the N Source Z set Z's.
+	
+		# Remember, for the setting where we have a translation model that translates from TARGET to SOURCe domains (i.e. a backward translation model). 
+		# We probably want to evaluate a batch_of_TARGET values, given the source GMM values.
+
+		# Don't actually get z's this here.. Just use the source latent z's...
+		# Just make sure we run this after the set_translated_z_sets function is called..
+		# # Actually get Z's. Hopefully this goes over representative proportion of dataset.
+		# self.source_manager.get_trajectory_and_latent_sets(get_visuals=False)
+		# self.target_manager.get_trajectory_and_latent_sets(get_visuals=False)
+		
+
+		# Remember, evaluation_domain is the domain from which the components Gaussians come from.
+		manager_list = [self.source_manager, self.target_manager]
+		policy_manager = manager_list[evaluation_domain]
+
+		###################################
+		# Create GMM
+		###################################
+
+		# Earlier we were not computing source latent z set because we were assuming it was already computed, but if preprocessing step once, we can't really assume this..
+		policy_manager.get_trajectory_and_latent_sets(get_visuals=False)
+		# This should be fixed now..
+
+		gmm_means = torch.tensor(np.concatenate(policy_manager.latent_z_set)).to(device)
+		gmm_variances = self.args.gmm_variance_value*torch.ones_like(gmm_means).to(device)
+		
+		self.mixture_distribution = torch.distributions.Categorical(torch.ones(gmm_means.shape[0]).to(device))
+		component_distribution = torch.distributions.Independent(torch.distributions.Normal(gmm_means,gmm_variances),1)
+		
+		GMM = torch.distributions.MixtureSameFamily(self.mixture_distribution, component_distribution)
+
+		# Can now query this GMM for differentiable probability estimate as: 
+		# self.GMM.log_prob(batch_of_values)	
+
+		return GMM
+
 	def train(self, model=None):
 
 		# Run some initialization process to manage GPU memory with variable sized batches.
 		self.initialize_training_batches()
+
+		# Setup GMM.
+		self.setup_GMM()
 
 		# Now run original training function.
 		print("About to run train function.")
@@ -7902,9 +8044,6 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		self.z_last_set_by = 'set_translated_z_sets'
 		self.set_trans_z +=1
-
-		print("Embedding in Set Translated Z Sets")
-		embed()
 
 	def update_plots(self, counter, viz_dict, log=False):
 
@@ -9454,14 +9593,6 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		self.target_manager.policy_network.load_state_dict(self.load_object['Target_Policy_Network'])
 		self.target_manager.variational_policy.load_state_dict(self.load_object['Target_Encoder_Network'])
 
-	# def create_networks(self):
-
-	# 	super().create_networks()
-
-	# def create_training_ops(self):
-
-	# 	super().create_training_ops()
-
 	def update_networks(self, domain, policy_manager, update_dictionary):		
 
 		#########################################################################
@@ -9499,7 +9630,7 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		###########################################################
 	
 		# Remember, the cross domain gt supervision loss should only be active when... trnaslating, i.e. when we have domain==1.
-		if self.args.cross_domain_supervision and domain==1:
+		if self.args.cross_domain_supervision:
 			# Call function to compute this. # This function depends on whether we have a translation model or not.. 
 			self.unweighted_unmasked_cross_domain_supervision_loss = update_dictionary['cross_domain_supervised_loss'].mean(dim=-1)
 			# Now mask using batch mask.			
@@ -9527,112 +9658,65 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 
 		log_dict = super().update_plots(counter, viz_dict, log=False)
 
-		##################################################
-		# Plot density coded embeddings. 
-		##################################################
-
-		# Now just use target_latent_zs..
-		target_z_tensor = torch.tensor(self.target_latent_zs).to(device)
-		
-		# Get log probabilities
-		log_probs = self.GMM.log_prob(target_z_tensor).detach().cpu().numpy()
-		color_scale = 50
-
-		# print("Embedding in update plots of dnesity based thing..")		
-		colors = np.concatenate([color_scale*np.ones_like(log_probs), log_probs])
-		# Embed and transform - just the target_z_tensor? 
-		# Do this with just the perplexity set to 30 for now.. 
-
-		tsne_embedded_zs , _ = self.get_transform(self.shared_latent_zs)
-		densne_embedded_zs , _ = self.get_transform(self.shared_latent_zs, projection='densne')
-
-		# tsne_embedded_zs , _ = self.get_transform(self.target_latent_zs)
-		# densne_embedded_zs , _ = self.get_transform(self.target_latent_zs, projection='densne')
-
-		tsne_image = self.plot_density_embedding(tsne_embedded_zs, colors, "Density Coded TSNE Embeddings.")
-		densne_image = self.plot_density_embedding(densne_embedded_zs, colors, "Density Coded DENSNE Embeddings.")
-
-		##################################################
-		# Now add to wandb log_dict.
-		##################################################
-
-		log_dict['Density Coded TSNE Embeddings Perp30'] = self.return_wandb_image(tsne_image)
-		log_dict['Density Coded DENSNE Embeddings Perp30'] = self.return_wandb_image(densne_image)
+		if counter%self.args.display_freq==0:
+			log_dict = self.construct_density_embeddings(log_dict)
 
 		if log:
 			wandb.log(log_dict, step=counter)
 		else:
 			return log_dict
 
-	def plot_density_embedding(self, embedded_zs, colors, title):
+	# def preprocessing_step(self):
 
-		# Now visualize TSNE image
-		matplotlib.rcParams['figure.figsize'] = [5,5]
-		fig = plt.figure()
-		ax = fig.gca()
-		
-		im = ax.scatter(embedded_zs[:,0],embedded_zs[:,1],c=colors,edgecolors='k')
-
-		from mpl_toolkits.axes_grid1 import make_axes_locatable
-		divider = make_axes_locatable(ax)
-		cax = divider.append_axes('right', size='5%', pad=0.05)
-		fig.colorbar(im, cax=cax, orientation='vertical')		
-
-		############################################################
-		# Now make the plot and generate numpy image from it. 
-		############################################################
-		ax.set_title("{0}".format(title),fontdict={'fontsize':15})
-		fig.canvas.draw()		
-		width, height = fig.get_size_inches() * fig.get_dpi()
-		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)		
-		image = np.transpose(image, axes=[2,0,1])
-
-		return image
-
-	def preprocessing_step(self):
-
-		# Overall algorithm.
-		# Preprocessing
-		# 1) For N samples of datapoints from the source domain. 
-		# 	# 2) Feed these input datapoints into the source domain encoder and get source encoding z. 
-		#	# 3) Add Z to Source Z Set. 
-		# 4) Build GMM with centers around the N Source Z set Z's.
+	# 	# Overall algorithm.
+	# 	# Preprocessing
+	# 	# 1) For N samples of datapoints from the source domain. 
+	# 	# 	# 2) Feed these input datapoints into the source domain encoder and get source encoding z. 
+	# 	#	# 3) Add Z to Source Z Set. 
+	# 	# 4) Build GMM with centers around the N Source Z set Z's.
 	
-		# Remember, for the setting where we have a translation model that translates from TARGET to SOURCe domains (i.e. a backward translation model). 
-		# We probably want to evaluate a batch_of_TARGET values, given the source GMM values.
+	# 	# Remember, for the setting where we have a translation model that translates from TARGET to SOURCe domains (i.e. a backward translation model). 
+	# 	# We probably want to evaluate a batch_of_TARGET values, given the source GMM values.
 
-		# Don't actually get z's this here.. Just use the source latent z's...
-		# Just make sure we run this after the set_translated_z_sets function is called..
-		# # Actually get Z's. Hopefully this goes over representative proportion of dataset.
-		# self.source_manager.get_trajectory_and_latent_sets(get_visuals=False)
-		# self.target_manager.get_trajectory_and_latent_sets(get_visuals=False)
+	# 	# Don't actually get z's this here.. Just use the source latent z's...
+	# 	# Just make sure we run this after the set_translated_z_sets function is called..
+	# 	# # Actually get Z's. Hopefully this goes over representative proportion of dataset.
+	# 	# self.source_manager.get_trajectory_and_latent_sets(get_visuals=False)
+	# 	# self.target_manager.get_trajectory_and_latent_sets(get_visuals=False)
 		
 
 
-		###################################
-		# Create GMM
-		###################################
+	# 	###################################
+	# 	# Create GMM
+	# 	###################################
 
-		# Earlier we were not computing source latent z set because we were assuming it was already computed, but if preprocessing step once, we can't really assume this..
-		self.source_manager.get_trajectory_and_latent_sets(get_visuals=False)
-		# This should be fixed now..
-		self.gmm_means = torch.tensor(np.concatenate(self.source_manager.latent_z_set)).to(device)
-		# self.gmm_means = torch.tensor(self.source_latent_zs).to(device)
-		
-		self.gmm_variance_value = 0.2		
-		self.gmm_variances = self.gmm_variance_value*torch.ones_like(self.gmm_means).to(device)
-		
-		self.mixture_distribution = torch.distributions.Categorical(torch.ones(self.gmm_means.shape[0]).to(device))
-		self.component_distribution = torch.distributions.Independent(torch.distributions.Normal(self.gmm_means,self.gmm_variances),1)
-		self.GMM = torch.distributions.MixtureSameFamily(self.mixture_distribution, self.component_distribution)
+	# 	# Earlier we were not computing source latent z set because we were assuming it was already computed, but if preprocessing step once, we can't really assume this..
+	# 	self.source_manager.get_trajectory_and_latent_sets(get_visuals=False)
+	# 	# This should be fixed now..
 
-		# Can now query this GMM for differentiable probability estimate as: 
-		# self.GMM.log_prob(batch_of_values)
+	# 	# print("embed in GMM creation")
+	# 	# embed()
+	# 	self.gmm_means = torch.tensor(np.concatenate(self.source_manager.latent_z_set)).to(device)
+	# 	# self.gmm_means = torch.tensor(self.source_latent_zs).to(device)
+		
+	# 	# self.gmm_variance_value = 0.2		
+	# 	self.gmm_variances = self.args.gmm_variance_value*torch.ones_like(self.gmm_means).to(device)
+		
+	# 	self.mixture_distribution = torch.distributions.Categorical(torch.ones(self.gmm_means.shape[0]).to(device))
+	# 	self.component_distribution = torch.distributions.Independent(torch.distributions.Normal(self.gmm_means,self.gmm_variances),1)
+	# 	self.GMM = torch.distributions.MixtureSameFamily(self.mixture_distribution, self.component_distribution)
+
+	# 	# Can now query this GMM for differentiable probability estimate as: 
+	# 	# self.GMM.log_prob(batch_of_values)
 
 	def compute_density_based_loss(self, update_dictionary):
+
+		# print("Embedding in density based loss computation")
+		# embed()
+
 		return - self.GMM.log_prob(update_dictionary['latent_z'])
 
-	def compute_cross_domain_supervision_loss(self, i, update_dictionary):
+	def compute_cross_domain_supervision_loss(self, i, update_dictionary, source_var_dict):
 
 		# Basically feed in the predicted zs from the translation model, and get likelihoods of the zs from the target domain. 
 		# This can be used as a loss function or as an evaluation metric. 
@@ -9649,7 +9733,7 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		unweighted_unmasked_cross_domain_supervision_loss = ((update_dictionary['cross_domain_latent_z'] - update_dictionary['latent_z'])**2)
 		
 		return unweighted_unmasked_cross_domain_supervision_loss
-
+	
 	def run_iteration(self, counter, i, domain=None):
 		
 		# Overall algorithm.
@@ -9672,7 +9756,7 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		# 		# 6) Compute gradients of objective and then update networks / policies.
 
 		# (0) Setup things like training phases, epislon values, etc.
-		self.set_iteration(counter)
+		self.set_iteration(counter, i=i)
 		
 		# (3), (4), (5a) Get input datapoint from target domain. One directional in this case.
 		source_input_dict, source_var_dict, source_eval_dict = self.encode_decode_trajectory(self.target_manager, i)
@@ -9684,7 +9768,7 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		update_dictionary['cross_domain_density_loss'] = self.compute_density_based_loss(update_dictionary)
 		
 		# 5c) Compute supervised loss..
-		update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(i, update_dictionary)
+		update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(i, update_dictionary, source_var_dict)
 
 		# 6) Compute gradients of objective and then update networks / policies.
 		self.update_networks(1, self.target_manager, update_dictionary)
@@ -9694,17 +9778,17 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		viz_dict['domain'] = domain
 		self.update_plots(counter, viz_dict, log=True)
 
-	def train(self, model=None):
+	# def train(self, model=None):
 
-		# Run preprocessing step that sets up z sets for GMM likeihood evaluation. 
-		self.preprocessing_step()		
+	# 	# Run preprocessing step that sets up z sets for GMM likeihood evaluation. 
+	# 	self.preprocessing_step()		
 
-		# Run some initialization process to manage GPU memory with variable sized batches.
-		self.initialize_training_batches()
+	# 	# Run some initialization process to manage GPU memory with variable sized batches.
+	# 	self.initialize_training_batches()
 
-		# Now run original training function.
-		print("About to run train function.")
-		super().train(model=model)
+	# 	# Now run original training function.
+	# 	print("About to run train function.")
+	# 	super().train(model=model)
 
 class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 
