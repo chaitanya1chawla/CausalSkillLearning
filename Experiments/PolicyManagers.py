@@ -5681,6 +5681,21 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Remove nested gif objects. 
 			del self.source_manager.ground_truth_gif, self.source_manager.rollout_gif, self.target_manager.ground_truth_gif, self.target_manager.rollout_gif
 
+	def log_density_and_chamfer_metrics(self, counter, log_dict):
+
+		##################################################
+		# Plot density visualizations. Both directions?
+		##################################################
+
+		if counter>0:
+			log_dict = self.construct_density_embeddings(log_dict)
+
+		if self.args.source_domain==self.args.target_domain and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:		
+			log_dict['Forward GMM Density'], log_dict['Reverse GMM Density'] = self.compute_aggregate_GMM_densities()
+			log_dict['Aggregate Chamfer Loss'] = self.compute_aggregate_chamfer_loss()
+
+		return log_dict
+
 	def update_plots(self, counter, viz_dict=None, log=True):
 
 		##################################################
@@ -5745,8 +5760,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			if self.args.setting in ['densityjointtransfer']:
 				log_dict['Unweighted Cross Domain Density Loss'] = self.unweighted_masked_cross_domain_density_loss.mean()
 				log_dict['Cross Domain Density Loss'] = self.cross_domain_density_loss.mean()
-
-
 
 		##################################################
 		# Now visualizing spaces. 
@@ -5825,12 +5838,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					self.return_wandb_image(self.viz_dictionary['densne_combined_embeddings_p30'])
 			
 			##################################################
-			# Plot density visualizations. Both directions?
-			##################################################
-
-			log_dict = self.construct_density_embeddings(log_dict)
-
-			##################################################
 			# We are also going to log Ground Truth trajectories and their reconstructions in each of the domains, to make sure our networks are learning. 		
 			##################################################
 
@@ -5862,9 +5869,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.source_manager.avg_reconstruction_error, self.target_manager.avg_reconstruction_error
 
 			if self.args.source_domain==self.args.target_domain and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:		
+				pass
 				# # self.evaluate_correspondence_metrics(computed_sets=False)
 				# # Actually, we've probably computed trajectory and latent sets. 
-				if counter>0:
+				# if counter>0:
 				# 	self.evaluate_correspondence_metrics()
 
 				# 	log_dict['Source To Target Translation Trajectory Error'] = self.source_target_trajectory_distance
@@ -5874,8 +5882,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				# 	log_dict['Average Corresponding Z Sequence Error'] = self.average_corresponding_z_sequence_error.mean()
 				# 	log_dict['Average Corresponding Z Transition Sequence Error'] = self.average_corresponding_z_transition_sequence_error.mean()
 
-					log_dict['Forward GMM Density'], log_dict['Reverse GMM Density'] = self.compute_aggregate_GMM_densities()
-					log_dict['Aggregate Chamfer Loss'] = self.compute_aggregate_chamfer_loss()
 
 
 			##################################################
@@ -5896,7 +5902,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			##################################################
 
 			self.free_memory()
-		
+
+		##################################################
+		# If we're directly optimizing representations.. call log_density_and_chamfer_metrics..		
+		##################################################
+
+		if self.args.setting in ['transfer','cycle_transfer','densityjointtransfer','jointtransfer','jointcycletransfer']:
+			log_dict = self.log_density_and_chamfer_metrics(counter, log_dict)		
+
 		##################################################
 		# Now log everything. 
 		##################################################
@@ -6910,7 +6923,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		##################################################
 		
 		# Evaluate log_probs of target..
-		log_probs = self.query_GMM_density(evaluation_domain=0, point_set=self.target_latent_zs)
+		log_probs = self.query_GMM_density(evaluation_domain=0, point_set=self.target_latent_zs).detach().cpu().numpy()
 		color_scale = 50
 
 		# print("Embedding in update plots of dnesity based thing..")		
@@ -8134,6 +8147,12 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# Now log the aggergate CDSL
 			log_dict['Aggregated Supervised Z Error'] = self.aggregate_cdsl_value
 
+		#####################################################
+		# Now also call log density and chamfer metrics, now that the translated sets are set..
+		#####################################################
+
+		log_dict = self.log_density_and_chamfer_metrics(counter, log_dict)
+		
 		if log:
 			wandb.log(log_dict, step=counter)
 		else:
