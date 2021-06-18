@@ -5687,7 +5687,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Plot density visualizations. Both directions?
 		##################################################
 	
-		log_dict = self.construct_density_embeddings(log_dict)
+		if counter%self.args.display_freq==0:
+			log_dict = self.construct_density_embeddings(log_dict)
 
 		if self.args.source_domain==self.args.target_domain and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:		
 			log_dict['Forward GMM Density'], log_dict['Reverse GMM Density'] = self.compute_aggregate_GMM_densities()
