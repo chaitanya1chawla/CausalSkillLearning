@@ -6982,6 +6982,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		self.GMM_list = [self.create_GMM(evaluation_domain=0), self.create_GMM(evaluation_domain=1)]		
 
+	# def compute_set_based_supervised_GMM_loss(self, ):
+
 	def compute_aggregate_GMM_densities(self):
 
 		# May need to batch this, depending on memory. 
@@ -9789,20 +9791,21 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 		update_dictionary['subpolicy_inputs'], update_dictionary['latent_z'], update_dictionary['loglikelihood'], update_dictionary['kl_divergence'] = \
 			source_eval_dict['subpolicy_inputs'], source_var_dict['latent_z_indices'], source_eval_dict['learnt_subpolicy_loglikelihoods'], source_var_dict['kl_divergence']
 
-		# 5b) Compute likelihood of target z under source domain.
-		update_dictionary['cross_domain_density_loss'] = self.compute_density_based_loss(update_dictionary)
-		
-		# 5c) Compute supervised loss..
-		update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(i, update_dictionary, source_var_dict)
+		if not(skip_viz):			
+			# 5b) Compute likelihood of target z under source domain.
+			# update_dictionary['cross_domain_density_loss'] = self.compute_density_based_loss(update_dictionary)
+			update_dictionary['cross_domain_density_loss'] = self.query_GMM_density(evaluation_domain=0, point_set=update_dictionary['latent_z'])
+			
+			# 5c) Compute supervised loss..
+			update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(i, update_dictionary, source_var_dict)
 
-		# 6) Compute gradients of objective and then update networks / policies.
-		self.update_networks(1, self.target_manager, update_dictionary)
+			# 6) Compute gradients of objective and then update networks / policies.
+			self.update_networks(1, self.target_manager, update_dictionary)
+			
+			# 7) Update plots. 
+			viz_dict = {}
+			viz_dict['domain'] = domain
 		
-		# 7) Update plots. 
-		viz_dict = {}
-		viz_dict['domain'] = domain
-
-		if not(skip_viz):
 			self.update_plots(counter, viz_dict, log=True)
 
 	# def train(self, model=None):
