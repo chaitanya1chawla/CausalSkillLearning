@@ -334,6 +334,9 @@ def parse_arguments():
 	parser.add_argument('--cycle_cross_domain_supervision_loss_weight',dest='cycle_cross_domain_supervision_loss_weight',type=float,default=0.,help='Weight associated with the cycle cross domain supervision loss.')
 	parser.add_argument('--z_normalization',dest='z_normalization',type=str,default=None,choices=[None, 'global','ind'],help='What normalization to use for zs.')
 
+	# Density loss terms
+	parser.add_argument('--supervised_set_based_density_loss',dest='supervised_set_based_density_loss',type=int,default=0,help='Whether to use the supervised_set_based_density_loss to train.')
+	parser.add_argument('--supervised_set_based_density_loss_weight',dest='supervised_set_based_density_loss_weight',type=float,default=0.,help='Weight associated with the supervised_set_based_density_loss.')
 	parser.add_argument('--cross_domain_density_loss_weight',dest='cross_domain_density_loss_weight',type=float,default=0.,help='Weight associated with the cross domain density loss.')
 	parser.add_argument('--gmm_variance_value', dest='gmm_variance_value', type=float, default=0.2,help='Variance value for GMM components.')
 
