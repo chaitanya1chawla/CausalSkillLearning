@@ -7038,7 +7038,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			diff_forward_logprobs = torch.transpose(forward_gmm.log_prob(torch.transpose(z_set_2,1,0)),1,0)
 			diff_backward_logprobs = torch.transpose(backward_gmm.log_prob(torch.transpose(z_set_1,1,0)),1,0)
 
-			if differentiable_output:
+			if differentiable_outputs:
 				forward_logprobs = diff_forward_logprobs
 				backward_logprobs = diff_backward_logprobs
 			else:
