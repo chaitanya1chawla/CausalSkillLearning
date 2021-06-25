@@ -5765,8 +5765,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				log_dict['Cross Domain Density Loss'] = self.cross_domain_density_loss.mean()
 
 			if self.args.supervised_set_based_density_loss:
-				log_dict['Unweighted Supervised Set Based Density Loss'] = self.unweighted_supervised_set_based_density_loss.mean()
-				log_dict['Supervised Set Based Density Loss'] = self.supervised_set_based_density_loss.mean()
+				log_dict['Unweighted Supervised Set Based Density Loss'] = self.unweighted_supervised_set_based_density_loss
+				log_dict['Datapoint Masked Supervised Set Based Density Loss'] = self.datapoint_masked_supervised_set_based_density_loss
+				log_dict['Supervised Set Based Density Loss'] = self.supervised_set_based_density_loss
 
 		##################################################
 		# Now visualizing spaces. 
@@ -6518,7 +6519,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.unweighted_supervised_set_based_density_loss = self.forward_set_loss + self.backward_set_loss
 		else:
 			self.unweighted_supervised_set_based_density_loss = 0.
-		self.supervised_set_based_density_loss = self.args.supervised_set_based_density_loss_weight*self.unweighted_supervised_set_based_density_loss
+
+		self.datapoint_masked_supervised_set_based_density_loss = self.supervised_datapoints_multiplier*self.unweighted_supervised_set_based_density_loss
+		self.supervised_set_based_density_loss = self.args.supervised_set_based_density_loss_weight*self.datapoint_masked_supervised_set_based_density_loss
 
 		###########################################################
 		# (1i) Finally, compute total losses. 
@@ -6695,7 +6698,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		self.neighbor_obj_set = True
 
-	def evaluate_translated_trajectory_distances(self):
+	def evaluate_translated_trajectory_segment_distances(self):
 		# Evaluate translated trajectory distances - from source to target and target to source domains. 
 
 		# Remember, absolute trajectory differences is meaningless, since the data is randomly initialized across the state space. 
@@ -6783,14 +6786,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		print("Evaluating correspondence metrics.")
 		# Evaluate the correspondence and alignment metrics. 
 
-		# Whether latent_z_sets and trajectory_sets are already computed for each manager.
-		self.compute_neighbors(computed_sets)
-
 		# Now that the neighbors have been computed, compute translated trajectory reconstruction errors via nearest neighbor z's. 
 		# Only use this version of evaluating trajectory distance.
 		if not(self.args.setting in ['jointtransfer','jointfixembed','jointfixcycle','densityjointtransfer']):		
 			
-			self.evaluate_translated_trajectory_distances()		
+			# Whether latent_z_sets and trajectory_sets are already computed for each manager.
+			self.compute_neighbors(computed_sets)
+			self.evaluate_translated_trajectory_segment_distances()		
 
 		if self.args.setting in ['jointtransfer','jointfixembed','jointfixcycle','densityjointtransfer']:
 			
@@ -6799,6 +6801,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			################################################
 			# Evaluate the following correspondence metrics.					
 			################################################
+
+			# This evaluates reconstruction error of full length trajectories when translated via z's using the translation model.
+			self.evaluate_translated_trajectory_distances()
 
 			################################################ 
 			# 1) First runs some things that are needed for evaluation. 
@@ -7116,6 +7121,86 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# self.GMM.log_prob(batch_of_values)	
 
 		return GMM
+
+	def compute_translated_trajectory_metrics():
+
+	# Copying over cross domain decoding and the differntiable rollout functions from JointCycleTransfer, because we want to use them in fix embed. 
+	# And eventually in JointFixEmbedCycleTransfer.
+	def cross_domain_decoding(self, domain, domain_manager, latent_z, start_state=None):
+
+		# If start state is none, first get start state, else use the argument. 
+		if start_state is None: 
+			# Feed the first latent_z in to get the start state.
+			# Get state from... first z in sequence., because we only need one start per trajectory / batch element.
+			start_state = self.get_start_state(domain, latent_z[0])
+		
+		# Now rollout in target domain.		
+		cross_domain_decoding_dict = {}
+		cross_domain_decoding_dict['differentiable_trajectory'], cross_domain_decoding_dict['differentiable_action_seq'], \
+			cross_domain_decoding_dict['differentiable_state_action_seq'], cross_domain_decoding_dict['subpolicy_inputs'] = \
+			self.differentiable_rollout(domain_manager, start_state, latent_z)
+		# differentiable_trajectory, differentiable_action_seq, differentiable_state_action_seq, subpolicy_inputs = self.differentiable_rollout(domain_manager, start_state, latent_z)
+
+		# return differentiable_trajectory, subpolicy_inputs
+		return cross_domain_decoding_dict
+
+	def differentiable_rollout(self, policy_manager, trajectory_start, latent_z, rollout_length=None):
+
+		# Now implementing a differentiable_rollout function that takes in a policy manager.
+
+		# Copying over from cycle_transfer differentiable rollout. 
+		# This function should provide rollout template, but needs modifications to deal with multiple z's being used.
+
+		# Remember, the differentiable rollout is required because the backtranslation / cycle-consistency loss needs to be propagated through multiple sets of translations. 
+		# Therefore it must pass through the decoder network(s), and through the latent_z's. (It doesn't actually pass through the states / actions?).		
+
+		subpolicy_inputs = torch.zeros((self.args.batch_size,2*policy_manager.state_dim+policy_manager.latent_z_dimensionality)).to(device).float()
+		subpolicy_inputs[:,:policy_manager.state_dim] = torch.tensor(trajectory_start).to(device).float()
+		# subpolicy_inputs[:,2*policy_manager.state_dim:] = torch.tensor(latent_z).to(device).float()
+		subpolicy_inputs[:,2*policy_manager.state_dim:] = latent_z[0]
+
+		if self.args.batch_size>1:
+			subpolicy_inputs = subpolicy_inputs.unsqueeze(0)
+
+		if rollout_length is not None: 
+			length = rollout_length-1
+		else:
+			length = policy_manager.rollout_timesteps-1
+
+		for t in range(length):
+
+			# Get actions from the policy.
+			actions = policy_manager.policy_network.reparameterized_get_actions(subpolicy_inputs, greedy=True)
+
+			# Select last action to execute. 
+			action_to_execute = actions[-1].squeeze(1)
+
+			# Downscale the actions by action_scale_factor.
+			action_to_execute = action_to_execute/self.args.action_scale_factor
+			
+			# Compute next state. 
+			new_state = subpolicy_inputs[t,...,:policy_manager.state_dim]+action_to_execute		
+
+			# Create new input row. 
+			input_row = torch.zeros((self.args.batch_size, 2*policy_manager.state_dim+policy_manager.latent_z_dimensionality)).to(device).float()
+			input_row[:,:policy_manager.state_dim] = new_state
+			# Feed in the ORIGINAL prediction from the network as input. Not the downscaled thing. 
+			input_row[:,policy_manager.state_dim:2*policy_manager.state_dim] = actions[-1].squeeze(1)
+			input_row[:,2*policy_manager.state_dim:] = latent_z[t+1]
+
+			# Now that we have assembled the new input row, concatenate it along temporal dimension with previous inputs. 
+			if self.args.batch_size>1:
+				subpolicy_inputs = torch.cat([subpolicy_inputs,input_row.unsqueeze(0)],dim=0)
+			else:
+				subpolicy_inputs = torch.cat([subpolicy_inputs,input_row],dim=0)
+
+		trajectory = subpolicy_inputs[...,:policy_manager.state_dim].detach().cpu().numpy()
+		differentiable_trajectory = subpolicy_inputs[...,:policy_manager.state_dim]
+		differentiable_action_seq = subpolicy_inputs[...,policy_manager.state_dim:2*policy_manager.state_dim]
+		differentiable_state_action_seq = subpolicy_inputs[...,:2*policy_manager.state_dim]
+
+		# For differentiabiity, return tuple of trajectory, actions, state actions, and subpolicy_inputs. 
+		return [differentiable_trajectory, differentiable_action_seq, differentiable_state_action_seq, subpolicy_inputs]
 
 	def train(self, model=None):
 
@@ -10175,5 +10260,3 @@ class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 
 		# Encode decode function: First encodes, takes trajectory segment, and outputs latent z. The latent z is then provided to decoder (along with initial state), and then we get SOURCE domain subpolicy inputs. 
 		# Cross domain decoding function: Takes encoded latent z (and start state), and then rolls out with target decoder. Function returns, target trajectory, action sequence, and TARGET domain subpolicy inputs. 
-
-
