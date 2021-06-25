@@ -5879,19 +5879,19 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			if self.args.source_domain==self.args.target_domain and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:		
 				pass
 				# # self.evaluate_correspondence_metrics(computed_sets=False)
+				
 				# # Actually, we've probably computed trajectory and latent sets. 
 				# if counter>0:
-				# 	self.evaluate_correspondence_metrics()
+				self.average_translated_trajectory_reconstruction_error = self.evaluate_correspondence_metrics()
 
 				# 	log_dict['Source To Target Translation Trajectory Error'] = self.source_target_trajectory_distance
 				# 	log_dict['Target To Source Translation Trajectory Error'] = self.target_source_trajectory_distance
+				log_dict['Target To Source Translation Trajectory Error'] = self.average_translated_trajectory_reconstruction_error
 				# 	log_dict['Source To Target Translation Trajectory Normalized Error'] = self.source_target_trajectory_normalized_distance
 				# 	log_dict['Target To Source Translation Trajectory Normalized Error'] = self.target_source_trajectory_normalized_distance
 				# 	log_dict['Average Corresponding Z Sequence Error'] = self.average_corresponding_z_sequence_error.mean()
 				# 	log_dict['Average Corresponding Z Transition Sequence Error'] = self.average_corresponding_z_transition_sequence_error.mean()
-
-
-
+			
 			##################################################
 			# Visualize Z Trajectories.
 			##################################################
@@ -6717,6 +6717,57 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.source_target_trajectory_normalized_distance = self.source_target_trajectory_distance/(np.linalg.norm(source_traj_actions, axis=2).mean())
 		self.target_source_trajectory_normalized_distance = self.target_source_trajectory_distance/(np.linalg.norm(target_traj_actions, axis=2).mean())		
 
+	def evaluate_translated_trajectory_distances(self):
+
+		# Basically overall flow: (remember, this will be computationally pretty expensive.)
+		# 1) For N input trajectories:
+		# 	# 2) Get source trajectory. 
+		# 	# 3) Encode trajectory as sequence of source z's and decode trajectory in same domain to get reconstruction source trajectory. 
+		# 	# 4) Get corresponding target trajectory. 
+		# 	# 5) Encode target trajectory as sequence of target z's. 
+		#	# 6) Translate sequence of target z's from target domain to source domain. 
+		# 	# 7) Feed translated sequence of target z's., along with start state of source trajectory into cross_domain decoding, and decode into a translated target-> source trajectory. 
+		# 	# 8) Evaluate L2 distance between the reconstructed source trajectory and the reconstructed translated target->source trjaectory. 
+		# Alternately: 
+		# 	# 8) Evaluate L2 distance between the original source trajectory and the reconstructed translated target->source trjaectory. 
+		
+		average_trajectory_reconstruction_error = 0.
+
+		with torch.no_grad():
+
+			# for i in range(1):
+			# Copy this range over from,.... train.
+			
+			# self.eval_extent = self.extent
+			self.eval_extent = 500 
+			for i in range(0,self.eval_extent,self.args.batch_size):
+
+				# t3 = time.time()
+				# 2) Get source trajectory.
+				# 3) Encode trajectory. 
+				source_input_dict, source_var_dict, _ = self.encode_decode_trajectory(self.source_manager, i)
+
+				# 4) Get corresponding target trajectrory. 
+				# 5) Encode target trajectory as sequence of target z's. 
+				target_input_dict, target_var_dict, _ = self.encode_decode_trajectory(self.target_manager, i)
+
+				# 6) Translate sequence of target z's from target domain to source domain. 
+				translated_latent_z = self.translate_latent_z(target_var_dict['latent_z_indices'])
+
+				# 7) Feed translated sequence of target z's., along with start state of source trajectory into cross_domain decoding, and decode into a translated target-> source trajectory. 
+				# Remember, must decode in the output domain of the translation model - usually the source domain (unless cycle setting.)
+				cross_domain_decoding_dict = self.cross_domain_decoding(0, self.source_manager, translated_latent_z, start_state=source_input_dict['sample_traj'][0], rollout_length=translated_latent_z.shape[0])
+
+				# 8) Evaluate L2 distance between the reconstructed source trajectory and the reconstructed translated target->source trjaectory. 				
+				# OR:
+				# 8) Evaluate L2 distance between the original source trajectory and the reconstructed translated target->source trjaectory. 
+				traj_recon_error = ((cross_domain_decoding_dict['differentiable_trajectory'].detach().cpu().numpy() - source_input_dict['sample_traj'])**2).mean(axis=(0,2)).sum()
+				average_trajectory_reconstruction_error += traj_recon_error
+				
+		average_trajectory_reconstruction_error /= (self.extent//self.args.batch_size+1)*self.args.batch_size
+
+		return average_trajectory_reconstruction_error
+
 	def evaluate_skill_sequences_across_domains(self):
 
 		################################################ 
@@ -6805,31 +6856,33 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# This evaluates reconstruction error of full length trajectories when translated via z's using the translation model.
 			self.evaluate_translated_trajectory_distances()
 
-			################################################ 
-			# 1) First runs some things that are needed for evaluation. 
-			################################################ 
+			if self.check_toy_dataset():
+				################################################ 
+				# 1) First runs some things that are needed for evaluation. 
+				################################################ 
 
-			self.setup_crossdomain_joint_evaluation()
+				self.setup_crossdomain_joint_evaluation()
 
-			################################################ 
-			# 2) Evaluate the same skill sequence across both domains. 
-			################################################ 
+				################################################ 
+				# 2) Evaluate the same skill sequence across both domains. 
+				################################################ 
 
-			self.evaluate_skill_sequences_across_domains()
+				self.evaluate_skill_sequences_across_domains()
 
 		##########################################
 		# Add more evaluation metrics here. 
 		##########################################
 
-		# self.evaluate_discriminator_accuracy()
-		# self.evaluate_cycle_reconstruction_error()
+		if not(self.args.setting in ['jointtransfer','jointfixembed','jointfixcycle','densityjointtransfer']) or self.check_toy_dataset():
+			# self.evaluate_discriminator_accuracy()
+			# self.evaluate_cycle_reconstruction_error()
 
-		# Reset variables to prevent memory leaks.
-		# source_neighbors_object = None
-		# target_neighbors_object = None
-		del self.source_neighbors_object
-		del self.target_neighbors_object
-		self.neighbor_obj_set = False		
+			# Reset variables to prevent memory leaks.
+			# source_neighbors_object = None
+			# target_neighbors_object = None
+			del self.source_neighbors_object
+			del self.target_neighbors_object
+			self.neighbor_obj_set = False		
 
 	def evaluate(self, model=None):
 
@@ -7122,11 +7175,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		return GMM
 
-	def compute_translated_trajectory_metrics():
-
 	# Copying over cross domain decoding and the differntiable rollout functions from JointCycleTransfer, because we want to use them in fix embed. 
 	# And eventually in JointFixEmbedCycleTransfer.
-	def cross_domain_decoding(self, domain, domain_manager, latent_z, start_state=None):
+	def cross_domain_decoding(self, domain, domain_manager, latent_z, start_state=None, rollout_length=None):
 
 		# If start state is none, first get start state, else use the argument. 
 		if start_state is None: 
@@ -7138,7 +7189,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		cross_domain_decoding_dict = {}
 		cross_domain_decoding_dict['differentiable_trajectory'], cross_domain_decoding_dict['differentiable_action_seq'], \
 			cross_domain_decoding_dict['differentiable_state_action_seq'], cross_domain_decoding_dict['subpolicy_inputs'] = \
-			self.differentiable_rollout(domain_manager, start_state, latent_z)
+			self.differentiable_rollout(domain_manager, start_state, latent_z, rollout_length=rollout_length)
 		# differentiable_trajectory, differentiable_action_seq, differentiable_state_action_seq, subpolicy_inputs = self.differentiable_rollout(domain_manager, start_state, latent_z)
 
 		# return differentiable_trajectory, subpolicy_inputs
@@ -8483,7 +8534,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		return source_input_dict, source_var_dict, source_eval_dict
 
-	def translate_latent_z(self, latent_z, latent_b, domain=1):
+	def translate_latent_z(self, latent_z, latent_b=None, domain=1):
 		
 		# Here, domain is the domain they're translating "FROM"
 
