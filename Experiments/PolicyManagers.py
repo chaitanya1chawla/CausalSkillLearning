@@ -10061,7 +10061,12 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		# Remember, the cross domain gt supervision loss should only be active when... trnaslating, i.e. when we have domain==1.
 		if self.args.cross_domain_supervision:
 			# Call function to compute this. # This function depends on whether we have a translation model or not.. 
-			self.unweighted_unmasked_cross_domain_supervision_loss = update_dictionary['cross_domain_supervised_loss'].mean(dim=-1)
+			self.unweighted_unmasked_cross_domain_supervision_loss = update_dictionary['cross_domain_supervised_loss']
+
+			# print("Embedding in update networks of the density setting")
+			# embed()
+
+
 			# Now mask using batch mask.			
 			# self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
 			self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(policy_manager.batch_mask.sum())
