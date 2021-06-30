@@ -8285,9 +8285,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# print("Run Super Plots")
 		log_dict = super().update_plots(counter, viz_dict, log=False)
 
-		# Also log identity loss..
-		log_dict['Unweighted Identity Translation Loss'] = self.unweighted_identity_translation_loss 
-		log_dict['Identity Translation Loss'] = self.identity_translation_loss
+		# # Also log identity loss..
+		# log_dict['Unweighted Identity Translation Loss'] = self.unweighted_identity_translation_loss 
+		# log_dict['Identity Translation Loss'] = self.identity_translation_loss
 		if self.args.gradient_penalty:
 			log_dict['Unweighted Wasserstein Gradient Penalty'] = self.unweighted_wasserstein_gradient_penalty
 			log_dict['Wasserstein Gradient Penalty'] = self.wasserstein_gradient_penalty
@@ -10041,7 +10041,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		#########################################################################
 
 		# Zero out gradients of encoder and decoder (policy).
-		policy_manager.optimizer.zero_grad()
+		self.optimizer.zero_grad()
 
 		# Log some dummy values
 		self.likelihood_loss = 0.
@@ -10093,7 +10093,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 		# Go backward through the generator (encoder / decoder), and take a step. 
 		self.total_VAE_loss.backward()
-		policy_manager.optimizer.step()
+		self.optimizer.step()
 
 	# Can inherit update plots, supervised loss, etc..
 	def run_iteration(self, counter, i, domain=None, skip_viz=False):
