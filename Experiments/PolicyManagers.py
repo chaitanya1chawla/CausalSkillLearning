@@ -5707,17 +5707,17 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Base logging. 
 		##################################################
 
-		log_dict = {'Policy Loglikelihood': self.likelihood_loss, 
-					'Encoder KL': self.encoder_KL,				
-					'Unweighted VAE Loss': self.unweighted_VAE_loss,
-					'VAE Loss': self.VAE_loss,
-					'Total VAE Loss:': self.total_VAE_loss,
-					'Domain': viz_dict['domain'],
-					'Training Phase': self.training_phase, 
-					'Training Discriminator': self.skip_vae, 
-					'Training Embeddings or Translation Models': self.skip_discriminator}
-		
+		log_dict = {'Domain': viz_dict['domain'], 
+					'Total VAE Loss': self.total_VAE_loss,
+					'Training Phase': self.training_phase}
+
 		if self.args.setting not in ['densityjointtransfer','densityjointfixembedtransfer']:
+			log_dict['Policy Loglikelihood'] = self.likelihood_loss
+			log_dict['Encoder KL'] = self.encoder_KL
+			log_dict['Unweighted VAE Loss'] = self.unweighted_VAE_loss
+			log_dict['VAE Loss'] = self.VAE_loss
+			log_dict['Training Discriminator'] = self.skip_vae
+			log_dict['Training Embeddings or Translation Models'] = self.skip_discriminator	
 			log_dict['Discriminability Loss'] = self.discriminability_loss
 			log_dict['Unweighted Discriminability Loss'] = self.unweighted_discriminability_loss
 			log_dict['Total Discriminability Loss'] = self.total_discriminability_loss
@@ -10042,6 +10042,13 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 		# Zero out gradients of encoder and decoder (policy).
 		policy_manager.optimizer.zero_grad()
+
+		# Log some dummy values
+		self.likelihood_loss = 0.
+		self.encoder_KL = 0.
+		self.unweighted_VAE_loss = self.likelihood_loss + self.args.kl_weight*self.encoder_KL
+		self.VAE_loss = self.vae_loss_weight*self.unweighted_VAE_loss
+		
 
 		###########################################################
 		# (1a) First compute cross domain density. 
