@@ -338,7 +338,7 @@ x = torch.from_numpy(a).cuda()
 y = torch.from_numpy(b).cuda()
 y.requires_grad=True
 
-gmmv = 0.001
+gmmv = 0.01
 opt = torch.optim.Adam([y],lr=1)
 fmixd = torch.distributions.Categorical(torch.ones(N).cuda())
 fcomd = torch.distributions.Independent(torch.distributions.Normal(x,gmmv*torch.ones_like(x).cuda()),1)

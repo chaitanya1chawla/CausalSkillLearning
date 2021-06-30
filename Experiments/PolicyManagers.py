@@ -42,7 +42,8 @@ class PolicyManager_BaseClass():
 			(self.args.setting=='jointfixembed' and isinstance(self, PolicyManager_JointFixEmbedTransfer)) or \
 			(self.args.setting=='jointcycletransfer' and isinstance(self, PolicyManager_JointCycleTransfer)) or \
 			(self.args.setting=='jointfixcycle' and isinstance(self, PolicyManager_JointFixEmbedCycleTransfer)) or \
-			(self.args.setting=='densityjointtransfer' and isinstance(self, PolicyManager_DensityJointTransfer)):
+			(self.args.setting=='densityjointtransfer' and isinstance(self, PolicyManager_DensityJointTransfer)) or \
+			(self.args.setting=='densityjointfixembedtransfer' and isinstance(self, PolicyManager_DensityJointFixEmbedTransfer)):
 				extent = self.extent
 		else:
 			extent = len(self.dataset)-self.test_set_size
@@ -56,7 +57,8 @@ class PolicyManager_BaseClass():
 			self.args.setting in ['jointcycletransfer'] and isinstance(self, PolicyManager_JointCycleTransfer) or \
 			self.args.setting in ['fixembed'] and isinstance(self, PolicyManager_FixEmbedCycleConTransfer) or \
 			self.args.setting in ['jointfixcycle'] and isinstance(self, PolicyManager_JointFixEmbedCycleTransfer) or \
-			self.args.setting in ['densityjointtransfer'] and isinstance(self, PolicyManager_DensityJointTransfer):
+			self.args.setting in ['densityjointtransfer'] and isinstance(self, PolicyManager_DensityJointTransfer) or \
+			self.args.setting in ['densityjointfixembedtransfer'] and isinstance(self, PolicyManager_DensityJointFixEmbedTransfer):
 			self.load_domain_models()
 
 	def initialize_plots(self):
@@ -232,7 +234,7 @@ class PolicyManager_BaseClass():
 			if self.args.setting=='imitation':
 				extent = self.dataset.get_number_task_demos(self.demo_task_index)
 			# if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed' or self.args.setting=='jointtransfer':
-			if self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer']:
+			if self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 				if self.args.debugging_datapoints>-1:
 					extent = self.args.debugging_datapoints
 					self.extent = self.args.debugging_datapoints
@@ -5500,7 +5502,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# print("FINALLY RUNNING CREATE TRAIN OPS")
 		# # Call create training ops from each of the policy managers. Need these optimizers, because the encoder-decoders get a different loss than the discriminator. 
-		if self.args.setting in ['jointtransfer','jointfixembed','jointfixcycle','densityjointtransfer']:
+		if self.args.setting in ['jointtransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 			self.source_manager.learning_rate = self.args.transfer_learning_rate
 			self.target_manager.learning_rate = self.args.transfer_learning_rate
 
@@ -5715,7 +5717,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					'Training Discriminator': self.skip_vae, 
 					'Training Embeddings or Translation Models': self.skip_discriminator}
 		
-		if self.args.setting not in ['densityjointtransfer']:
+		if self.args.setting not in ['densityjointtransfer','densityjointfixembedtransfer']:
 			log_dict['Discriminability Loss'] = self.discriminability_loss
 			log_dict['Unweighted Discriminability Loss'] = self.unweighted_discriminability_loss
 			log_dict['Total Discriminability Loss'] = self.total_discriminability_loss
@@ -5727,7 +5729,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Plot discriminator values after we've started training it. 
 		if self.training_phase>1:
 
-			if self.args.setting not in ['densityjointtransfer']:
+			if self.args.setting not in ['densityjointtransfer','densityjointfixembedtransfer']:
 
 				# Compute discriminator loss and discriminator prob of right action for logging. 
 				log_dict['Z Discriminator Loss'], log_dict['Z Discriminator Probability'] = self.discriminator_loss, viz_dict['discriminator_probs']
@@ -5753,14 +5755,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					log_dict['Unweighted Task Discriminator Loss'] = self.unweighted_task_discriminator_loss.mean()
 					log_dict['Task Discriminator Domain Probability'] = viz_dict['task_discriminator_probs']
 
-			if self.args.cross_domain_supervision and (viz_dict['domain']==1 or self.args.setting in ['jointfixcycle','densityjointtransfer']):
+			if self.args.cross_domain_supervision and (viz_dict['domain']==1 or self.args.setting in ['jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']):
 				# If cycle, plot cdsl in both directions.
 				log_dict['Unweighted Cross Domain Superivision Loss'] = self.unweighted_masked_cross_domain_supervision_loss.mean()
 				# Now zero out if we want to use partial supervision..
 				log_dict['Datapoint Masked Cross Domain Supervision Loss'] = self.datapoint_masked_cross_domain_supervised_loss
 				log_dict['Cross Domain Superivision Loss'] = self.cross_domain_supervision_loss
 
-			if self.args.setting in ['densityjointtransfer']:
+			if self.args.setting in ['densityjointtransfer','densityjointfixembedtransfer']:
 				log_dict['Unweighted Cross Domain Density Loss'] = self.unweighted_masked_cross_domain_density_loss.mean()
 				log_dict['Cross Domain Density Loss'] = self.cross_domain_density_loss.mean()
 
@@ -5882,7 +5884,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				
 				# # Actually, we've probably computed trajectory and latent sets. 
 				# if counter>0:
-				self.average_translated_trajectory_reconstruction_error = self.evaluate_correspondence_metrics()
+				self.evaluate_correspondence_metrics()
 
 				# 	log_dict['Source To Target Translation Trajectory Error'] = self.source_target_trajectory_distance
 				# 	log_dict['Target To Source Translation Trajectory Error'] = self.target_source_trajectory_distance
@@ -5915,7 +5917,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# If we're directly optimizing representations.. call log_density_and_chamfer_metrics..		
 		##################################################
 
-		if self.args.setting in ['transfer','cycle_transfer','densityjointtransfer','jointtransfer','jointcycletransfer']:
+		if self.args.setting in ['transfer','cycle_transfer','densityjointtransfer','jointtransfer','jointcycletransfer','densityjointfixembedtransfer']:
 			log_dict = self.log_density_and_chamfer_metrics(counter, log_dict, viz_dict)		
 
 		##################################################
@@ -5998,7 +6000,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Now assemble them into local variables.
 		self.N = self.source_manager.N
 
-		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer']:
+		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 			self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
 			self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)			
 			# First, normalize the sets.. 
@@ -6243,7 +6245,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.source_manager.get_trajectory_and_latent_sets()
 				self.target_manager.get_trajectory_and_latent_sets()						
 
-				if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer']:
+				if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 					# self.source_manager.trajectory_set = np.array(self.source_manager.trajectory_set)
 					# self.target_manager.trajectory_set = np.array(self.target_manager.trajectory_set)
 					# traj_length = len(self.source_manager.trajectory_set[0,:,0])
@@ -6343,7 +6345,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		i = np.random.randint(0,high=self.extent)
 
 		# First get a trajectory, starting point, and latent z.
-		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer']:
+		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 			source_input_traj, source_var_dict, _ = self.encode_decode_trajectory(self.source_manager, i)
 			source_trajectory = source_input_traj['sample_traj']
 			source_latent_z = source_var_dict['latent_z_indices']			
@@ -6360,7 +6362,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		if source_trajectory is not None:
 			# Reconstruct using the source domain manager. 
 
-			_, self.source_trajectory_image, self.source_reconstruction_image = self.source_manager.get_robot_visuals(0, source_latent_z, source_trajectory, return_image=True, return_numpy=True, z_seq=(self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer']))
+			_, self.source_trajectory_image, self.source_reconstruction_image = self.source_manager.get_robot_visuals(0, source_latent_z, source_trajectory, return_image=True, return_numpy=True, z_seq=(self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']))
 
 			# Now repeat the same for target domain - First get a trajectory, starting point, and latent z.
 			if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle']:
@@ -6375,7 +6377,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				target_latent_z = target_latent_z[:,0]
 
 			# Reconstruct using the target domain manager. 
-			_, self.target_trajectory_image, self.target_reconstruction_image = self.target_manager.get_robot_visuals(0, target_latent_z, target_trajectory, return_image=True, return_numpy=True, z_seq=(self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer']))
+			_, self.target_trajectory_image, self.target_reconstruction_image = self.target_manager.get_robot_visuals(0, target_latent_z, target_trajectory, return_image=True, return_numpy=True, z_seq=(self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']))
 
 			# return np.array(self.source_trajectory_image), np.array(self.source_reconstruction_image), np.array(self.target_trajectory_image), np.array(self.target_reconstruction_image)
 			return self.source_trajectory_image, self.source_reconstruction_image, self.target_trajectory_image, self.target_reconstruction_image	
@@ -6503,10 +6505,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		###########################################################
 
 		# If "translating" source domain z., 
-		if domain==0:
-			self.unweighted_identity_translation_loss = self.compute_identity_loss(update_dictionary)			
-		else:
-			self.unweighted_identity_translation_loss = 0.
+		# if domain==0:
+		# 	self.unweighted_identity_translation_loss = self.compute_identity_loss(update_dictionary)			
+		# else:
+		# 	self.unweighted_identity_translation_loss = 0.
+		self.unweighted_identity_translation_loss = 0.
 		self.identity_translation_loss = self.args.identity_translation_loss_weight*self.unweighted_identity_translation_loss
 
 		###########################################################
@@ -6661,7 +6664,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.set_neighbor_objects(computed_sets=computed_sets)
 
 		# Now that neighbor objects are set, compute neighbors. 			
-		if self.args.setting in ['jointtransfer','jointfixembed','jointfixcycle','densityjointtransfer']:
+		if self.args.setting in ['jointtransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 			_, self.source_target_neighbors = self.source_neighbors_object.kneighbors(self.target_latent_zs)
 			_, self.target_source_neighbors = self.target_neighbors_object.kneighbors(self.source_latent_zs)
 		else:
@@ -6678,7 +6681,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# print("Embed before computing neighbor objects.")
 		# embed()
 		# Reassembling for neearest neighbor object creation.
-		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer']:
+		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 			# self.source_latent_z_set = np.concatenate(self.source_manager.latent_z_set)
 			# self.target_latent_z_set = np.concatenate(self.target_manager.latent_z_set)
 
@@ -6752,7 +6755,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				target_input_dict, target_var_dict, _ = self.encode_decode_trajectory(self.target_manager, i)
 
 				# 6) Translate sequence of target z's from target domain to source domain. 
-				translated_latent_z = self.translate_latent_z(target_var_dict['latent_z_indices'])
+				translated_latent_z = self.translate_latent_z(target_var_dict['latent_z_indices'], latent_b=target_var_dict['latent_b'])
 
 				# 7) Feed translated sequence of target z's., along with start state of source trajectory into cross_domain decoding, and decode into a translated target-> source trajectory. 
 				# Remember, must decode in the output domain of the translation model - usually the source domain (unless cycle setting.)
@@ -6839,13 +6842,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# Now that the neighbors have been computed, compute translated trajectory reconstruction errors via nearest neighbor z's. 
 		# Only use this version of evaluating trajectory distance.
-		if not(self.args.setting in ['jointtransfer','jointfixembed','jointfixcycle','densityjointtransfer']):		
+		if not(self.args.setting in ['jointtransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']):		
 			
 			# Whether latent_z_sets and trajectory_sets are already computed for each manager.
 			self.compute_neighbors(computed_sets)
 			self.evaluate_translated_trajectory_segment_distances()		
 
-		if self.args.setting in ['jointtransfer','jointfixembed','jointfixcycle','densityjointtransfer']:
+		if self.args.setting in ['jointtransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 			
 			# If we are actually in joint transfer setting: 
 
@@ -6854,7 +6857,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			################################################
 
 			# This evaluates reconstruction error of full length trajectories when translated via z's using the translation model.
-			self.evaluate_translated_trajectory_distances()
+			self.average_translated_trajectory_reconstruction_error = self.evaluate_translated_trajectory_distances()
 
 			if self.check_toy_dataset():
 				################################################ 
@@ -6873,7 +6876,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Add more evaluation metrics here. 
 		##########################################
 
-		if not(self.args.setting in ['jointtransfer','jointfixembed','jointfixcycle','densityjointtransfer']) or self.check_toy_dataset():
+		if not(self.args.setting in ['jointtransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']) or self.check_toy_dataset():
 			# self.evaluate_discriminator_accuracy()
 			# self.evaluate_cycle_reconstruction_error()
 
@@ -7162,6 +7165,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				gmm_means = mean_point_set
 			else:
 				gmm_means = torch.tensor(mean_point_set).to(device)
+
 		gmm_variances = self.args.gmm_variance_value*torch.ones_like(gmm_means).to(device)
 		
 		# Create a mixture that ignores last dimension.. this should be able to handle both batched and non-batched inputs..
@@ -8568,9 +8572,20 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			with torch.no_grad():
 				detached_z = torch.tensor(self.original_target_latent_z_set[v:eval_ind_range[k+1]]).to(device)
 				cross_domain_z = torch.tensor(self.original_source_latent_z_set[v:eval_ind_range[k+1]]).to(device)
-				self.aggregate_cdsl_stat += (self.translation_model_list[domain].get_probabilities(detached_z, action_epsilon=self.translated_z_epsilon, evaluate_value=cross_domain_z)**2).sum()
 
-		self.aggregate_cdsl_value = torch.sqrt(self.aggregate_cdsl_stat/len(self.original_source_latent_z_set)).detach().cpu().numpy()
+				if self.args.recurrent_translation:
+					# self.aggregate_cdsl_stat += (self.translation_model_list[domain].get_probabilities(detached_z, epsilon=self.translated_z_epsilon, precomputed_b=update_dictionary['latent_b'], evaluate_value=cross_domain_z)
+					self.aggregate_cdsl_stat += 0.
+				else:					
+			
+					# Is this even legit???!?!?
+					self.aggregate_cdsl_stat += self.translation_model_list[domain].get_probabilities(detached_z, action_epsilon=self.translated_z_epsilon, evaluate_value=cross_domain_z).sum()
+					# self.aggregate_cdsl_stat += (self.translation_model_list[domain].get_probabilities(detached_z, action_epsilon=self.translated_z_epsilon, evaluate_value=cross_domain_z)**2).sum()
+					
+		if self.args.recurrent_translation:
+			self.aggregate_cdsl_value = 0.
+		else:
+			self.aggregate_cdsl_value = (self.aggregate_cdsl_stat/len(self.original_source_latent_z_set)).detach().cpu().numpy()
 
 	def compute_cross_domain_supervision_loss(self, update_dictionary, domain=1):
 
@@ -9999,6 +10014,127 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 
 			if domain==1:
 				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['translated_latent_z'], update_dictionary['cross_domain_latent_z'])
+
+			# 6) Compute gradients of objective and then update networks / policies.
+			self.update_networks(1, self.target_manager, update_dictionary)					
+
+			# 7) Update plots. 
+			viz_dict = {}
+			viz_dict['domain'] = domain
+			if domain==1:
+				viz_dict['forward_set_based_supervised_loss'], viz_dict['backward_set_based_supervised_loss'] = update_dictionary['forward_set_based_supervised_loss'].mean().detach().cpu().numpy(), update_dictionary['backward_set_based_supervised_loss'].mean().detach().cpu().numpy()
+		
+			self.update_plots(counter, viz_dict, log=True)
+
+class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTransfer):
+
+	def __init__(self, args=None, source_dataset=None, target_dataset=None):
+
+		super(PolicyManager_DensityJointFixEmbedTransfer, self).__init__(args, source_dataset, target_dataset)
+
+	def update_networks(self, domain, policy_manager, update_dictionary):		
+
+		#########################################################################
+		#########################################################################
+		# (1) First, update the representation based on reconstruction and discriminability.
+		#########################################################################
+		#########################################################################
+
+		# Zero out gradients of encoder and decoder (policy).
+		policy_manager.optimizer.zero_grad()
+
+		###########################################################
+		# (1a) First compute cross domain density. 
+		###########################################################
+
+		# Does this need to be masked? 
+		self.unweighted_unmasked_cross_domain_density_loss = update_dictionary['forward_density_loss'] + update_dictionary['backward_density_loss']
+		# Mask..
+		self.unweighted_masked_cross_domain_density_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_density_loss).sum()/(policy_manager.batch_mask.sum())
+		# Weight this loss.
+		self.cross_domain_density_loss = self.args.cross_domain_density_loss_weight*self.unweighted_masked_cross_domain_density_loss
+
+		###########################################################
+		# (1c) If active, compute cross domain z loss. 
+		###########################################################
+	
+		# Remember, the cross domain gt supervision loss should only be active when... trnaslating, i.e. when we have domain==1.
+		if self.args.cross_domain_supervision:
+			# Call function to compute this. # This function depends on whether we have a translation model or not.. 
+			self.unweighted_unmasked_cross_domain_supervision_loss = update_dictionary['cross_domain_supervised_loss'].mean(dim=-1)
+			# Now mask using batch mask.			
+			# self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
+			self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(policy_manager.batch_mask.sum())
+			# Now zero out if we want to use partial supervision..
+			self.datapoint_masked_cross_domain_supervised_loss = self.supervised_datapoints_multiplier*self.unweighted_masked_cross_domain_supervision_loss
+			# Now weight.			
+			self.cross_domain_supervision_loss = self.args.cross_domain_supervision_loss_weight*self.datapoint_masked_cross_domain_supervised_loss
+		else:
+			self.unweighted_masked_cross_domain_supervision_loss = 0.
+			self.cross_domain_supervision_loss = 0.
+
+		###########################################################
+		# (1d) Finally, compute total loss.
+		###########################################################
+
+		self.total_VAE_loss = self.cross_domain_supervision_loss + self.cross_domain_density_loss
+
+		# Go backward through the generator (encoder / decoder), and take a step. 
+		self.total_VAE_loss.backward()
+		policy_manager.optimizer.step()
+
+	# Can inherit update plots, supervised loss, etc..
+	def run_iteration(self, counter, i, domain=None, skip_viz=False):
+
+		# Overall algorithm.
+		# Preprocessing
+		# 1) For N samples of datapoints from the source domain. 
+		# 	# 2) Feed these input datapoints into the source domain encoder and get source encoding z. 
+		#	# 3) Add Z to Source Z Set. 
+		# 4) Build GMM with centers around the N Source Z set Z's.
+
+		# Training. 
+		# 0) Setup things like training phases, epsilon values, etc.
+		# 1) For E Epochs:
+		# 	# 2) For D datapoints:
+		#		# 3) Sample x from target domain.
+		#		# 4) Feed x into target domain encoder to get z encoding. 
+		# 		# 5) Compute overall objective. 
+		# 			# 5a) Compute likelihood of target z encoding under the source domain GMM. 
+		# 			# 5b) Compute likelihood of source z encoding(s) under the target domain GMM. (Backward GMM Loss / IMLE)
+		# 			# 5c) Compute supervised loss.
+		# 		# 6) Compute gradients of objective and then update networks / policies.
+
+		# (0) Setup things like training phases, epislon values, etc.
+		self.set_iteration(counter, i=i)
+		
+		# (3), (4), (5a) Get input datapoint from target domain. One directional in this case.
+		source_input_dict, source_var_dict, source_eval_dict = self.encode_decode_trajectory(self.target_manager, i)
+		update_dictionary = {}
+		update_dictionary['subpolicy_inputs'], update_dictionary['latent_z'], update_dictionary['loglikelihood'], update_dictionary['kl_divergence'] = \
+			source_eval_dict['subpolicy_inputs'], source_var_dict['latent_z_indices'], source_eval_dict['learnt_subpolicy_loglikelihoods'], source_var_dict['kl_divergence']
+
+		if not(skip_viz):			
+
+			# Precursor to 5c - run cross domain encode / decode. Running this in run iteration so we have access to variables.
+			cross_domain_input_dict, cross_domain_var_dict, cross_domain_eval_dict = self.encode_decode_trajectory(self.source_manager, i)
+			update_dictionary['cross_domain_latent_z'] = cross_domain_var_dict['latent_z_indices']
+
+			# 5a) Compute likelihood of target z encoding under the source domain GMM. 
+			# update_dictionary['cross_domain_density_loss'] = self.compute_density_based_loss(update_dictionary)
+			update_dictionary['forward_density_loss'] = self.query_GMM_density(evaluation_domain=0, point_set=update_dictionary['latent_z'])
+
+			# 5b) Compute likelihood of source z encoding(s) under the target domain GMM. (Backward GMM Loss / IMLE)
+			update_dictionary['backward_density_loss'] = self.query_GMM_density(evaluation_domain=1, point_set=update_dictionary['cross_domain_latent_z'])
+	
+			# 5c) Compute supervised loss..
+			update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(i, update_dictionary)
+
+			# The .view(-1,z_dim) was accumulating z's across the batch, which is wrong. Compute set based loss independently across the batch, then do mean reduction.
+			# update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['latent_z'], update_dictionary['cross_domain_latent_z'])
+
+			# if domain==1:
+			# 	update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['translated_latent_z'], update_dictionary['cross_domain_latent_z'])
 
 			# 6) Compute gradients of objective and then update networks / policies.
 			self.update_networks(1, self.target_manager, update_dictionary)					
