@@ -8165,7 +8165,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 	def set_iteration(self, counter, i=0):
 		# First call the set iteration of super. 
-		super().set_iteration(counter)
+		super().set_iteration(counter, i)
 
 		# Now make sure VAE loss weight is set to 0, because we can ignore the reconstruction losses in this setting.
 		self.vae_loss_weight = 0.
@@ -10070,8 +10070,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			# Call function to compute this. # This function depends on whether we have a translation model or not.. 
 			self.unweighted_unmasked_cross_domain_supervision_loss = update_dictionary['cross_domain_supervised_loss']
 
-			# print("Embedding in update networks of the density setting")
-			# embed()
+			print("Embedding in update networks of the density setting")
+			embed()
 
 
 			# Now mask using batch mask.			
