@@ -5765,8 +5765,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			if self.args.setting in ['densityjointtransfer','densityjointfixembedtransfer']:
 				log_dict['Unweighted Cross Domain Density Loss'] = self.unweighted_masked_cross_domain_density_loss.mean()
 				log_dict['Cross Domain Density Loss'] = self.cross_domain_density_loss.mean()
-				log_dict['Forward GMM Density Loss'] = viz_dict['forward_density_loss']
-				log_dict['Backward GMM Density Loss'] = viz_dict['backward_density_loss']
+
+				if self.args.setting in ['densityjointfixembedtransfer']:
+					log_dict['Forward GMM Density Loss'] = viz_dict['forward_density_loss']
+					log_dict['Backward GMM Density Loss'] = viz_dict['backward_density_loss']
 
 			if self.args.supervised_set_based_density_loss:
 				log_dict['Unweighted Supervised Set Based Density Loss'] = self.unweighted_supervised_set_based_density_loss
@@ -7052,7 +7054,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		return log_dict
 
-	def plot_density_embedding(self, embedded_zs, colors, title):
+	def plot_density_embedding(self, embedded_zs, colors, title): 
 
 		# Now visualize TSNE image
 		matplotlib.rcParams['figure.figsize'] = [5,5]
@@ -9095,7 +9097,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 			# Need to feed translated_latent_z's rather than the latent_z.. 
 			if domain==1:
-				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['translated_latent_z'], update_dictionary['cross_domain_latent_z'], differentiable_outputs=True)
+				# update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['translated_latent_z'], update_dictionary['cross_domain_latent_z'], differentiable_outputs=True)
+				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'], differentiable_outputs=True)
 
 			#################################################
 			## (5) Compute and apply gradient updates. 			
@@ -10018,7 +10021,8 @@ class PolicyManager_DensityJointTransfer(PolicyManager_JointTransfer):
 			# update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['latent_z'], update_dictionary['cross_domain_latent_z'])
 
 			if domain==1:
-				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['translated_latent_z'], update_dictionary['cross_domain_latent_z'])
+				# update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['translated_latent_z'], update_dictionary['cross_domain_latent_z'])
+				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'])
 
 			# 6) Compute gradients of objective and then update networks / policies.
 			self.update_networks(1, self.target_manager, update_dictionary)					
@@ -10168,8 +10172,9 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			# The .view(-1,z_dim) was accumulating z's across the batch, which is wrong. Compute set based loss independently across the batch, then do mean reduction.
 			# update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['latent_z'], update_dictionary['cross_domain_latent_z'])
 
-			# if domain==1:
-			# 	update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['translated_latent_z'], update_dictionary['cross_domain_latent_z'])
+			if domain==1:
+				# update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['translated_latent_z'], update_dictionary['cross_domain_latent_z'], differentiable_outputs=True)
+				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'], differentiable_outputs=True)
 
 			# 6) Compute gradients of objective and then update networks / policies.
 			self.update_networks(1, self.target_manager, update_dictionary)					
@@ -10177,8 +10182,12 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			# 7) Update plots. 
 			viz_dict = {}
 			viz_dict['domain'] = domain
-			# viz_dict['forward_set_based_supervised_loss'], viz_dict['backward_set_based_supervised_loss'] = update_dictionary['forward_set_based_supervised_loss'].mean().detach().cpu().numpy(), update_dictionary['backward_set_based_supervised_loss'].mean().detach().cpu().numpy()
-			viz_dict['forward_density_loss'], viz_dict['backward_density_loss'] = update_dictionary['forward_density_loss'], update_dictionary['backward_density_loss']
+
+			# print("Embedding in run iteration of DJFE")
+			# embed()
+
+			viz_dict['forward_set_based_supervised_loss'], viz_dict['backward_set_based_supervised_loss'] = update_dictionary['forward_set_based_supervised_loss'].mean().detach().cpu().numpy(), update_dictionary['backward_set_based_supervised_loss'].mean().detach().cpu().numpy()
+			viz_dict['forward_density_loss'], viz_dict['backward_density_loss'] = update_dictionary['forward_density_loss'].mean().detach().cpu().numpy(), update_dictionary['backward_density_loss'].mean().detach().cpu().numpy()
 		
 			self.update_plots(counter, viz_dict, log=True)
 
