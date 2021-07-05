@@ -781,3 +781,63 @@ for i in range(ndp):
         if (k+1)%1000==0:
             print('iter',k)
             print('y:',y[i])
+
+#######################################################################################
+# Non sequential data, recreating GMMs, testing out.. Effect of .. Number of z's in the source and target spaces, versus the variance of the GMM, which losses are being optimized, and distances in z space between different zs in the same cluster. 
+
+#######################################################################################
+
+
+import torch
+import numpy as np
+np.set_printoptions(suppress=True, precision=4)
+np.random.seed(0)
+torch.manual_seed(0)
+torch.set_printoptions(sci_mode=False, precision=4)
+
+
+N = 10
+M = 15
+a = np.random.randn(N,4)
+b = np.random.randn(M,4)
+
+a[:3] = a[0]
+a[3:6] = a[3]
+a[6:10] = a[6]
+
+a_noise = 0.01*np.random.randn(N,4)
+a = a+a_noise
+# x = torch.randn((N,4)).cuda()
+# y = torch.randn((M,4),requires_grad=True,device='cuda')
+# x.data = a
+# y.data = b
+
+# 
+x = torch.from_numpy(a).cuda()
+y = torch.from_numpy(b).cuda()
+y.requires_grad=True
+
+gmmv = 0.01
+opt = torch.optim.Adam([y],lr=1)
+fmixd = torch.distributions.Categorical(torch.ones(N).cuda())
+fcomd = torch.distributions.Independent(torch.distributions.Normal(x,gmmv*torch.ones_like(x).cuda()),1)
+fgmm = torch.distributions.MixtureSameFamily(fmixd, fcomd)
+bmixd = torch.distributions.Categorical(torch.ones(M).cuda())
+
+for k in range(1000):
+    opt.zero_grad()
+    floss = - fgmm.log_prob(y)
+
+    bcomd = torch.distributions.Independent(torch.distributions.Normal(y,gmmv*torch.ones_like(y).cuda()),1)
+    bgmm = torch.distributions.MixtureSameFamily(bmixd, bcomd)
+     
+    bloss = - bgmm.log_prob(x)
+    # loss = bloss.sum()+floss.sum()
+    # loss = bloss.sum()
+    loss = floss.sum()
+    loss.sum().backward()
+    opt.step()
+    if k%100==0:
+        print('iter',k)
+        print('y:',y)
+
