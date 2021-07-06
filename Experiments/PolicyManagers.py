@@ -5792,32 +5792,34 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Plot source, target, and shared embeddings via TSNE.
 			##################################################
 
+			# # First run get embeddings. 
+			# self.viz_dictionary['tsne_source_embedding'], self.viz_dictionary['tsne_target_embedding'], \
+			# 	self.viz_dictionary['tsne_combined_embeddings_p5'], self.viz_dictionary['tsne_combined_embeddings_p10'], self.viz_dictionary['tsne_combined_embeddings_p30'], \
+			# 	self.viz_dictionary['tsne_combined_traj_embeddings_p5'], self.viz_dictionary['tsne_combined_traj_embeddings_p10'], self.viz_dictionary['tsne_combined_traj_embeddings_p30'] = \
+			# 		self.get_embeddings(projection='tsne')
+
 			# First run get embeddings. 
-			self.viz_dictionary['tsne_source_embedding'], self.viz_dictionary['tsne_target_embedding'], \
-				self.viz_dictionary['tsne_combined_embeddings_p5'], self.viz_dictionary['tsne_combined_embeddings_p10'], self.viz_dictionary['tsne_combined_embeddings_p30'], \
-				self.viz_dictionary['tsne_combined_traj_embeddings_p5'], self.viz_dictionary['tsne_combined_traj_embeddings_p10'], self.viz_dictionary['tsne_combined_traj_embeddings_p30'] = \
+			_, _, self.viz_dictionary['tsne_combined_embeddings_p5'], self.viz_dictionary['tsne_combined_embeddings_p10'], self.viz_dictionary['tsne_combined_embeddings_p30'], _, _, _ = \
 					self.get_embeddings(projection='tsne')
 
-			# If toy domain, plot the trajectories over the embeddings.		
-			if self.check_toy_dataset():
-				log_dict['TSNE Source Traj Embedding'], log_dict['TSNE Target Traj Embedding'] = \
-					 self.return_wandb_image(self.source_traj_image), self.return_wandb_image(self.target_traj_image)
 
+			# # If toy domain, plot the trajectories over the embeddings.		
+			# if self.check_toy_dataset():
+			# 	log_dict['TSNE Source Traj Embedding'], log_dict['TSNE Target Traj Embedding'] = \
+			# 		 self.return_wandb_image(self.source_traj_image), self.return_wandb_image(self.target_traj_image)
+
+			# # Add the embeddings to logging dict.
+			# log_dict['TSNE Source Embedding'], log_dict['TSNE Target Embedding'], log_dict['TSNE Combined Embedding Perplexity 5'], \
+			# 	log_dict['TSNE Combined Embedding Perplexity 10'], log_dict['TSNE Combined Embedding Perplexity 30'] = \
+			# 		self.return_wandb_image(self.viz_dictionary['tsne_source_embedding']), self.return_wandb_image(self.viz_dictionary['tsne_target_embedding']), \
+			# 		self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p5']), self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p10']), \
+			# 		self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p30'])
+			
 			# Add the embeddings to logging dict.
-			log_dict['TSNE Source Embedding'], log_dict['TSNE Target Embedding'], log_dict['TSNE Combined Embedding Perplexity 5'], \
-				log_dict['TSNE Combined Embedding Perplexity 10'], log_dict['TSNE Combined Embedding Perplexity 30'] = \
-					self.return_wandb_image(self.viz_dictionary['tsne_source_embedding']), self.return_wandb_image(self.viz_dictionary['tsne_target_embedding']), \
+			log_dict['TSNE Combined Embedding Perplexity 5'], log_dict['TSNE Combined Embedding Perplexity 10'], log_dict['TSNE Combined Embedding Perplexity 30'] = \
 					self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p5']), self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p10']), \
 					self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p30'])
-			
-
-			# Add the embeddings to logging dict.
-			log_dict['TSNE Source Embedding'], log_dict['TSNE Target Embedding'], log_dict['TSNE Combined Embedding Perplexity 5'], \
-				log_dict['TSNE Combined Embedding Perplexity 10'], log_dict['TSNE Combined Embedding Perplexity 30'] = \
-					self.return_wandb_image(self.viz_dictionary['tsne_source_embedding']), self.return_wandb_image(self.viz_dictionary['tsne_target_embedding']), \
-					self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p5']), self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p10']), \
-					self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p30'])
-			
+		
 
 			##################################################
 			# Plot source, target, and shared embeddings via PCA. 
@@ -5826,40 +5828,40 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# print("Running embeddings PCA.")
 			
 			# First run get embeddings. 
-			self.viz_dictionary['pca_source_embedding'], self.viz_dictionary['pca_target_embedding'], self.viz_dictionary['pca_combined_embeddings'], self.viz_dictionary['pca_combined_traj_embeddings'] = self.get_embeddings(projection='pca', computed_sets=True)
+			_, _, self.viz_dictionary['pca_combined_embeddings'], _ = self.get_embeddings(projection='pca', computed_sets=True)
 
-			# Add embeddings to logging dict.			
-			log_dict['PCA Source Embedding'], log_dict['PCA Target Embedding'], log_dict['PCA Combined Embedding'] = \
-				self.return_wandb_image(self.viz_dictionary['pca_source_embedding']), self.return_wandb_image(self.viz_dictionary['pca_target_embedding']), \
-				self.return_wandb_image(self.viz_dictionary['pca_combined_embeddings'])
+			# # Add embeddings to logging dict.			
+			# log_dict['PCA Source Embedding'], log_dict['PCA Target Embedding'], log_dict['PCA Combined Embedding'] = \
+			# 	self.return_wandb_image(self.viz_dictionary['pca_source_embedding']), self.return_wandb_image(self.viz_dictionary['pca_target_embedding']), \
+			# 	self.return_wandb_image(self.viz_dictionary['pca_combined_embeddings'])
 	
-			# If toy domain, add to log dict.
-			if self.check_toy_dataset():				
-				log_dict['PCA Combined Trajectory Embeddings'], log_dict['TSNE Combined Trajectory Embeddings Perplexity 5'], \
-					log_dict['TSNE Combined Trajectory Embeddings Perplexity 10'], log_dict['TSNE Combined Trajectory Embeddings Perplexity 30'] = \
-						self.return_wandb_image(self.viz_dictionary['pca_combined_traj_embeddings']), self.return_wandb_image(self.viz_dictionary['tsne_combined_traj_embeddings_p5']), \
-						self.return_wandb_image(self.viz_dictionary['tsne_combined_traj_embeddings_p10']), self.return_wandb_image(self.viz_dictionary['tsne_combined_traj_embeddings_p30'])
+			# Add embeddings to logging dict.			
+			log_dict['PCA Combined Embedding'] = self.return_wandb_image(self.viz_dictionary['pca_combined_embeddings'])
+
+
+			# # If toy domain, add to log dict.
+			# if self.check_toy_dataset():				
+			# 	log_dict['PCA Combined Trajectory Embeddings'], log_dict['TSNE Combined Trajectory Embeddings Perplexity 5'], \
+			# 		log_dict['TSNE Combined Trajectory Embeddings Perplexity 10'], log_dict['TSNE Combined Trajectory Embeddings Perplexity 30'] = \
+			# 			self.return_wandb_image(self.viz_dictionary['pca_combined_traj_embeddings']), self.return_wandb_image(self.viz_dictionary['tsne_combined_traj_embeddings_p5']), \
+			# 			self.return_wandb_image(self.viz_dictionary['tsne_combined_traj_embeddings_p10']), self.return_wandb_image(self.viz_dictionary['tsne_combined_traj_embeddings_p30'])
 
 			##################################################
 			# Plot source, target, and shared embeddings via DENSNE.
 			##################################################
 
 			# First run get embeddings. 
-			self.viz_dictionary['densne_source_embedding'], self.viz_dictionary['densne_target_embedding'], \
-				self.viz_dictionary['densne_combined_embeddings_p5'], self.viz_dictionary['densne_combined_embeddings_p10'], self.viz_dictionary['densne_combined_embeddings_p30'], \
-				self.viz_dictionary['densne_combined_traj_embeddings_p5'], self.viz_dictionary['densne_combined_traj_embeddings_p10'], self.viz_dictionary['densne_combined_traj_embeddings_p30'] = \
-					self.get_embeddings(projection='densne')
+			_, _, self.viz_dictionary['densne_combined_embeddings_p5'], self.viz_dictionary['densne_combined_embeddings_p10'], self.viz_dictionary['densne_combined_embeddings_p30'], \
+				_, _, _ = self.get_embeddings(projection='densne')
 
-			# If toy domain, plot the trajectories over the embeddings.		
-			if self.check_toy_dataset():
-				log_dict['DENSNE Source Traj Embedding'], log_dict['DENSNE Target Traj Embedding'] = \
-					 self.return_wandb_image(self.source_traj_image), self.return_wandb_image(self.target_traj_image)
+			# # If toy domain, plot the trajectories over the embeddings.		
+			# if self.check_toy_dataset():
+			# 	log_dict['DENSNE Source Traj Embedding'], log_dict['DENSNE Target Traj Embedding'] = \
+			# 		 self.return_wandb_image(self.source_traj_image), self.return_wandb_image(self.target_traj_image)
 
 			# Add the embeddings to logging dict.
-			log_dict['DENSNE Source Embedding'], log_dict['DENSNE Target Embedding'], log_dict['DENSNE Combined Embedding Perplexity 5'], \
-				log_dict['DENSNE Combined Embedding Perplexity 10'], log_dict['DENSNE Combined Embedding Perplexity 30'] = \
-					self.return_wandb_image(self.viz_dictionary['densne_source_embedding']), self.return_wandb_image(self.viz_dictionary['densne_target_embedding']), \
-					self.return_wandb_image(self.viz_dictionary['densne_combined_embeddings_p5']), self.return_wandb_image(self.viz_dictionary['densne_combined_embeddings_p10']), \
+			log_dict['DENSNE Combined Embedding Perplexity 5'], log_dict['DENSNE Combined Embedding Perplexity 10'], log_dict['DENSNE Combined Embedding Perplexity 30'] = \
+				self.return_wandb_image(self.viz_dictionary['densne_combined_embeddings_p5']), self.return_wandb_image(self.viz_dictionary['densne_combined_embeddings_p10']), \
 					self.return_wandb_image(self.viz_dictionary['densne_combined_embeddings_p30'])
 			
 			##################################################
@@ -8334,7 +8336,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# Now log combined source and translated target visualizations, and if we want, target and translated source.
 			##################################################
 
-			log_dict["TSNE Translated Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transtarget_p30'])	
+			# log_dict["TSNE Translated Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transtarget_p30'])	
 
 			log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p05'])
 			log_dict["TSNE Combined Source and Translated Target Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_p10'])
@@ -8344,7 +8346,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# log_dict["TSNE Combined Translated Source and Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_p30'])
 
 			## Now for DENSNE
-			log_dict["DENSNE Translated Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['densne_transtarget_p30'])	
+			# log_dict["DENSNE Translated Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['densne_transtarget_p30'])	
 			log_dict["DENSNE Combined Source and Translated Target Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['densne_origsource_transtarget_p05'])
 			log_dict["DENSNE Combined Source and Translated Target Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['densne_origsource_transtarget_p10'])
 			log_dict["DENSNE Combined Source and Translated Target Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['densne_origsource_transtarget_p30'])
@@ -8360,23 +8362,23 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			log_dict["PCA Combined Source and Translated Target Embeddings"] = self.return_wandb_image(self.viz_dictionary['pca_combined_origsource_transtarget_embeddings'])
 			# log_dict["PCA Combined Source and Translated Target Embeddings"] = self.return_wandb_image(self.viz_dictionary['pca_combined_transsource_origtarget_embeddings'])
 
-			if self.check_toy_dataset():					
-				log_dict["TSNE Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transtarget_traj_p30'])
-				log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p05'])
-				log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p10'])
-				log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p30'])
-				# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p05'])
-				# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p10'])
-				# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p30'])
+			# if self.check_toy_dataset():					
+			# 	log_dict["TSNE Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transtarget_traj_p30'])
+			# 	log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p05'])
+			# 	log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p10'])
+			# 	log_dict["TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_origsource_transtarget_traj_p30'])
+			# 	# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p05'])
+			# 	# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p10'])
+			# 	# log_dict["TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['tsne_transsource_origtarget_traj_p30'])
 
-				# Now for DENSNE
-				log_dict["DENSNE Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['densne_transtarget_traj_p30'])
-				log_dict["DENSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['densne_origsource_transtarget_traj_p05'])
-				log_dict["DENSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['densne_origsource_transtarget_traj_p10'])
-				log_dict["DENSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['densne_origsource_transtarget_traj_p30'])
-				# log_dict["DENSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['densne_transsource_origtarget_traj_p05'])
-				# log_dict["DENSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['densne_transsource_origtarget_traj_p10'])
-				# log_dict["DENSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['densne_transsource_origtarget_traj_p30'])
+			# 	# Now for DENSNE
+			# 	log_dict["DENSNE Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['densne_transtarget_traj_p30'])
+			# 	log_dict["DENSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['densne_origsource_transtarget_traj_p05'])
+			# 	log_dict["DENSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['densne_origsource_transtarget_traj_p10'])
+			# 	log_dict["DENSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['densne_origsource_transtarget_traj_p30'])
+			# 	# log_dict["DENSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 05"] = self.return_wandb_image(self.viz_dictionary['densne_transsource_origtarget_traj_p05'])
+			# 	# log_dict["DENSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['densne_transsource_origtarget_traj_p10'])
+			# 	# log_dict["DENSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['densne_transsource_origtarget_traj_p30'])
 
 			###################################################
 			# Compute Aggregate CDSL
@@ -10139,18 +10141,26 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		#		# 3) Sample x from target domain.
 		#		# 4) Feed x into target domain encoder to get z encoding. 
 		# 		# 5) Compute overall objective. 
-		# 			# 5a) Compute likelihood of target z encoding under the source domain GMM. 
-		# 			# 5b) Compute likelihood of source z encoding(s) under the target domain GMM. (Backward GMM Loss / IMLE)
+		#			# 5a) Compute Z GMM likelihoods. 
+		# 				# 5a1) Compute likelihood of target z encoding under the source domain GMM. 
+		# 				# 5a2) Compute likelihood of source z encoding(s) under the target domain GMM. (Backward GMM Loss / IMLE)
+		#			# 5b) Compute Z Tuple GMM likelihoods.
 		# 			# 5c) Compute supervised loss.
 		# 		# 6) Compute gradients of objective and then update networks / policies.
 
+		################################################
 		# (0) Setup things like training phases, epislon values, etc.
+		################################################
+
 		self.set_iteration(counter, i=i)
 		
 		if counter==0:
 			self.set_z_objects()
-			
+
+		################################################			
 		# (3), (4), (5a) Get input datapoint from target domain. One directional in this case.
+		################################################
+
 		domain = 1
 		source_input_dict, source_var_dict, source_eval_dict = self.encode_decode_trajectory(self.target_manager, i)
 		update_dictionary = {}
@@ -10159,45 +10169,70 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 		if not(skip_viz):			
 
+			################################################
 			# Precursor to 5c - run cross domain encode / decode. Running this in run iteration so we have access to variables.
+			################################################
+
 			cross_domain_input_dict, cross_domain_var_dict, cross_domain_eval_dict = self.encode_decode_trajectory(self.source_manager, i)
 			update_dictionary['cross_domain_latent_z'] = cross_domain_var_dict['latent_z_indices']
 
 			detached_original_latent_z = update_dictionary['latent_z'].detach()
 			update_dictionary['translated_latent_z'] = self.translate_latent_z(detached_original_latent_z, source_var_dict['latent_b'].detach())
 
-			# 5a) Compute likelihood of target z encoding under the source domain GMM. 
+			################################################
+			# 5a1) Compute likelihood of target z encoding under the source domain GMM. 
+			################################################
+
 			# update_dictionary['cross_domain_density_loss'] = self.compute_density_based_loss(update_dictionary)
 			update_dictionary['forward_density_loss'] = self.query_GMM_density(evaluation_domain=0, point_set=update_dictionary['translated_latent_z'], differentiable_points=True)
 
-			# 5b) Computing likelihood of source z encoding(s) under the target domain GMM. (Backward GMM Loss / IMLE)
+			################################################
+			# 5a2) Computing likelihood of source z encoding(s) under the target domain GMM. (Backward GMM Loss / IMLE)
+			################################################
+
 			# Step 1: Recompute translated means. 
 			self.differentiable_mean_computation(counter)
 			# Step 2: Recreate target domain GMM (with translated z's as input).						
-
 			self.GMM_list[domain] = self.create_GMM(evaluation_domain=domain, mean_point_set=self.differentiable_target_means, differentiable_points=True)
 			# Step 3: Actually query GMM for likelihoods. Remember, this needs to be done differentiably. 
 			update_dictionary['backward_density_loss'] = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['cross_domain_latent_z'], differentiable_points=True)
 	
-			# 5c) Compute supervised loss..
+			################################################
+			# 5b) Compute Z Tuple GMM likelihood.
+			################################################
+
+			################################################
+			# 5b1) Compute Z Tuples. 
+			################################################
+
+			if self.args.z_tuple_gmm:
+				update_dictionary['z_transformations'], update_dictionary['z_trajectory_weights'], _ = self.get_z_transformation(update_dictionary['translated_latent_z'], source_var_dict['latent_b'])			
+				update_dictionary['z_trajectory'] = update_dictionary['z_transformations']
+
+			
+					
+
+			################################################
+			# 5c) Compute supervised loss.
+			################################################
+
 			update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(update_dictionary)
 
-			# The .view(-1,z_dim) was accumulating z's across the batch, which is wrong. Compute set based loss independently across the batch, then do mean reduction.
-			# update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['latent_z'], update_dictionary['cross_domain_latent_z'])
-
 			if domain==1:
-				# update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['translated_latent_z'], update_dictionary['cross_domain_latent_z'], differentiable_outputs=True)
 				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'], differentiable_outputs=True)
 
+			################################################
 			# 6) Compute gradients of objective and then update networks / policies.
+			################################################
+
 			self.update_networks(1, self.target_manager, update_dictionary)					
 
+			################################################
 			# 7) Update plots. 
+			################################################
+			
 			viz_dict = {}
 			viz_dict['domain'] = domain
-
-			# print("Embedding in run iteration of DJFE")
-			# embed()
 
 			viz_dict['forward_set_based_supervised_loss'], viz_dict['backward_set_based_supervised_loss'] = update_dictionary['forward_set_based_supervised_loss'].mean().detach().cpu().numpy(), update_dictionary['backward_set_based_supervised_loss'].mean().detach().cpu().numpy()
 			viz_dict['forward_density_loss'], viz_dict['backward_density_loss'] = update_dictionary['forward_density_loss'].mean().detach().cpu().numpy(), update_dictionary['backward_density_loss'].mean().detach().cpu().numpy()
