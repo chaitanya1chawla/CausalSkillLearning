@@ -3319,6 +3319,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# Also logging latent bs and full latent z trajectory now, because recurrent translation model setting needs it..
 		self.latent_b_set = []
 		self.full_latent_z_trajectory = []
+		self.number_distinct_zs = []
 
 		break_var = 0
 		self.number_set_elements = 0 
@@ -3332,6 +3333,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			# Getting latent_b_set and full z traj.
 			# Don't unbatch them yet.
+			# Basically, if we want to use the Z tuple GMM, we need a differentiable version of the z's that we hold on to.. 
 			if self.args.recurrent_translation:
 				self.latent_b_set.append(variational_dict['latent_b'].clone().detach())
 				self.full_latent_z_trajectory.append(variational_dict['latent_z_indices'].clone().detach())
@@ -3348,6 +3350,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				distinct_z_indices = torch.where(variational_dict['latent_b'][:,b])[0].clone().detach().cpu().numpy()
 				# Get distinct z's.
 				distinct_zs = variational_dict['latent_z_indices'][distinct_z_indices, b].clone().detach().cpu().numpy()
+
+				if self.args.z_tuple_gmm:
+					self.number_distinct_zs.append(len(distinct_z_indices))
 				
 				# Copy over these into lists.
 				self.latent_z_set.append(copy.deepcopy(distinct_zs))
@@ -3371,6 +3376,11 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				
 
 		self.avg_reconstruction_error = 0.
+
+		# Log cummulative number of z's..
+		if self.args.z_tuple_gmm:			
+			self.cummulative_number_zs = np.concatenate([np.zeros(1),np.cumsum(np.array(self.number_distinct_zs))]).astype(int)
+			
 
 		# # if self.args.setting=='jointtransfer':
 		# # 	self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
@@ -6019,7 +6029,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 			self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
-			self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)			
+			self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)
 			# First, normalize the sets.. 
 
 			self.source_latent_zs = (self.source_latent_zs-self.source_z_mean.detach().cpu().numpy())/self.source_z_std.detach().cpu().numpy()
@@ -6039,6 +6049,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Try something
 		self.source_latent_zs = self.source_latent_zs[:min(500,len(self.source_latent_zs))]
 		self.target_latent_zs = self.target_latent_zs[:min(500,len(self.target_latent_zs))]
+
+		self.final_number_of_zs = [self.source_latent_zs.shape[0], self.target_latent_zs.shape[0]]
 
 		# Copy sets so we don't accidentally perform in-place operations on any of the computed sets.
 		self.original_source_latent_z_set = copy.deepcopy(self.source_latent_zs)
@@ -7096,6 +7108,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		self.GMM_list = [self.create_GMM(evaluation_domain=0), self.create_GMM(evaluation_domain=1)]
 
+		if self.args.z_tuple_gmm:
+			
+			# Set Z Tuple Means...
+			self.differentiable_mean_computation(0)
+			# Also set up Z Tuple GMMs
+			self.Z_Tuple_GMM_list = [self.create_GMM(evaluation_domain=0, mean_point_set=self.source_z_tuple_set, differentiable_points=True), \
+									 self.create_GMM(evaluation_domain=1, mean_point_set=self.target_z_tuple_set, differentiable_points=True)]
+
 	def compute_set_based_supervised_GMM_loss(self, z_set_1, z_set_2, differentiable_outputs=False):
 
 		# self.temporary_gmm_model = 
@@ -7134,18 +7154,36 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 	def compute_aggregate_GMM_densities(self):
 
+		print("ABOUT TO RUN COMPUTE AGGREGATE GMM DENSITIES")
 		# May need to batch this, depending on memory. 
 		forward_density = self.query_GMM_density(evaluation_domain=0, point_set=self.target_latent_zs).mean()
 		reverse_density = self.query_GMM_density(evaluation_domain=1, point_set=self.source_latent_zs).mean()
 
 		return forward_density.detach().cpu().numpy(), reverse_density.detach().cpu().numpy()
 
-	def query_GMM_density(self, evaluation_domain=0, point_set=None, differentiable_points=False):
+	@gpu_profile_every(1)
+	def query_GMM_density(self, evaluation_domain=0, point_set=None, differentiable_points=False, GMM=None):
 		
-		if differentiable_points:
-			return self.GMM_list[evaluation_domain].log_prob(point_set)
-		else:
-			return self.GMM_list[evaluation_domain].log_prob(torch.tensor(point_set).to(device))
+		# if GMM is None:
+		# 	if differentiable_points:
+		# 		return self.GMM_list[evaluation_domain].log_prob(point_set)
+		# 	else:
+		# 		return self.GMM_list[evaluation_domain].log_prob(torch.tensor(point_set).to(device))
+		# else:			
+		# 	if differentiable_points:
+		# 		return GMM.log_prob(point_set)
+		# 	else:
+		# 		return GMM.log_prob(torch.tensor(point_set).to(device))
+	
+		if GMM is None:
+			GMM = self.GMM_list[evaluation_domain]
+
+		if differentiable_points==False:
+			with torch.no_grad():
+				point_set = torch.tensor(point_set).to(device)
+				return GMM.log_prob(point_set)
+
+		return GMM.log_prob(point_set)
 
 	def create_GMM(self, evaluation_domain=0, mean_point_set=None, differentiable_points=False):
 
@@ -10054,6 +10092,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 		super(PolicyManager_DensityJointFixEmbedTransfer, self).__init__(args, source_dataset, target_dataset)
 
+	# @gpu_profile_every(1)
 	def update_networks(self, domain, policy_manager, update_dictionary):		
 
 		#########################################################################
@@ -10069,8 +10108,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		self.likelihood_loss = 0.
 		self.encoder_KL = 0.
 		self.unweighted_VAE_loss = self.likelihood_loss + self.args.kl_weight*self.encoder_KL
-		self.VAE_loss = self.vae_loss_weight*self.unweighted_VAE_loss
-		
+		self.VAE_loss = self.vae_loss_weight*self.unweighted_VAE_loss		
 
 		###########################################################
 		# (1a) First compute cross domain density. 
@@ -10085,6 +10123,26 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		self.unweighted_masked_cross_domain_density_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_density_loss).sum()/(policy_manager.batch_mask.sum())
 		# Weight this loss.
 		self.cross_domain_density_loss = self.args.cross_domain_density_loss_weight*self.unweighted_masked_cross_domain_density_loss
+
+		###########################################################
+		# (1b) Compute cross domain z tuple density. 
+		###########################################################
+
+		if self.args.z_tuple_gmm:
+			# (1b1) Forward Z tuple density loss.
+			self.masked_forward_z_tuple_density_loss = - update_dictionary['target_z_trajectory_weights']*update_dictionary['forward_z_tuple_density_loss']
+			self.forward_z_tuple_density_loss = self.masked_forward_z_tuple_density_loss.sum()/update_dictionary['target_z_trajectory_weights'].sum()
+
+			# (1b2) Backward Z tuple density loss.
+			self.masked_backward_z_tuple_density_loss = - update_dictionary['source_z_trajectory_weights']*update_dictionary['backward_z_tuple_density_loss']
+			self.backward_z_tuple_density_loss = self.masked_backward_z_tuple_density_loss.sum()/update_dictionary['source_z_trajectory_weights'].sum()
+			
+			# Total Z tuple density loss. 
+			self.unweighted_masked_cross_domain_z_tuple_density_loss = self.forward_z_tuple_density_loss + self.backward_z_tuple_density_loss			
+		else:
+			self.unweighted_masked_cross_domain_z_tuple_density_loss = 0.
+			
+		self.cross_domain_z_tuple_density_loss = self.args.cross_domain_z_tuple_density_loss_weight*self.unweighted_masked_cross_domain_z_tuple_density_loss
 
 		###########################################################
 		# (1c) If active, compute cross domain z loss. 
@@ -10110,21 +10168,95 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		# (1d) Finally, compute total loss.
 		###########################################################
 
-		self.total_VAE_loss = self.cross_domain_supervision_loss + self.cross_domain_density_loss
+		self.total_VAE_loss = self.cross_domain_supervision_loss + self.cross_domain_density_loss + self.cross_domain_z_tuple_density_loss
 
 		# Go backward through the generator (encoder / decoder), and take a step. 
 		self.total_VAE_loss.backward()
 		self.optimizer.step()
 
+	def construct_z_tuples_from_z_sets(self, z_set, cummulative_number_zs):
+
+		# Making this a fucntion so that we can use for source and target domains.
+		z_trajectories = [z_set[low:high] for low, high in zip(cummulative_number_zs, cummulative_number_zs[1:])]
+		z_tuples = None
+		for k, v in enumerate(z_trajectories):
+			z_tuple_list = torch.cat([v[i:i+2].view(-1,2*self.args.z_dimensions) for i in range(v.shape[0]-1)])
+			if z_tuples is None:
+				z_tuples = z_tuple_list
+			else:
+				z_tuples =  torch.cat([z_tuples, z_tuple_list])
+
+		return z_tuples		
+
+	def construct_z_tuple_sets(self, domain=None, policy_manager=None, z_set=None):
+
+		######################################################
+		# Compute target tuples.
+		######################################################
+
+		# If we're also using z tuple GMMs, re-assemble z tuples from the differentiable_target_means, using the self.target_mananger.cummulative_number_zs
+		# Remember, cummulative_number_zs is the for N trajectories, but we subsampled 500 (distinct) z's from that. 
+		# Needs to be handled - if cummulative_z[-1] > 500 or < 500. 
+
+		if policy_manager.cummulative_number_zs[-1] > self.final_number_of_zs[domain]:
+
+			# Find bucket of self.final_number_of_target_zs, and 
+			upper_bucket_index = np.digitize(self.final_number_of_zs[domain], policy_manager.cummulative_number_zs)
+			# Select cummulative_number_zs until this bucket. 
+			cummulative_number_zs = policy_manager.cummulative_number_zs[:upper_bucket_index]
+			# Set last element to self.final_number_of_zs[1]
+			cummulative_number_zs[-1] = self.final_number_of_zs[domain]
+		else:
+			cummulative_number_zs = policy_manager.cummulative_number_zs
+		
+		# Now reassemble the z tuples from the given z_set. 
+		z_tuples = self.construct_z_tuples_from_z_sets(z_set, cummulative_number_zs)
+		
+		return z_tuples
+		
 	def differentiable_mean_computation(self, counter):
 		
 		# Function to differentiably compute means of the reverse GMM, as a function of the trnaslation mdoel. 
 		# The original target latent z variable is always pre translation.
 
-		self.inputs_to_translation_model = torch.tensor(self.original_target_latent_z_set).to(device)
+		self.inputs_to_translation_model = torch.tensor(self.original_target_latent_z_set).to(device)		
 		self.differentiable_target_means = self.backward_translation_model(self.inputs_to_translation_model)
 
+		# Create torch tensor for source means.
+		self.differentiable_source_means = torch.tensor(self.original_source_latent_z_set).to(device)
+
+		if self.args.z_tuple_gmm:
+
+			# Get target domain z tuples.
+			self.target_z_tuple_set = self.construct_z_tuple_sets(domain=1, policy_manager=self.target_manager, z_set=self.differentiable_target_means)
+
+			# Remember, this mean set doesn't need to be recomputed at every step. 
+			# Check if we're running for the first time, otherwise just keep as is. 
+			if counter==0:
+				# Get source domain z tuples.
+				self.source_z_tuple_set = self.construct_z_tuple_sets(domain=0, policy_manager=self.source_manager, z_set=self.differentiable_source_means)
+
+	def update_plots(self, counter, viz_dict, log=False):
+
+		# Call super update plots for the majority of the work. Call this with log==false to make sure that wandb only logs things we add in this function. 		
+		log_dict = super().update_plots(counter, viz_dict, log=False)
+
+		if self.args.z_tuple_gmm:
+			# Log Z tuple densities. 
+			log_dict['Forward Z Tuple Density Loss'] = self.forward_z_tuple_density_loss
+			log_dict['Backward Z Tuple Density Loss'] = self.backward_z_tuple_density_loss
+			log_dict['Unweighted Z Tuple Density Loss'] = self.unweighted_masked_cross_domain_z_tuple_density_loss
+			log_dict['Z Tuple Density Loss'] = self.cross_domain_z_tuple_density_loss 
+
+		# Actually log. 
+		if log:
+			wandb.log(log_dict, step=counter)
+		else:
+			return log_dict
+
 	# Can inherit update plots, supervised loss, etc..
+
+	@gpu_profile_every(1)
 	def run_iteration(self, counter, i, domain=None, skip_viz=False):
 
 		# Overall algorithm.
@@ -10180,10 +10312,15 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			update_dictionary['translated_latent_z'] = self.translate_latent_z(detached_original_latent_z, source_var_dict['latent_b'].detach())
 
 			################################################
+			# 5a) Compute Z GMM likelihoods. 
+			################################################
+
+			################################################
 			# 5a1) Compute likelihood of target z encoding under the source domain GMM. 
 			################################################
 
 			# update_dictionary['cross_domain_density_loss'] = self.compute_density_based_loss(update_dictionary)
+			print("RUNNING QGMMD Forward Z Den")
 			update_dictionary['forward_density_loss'] = self.query_GMM_density(evaluation_domain=0, point_set=update_dictionary['translated_latent_z'], differentiable_points=True)
 
 			################################################
@@ -10195,22 +10332,41 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			# Step 2: Recreate target domain GMM (with translated z's as input).						
 			self.GMM_list[domain] = self.create_GMM(evaluation_domain=domain, mean_point_set=self.differentiable_target_means, differentiable_points=True)
 			# Step 3: Actually query GMM for likelihoods. Remember, this needs to be done differentiably. 
+			print("RUNNING QGMMD Backward Z Den")
 			update_dictionary['backward_density_loss'] = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['cross_domain_latent_z'], differentiable_points=True)
-	
+
 			################################################
 			# 5b) Compute Z Tuple GMM likelihood.
-			################################################
-
-			################################################
-			# 5b1) Compute Z Tuples. 
-			################################################
+			################################################	
 
 			if self.args.z_tuple_gmm:
-				update_dictionary['z_transformations'], update_dictionary['z_trajectory_weights'], _ = self.get_z_transformation(update_dictionary['translated_latent_z'], source_var_dict['latent_b'])			
-				update_dictionary['z_trajectory'] = update_dictionary['z_transformations']
 
-			
-					
+				################################################
+				# 5b1) Compute Translated Z Tuples for this iteration.
+				################################################
+
+				# Computing tuples in both domains for this particular batch.
+				update_dictionary['target_z_transformations'], update_dictionary['target_z_trajectory_weights'], _ = self.get_z_transformation(update_dictionary['translated_latent_z'], source_var_dict['latent_b'])
+				update_dictionary['source_z_transformations'], update_dictionary['source_z_trajectory_weights'], _ = self.get_z_transformation(update_dictionary['cross_domain_latent_z'], cross_domain_var_dict['latent_b'])
+				# update_dictionary['z_trajectory'] = update_dictionary['z_transformations']
+
+				################################################
+				# 5b2) Compute likelihood of target z encoding tuples under the source domain Z Tuple GMM. 			
+				################################################
+
+				print("RUNNING QGMMD Forward Z Tup Den")
+				update_dictionary['forward_z_tuple_density_loss'] = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['target_z_transformations'], differentiable_points=True, GMM=self.Z_Tuple_GMM_list[0])
+
+				################################################
+				# 5b3) Compute likelihood of target z encoding tuples under the source domain Z Tuple GMM. 			
+				################################################
+
+				# Step 1: Recompute translated means. Remember, this is already done by differentiable mean computation.
+				# Step 2: Recreate target domain Z Tuple GMM (wiht translated z tuples as input.). 
+				self.Z_Tuple_GMM_list[1] = self.create_GMM(evaluation_domain=domain, mean_point_set=self.target_z_tuple_set, differentiable_points=True)
+				# Step 3: Actually query GMM for likelihood. 
+				print("RUNNING QGMMD Backward Z Tup Den")
+				update_dictionary['backward_z_tuple_density_loss'] = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['source_z_transformations'], differentiable_points=True, GMM=self.Z_Tuple_GMM_list[1])
 
 			################################################
 			# 5c) Compute supervised loss.

@@ -341,6 +341,7 @@ def parse_arguments():
 	parser.add_argument('--supervised_set_based_density_loss',dest='supervised_set_based_density_loss',type=int,default=0,help='Whether to use the supervised_set_based_density_loss to train.')
 	parser.add_argument('--supervised_set_based_density_loss_weight',dest='supervised_set_based_density_loss_weight',type=float,default=0.,help='Weight associated with the supervised_set_based_density_loss.')
 	parser.add_argument('--cross_domain_density_loss_weight',dest='cross_domain_density_loss_weight',type=float,default=0.,help='Weight associated with the cross domain density loss.')
+	parser.add_argument('--cross_domain_z_tuple_density_loss_weight',dest='cross_domain_z_tuple_density_loss_weight',type=float,default=0.,help='Weight associated with the z tuple cross domain density loss.')	
 	parser.add_argument('--forward_loss_weight',dest='forward_loss_weight',type=float,default=0.,help='Weight associated with forward density loss.')
 	parser.add_argument('--backward_loss_weight',dest='backward_loss_weight',type=float,default=0.,help='Weight associated with backward density loss.')
 	parser.add_argument('--gmm_variance_value', dest='gmm_variance_value', type=float, default=0.2,help='Variance value for GMM components.')
