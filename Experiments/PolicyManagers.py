@@ -5422,6 +5422,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		else:
 			self.epsilon = self.final_epsilon	
 
+		self.counter = counter
 		# Based on what phase of training we are in, set discriminability loss weight, etc. 
 		
 		# Phase 1 of training: Don't train discriminator at all, set discriminability loss weight to 0.
@@ -6796,6 +6797,28 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				traj_recon_error = ((cross_domain_decoding_dict['differentiable_trajectory'].detach().cpu().numpy() - source_input_dict['sample_traj'])**2).mean(axis=(0,2)).sum()
 				average_trajectory_reconstruction_error += traj_recon_error
 				
+				# print("Embedding in average trajectory reconstruction error computation")
+				# embed()
+				
+				# Also visualize trajectories 0 and 1 if we have mujoco.
+				if self.args.no_mujoco==0 and i==0:
+
+					self.traj_viz_dir_name = os.path.join(self.args.logdir,self.args.name,"TrajVizDict")
+					if not(os.path.isdir(self.traj_viz_dir_name)):
+						os.mkdir(self.traj_viz_dir_name)
+									
+					# First unnormalize the trajectories.
+					unnormalized_source_traj = (source_input_dict['sample_traj']*self.source_manager.norm_denom_value)+self.source_manager.norm_sub_value														
+					unnormalized_target_traj = (cross_domain_decoding_dict['differentiable_trajectory'].detach().cpu().numpy()*self.target_manager.norm_denom_value)+self.target_manager.norm_sub_value
+
+					# Now for these many trajectories:
+					for k in range(2):
+						# Now visualize the source trajectory. 
+						self.visualizer.visualize_joint_trajectory(unnormalized_source_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_SourceTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=False)
+
+						# Now visualize the target trajectory. 
+						self.visualizer.visualize_joint_trajectory(unnormalized_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}__Traj{2}_TargetTranslatedTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=False)
+
 		average_trajectory_reconstruction_error /= (self.extent//self.args.batch_size+1)*self.args.batch_size
 
 		return average_trajectory_reconstruction_error
@@ -6939,7 +6962,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 	def check_toy_dataset(self):
 		return self.args.source_domain in ['ContinuousNonZero','ToyContext'] and self.args.target_domain in ['ContinuousNonZero','ToyContext']
 
-	def initialize_training_batches(self):
+	def initialize_training_batches(self, skip=True):
 
 		print("Running Initialize Training Batches for Transfer setting.")
 		# Find out which domain has a bigger batch size. 
@@ -6963,7 +6986,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Now actually run iteration of the joint transfer / joint embed transfer with these specal indices.
 		counter = 0
 		print("Running initializing iteration.")
-		self.run_iteration(counter, max_batch_index, domain=max_batch_domain, skip_viz=True)
+		self.run_iteration(counter, max_batch_index, domain=max_batch_domain, skip_viz=skip)
 
 	def compute_z_statistics(self):
 
@@ -7104,6 +7127,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		return image
 
+	# @gpu_profile_every(1)
 	def setup_GMM(self):
 
 		self.GMM_list = [self.create_GMM(evaluation_domain=0), self.create_GMM(evaluation_domain=1)]
@@ -7154,14 +7178,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 	def compute_aggregate_GMM_densities(self):
 
-		print("ABOUT TO RUN COMPUTE AGGREGATE GMM DENSITIES")
+		# print("ABOUT TO RUN COMPUTE AGGREGATE GMM DENSITIES")
 		# May need to batch this, depending on memory. 
 		forward_density = self.query_GMM_density(evaluation_domain=0, point_set=self.target_latent_zs).mean()
 		reverse_density = self.query_GMM_density(evaluation_domain=1, point_set=self.source_latent_zs).mean()
 
 		return forward_density.detach().cpu().numpy(), reverse_density.detach().cpu().numpy()
 
-	@gpu_profile_every(1)
+	# @gpu_profile_every(1)
 	def query_GMM_density(self, evaluation_domain=0, point_set=None, differentiable_points=False, GMM=None):
 		
 		# if GMM is None:
@@ -7322,6 +7346,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# Setup GMM.
 		self.setup_GMM()
+
+		if self.args.setting in ['densityjointfixembedtransfer']:
+			# Specially for this setting, now run initialize_training_batches again without skipping GMM steps.
+			self.initialize_training_batches(skip=False)
 
 		# Now run original training function.
 		print("About to run train function.")
@@ -10256,7 +10284,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 	# Can inherit update plots, supervised loss, etc..
 
-	@gpu_profile_every(1)
+	# @gpu_profile_every(1)
 	def run_iteration(self, counter, i, domain=None, skip_viz=False):
 
 		# Overall algorithm.
@@ -10320,7 +10348,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			################################################
 
 			# update_dictionary['cross_domain_density_loss'] = self.compute_density_based_loss(update_dictionary)
-			print("RUNNING QGMMD Forward Z Den")
+			# print("RUNNING QGMMD Forward Z Den")
 			update_dictionary['forward_density_loss'] = self.query_GMM_density(evaluation_domain=0, point_set=update_dictionary['translated_latent_z'], differentiable_points=True)
 
 			################################################
@@ -10332,7 +10360,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			# Step 2: Recreate target domain GMM (with translated z's as input).						
 			self.GMM_list[domain] = self.create_GMM(evaluation_domain=domain, mean_point_set=self.differentiable_target_means, differentiable_points=True)
 			# Step 3: Actually query GMM for likelihoods. Remember, this needs to be done differentiably. 
-			print("RUNNING QGMMD Backward Z Den")
+			# print("RUNNING QGMMD Backward Z Den")
 			update_dictionary['backward_density_loss'] = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['cross_domain_latent_z'], differentiable_points=True)
 
 			################################################
@@ -10354,7 +10382,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 				# 5b2) Compute likelihood of target z encoding tuples under the source domain Z Tuple GMM. 			
 				################################################
 
-				print("RUNNING QGMMD Forward Z Tup Den")
+				# print("RUNNING QGMMD Forward Z Tup Den")
 				update_dictionary['forward_z_tuple_density_loss'] = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['target_z_transformations'], differentiable_points=True, GMM=self.Z_Tuple_GMM_list[0])
 
 				################################################
@@ -10365,7 +10393,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 				# Step 2: Recreate target domain Z Tuple GMM (wiht translated z tuples as input.). 
 				self.Z_Tuple_GMM_list[1] = self.create_GMM(evaluation_domain=domain, mean_point_set=self.target_z_tuple_set, differentiable_points=True)
 				# Step 3: Actually query GMM for likelihood. 
-				print("RUNNING QGMMD Backward Z Tup Den")
+				# print("RUNNING QGMMD Backward Z Tup Den")
 				update_dictionary['backward_z_tuple_density_loss'] = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['source_z_transformations'], differentiable_points=True, GMM=self.Z_Tuple_GMM_list[1])
 
 			################################################
