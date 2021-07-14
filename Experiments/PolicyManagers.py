@@ -5813,7 +5813,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			_, _, self.viz_dictionary['tsne_combined_embeddings_p5'], self.viz_dictionary['tsne_combined_embeddings_p10'], self.viz_dictionary['tsne_combined_embeddings_p30'], _, _, _ = \
 					self.get_embeddings(projection='tsne')
 
-
 			# # If toy domain, plot the trajectories over the embeddings.		
 			# if self.check_toy_dataset():
 			# 	log_dict['TSNE Source Traj Embedding'], log_dict['TSNE Target Traj Embedding'] = \
@@ -5829,8 +5828,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Add the embeddings to logging dict.
 			log_dict['TSNE Combined Embedding Perplexity 5'], log_dict['TSNE Combined Embedding Perplexity 10'], log_dict['TSNE Combined Embedding Perplexity 30'] = \
 					self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p5']), self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p10']), \
-					self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p30'])
-		
+					self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p30'])		
 
 			##################################################
 			# Plot source, target, and shared embeddings via PCA. 
@@ -5848,7 +5846,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 	
 			# Add embeddings to logging dict.			
 			log_dict['PCA Combined Embedding'] = self.return_wandb_image(self.viz_dictionary['pca_combined_embeddings'])
-
 
 			# # If toy domain, add to log dict.
 			# if self.check_toy_dataset():				
@@ -5922,6 +5919,18 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				# 	log_dict['Average Corresponding Z Sequence Error'] = self.average_corresponding_z_sequence_error.mean()
 				# 	log_dict['Average Corresponding Z Transition Sequence Error'] = self.average_corresponding_z_transition_sequence_error.mean()
 			
+				if self.args.no_mujoco==0:
+
+					# print("Embed in traj gif logging")
+					# embed()
+
+					# x = self.gif_logs['Traj0_Source_Traj']
+					# x[...,0] = 
+					log_dict['Trajectory 0 Source GIF'] = self.return_wandb_gif(self.gif_logs['Traj0_Source_Traj'])
+					log_dict['Trajectory 0 Target GIF'] = self.return_wandb_gif(self.gif_logs['Traj0_Target_Traj'])
+					log_dict['Trajectory 1 Source GIF'] = self.return_wandb_gif(self.gif_logs['Traj1_Source_Traj'])
+					log_dict['Trajectory 1 Target GIF'] = self.return_wandb_gif(self.gif_logs['Traj1_Target_Traj'])
+
 			##################################################
 			# Visualize Z Trajectories.
 			##################################################
@@ -6811,13 +6820,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					unnormalized_source_traj = (source_input_dict['sample_traj']*self.source_manager.norm_denom_value)+self.source_manager.norm_sub_value														
 					unnormalized_target_traj = (cross_domain_decoding_dict['differentiable_trajectory'].detach().cpu().numpy()*self.target_manager.norm_denom_value)+self.target_manager.norm_sub_value
 
+					self.gif_logs = {}
 					# Now for these many trajectories:
 					for k in range(2):
 						# Now visualize the source trajectory. 
-						self.visualizer.visualize_joint_trajectory(unnormalized_source_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_SourceTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=False)
+						self.gif_logs['Traj{0}_Source_Traj'.format(k)] = np.array(self.visualizer.visualize_joint_trajectory(unnormalized_source_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_SourceTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True))
 
 						# Now visualize the target trajectory. 
-						self.visualizer.visualize_joint_trajectory(unnormalized_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TargetTranslatedTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=False)
+						self.gif_logs['Traj{0}_Target_Traj'.format(k)] = np.array(self.visualizer.visualize_joint_trajectory(unnormalized_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TargetTranslatedTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True))
 
 		average_trajectory_reconstruction_error /= (self.extent//self.args.batch_size+1)*self.args.batch_size
 
@@ -7342,11 +7352,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 	def train(self, model=None):
 
 		# Run some initialization process to manage GPU memory with variable sized batches.
+		self.current_epoch_running = 0
 		self.initialize_training_batches()
 
 		# Setup GMM.
 		self.setup_GMM()
-
+		
 		if self.args.setting in ['densityjointfixembedtransfer']:
 			# Specially for this setting, now run initialize_training_batches again without skipping GMM steps.
 			self.initialize_training_batches(skip=False)
