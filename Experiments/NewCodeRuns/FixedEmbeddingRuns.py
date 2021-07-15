@@ -1447,3 +1447,32 @@ CUDA_VISIBLE_DEVICES=1 python Master.py --name=JFE_MIME_psup_100_evaltraj --trai
 
 # 
 CUDA_VISIBLE_DEVICES=0 python Master.py --name=JFE_MIME_psup_101_evaltraj --train=1 --setting=jointfixembed --data=MIME --source_domain=MIME --target_domain=MIME --z_dimensions=16 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --training_phase_size=10 --display_freq=100 --eval_freq=4 --alternating_phase_size=10 --discriminator_phase_size=5 --generator_phase_size=1 --vae_loss_weight=0. --kl_weight=0.0 --var_skill_length=1 --context=0 --batch_size=32 --source_model=ExpWandbLogs/MJ_111/saved_models/Model_epoch500 --target_model=ExpWandbLogs/MJ_116/saved_models/Model_epoch500 --transfer_learning_rate=1e-4 --fix_source=1 --fix_target=1 --discriminability_weight=1.0 --discriminator_weight=1. --z_transform_discriminator=1 --z_trajectory_discriminability_weight=12. --z_trajectory_discriminator_weight=1. --eval_transfer_metrics=1 --max_viz_trajs=1 --traj_length=-1 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=30 --recurrent_translation=0 --cross_domain_supervision=1 --cross_domain_supervision_loss_weight=0.1 --normalization=minmax --learning_rate=1e-4 --epochs=5 --save_freq=20 --mlp_dropout=0.5 --regularization_weight=0. --no_mujoco=0 --identity_translation_loss_weight=0. --dataset_traj_length_limit=50 --number_of_supervised_datapoints=62 --metric_eval_freq=100 --model=ExpWandbLogs/JFE_MIME_psup_101/saved_models/Model_epoch8000
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 
+CUDA_VISIBLE_DEVICES=0 python Master.py --name=JFE_leftmime_rightmime_001 --train=1 --setting=jointfixembed --data=MIME --source_domain=MIME --target_domain=MIME --z_dimensions=16 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --training_phase_size=10 --display_freq=5000 --eval_freq=4 --alternating_phase_size=10 --discriminator_phase_size=5 --generator_phase_size=1 --vae_loss_weight=0. --kl_weight=0.0 --var_skill_length=1 --context=0 --batch_size=32 --source_model=ExpWandbLogs/MJ_111/saved_models/Model_epoch500 --target_model=ExpWandbLogs/MJ_116/saved_models/Model_epoch500 --transfer_learning_rate=1e-4 --fix_source=1 --fix_target=1 --discriminability_weight=1.0 --discriminator_weight=1. --z_transform_discriminator=1 --z_trajectory_discriminability_weight=12. --z_trajectory_discriminator_weight=1. --eval_transfer_metrics=1 --max_viz_trajs=1 --traj_length=-1 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=30 --recurrent_translation=0 --cross_domain_supervision=0 --cross_domain_supervision_loss_weight=0.1 --normalization=minmax --learning_rate=1e-4 --epochs=10000 --save_freq=100 --mlp_dropout=0.5 --regularization_weight=0. --no_mujoco=1 --identity_translation_loss_weight=0. --dataset_traj_length_limit=50 --number_of_supervised_datapoints=0 --metric_eval_freq=5000 --source_single_hand=left --target_single_hand=right --supervised_set_based_density_loss=0
