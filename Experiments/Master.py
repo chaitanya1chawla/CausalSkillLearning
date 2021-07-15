@@ -28,7 +28,10 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	elif args.data=='OldMIME':
 		dataset = MIME_DataLoader.MIME_NewDataset(args, short_traj=args.short_trajectories)
 	elif args.data=='MIME':
-		dataset = MIME_DataLoader.MIME_NewMetaDataset(args, short_traj=args.short_trajectories, traj_length_threshold=args.dataset_traj_length_limit)
+		if args.single_hand is None:
+			dataset = MIME_DataLoader.MIME_NewMetaDataset(args, short_traj=args.short_trajectories, traj_length_threshold=args.dataset_traj_length_limit)
+		else:
+			dataset = MIME_DataLoader.MIME_OneHandedDataset(args, short_traj=args.short_trajectories, traj_length_threshold=args.dataset_traj_length_limit)
 	elif args.data=='Roboturk':		
 		dataset = Roboturk_DataLoader.Roboturk_NewSegmentedDataset(args)
 	elif args.data=='OrigRoboturk':
@@ -81,9 +84,15 @@ class Master():
 			self.policy_manager = PolicyManager_Imitation(self.args.number_policies, self.dataset, self.args)
 
 		elif self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
-		
-			source_dataset = return_dataset(self.args, data=self.args.source_domain)
-			target_dataset = return_dataset(self.args, data=self.args.target_domain)
+
+			# Creating two copies of arguments, in case we're transferring between MIME left and MIME right.
+			source_args = copy.deepcopy(self.args)
+			target_args = copy.deepcopy(self.args)
+			source_args.single_hand = self.args.source_single_hand
+			target_args.single_hand = self.args.target_single_hand
+
+			source_dataset = return_dataset(source_args, data=self.args.source_domain)
+			target_dataset = return_dataset(target_args, data=self.args.target_domain)
 		
 			# If we're creating a variation in the dataset: 
 			if self.args.dataset_variation:
@@ -202,6 +211,7 @@ def parse_arguments():
 	# Data parameters. 
 	parser.add_argument('--traj_segments',dest='traj_segments',type=int,default=1) # Defines whether to use trajectory segments for pretraining or entire trajectories. Useful for baseline implementation.
 	parser.add_argument('--gripper',dest='gripper',type=int,default=1) # Whether to use gripper training in roboturk.
+	parser.add_argument('--single_hand',dest='single_hand',type=str,default=None,help='Whether to use a single hand, if so, which hand. Only for MIME dataset.')
 	parser.add_argument('--ds_freq',dest='ds_freq',type=int,default=1) # Additional downsample frequency.
 	parser.add_argument('--condition_size',dest='condition_size',type=int,default=4)
 	parser.add_argument('--smoothen', dest='smoothen',type=int,default=0) # Whether to smoothen the original dataset. 
@@ -315,6 +325,8 @@ def parse_arguments():
 	# Transfer learning domains, etc. 
 	parser.add_argument('--source_domain',dest='source_domain',type=str,help='What the source domain is in transfer.')
 	parser.add_argument('--target_domain',dest='target_domain',type=str,help='What the target domain is in transfer.')
+	parser.add_argument('--source_single_hand',dest='source_single_hand',type=str,default=None,help='Whether to use a single hand for each domain, if so, which hand. Only for MIME dataset.')
+	parser.add_argument('--target_single_hand',dest='target_single_hand',type=str,default=None,help='Whether to use a single hand for each domain, if so, which hand. Only for MIME dataset.')
 	parser.add_argument('--source_model',dest='source_model',type=str,help='What model to use for the source domain.',default=None)
 	parser.add_argument('--target_model',dest='target_model',type=str,help='What model to use for the target domain.',default=None)
 	parser.add_argument('--source_subpolicy_model',dest='source_subpolicy_model',type=str,help='What subpolicy model to use for the source domain.',default=None)
