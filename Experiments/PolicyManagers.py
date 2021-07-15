@@ -6493,6 +6493,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				traj_domain_label = domain_label
 
 			# Set z transform discriminability loss.
+			print("Embedding in update networks, right before computing z traj disc loss")
+			embed()
 			self.unweighted_z_trajectory_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['z_trajectory_discriminator_logprob'].view(-1,2), 1-traj_domain_label)
 			# self.unweighted_z_trajectory_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['z_trajectory_discriminator_logprob'].view(-1,2), 1-domain_label)
 			self.masked_z_trajectory_discriminability_loss = update_dictionary['z_trajectory_weights'].view(-1,)*self.unweighted_z_trajectory_discriminability_loss
