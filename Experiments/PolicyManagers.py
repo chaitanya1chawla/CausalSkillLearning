@@ -8640,7 +8640,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		latent_z_transformation_vector = torch.cat([prepadded_z, postpadded_z], dim=-1)
 		latent_z_transformation_weights = torch.cat([latent_b, torch.zeros(1,self.args.batch_size).to(device)])
 
-		return latent_z_transformation_vector, latent_z_transformation_weights, padded_latent_z_diff
+		return latent_z_transformation_vector, latent_z_transformation_weights, None
 
 	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False, domain=None, initialize_run=False):
 
