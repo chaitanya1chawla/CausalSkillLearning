@@ -6045,6 +6045,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Now assemble them into local variables.
 		self.N = self.source_manager.N
 
+		print("Embed in Set Z Objects")
+		embed()
+
 		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 			self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
 			self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)
