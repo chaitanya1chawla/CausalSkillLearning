@@ -5715,7 +5715,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			log_dict['Aggregate Forward GMM Density'], log_dict['Aggregate Reverse GMM Density'] = self.compute_aggregate_GMM_densities()
 			log_dict['Aggregate Chamfer Loss'] = self.compute_aggregate_chamfer_loss()
 
-		if log_dict['Domain']==1 and self.check_same_domains():
+		if log_dict['Domain']==1 and self.check_same_domains() and self.args.supervised_set_based_density_loss:
 			log_dict['forward_set_based_supervised_loss'], log_dict['backward_set_based_supervised_loss'] = viz_dict['forward_set_based_supervised_loss'], viz_dict['backward_set_based_supervised_loss']
 
 		return log_dict
