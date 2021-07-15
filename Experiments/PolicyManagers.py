@@ -6045,8 +6045,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Now assemble them into local variables.
 		self.N = self.source_manager.N
 
-		print("Embed in Set Z Objects")
-		embed()
+		# print("Embed in Set Z Objects")
+		# embed()
 
 		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 			self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
@@ -7109,9 +7109,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# tsne_embedded_zs , _ = self.get_transform(self.target_latent_zs)
 		# densne_embedded_zs , _ = self.get_transform(self.target_latent_zs, projection='densne')
 
-		if domain==1:
-			print("Embedding in construct density embeddings")
-			embed()
+		# if domain==1:
+		# 	print("Embedding in construct density embeddings")
+		# 	embed()
 
 		tsne_image = self.plot_density_embedding(tsne_embedded_zs, colors, "{0} Density Coded TSNE Embeddings.".format(prefix))
 		densne_image = self.plot_density_embedding(densne_embedded_zs, colors, "{0} Density Coded DENSNE Embeddings.".format(prefix))
@@ -9205,10 +9205,13 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				# update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['translated_latent_z'], update_dictionary['cross_domain_latent_z'], differentiable_outputs=True)
 				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'], differentiable_outputs=True)
 
+			print("Embed in JFE Run iter")
+			embed()
+
 			#################################################
 			## (5) Compute and apply gradient updates. 			
-			#################################################
-			
+			#################################################	
+
 			self.update_networks(domain, policy_manager, update_dictionary)			
 
 			#################################################
