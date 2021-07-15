@@ -34,7 +34,7 @@ flags.DEFINE_integer('ngpus', 1, 'Number of gpus per task')
 
 flags.DEFINE_string('name', '', 'Job name')
 flags.DEFINE_enum('partition', 'learnfair', ['dev', 'priority','uninterrupted','learnfair'], 'Cluster partition')
-flags.DEFINE_string('comment', 'for ICML deadline in 2020.', 'Comment')
+flags.DEFINE_string('comment', 'for Tanmays FAIR Internship 2021.', 'Comment')
 flags.DEFINE_string('time', '72:00:00', 'Time for which the job should run')
 
 flags.DEFINE_string('setup', '/private/home/tanmayshankar/Research/Code/Setup.bash', 'Setup script that will be run before the command')
