@@ -8604,32 +8604,43 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
 			self.z_trajectory_discriminator.load_state_dict(self.load_object['z_trajectory_discriminator'])
 
+	# def get_z_transformation(self, latent_z, latent_b):
+
+	# 	# First compute the differences.
+	# 	# No torch diff op, so do it manually. 
+	# 	if self.args.z_transform_or_tuple:
+	# 		# Actually compute difference.
+	# 		latent_z_diff = latent_z[1:] - latent_z[:-1]
+	# 	else:
+	# 		# Instead of computing differences, we're going to copy over the subsequent / succeeding z's into the diff vector, to form a tuple.
+	# 		latent_z_diff = latent_z[1:]
+
+	# 	# Better way to compute weights is just roll latent_b		
+	# 	with torch.no_grad():
+	# 		latent_z_transformation_weights = latent_b.roll(-1,dims=0)
+	# 		# Zero out last weight, to ignore (z_t, 0) tuple at the end. 
+	# 		if self.args.ignore_last_z_transform:
+	# 			latent_z_transformation_weights[-1] = 0
+
+	# 	# Concatenate 0's to the latent_z_diff. 
+	# 	padded_latent_z_diff = torch.cat([latent_z_diff, torch.zeros((1,self.args.batch_size,self.args.z_dimensions)).to(device)],dim=0)
+
+	# 	# Now concatenate the z's themselves... 
+	# 	latent_z_transformation_vector = torch.cat([padded_latent_z_diff, latent_z], dim=-1)	
+
+	# 	return latent_z_transformation_vector, latent_z_transformation_weights, padded_latent_z_diff
+	# 	# return latent_z_transformation_vector.view(-1,2*self.args.z_dimensions), latent_z_transformation_weights.view(-1,1)
+
 	def get_z_transformation(self, latent_z, latent_b):
 
-		# First compute the differences.
-		# No torch diff op, so do it manually. 
-		if self.args.z_transform_or_tuple:
-			# Actually compute difference.
-			latent_z_diff = latent_z[1:] - latent_z[:-1]
-		else:
-			# Instead of computing differences, we're going to copy over the subsequent / succeeding z's into the diff vector, to form a tuple.
-			latent_z_diff = latent_z[1:]
-
-		# Better way to compute weights is just roll latent_b		
-		with torch.no_grad():
-			latent_z_transformation_weights = latent_b.roll(-1,dims=0)
-			# Zero out last weight, to ignore (z_t, 0) tuple at the end. 
-			if self.args.ignore_last_z_transform:
-				latent_z_transformation_weights[-1] = 0
-
-		# Concatenate 0's to the latent_z_diff. 
-		padded_latent_z_diff = torch.cat([latent_z_diff, torch.zeros((1,self.args.batch_size,self.args.z_dimensions)).to(device)],dim=0)
-
-		# Now concatenate the z's themselves... 
-		latent_z_transformation_vector = torch.cat([padded_latent_z_diff, latent_z], dim=-1)	
+		# New transformation... 
+		prepadded_z = torch.cat([torch.zeros((1,self.args.batch_size,self.args.z_dimensions)).to(device), latent_z])
+		postpadded_z = torch.cat([latent_z, torch.zeros((1,self.args.batch_size,self.args.z_dimensions)).to(device)])
+		
+		latent_z_transformation_vector = torch.cat([prepadded_z, postpadded_z], dim=-1)
+		latent_z_transformation_weight = torch.cat([latent_b, torch.zeros(1,self.args.batch_size).to(device)])
 
 		return latent_z_transformation_vector, latent_z_transformation_weights, padded_latent_z_diff
-		# return latent_z_transformation_vector.view(-1,2*self.args.z_dimensions), latent_z_transformation_weights.view(-1,1)
 
 	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False, domain=None, initialize_run=False):
 
@@ -9205,8 +9216,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				# update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['translated_latent_z'], update_dictionary['cross_domain_latent_z'], differentiable_outputs=True)
 				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'], differentiable_outputs=True)
 
-			print("Embed in JFE Run iter")
-			embed()
+			# print("Embed in JFE Run iter")
+			# embed()
 
 			#################################################
 			## (5) Compute and apply gradient updates. 			
