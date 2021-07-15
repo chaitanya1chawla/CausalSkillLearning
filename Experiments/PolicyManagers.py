@@ -7106,6 +7106,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# tsne_embedded_zs , _ = self.get_transform(self.target_latent_zs)
 		# densne_embedded_zs , _ = self.get_transform(self.target_latent_zs, projection='densne')
 
+		if domain==1:
+			print("Embedding in construct density embeddings")
+			embed()
+
 		tsne_image = self.plot_density_embedding(tsne_embedded_zs, colors, "{0} Density Coded TSNE Embeddings.".format(prefix))
 		densne_image = self.plot_density_embedding(densne_embedded_zs, colors, "{0} Density Coded DENSNE Embeddings.".format(prefix))
 		pca_image = self.plot_density_embedding(pca_embedded_zs, colors, "{0} Density Coded PCA Embeddings.".format(prefix))
