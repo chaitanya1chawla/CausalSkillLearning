@@ -5715,7 +5715,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			log_dict['Aggregate Forward GMM Density'], log_dict['Aggregate Reverse GMM Density'] = self.compute_aggregate_GMM_densities()
 			log_dict['Aggregate Chamfer Loss'] = self.compute_aggregate_chamfer_loss()
 
-		if log_dict['Domain']==1 and self.check_same_domains():
+		if log_dict['Domain']==1 and self.check_same_domains() and self.args.supervised_set_based_density_loss:
 			log_dict['forward_set_based_supervised_loss'], log_dict['backward_set_based_supervised_loss'] = viz_dict['forward_set_based_supervised_loss'], viz_dict['backward_set_based_supervised_loss']
 
 		return log_dict
@@ -6044,6 +6044,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				
 		# Now assemble them into local variables.
 		self.N = self.source_manager.N
+
+		# print("Embed in Set Z Objects")
+		# embed()
 
 		if self.args.setting in ['jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 			self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
@@ -6487,9 +6490,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				update_dictionary['z_trajectory_weights'] = torch.ones(self.args.batch_size).to(device).float()
 			
 			elif self.args.z_transform_discriminator:
-				traj_domain_label = domain_label
+				# traj_domain_label = domain_label
+				# domain*torch.ones(update_dictionary['discriminator_logprob'].shape[0]*update_dictionary['discriminator_logprob'].shape[1]).to(device).long()
+				traj_domain_label = domain*torch.ones(update_dictionary['z_trajectory_discriminator_logprob'].shape[0],update_dictionary['z_trajectory_discriminator_logprob'].shape[1]).view(-1,).to(device).long()
 
 			# Set z transform discriminability loss.
+			# print("Embedding in update networks, right before computing z traj disc loss")
+			# embed()
+
 			self.unweighted_z_trajectory_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['z_trajectory_discriminator_logprob'].view(-1,2), 1-traj_domain_label)
 			# self.unweighted_z_trajectory_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['z_trajectory_discriminator_logprob'].view(-1,2), 1-domain_label)
 			self.masked_z_trajectory_discriminability_loss = update_dictionary['z_trajectory_weights'].view(-1,)*self.unweighted_z_trajectory_discriminability_loss
@@ -7105,6 +7113,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# tsne_embedded_zs , _ = self.get_transform(self.target_latent_zs)
 		# densne_embedded_zs , _ = self.get_transform(self.target_latent_zs, projection='densne')
+
+		# if domain==1:
+		# 	print("Embedding in construct density embeddings")
+		# 	embed()
 
 		tsne_image = self.plot_density_embedding(tsne_embedded_zs, colors, "{0} Density Coded TSNE Embeddings.".format(prefix))
 		densne_image = self.plot_density_embedding(densne_embedded_zs, colors, "{0} Density Coded DENSNE Embeddings.".format(prefix))
@@ -8597,32 +8609,43 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
 			self.z_trajectory_discriminator.load_state_dict(self.load_object['z_trajectory_discriminator'])
 
+	# def get_z_transformation(self, latent_z, latent_b):
+
+	# 	# First compute the differences.
+	# 	# No torch diff op, so do it manually. 
+	# 	if self.args.z_transform_or_tuple:
+	# 		# Actually compute difference.
+	# 		latent_z_diff = latent_z[1:] - latent_z[:-1]
+	# 	else:
+	# 		# Instead of computing differences, we're going to copy over the subsequent / succeeding z's into the diff vector, to form a tuple.
+	# 		latent_z_diff = latent_z[1:]
+
+	# 	# Better way to compute weights is just roll latent_b		
+	# 	with torch.no_grad():
+	# 		latent_z_transformation_weights = latent_b.roll(-1,dims=0)
+	# 		# Zero out last weight, to ignore (z_t, 0) tuple at the end. 
+	# 		if self.args.ignore_last_z_transform:
+	# 			latent_z_transformation_weights[-1] = 0
+
+	# 	# Concatenate 0's to the latent_z_diff. 
+	# 	padded_latent_z_diff = torch.cat([latent_z_diff, torch.zeros((1,self.args.batch_size,self.args.z_dimensions)).to(device)],dim=0)
+
+	# 	# Now concatenate the z's themselves... 
+	# 	latent_z_transformation_vector = torch.cat([padded_latent_z_diff, latent_z], dim=-1)	
+
+	# 	return latent_z_transformation_vector, latent_z_transformation_weights, padded_latent_z_diff
+	# 	# return latent_z_transformation_vector.view(-1,2*self.args.z_dimensions), latent_z_transformation_weights.view(-1,1)
+
 	def get_z_transformation(self, latent_z, latent_b):
 
-		# First compute the differences.
-		# No torch diff op, so do it manually. 
-		if self.args.z_transform_or_tuple:
-			# Actually compute difference.
-			latent_z_diff = latent_z[1:] - latent_z[:-1]
-		else:
-			# Instead of computing differences, we're going to copy over the subsequent / succeeding z's into the diff vector, to form a tuple.
-			latent_z_diff = latent_z[1:]
+		# New transformation... 
+		prepadded_z = torch.cat([torch.zeros((1,self.args.batch_size,self.args.z_dimensions)).to(device), latent_z])
+		postpadded_z = torch.cat([latent_z, torch.zeros((1,self.args.batch_size,self.args.z_dimensions)).to(device)])
+		
+		latent_z_transformation_vector = torch.cat([prepadded_z, postpadded_z], dim=-1)
+		latent_z_transformation_weights = torch.cat([latent_b, torch.zeros(1,self.args.batch_size).to(device)])
 
-		# Better way to compute weights is just roll latent_b		
-		with torch.no_grad():
-			latent_z_transformation_weights = latent_b.roll(-1,dims=0)
-			# Zero out last weight, to ignore (z_t, 0) tuple at the end. 
-			if self.args.ignore_last_z_transform:
-				latent_z_transformation_weights[-1] = 0
-
-		# Concatenate 0's to the latent_z_diff. 
-		padded_latent_z_diff = torch.cat([latent_z_diff, torch.zeros((1,self.args.batch_size,self.args.z_dimensions)).to(device)],dim=0)
-
-		# Now concatenate the z's themselves... 
-		latent_z_transformation_vector = torch.cat([padded_latent_z_diff, latent_z], dim=-1)	
-
-		return latent_z_transformation_vector, latent_z_transformation_weights, padded_latent_z_diff
-		# return latent_z_transformation_vector.view(-1,2*self.args.z_dimensions), latent_z_transformation_weights.view(-1,1)
+		return latent_z_transformation_vector, latent_z_transformation_weights, None
 
 	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False, domain=None, initialize_run=False):
 
@@ -9198,10 +9221,13 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				# update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['translated_latent_z'], update_dictionary['cross_domain_latent_z'], differentiable_outputs=True)
 				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'], differentiable_outputs=True)
 
+			# print("Embed in JFE Run iter")
+			# embed()
+
 			#################################################
 			## (5) Compute and apply gradient updates. 			
-			#################################################
-			
+			#################################################	
+
 			self.update_networks(domain, policy_manager, update_dictionary)			
 
 			#################################################
