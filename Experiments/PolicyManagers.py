@@ -6490,13 +6490,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				update_dictionary['z_trajectory_weights'] = torch.ones(self.args.batch_size).to(device).float()
 			
 			elif self.args.z_transform_discriminator:
-				traj_domain_label = domain_label
+				# traj_domain_label = domain_label
 				# domain*torch.ones(update_dictionary['discriminator_logprob'].shape[0]*update_dictionary['discriminator_logprob'].shape[1]).to(device).long()
-				traj_domain_label = domain*torch.ones_like(update_dictionary['z_trajectory_discriminator_logprob']).view(-1,2)
+				traj_domain_label = domain*torch.ones(update_dictionary['z_trajectory_discriminator_logprob'].shape[0],update_dictionary['z_trajectory_discriminator_logprob'].shape[1]).view(-1,).to(device).long()
 
 			# Set z transform discriminability loss.
-			print("Embedding in update networks, right before computing z traj disc loss")
-			embed()
+			# print("Embedding in update networks, right before computing z traj disc loss")
+			# embed()
 
 			self.unweighted_z_trajectory_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['z_trajectory_discriminator_logprob'].view(-1,2), 1-traj_domain_label)
 			# self.unweighted_z_trajectory_discriminability_loss = self.negative_log_likelihood_loss_function(update_dictionary['z_trajectory_discriminator_logprob'].view(-1,2), 1-domain_label)
