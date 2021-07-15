@@ -8638,7 +8638,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		postpadded_z = torch.cat([latent_z, torch.zeros((1,self.args.batch_size,self.args.z_dimensions)).to(device)])
 		
 		latent_z_transformation_vector = torch.cat([prepadded_z, postpadded_z], dim=-1)
-		latent_z_transformation_weight = torch.cat([latent_b, torch.zeros(1,self.args.batch_size).to(device)])
+		latent_z_transformation_weights = torch.cat([latent_b, torch.zeros(1,self.args.batch_size).to(device)])
 
 		return latent_z_transformation_vector, latent_z_transformation_weights, padded_latent_z_diff
 
