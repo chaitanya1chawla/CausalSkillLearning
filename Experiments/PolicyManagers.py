@@ -5694,6 +5694,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Remove nested gif objects. 
 			del self.source_manager.ground_truth_gif, self.source_manager.rollout_gif, self.target_manager.ground_truth_gif, self.target_manager.rollout_gif
 
+	def check_same_domains(self):
+
+		if (self.args.source_domain==self.args.target_domain) and (self.args.source_domain not in ['MIME']):
+			return True
+		if (self.args.source_domain==self.args.target_domain) and (self.args.source_domain in ['MIME']) and (self.args.source_single_hand==self.args.target_single_hand):
+			return True
+		return False
+
 	def log_density_and_chamfer_metrics(self, counter, log_dict, viz_dict=None):
 
 		##################################################
@@ -5703,11 +5711,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		if counter%self.args.display_freq==0:
 			log_dict = self.construct_density_embeddings(log_dict)		
 
-		if self.args.source_domain==self.args.target_domain and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:		
+		if self.check_same_domains() and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:		
 			log_dict['Aggregate Forward GMM Density'], log_dict['Aggregate Reverse GMM Density'] = self.compute_aggregate_GMM_densities()
 			log_dict['Aggregate Chamfer Loss'] = self.compute_aggregate_chamfer_loss()
 
-		if log_dict['Domain']==1:
+		if log_dict['Domain']==1 and self.check_same_domains():
 			log_dict['forward_set_based_supervised_loss'], log_dict['backward_set_based_supervised_loss'] = viz_dict['forward_set_based_supervised_loss'], viz_dict['backward_set_based_supervised_loss']
 
 		return log_dict
@@ -5903,7 +5911,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			log_dict['Source Trajectory Reconstruction Error'], log_dict['Target Trajectory Reconstruction Error'] = \
 				self.source_manager.avg_reconstruction_error, self.target_manager.avg_reconstruction_error
 
-			if self.args.source_domain==self.args.target_domain and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:		
+			if self.check_same_domains() and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:
 				pass
 				# # self.evaluate_correspondence_metrics(computed_sets=False)
 				
@@ -9186,7 +9194,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['latent_z'], update_dictionary['cross_domain_latent_z'])
 
 			# Need to feed translated_latent_z's rather than the latent_z.. 
-			if domain==1:
+			if domain==1 and self.args.supervised_set_based_density_loss:
 				# update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['translated_latent_z'], update_dictionary['cross_domain_latent_z'], differentiable_outputs=True)
 				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'], differentiable_outputs=True)
 
@@ -9210,7 +9218,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			if self.args.task_discriminability:
 				viz_dict['task_discriminator_probs'] = update_dictionary['task_discriminator_prob'][...,domain].detach().cpu().numpy().mean()
 
-			if domain==1:
+			if domain==1 and self.args.supervised_set_based_density_loss:
 				viz_dict['forward_set_based_supervised_loss'], viz_dict['backward_set_based_supervised_loss'] = update_dictionary['forward_set_based_supervised_loss'].mean().detach().cpu().numpy(), update_dictionary['backward_set_based_supervised_loss'].mean().detach().cpu().numpy()
 
 			if not(skip_viz):
