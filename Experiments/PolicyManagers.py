@@ -10249,6 +10249,9 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 	def construct_z_tuples_from_z_sets(self, z_set, cummulative_number_zs):
 
+		print("embedding in construct tuples frm set")
+		embed()
+
 		# Making this a fucntion so that we can use for source and target domains.
 		z_trajectories = [z_set[low:high] for low, high in zip(cummulative_number_zs, cummulative_number_zs[1:])]
 		z_tuples = None
