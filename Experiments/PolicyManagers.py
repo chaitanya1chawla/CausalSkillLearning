@@ -10258,8 +10258,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			unpadded_z_tuple_list = torch.cat([v[i:i+2].view(-1,2*self.args.z_dimensions) for i in range(v.shape[0]-1)])
 
 			# Also pad this set of z tuples with (0, z1) and (zn, 0), so that we also encourage similarity of initial and terminal z distributions. 
-			pretup =  torch.cat([torch.zeros_like(z_tuple_list[0,:self.args.z_dimensions]).to(device), z_tuple_list[0,:self.args.z_dimensions]]).view(1,-1)
-			posttup = torch.cat([z_tuple_list[-1, self.args.z_dimensions:],torch.zeros_like(z_tuple_list[-1,self.args.z_dimensions:]).to(device)]).view(1,-1)
+			pretup =  torch.cat([torch.zeros_like(unpadded_z_tuple_list[0,:self.args.z_dimensions]).to(device), unpadded_z_tuple_list[0,:self.args.z_dimensions]]).view(1,-1)
+			posttup = torch.cat([unpadded_z_tuple_list[-1, self.args.z_dimensions:],torch.zeros_like(unpadded_z_tuple_list[-1,self.args.z_dimensions:]).to(device)]).view(1,-1)
 
 			z_tuple_list = torch.cat([pretup, unpadded_z_tuple_list, posttup])
 
