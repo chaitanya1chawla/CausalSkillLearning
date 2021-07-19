@@ -9182,6 +9182,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			else:
 				viz_dict = {}
 
+			print("Embed in run iter of JFE")
+			embed()
+
 			#################################################
 			## (4c) If we are using cross domain supervision.
 			#################################################
@@ -9205,6 +9208,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 				# Feed in the source latent z's into the appropriate task discriminatory (based on batch task ID, source_input_dict['batch_task_id'] ). 
 				update_dictionary['task_discriminator_logprob'], update_dictionary['task_discriminator_prob'] = self.task_discriminators[source_input_dict['sample_task_id']].get_probabilities(update_dictionary['translated_latent_z'])
+
 
 
 			#################################################
