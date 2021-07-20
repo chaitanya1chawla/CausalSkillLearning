@@ -9100,10 +9100,10 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				traj = input_dict['sample_traj'][indices]
 				unnorm_traj = (traj*self.source_manager.norm_denom_value) + self.source_manager.norm_sub_value		
 
-				print("embedding in visualize low ll skillss")
-				embed()
+				# print("embedding in visualize low ll skillss")
+				# embed()
 				# Now visualize.. 
-				self.visualizer.visualize_joint_trajectory(unnorm_traj, gif_path="LowlikelihoodTraj", gif_name="Unaligned_Traj{0}.npy".format(self.global_traj_counter), return_and_save=True)
+				self.visualizer.visualize_joint_trajectory(unnorm_traj, gif_path="LowlikelihoodTraj", gif_name="Unaligned_Traj{0}.gif".format(self.global_traj_counter), return_and_save=True)
 
 				self.global_traj_counter+=1
 
