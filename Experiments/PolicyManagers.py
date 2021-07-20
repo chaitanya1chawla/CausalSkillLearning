@@ -7114,9 +7114,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# tsne_embedded_zs , _ = self.get_transform(self.target_latent_zs)
 		# densne_embedded_zs , _ = self.get_transform(self.target_latent_zs, projection='densne')
 
-		if domain==1:
-			print("Embedding in construct density embeddings")
-			embed()
+		# if domain==1:
+		# 	print("Embedding in construct density embeddings")
+		# 	embed()
 
 		tsne_image = self.plot_density_embedding(tsne_embedded_zs, colors, "{0} Density Coded TSNE Embeddings.".format(prefix))
 		densne_image = self.plot_density_embedding(densne_embedded_zs, colors, "{0} Density Coded DENSNE Embeddings.".format(prefix))
@@ -9182,8 +9182,11 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			else:
 				viz_dict = {}
 
-			print("Embed in run iter of JFE")
-			embed()
+			if domain==0:
+				lps = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['latent_z'])
+				if lps.min()<-400:
+					print("Embed in run iter of")
+					embed()
 
 			#################################################
 			## (4c) If we are using cross domain supervision.
