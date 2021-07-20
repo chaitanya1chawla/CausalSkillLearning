@@ -6805,7 +6805,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				# 3) Encode trajectory. 
 				source_input_dict, source_var_dict, _ = self.encode_decode_trajectory(self.source_manager, i)
 
-				# 4) Get corresponding target trajectrory. 
+				# 4) Get corresponding target trajectory. 
 				# 5) Encode target trajectory as sequence of target z's. 
 				target_input_dict, target_var_dict, _ = self.encode_decode_trajectory(self.target_manager, i)
 
@@ -8251,6 +8251,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.args.fix_source = 1
 		self.args.fix_target = 1
 		self.set_trans_z = 0
+		self.global_traj_counter = 0
 
 		# Set source noise to very close to 0...
 		# self.source_args.epsilon_from = 0.02
@@ -9083,6 +9084,28 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# 6) Feed back as penalty
 		return gradient_penalty
 
+	def visualize_low_likelihood_skills(self, domain, update_dictionary, input_dict): 
+	
+		self.global_traj_counter_max = 10
+
+		if domain==0 and self.global_traj_counter<self.global_traj_counter_max:
+			lps = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['latent_z'])
+			if lps.min()<-400:	
+
+				# Get z's for which it's low likelihood. 
+				tindices = torch.where(lps<-400)
+				indices = (tindices[0].detach().cpu().numpy(), tindices[1].detach().cpu().numpy())
+
+				# Just directly get the trajectory.
+				traj = input_dict['sample_traj'][indices]
+				unnorm_traj = (traj*self.source_manager.norm_denom_value) + self.source_manager.norm_sub_value		
+
+				# Now visualize.. 
+				self.visualizer.visualize_joint_trajectory(unnorm_traj, gif_path="LowlikelihoodTraj", gif_name="Unaligned_Traj{0}.npy".format(self.global_traj_counter), return_and_save=True)
+
+				self.global_traj_counter+=1
+
+
 	def run_iteration(self, counter, i, domain=None, skip_viz=False):
 		
 		#################################################
@@ -9182,11 +9205,14 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			else:
 				viz_dict = {}
 
-			if domain==0:
-				lps = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['latent_z'])
-				if lps.min()<-400:
-					print("Embed in run iter of")
-					embed()
+			# if domain==0:
+			# 	lps = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['latent_z'])
+			# 	if lps.min()<-400:
+			# 		print("Embed in run iter of")
+			# 		embed()
+
+			####
+			self.visualize_low_likelihood_skills(domain, update_dictionary, source_input_dict)
 
 			#################################################
 			## (4c) If we are using cross domain supervision.
