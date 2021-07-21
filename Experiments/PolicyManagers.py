@@ -531,6 +531,8 @@ class PolicyManager_BaseClass():
 		# print("Embedding in get robot visuals.")
 		# embed()
 
+		print(trajectory)
+		
 		print("Rollout length:", trajectory.shape[0])	
 
 		trajectory_rollout = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq)
