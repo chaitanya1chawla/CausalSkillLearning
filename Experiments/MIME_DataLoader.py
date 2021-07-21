@@ -134,9 +134,12 @@ class MIME_NewDataset(Dataset):
 		
 		self.file = "Data_List.npy"
 		self.key = 'demo'
+		
 		if isinstance(self, MIME_NewMetaDataset):
 			# This is not an elif condition, because the first always evaluates to true...		
-			self.file = "MIMEDataArray.npy"
+			# self.file = "MIMEDataArray.npy"
+			# Just load the EE augmented version anyway.. just 80Mb bigger
+			self.file = "MIMEDataArray_EEAugmented.npy"
 		
 		self.original_data_list = np.load(os.path.join(self.dataset_directory, self.file),allow_pickle=True)			
 		self.original_dataset_length = len(self.original_data_list)
@@ -300,6 +303,7 @@ class MIME_OneHandedDataset(MIME_NewMetaDataset):
 		self.dataset_trajectory_lengths = np.array(self.onehanded_dataset_trajectory_lengths)		
 		self.data_list = self.onehanded_data_list
 		self.data_list_array = np.array(self.data_list)
+
 class MIME_Dataloader_Tester(unittest.TestCase):
 	
 	def test_MIMEdataloader(self):

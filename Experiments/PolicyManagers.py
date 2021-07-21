@@ -1886,7 +1886,10 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			for x in range(self.args.batch_size):
 
 				# Select the trajectory for each instance in the batch. 
-				traj = data_element[x]['demo']
+				if self.args.ee_trajectories:
+					traj = data_element[x]['endeffector_trajectory']
+				else:
+					traj = data_element[x]['demo']
 
 				# Pick start and end.               
 
@@ -1909,9 +1912,15 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 					end_timepoint = start_timepoint + self.current_traj_len
 
-					batch_trajectory[x] = data_element[x]['demo'][start_timepoint:end_timepoint]
+					if self.args.ee_trajectories:
+						batch_trajectory[x] = data_element[x]['endeffector_trajectory'][start_timepoint:end_timepoint]
+					else:
+						batch_trajectory[x] = data_element[x]['demo'][start_timepoint:end_timepoint]
 					if not(self.args.gripper):
-						batch_trajectory[x] = data_element['demo'][start_timepoint:end_timepoint,:-1]
+						if self.args.ee_trajectories:
+							batch_trajectory[x] = data_element['endeffector_trajectory'][start_timepoint:end_timepoint,:-1]
+						else:
+							batch_trajectory[x] = data_element['demo'][start_timepoint:end_timepoint,:-1]
 
 			# If normalization is set to some value.
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
@@ -3966,7 +3975,11 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			maxl = 0
 			
 			for x in range(self.args.batch_size):
-				self.batch_trajectory_lengths[x] = data_element[x]['demo'].shape[0]
+
+				if self.args.ee_trajectories:
+					self.batch_trajectory_lengths[x] = data_element[x]['endeffector_trajectory'].shape[0]
+				else:
+					self.batch_trajectory_lengths[x] = data_element[x]['demo'].shape[0]
 				maxl = max(maxl,self.batch_trajectory_lengths[x])
 				minl = min(minl,self.batch_trajectory_lengths[x])
 			# print("For this iteration:",maxl-minl,minl,maxl)
@@ -3977,7 +3990,10 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			batch_trajectory = np.zeros((self.args.batch_size, self.max_batch_traj_length, self.state_size))
 			# Copy over data elements into batch_trajectory array.
 			for x in range(self.args.batch_size):
-				batch_trajectory[x,:self.batch_trajectory_lengths[x]] = data_element[x]['demo']
+				if self.args.ee_trajectories:	
+					batch_trajectory[x,:self.batch_trajectory_lengths[x]] = data_element[x]['endeffector_trajectory']
+				else:					
+					batch_trajectory[x,:self.batch_trajectory_lengths[x]] = data_element[x]['demo']
 			
 			# If normalization is set to some value.
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
@@ -8610,33 +8626,6 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
 			self.z_trajectory_discriminator.load_state_dict(self.load_object['z_trajectory_discriminator'])
 
-	# def get_z_transformation(self, latent_z, latent_b):
-
-	# 	# First compute the differences.
-	# 	# No torch diff op, so do it manually. 
-	# 	if self.args.z_transform_or_tuple:
-	# 		# Actually compute difference.
-	# 		latent_z_diff = latent_z[1:] - latent_z[:-1]
-	# 	else:
-	# 		# Instead of computing differences, we're going to copy over the subsequent / succeeding z's into the diff vector, to form a tuple.
-	# 		latent_z_diff = latent_z[1:]
-
-	# 	# Better way to compute weights is just roll latent_b		
-	# 	with torch.no_grad():
-	# 		latent_z_transformation_weights = latent_b.roll(-1,dims=0)
-	# 		# Zero out last weight, to ignore (z_t, 0) tuple at the end. 
-	# 		if self.args.ignore_last_z_transform:
-	# 			latent_z_transformation_weights[-1] = 0
-
-	# 	# Concatenate 0's to the latent_z_diff. 
-	# 	padded_latent_z_diff = torch.cat([latent_z_diff, torch.zeros((1,self.args.batch_size,self.args.z_dimensions)).to(device)],dim=0)
-
-	# 	# Now concatenate the z's themselves... 
-	# 	latent_z_transformation_vector = torch.cat([padded_latent_z_diff, latent_z], dim=-1)	
-
-	# 	return latent_z_transformation_vector, latent_z_transformation_weights, padded_latent_z_diff
-	# 	# return latent_z_transformation_vector.view(-1,2*self.args.z_dimensions), latent_z_transformation_weights.view(-1,1)
-
 	def get_z_transformation(self, latent_z, latent_b):
 
 		# New transformation... 
@@ -9098,7 +9087,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 				# Just directly get the trajectory.
 				traj = input_dict['sample_traj'][indices]
-				unnorm_traj = (traj*self.source_manager.norm_denom_value) + self.source_manager.norm_sub_value		
+				unnorm_traj = (traj*self.source_manager.norm_denom_value) + self.source_manager.norm_sub_value
 
 				# print("embedding in visualize low ll skillss")
 				# embed()
@@ -9106,7 +9095,6 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				self.visualizer.visualize_joint_trajectory(unnorm_traj, gif_path="LowlikelihoodTraj", gif_name="Unaligned_Traj{0}.gif".format(self.global_traj_counter), return_and_save=True)
 
 				self.global_traj_counter+=1
-
 
 	def run_iteration(self, counter, i, domain=None, skip_viz=False):
 		
@@ -9151,6 +9139,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		source_input_dict, source_var_dict, source_eval_dict = self.encode_decode_trajectory(policy_manager, i, domain=domain)
 		update_dictionary['subpolicy_inputs'], update_dictionary['latent_z'], update_dictionary['loglikelihood'], update_dictionary['kl_divergence'] = \
 			source_eval_dict['subpolicy_inputs'], source_var_dict['latent_z_indices'], source_eval_dict['learnt_subpolicy_loglikelihoods'], source_var_dict['kl_divergence']
+		
 		if self.args.task_discriminability:
 			update_dictionary['sample_task_id'] = source_input_dict['sample_task_id']
 
@@ -9315,24 +9304,24 @@ class PolicyManager_JointFixEmbedCycleTransfer(PolicyManager_JointFixEmbedTransf
 		# self.target_z_discriminator = DiscreteMLP(self.args.z_dimensions, self.hidden_size, 2, args=self.args).to(device)
 		
 		# For now, don't use discriminators.... 
-		# # Create lists of discriminators. 
-		# # self.discriminator_list = [self.source_discriminator, self.target_discriminator]
-		# self.z_discriminator_list = [self.source_z_discriminator, self.target_z_discriminator]
+		# Create lists of discriminators. 
+		# self.discriminator_list = [self.source_discriminator, self.target_discriminator]
+		self.z_discriminator_list = [self.source_z_discriminator, self.target_z_discriminator]
 
-		# if self.args.z_transform_discriminator:
-		# 	self.source_z_trajectory_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
-		# 	self.target_z_trajectory_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
+		if self.args.z_transform_discriminator:
+			self.source_z_trajectory_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
+			self.target_z_trajectory_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
 
-		# 	# self.z_trajectory_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
-		# 	self.z_trajectory_discriminator_list = [self.source_z_trajectory_discriminator, self.target_z_trajectory_discriminator]
+			# self.z_trajectory_discriminator = DiscreteMLP(2*self.input_size, self.hidden_size, self.output_size, args=self.args).to(device)
+			self.z_trajectory_discriminator_list = [self.source_z_trajectory_discriminator, self.target_z_trajectory_discriminator]
 
-		# elif self.args.z_trajectory_discriminator:
+		elif self.args.z_trajectory_discriminator:
 			
-		# 	self.source_z_trajectory_discriminator = EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size, args=self.args).to(device)
-		# 	self.target_z_trajectory_discriminator = EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size, args=self.args).to(device)
+			self.source_z_trajectory_discriminator = EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size, args=self.args).to(device)
+			self.target_z_trajectory_discriminator = EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size, args=self.args).to(device)
 
-		# 	# self.z_trajectory_discriminator = EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size, args=self.args).to(device)
-		# 	self.z_trajectory_discriminator_list = [self.source_z_trajectory_discriminator, self.target_z_trajectory_discriminator]
+			# self.z_trajectory_discriminator = EncoderNetwork(self.input_size, self.hidden_size, self.output_size, batch_size=self.args.batch_size, args=self.args).to(device)
+			self.z_trajectory_discriminator_list = [self.source_z_trajectory_discriminator, self.target_z_trajectory_discriminator]
 
 	def create_training_ops(self):
 
@@ -9351,17 +9340,17 @@ class PolicyManager_JointFixEmbedCycleTransfer(PolicyManager_JointFixEmbedTransf
 
 		# For now, don't use discriminators.... 
 		
-		# # Set discriminator parameter list. 
-		# self.discriminator_parameter_list = list(self.source_z_discriminator.parameters()) + list(self.target_z_discriminator.parameters())
-		# # if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
-		# 	self.discriminator_parameter_list += list(self.source_z_trajectory_discriminator.parameters()) + list(self.target_z_trajectory_discriminator.parameters())
+		# Set discriminator parameter list. 
+		self.discriminator_parameter_list = list(self.source_z_discriminator.parameters()) + list(self.target_z_discriminator.parameters())
+		if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
+			self.discriminator_parameter_list += list(self.source_z_trajectory_discriminator.parameters()) + list(self.target_z_trajectory_discriminator.parameters())
 
-		# # self.discriminator_parameter_list = list(self.discriminator_network.parameters())
-		# # if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
-		# # 	self.discriminator_parameter_list += list(self.z_trajectory_discriminator.parameters())
+		# self.discriminator_parameter_list = list(self.discriminator_network.parameters())
+		# if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
+		# 	self.discriminator_parameter_list += list(self.z_trajectory_discriminator.parameters())
 
-		# # Create common optimizer for source, target, and discriminator networks. 
-		# self.discriminator_optimizer = torch.optim.Adam(self.discriminator_parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
+		# Create common optimizer for source, target, and discriminator networks. 
+		self.discriminator_optimizer = torch.optim.Adam(self.discriminator_parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
 
 	def save_all_models(self, suffix):
 
@@ -9375,13 +9364,13 @@ class PolicyManager_JointFixEmbedCycleTransfer(PolicyManager_JointFixEmbedTransf
 		self.save_object['forward_translation_model'] = self.forward_translation_model.state_dict()
 		self.save_object['backward_translation_model'] = self.backward_translation_model.state_dict()
 
-		# self.save_object['source_z_discriminator'] = self.source_z_discriminator.state_dict()
-		# self.save_object['target_z_discriminator'] = self.target_z_discriminator.state_dict()
+		self.save_object['source_z_discriminator'] = self.source_z_discriminator.state_dict()
+		self.save_object['target_z_discriminator'] = self.target_z_discriminator.state_dict()
 		
 		if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:		
-			pass
-			# self.save_object['source_z_trajectory_discriminator'] = self.z_trajectory_discriminator.state_dict()
-			# self.save_object['target_z_trajectory_discriminator'] = self.z_trajectory_discriminator.state_dict()
+			# pass
+			self.save_object['source_z_trajectory_discriminator'] = self.z_trajectory_discriminator.state_dict()
+			self.save_object['target_z_trajectory_discriminator'] = self.z_trajectory_discriminator.state_dict()
 
 		# Overwrite the save from super. 
 		torch.save(self.save_object,os.path.join(self.savedir,"Model_"+suffix))
@@ -9393,13 +9382,13 @@ class PolicyManager_JointFixEmbedCycleTransfer(PolicyManager_JointFixEmbedTransf
 		self.forward_translation_model.load_state_dict(self.load_object['forward_translation_model'])
 		self.backward_translation_model.load_state_dict(self.load_object['backward_translation_model'])
 
-		# self.source_discriminator_network.load_state_dict(self.load_object['source_z_discriminator'])
-		# self.target_discriminator_network.load_state_dict(self.load_object['target_z_discriminator'])
+		self.source_discriminator_network.load_state_dict(self.load_object['source_z_discriminator'])
+		self.target_discriminator_network.load_state_dict(self.load_object['target_z_discriminator'])
 
 		if self.args.z_transform_discriminator or self.args.z_trajectory_discriminator:
-			# self.source_z_trajectory_discriminator.load_state_dict(self.load_object['source_z_trajectory_discriminator'])
-			# self.target_z_trajectory_discriminator.load_state_dict(self.load_object['target_z_trajectory_discriminator'])
-			pass 
+			self.source_z_trajectory_discriminator.load_state_dict(self.load_object['source_z_trajectory_discriminator'])
+			self.target_z_trajectory_discriminator.load_state_dict(self.load_object['target_z_trajectory_discriminator'])
+			# pass 
 
 	def update_plots(self, counter, viz_dict, log=False):
 
