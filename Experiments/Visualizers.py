@@ -13,6 +13,7 @@ import copy, os, imageio, scipy.misc, pdb, math, time, numpy as np
 
 import matplotlib.pyplot as plt
 from IPython import embed
+from memory_profiler import profile
 
 # # Mocap viz.
 # import MocapVisualizationUtils
@@ -168,6 +169,7 @@ class BaxterVisualizer():
 			self.state[:7] = joint_pose[7:14]
 			# Now left hand. 
 			self.state[7:] = joint_pose[:7]
+			
 		# Set the joint angles magically. 
 		self.environment.set_robot_joint_positions(self.state)
 
@@ -331,6 +333,7 @@ class ToyDataVisualizer():
 
 		pass
 
+	# @profile
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None):
 
 		fig = plt.figure()		
@@ -344,6 +347,10 @@ class ToyDataVisualizer():
 		width, height = fig.get_size_inches() * fig.get_dpi()
 		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)
 		image = np.transpose(image, axes=[2,0,1])
+
+		ax.clear()
+		fig.clear()
+		plt.close(fig)
 
 		return image
 

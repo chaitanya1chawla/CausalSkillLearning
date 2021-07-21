@@ -119,12 +119,26 @@ class MIME_Dataset(Dataset):
 
 class MIME_NewDataset(Dataset):
 
-	def __init__(self, split='all'):
-		# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
-		self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
+	def __init__(self, args, split='all', short_traj=False, traj_length_threshold=500):
+
+		# 
+		self.args = args		
+
+		if self.args.datadir is None:
+			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
+			self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
+		else:
+			self.dataset_directory = self.args.datadir
 
 		# Load the entire set of trajectories. 
-		self.original_data_list = np.load(os.path.join(self.dataset_directory, "Data_List.npy"),allow_pickle=True)
+		
+		self.file = "Data_List.npy"
+		self.key = 'demo'
+		if isinstance(self, MIME_NewMetaDataset):
+			# This is not an elif condition, because the first always evaluates to true...		
+			self.file = "MIMEDataArray.npy"
+		
+		self.original_data_list = np.load(os.path.join(self.dataset_directory, self.file),allow_pickle=True)			
 		self.original_dataset_length = len(self.original_data_list)
 
 		# Now only selecting valid datapoints.
@@ -135,6 +149,22 @@ class MIME_NewDataset(Dataset):
 
 		self.dataset_length = len(self.data_list)
 
+		if short_traj:
+			
+			length_threshold = traj_length_threshold
+			self.short_data_list = []
+			self.dataset_trajectory_lengths = []
+			for i in range(self.dataset_length):
+				if self.data_list[i][self.key].shape[0]<length_threshold:
+					self.short_data_list.append(self.data_list[i])
+					self.dataset_trajectory_lengths.append(self.data_list[i][self.key].shape[0])
+
+			self.data_list = self.short_data_list
+			self.dataset_length = len(self.data_list)
+			self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)		
+		
+		self.data_list_array = np.array(self.data_list)
+
 	def __len__(self):
 		# Return length of file list. 
 		return self.dataset_length
@@ -143,7 +173,10 @@ class MIME_NewDataset(Dataset):
 		# Return n'th item of dataset.
 		# This has already processed everything.
 
-		return self.data_list[index]
+		if isinstance(index,np.ndarray):			
+			return list(self.data_list_array[index])
+		else:
+			return self.data_list[index]
 
 	def compute_statistics(self):
 
@@ -215,6 +248,11 @@ class MIME_NewDataset(Dataset):
 		np.save("MIME_Orig_Vel_Min.npy", vel_min_value)
 		np.save("MIME_Orig_Vel_Max.npy", vel_max_value)
 
+class MIME_NewMetaDataset(MIME_NewDataset):
+
+	def __init__(self, args, split='all', short_traj=False, traj_length_threshold=500):
+
+		super(MIME_NewMetaDataset, self).__init__(args, split=split, short_traj=short_traj, traj_length_threshold=traj_length_threshold)
 
 class MIME_Dataloader_Tester(unittest.TestCase):
 	
