@@ -8666,6 +8666,10 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 	def translate_latent_z(self, latent_z, latent_b=None, domain=1):
 		
+		if len(latent_z.shape)==2 or latent_z.shape[0]==1:
+			print("Embedding in translate latent z")
+			embed()
+		
 		# Here, domain is the domain they're translating "FROM"
 
 		# Translate Z. 	
