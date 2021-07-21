@@ -548,10 +548,10 @@ class PolicyManager_BaseClass():
 			animation_object = self.dataset[i]['animation']
 
 		# 3) Run unnormalized ground truth trajectory in visualizer. 
-		self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GT.gif".format(i), return_and_save=True)
+		self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories)
 		
 		# 4) Run unnormalized rollout trajectory in visualizer. 
-		self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_Rollout.gif".format(i), return_and_save=True)
+		self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_Rollout.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories)
 		
 		self.gt_gif_list.append(copy.deepcopy(self.ground_truth_gif))
 		self.rollout_gif_list.append(copy.deepcopy(self.rollout_gif))
@@ -2275,10 +2275,10 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 				animation_object = self.dataset[i]['animation']
 
-				return self.visualizer.visualize_joint_trajectory(unnorm_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_{1}.gif".format(i,suffix), return_and_save=True, additional_info=animation_object)
+				return self.visualizer.visualize_joint_trajectory(unnorm_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_{1}.gif".format(i,suffix), return_and_save=True, additional_info=animation_object, end_effector=self.args.ee_trajectories)
 			else:
 				if not(self.args.no_mujoco):
-					return self.visualizer.visualize_joint_trajectory(unnorm_trajectory, return_gif=True, segmentations=segmentations)
+					return self.visualizer.visualize_joint_trajectory(unnorm_trajectory, return_gif=True, segmentations=segmentations, end_effector=self.args.ee_trajectories)
 		else:
 			return self.visualize_2D_trajectory(trajectory)
 
@@ -6864,10 +6864,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					# Now for these many trajectories:
 					for k in range(2):
 						# Now visualize the source trajectory. 
-						self.gif_logs['Traj{0}_Source_Traj'.format(k)] = np.array(self.visualizer.visualize_joint_trajectory(unnormalized_source_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_SourceTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True))
+						self.gif_logs['Traj{0}_Source_Traj'.format(k)] = np.array(self.visualizer.visualize_joint_trajectory(unnormalized_source_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_SourceTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
 
 						# Now visualize the target trajectory. 
-						self.gif_logs['Traj{0}_Target_Traj'.format(k)] = np.array(self.visualizer.visualize_joint_trajectory(unnormalized_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TargetTranslatedTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True))
+						self.gif_logs['Traj{0}_Target_Traj'.format(k)] = np.array(self.visualizer.visualize_joint_trajectory(unnormalized_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TargetTranslatedTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
 
 		average_trajectory_reconstruction_error /= (self.extent//self.args.batch_size+1)*self.args.batch_size
 
@@ -8666,9 +8666,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 	def translate_latent_z(self, latent_z, latent_b=None, domain=1):
 		
-		if len(latent_z.shape)==2 or latent_z.shape[0]==1:
-			print("Embedding in translate latent z")
-			embed()
+		# if len(latent_z.shape)==2 or latent_z.shape[0]==1:
+		# 	print("Embedding in translate latent z")
+		# 	embed()
 		
 		# Here, domain is the domain they're translating "FROM"
 
@@ -9104,7 +9104,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				# print("embedding in visualize low ll skillss")
 				# embed()
 				# Now visualize.. 
-				self.visualizer.visualize_joint_trajectory(unnorm_traj, gif_path="LowlikelihoodTraj", gif_name="Unaligned_Traj{0}.gif".format(self.global_traj_counter), return_and_save=True)
+				self.visualizer.visualize_joint_trajectory(unnorm_traj, gif_path="LowlikelihoodTraj", gif_name="Unaligned_Traj{0}.gif".format(self.global_traj_counter), return_and_save=True, end_effector=self.args.ee_trajectories)
 
 				self.global_traj_counter+=1
 
