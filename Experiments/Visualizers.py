@@ -144,9 +144,11 @@ class BaxterVisualizer():
 				rest_poses=seed
 			)
 
+		return joint_positions
+
 	def set_ee_pose_return_image(self, ee_pose, arm='right', seed=None):
 		
-		self.set_ee_pose(ee_pose, arm=arm, seed=seed)
+		joint_positions = self.set_ee_pose(ee_pose, arm=arm, seed=seed)
 
 		image = self.set_joint_pose_return_image(joint_positions, arm=arm, gripper=False)
 		return image
