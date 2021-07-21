@@ -528,11 +528,7 @@ class PolicyManager_BaseClass():
 	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False):		
 
 		# 1) Feed Z into policy, rollout trajectory. 
-		# print("Embedding in get robot visuals.")
-		# embed()
 
-		print(trajectory)
-		
 		print("Rollout length:", trajectory.shape[0])	
 
 		trajectory_rollout = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq)
@@ -544,6 +540,9 @@ class PolicyManager_BaseClass():
 		else:
 			unnorm_gt_trajectory = trajectory
 			unnorm_pred_trajectory = trajectory_rollout
+
+		print("Embedding in get robot visuals.")
+		embed()
 
 		if self.args.data=='Mocap':
 			# Get animation object from dataset. 
