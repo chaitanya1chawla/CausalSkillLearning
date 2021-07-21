@@ -211,6 +211,7 @@ def parse_arguments():
 	# Data parameters. 
 	parser.add_argument('--traj_segments',dest='traj_segments',type=int,default=1) # Defines whether to use trajectory segments for pretraining or entire trajectories. Useful for baseline implementation.
 	parser.add_argument('--gripper',dest='gripper',type=int,default=1) # Whether to use gripper training in roboturk.
+	parser.add_argument('--ee_trajectories',dest='ee_trajectories',type=int,default=0,help='Whether to learn a skill space from end effector trajectories rather than joint space.')
 	parser.add_argument('--single_hand',dest='single_hand',type=str,default=None,help='Whether to use a single hand, if so, which hand. Only for MIME dataset.')
 	parser.add_argument('--ds_freq',dest='ds_freq',type=int,default=1) # Additional downsample frequency.
 	parser.add_argument('--condition_size',dest='condition_size',type=int,default=4)
