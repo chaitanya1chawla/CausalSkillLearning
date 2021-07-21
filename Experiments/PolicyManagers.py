@@ -1013,12 +1013,20 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length
 			self.number_epochs = self.args.epochs
 
-			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/MIME/MIME_Orig_Mean.npy")
-				self.norm_denom_value = np.load("Statistics/MIME/MIME_Orig_Var.npy")
-			elif self.args.normalization=='minmax':
-				self.norm_sub_value = np.load("Statistics/MIME/MIME_Orig_Min.npy")
-				self.norm_denom_value = np.load("Statistics/MIME/MIME_Orig_Max.npy") - self.norm_sub_value
+			if self.args.ee_trajectories:
+				if self.args.normalization=='meanvar':
+					self.norm_sub_value = np.load("Statistics/MIME/MIME_EE_Mean.npy")
+					self.norm_denom_value = np.load("Statistics/MIME/MIME_EE_Var.npy")
+				elif self.args.normalization=='minmax':
+					self.norm_sub_value = np.load("Statistics/MIME/MIME_EE_Min.npy")
+					self.norm_denom_value = np.load("Statistics/MIME/MIME_EE_Max.npy")
+			else:
+				if self.args.normalization=='meanvar':
+					self.norm_sub_value = np.load("Statistics/MIME/MIME_Orig_Mean.npy")
+					self.norm_denom_value = np.load("Statistics/MIME/MIME_Orig_Var.npy")
+				elif self.args.normalization=='minmax':
+					self.norm_sub_value = np.load("Statistics/MIME/MIME_Orig_Min.npy")
+					self.norm_denom_value = np.load("Statistics/MIME/MIME_Orig_Max.npy") - self.norm_sub_value
 
 			# Max of robot_state + object_state sizes across all Baxter environments. 			
 			self.cond_robot_state_size = 60
