@@ -93,7 +93,6 @@ class BaxterVisualizer():
 
 		# Create environment.
 		print("Do I have a display?", has_display)
-
 		
 		import robosuite, threading
 		from robosuite.wrappers import IKWrapper
@@ -147,7 +146,7 @@ class BaxterVisualizer():
 		image = self.set_joint_pose_return_image(joint_positions, arm=arm, gripper=False)
 		return image
 
-	def set_joint_pose_return_image(self, joint_pose, arm='both', gripper=False):
+	def set_joint_pose(self, joint_pose, arm='both', gripper=False):
 
 		# FOR FULL 16 DOF STATE: ASSUMES JOINT_POSE IS <LEFT_JA, RIGHT_JA, LEFT_GRIPPER, RIGHT_GRIPPER>.
 
@@ -186,6 +185,11 @@ class BaxterVisualizer():
 				action[15] = -joint_pose[14]*2+1
 			# Move gripper positions.
 			self.environment.step(action)
+
+	def set_joint_pose_return_image(self, joint_pose, arm='both', gripper=False):
+
+		# Just use the set pose function..
+		self.set_joint_pose(joint_pose=joint_pose, arm=arm, gripper=gripper)
 
 		image = np.flipud(self.environment.sim.render(600, 600, camera_name='vizview1'))
 		return image
