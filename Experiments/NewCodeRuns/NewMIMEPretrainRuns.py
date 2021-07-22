@@ -169,3 +169,20 @@ python Master.py --train=1 --setting=pretrain_sub --name=MPE_000 --data=MIME --n
 python Master.py --train=1 --setting=pretrain_sub --name=MPE_001 --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --normalization=minmax --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --ee_trajectories=1
 
 python Master.py --train=1 --setting=pretrain_sub --name=MPE_002 --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --normalization=minmax --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --ee_trajectories=1
+
+#######################################
+# Now run MIME Pretrain with EE
+python Master.py --train=1 --setting=pretrain_sub --name=MPE_000 --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --normalization=minmax --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --ee_trajectories=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/
+
+python Master.py --train=1 --setting=pretrain_sub --name=MPE_001 --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --normalization=minmax --seed=1 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --ee_trajectories=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/
+
+python Master.py --train=1 --setting=pretrain_sub --name=MPE_002 --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --normalization=minmax --seed=2 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --ee_trajectories=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/
+
+# Run wihtout normalization
+CUDA_VISIBLE_DEVICES=1 python Master.py --train=1 --setting=pretrain_sub --name=MPE_006 --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --ee_trajectories=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/
+
+CUDA_VISIBLE_DEVICES=1 python Master.py --train=1 --setting=pretrain_sub --name=MPE_007 --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --seed=1 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --ee_trajectories=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/
+
+CUDA_VISIBLE_DEVICES=1 python Master.py --train=1 --setting=pretrain_sub --name=MPE_008 --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --seed=2 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --ee_trajectories=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/
+
+####################################

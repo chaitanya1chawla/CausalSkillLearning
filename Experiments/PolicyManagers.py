@@ -541,8 +541,8 @@ class PolicyManager_BaseClass():
 			unnorm_gt_trajectory = trajectory
 			unnorm_pred_trajectory = trajectory_rollout
 
-		print("Embedding in get robot visuals.")
-		embed()
+		# print("Embedding in get robot visuals.")
+		# embed()
 
 		if self.args.data=='Mocap':
 			# Get animation object from dataset. 
