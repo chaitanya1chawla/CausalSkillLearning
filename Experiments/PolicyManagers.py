@@ -7115,9 +7115,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		
 		if domain==0:
 			point_set = self.target_latent_zs
+			opp_point_set_length = len(self.source_latent_zs)
 			prefix = "Forward"
 		else:
 			point_set = self.source_latent_zs
+			opp_point_set_length = len(self.target_latent_zs)
 			prefix = "Backward"
 
 		# Evaluate log_probs of target..
@@ -7125,10 +7127,19 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		color_scale = 50
 
 		# print("Embedding in update plots of dnesity based thing..")		
+
+		# Colors that count sizes..
 		if domain==0:
-			colors = np.concatenate([color_scale*np.ones_like(log_probs), log_probs])
+			colors = np.concatenate([color_scale*np.ones(opp_point_set_length), log_probs])
 		else:
-			colors = np.concatenate([log_probs, color_scale*np.ones_like(log_probs)])
+			colors = np.concatenate([log_probs, color_scale*np.ones(opp_point_set_length)])
+
+		# # This assumes same number of z's in both ... This may not be true.. 
+		# if domain==0:
+		# 	colors = np.concatenate([color_scale*np.ones_like(log_probs), log_probs])
+		# else:
+		# 	colors = np.concatenate([log_probs, color_scale*np.ones_like(log_probs)])
+
 		# Embed and transform - just the target_z_tensor? 
 		# Do this with just the perplexity set to 30 for now.. 
 
