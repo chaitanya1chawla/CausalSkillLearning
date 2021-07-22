@@ -8507,7 +8507,10 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# Compute Aggregate CDSL
 			###################################################
 
-			self.compute_aggregate_supervised_loss()
+			# self.compute_aggregate_supervised_loss()
+			
+			# IGNORING AGGREGATE CDSL FOR NOW.
+			self.aggregate_cdsl_value = 0.
 			# Now log the aggergate CDSL
 			log_dict['Aggregated Supervised Z Error'] = self.aggregate_cdsl_value
 
@@ -8699,8 +8702,14 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		eval_ind_range = np.arange(0,len(self.original_source_latent_z_set),self.args.batch_size)
 		eval_ind_range = np.append(eval_ind_range,len(self.original_source_latent_z_set))
-		for k, v in enumerate(eval_ind_range[:-1]):
+
+		for k, v in enumerate(eval_ind_range[:-1]):	
 			with torch.no_grad():
+
+				# DOESN'T THIS IMPLICITLY ASSUME ALIGNED TEMPORAL SEGMENTATION? 
+				# USING THE Z SET... RATHER THAN Z'S COMPTUTED FROM CORRESPONDING TRAJECTORIES... ASSUMES ... 
+				# well not exactly aligned temporal segmentation, but something weaker - same number of z's across domains across all trajectories. 
+				# Which is still bad enough to mess up evaluation... basically ignore aggregate supervised loss? 
 				detached_z = torch.tensor(self.original_target_latent_z_set[v:eval_ind_range[k+1]]).to(device)
 				cross_domain_z = torch.tensor(self.original_source_latent_z_set[v:eval_ind_range[k+1]]).to(device)
 
