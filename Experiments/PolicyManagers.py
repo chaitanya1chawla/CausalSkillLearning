@@ -8719,8 +8719,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				else:					
 			
 					# Is this even legit???!?!?
-					print("Embedding in agg superivsed loss")
-					embed()
+					# print("Embedding in agg superivsed loss")
+					# embed()
 					self.aggregate_cdsl_stat += self.translation_model_list[domain].get_probabilities(detached_z, action_epsilon=self.translated_z_epsilon, evaluate_value=cross_domain_z).sum()
 					# self.aggregate_cdsl_stat += (self.translation_model_list[domain].get_probabilities(detached_z, action_epsilon=self.translated_z_epsilon, evaluate_value=cross_domain_z)**2).sum()
 					
