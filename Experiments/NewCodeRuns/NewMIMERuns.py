@@ -418,3 +418,4 @@ python cluster_run.py --name='MJ_04' --cmd='python Master.py --train=1 --setting
 
 python cluster_run.py --name='MJ_05' --cmd='python Master.py --train=1 --setting=learntsub --name=MJ_405 --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=MIME  --subpolicy_model=ExpWandbLogs/MPE_002/saved_models/Model_epoch500 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=2 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=100 --ee_trajectories=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/'
 
+# 
