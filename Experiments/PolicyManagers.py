@@ -541,8 +541,8 @@ class PolicyManager_BaseClass():
 			unnorm_gt_trajectory = trajectory
 			unnorm_pred_trajectory = trajectory_rollout
 
-		print("Embedding in get robot visuals.")
-		embed()
+		# print("Embedding in get robot visuals.")
+		# embed()
 
 		if self.args.data=='Mocap':
 			# Get animation object from dataset. 
@@ -10246,8 +10246,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		# (1a) First compute cross domain density. 
 		###########################################################
 
-		self.weighted_forward_loss = - self.args.forward_loss_weight*update_dictionary['forward_density_loss']
-		self.weighted_backward_loss = - self.args.backward_loss_weight*update_dictionary['backward_density_loss']
+		self.weighted_forward_loss = - self.args.forward_density_loss_weight*update_dictionary['forward_density_loss']
+		self.weighted_backward_loss = - self.args.backward_density_loss_weight*update_dictionary['backward_density_loss']
 
 		# Does this need to be masked? 	
 		self.unweighted_unmasked_cross_domain_density_loss = self.weighted_forward_loss + self.weighted_backward_loss
@@ -10262,12 +10262,14 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 		if self.args.z_tuple_gmm:
 			# (1b1) Forward Z tuple density loss.
-			self.masked_forward_z_tuple_density_loss = - update_dictionary['target_z_trajectory_weights']*update_dictionary['forward_z_tuple_density_loss']
-			self.forward_z_tuple_density_loss = self.masked_forward_z_tuple_density_loss.sum()/update_dictionary['target_z_trajectory_weights'].sum()
+			self.unweighted_masked_forward_z_tuple_density_loss = - update_dictionary['target_z_trajectory_weights']*update_dictionary['forward_z_tuple_density_loss']
+			self.unweighted_forward_z_tuple_density_loss = self.unweighted_masked_forward_z_tuple_density_loss.sum()/update_dictionary['target_z_trajectory_weights'].sum()
+			self.forward_z_tuple_density_loss = self.args.forward_tuple_density_loss_weight*self.unweighted_forward_z_tuple_density_loss
 
 			# (1b2) Backward Z tuple density loss.
-			self.masked_backward_z_tuple_density_loss = - update_dictionary['source_z_trajectory_weights']*update_dictionary['backward_z_tuple_density_loss']
-			self.backward_z_tuple_density_loss = self.masked_backward_z_tuple_density_loss.sum()/update_dictionary['source_z_trajectory_weights'].sum()
+			self.unweighted_masked_backward_z_tuple_density_loss = - update_dictionary['source_z_trajectory_weights']*update_dictionary['backward_z_tuple_density_loss']
+			self.unweighted_backward_z_tuple_density_loss = self.unweighted_masked_backward_z_tuple_density_loss.sum()/update_dictionary['source_z_trajectory_weights'].sum()
+			self.backward_z_tuple_density_loss = self.args.backward_tuple_density_loss_weight*self.unweighted_backward_z_tuple_density_loss
 			
 			# Total Z tuple density loss. 
 			self.unweighted_masked_cross_domain_z_tuple_density_loss = self.forward_z_tuple_density_loss + self.backward_z_tuple_density_loss			

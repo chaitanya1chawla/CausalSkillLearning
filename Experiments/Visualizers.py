@@ -111,6 +111,8 @@ class BaxterVisualizer():
 	def set_ee_pose(self, ee_pose, arm='both', seed=None):
 
 		# Assumes EE pose is Position in the first three elements, and quaternion in last 4 elements. 
+
+		self.environment.reset()		
 		self.update_state()
 
 		if seed is None:
