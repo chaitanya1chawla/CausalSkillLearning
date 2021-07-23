@@ -10391,6 +10391,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			# Log Z tuple densities. 
 			log_dict['Forward Z Tuple Density Loss'] = self.forward_z_tuple_density_loss
 			log_dict['Backward Z Tuple Density Loss'] = self.backward_z_tuple_density_loss
+			log_dict['Unweighted Forward Z Tuple Density Loss'] = self.unweighted_forward_z_tuple_density_loss
+			log_dict['Unweighted Backward Z Tuple Density Loss'] = self.unweighted_backward_z_tuple_density_loss			
 			log_dict['Unweighted Z Tuple Density Loss'] = self.unweighted_masked_cross_domain_z_tuple_density_loss
 			log_dict['Z Tuple Density Loss'] = self.cross_domain_z_tuple_density_loss 
 
