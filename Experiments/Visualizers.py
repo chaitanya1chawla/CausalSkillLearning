@@ -115,6 +115,8 @@ class BaxterVisualizer():
 		self.environment.reset()		
 		self.update_state()
 
+		# self.baxter_IK_object.
+
 		if seed is None:
 			# Set seed to current state.
 			seed = self.full_state['joint_pos']
