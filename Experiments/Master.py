@@ -363,7 +363,8 @@ def parse_arguments():
 	parser.add_argument('--backward_density_loss_weight',dest='backward_density_loss_weight',type=float,default=0.,help='Weight associated with backward density loss.')
 	parser.add_argument('--forward_tuple_density_loss_weight',dest='forward_tuple_density_loss_weight',type=float,default=0.,help='Weight associated with forward tuple density loss.')
 	parser.add_argument('--backward_tuple_density_loss_weight',dest='backward_tuple_density_loss_weight',type=float,default=0.,help='Weight associated with backward tuple density loss.')	
-	parser.add_argument('--gmm_variance_value', dest='gmm_variance_value', type=float, default=0.2,help='Variance value for GMM components.')
+	parser.add_argument('--gmm_variance_value', dest='gmm_variance_value', type=float, default=0.5,help='Variance value for GMM components.')
+	parser.add_argument('--gmm_tuple_variance_value', dest='gmm_tuple_variance_value', type=float, default=0.5,help='Variance value for Z Tuple GMM components.')
 	parser.add_argument('--z_tuple_gmm',dest='z_tuple_gmm',type=int,default=0,help='Whether to use a Z Tuple GMM or not.')
 
 	# Wasserstein GAN

@@ -5,7 +5,7 @@ import numpy as np, robosuite, copy
 
 
 x = np.load("MIMEDataArray.npy",allow_pickle=True)
-
+np.set_printoptions(suppress=True,precision=2)
 # Create visualizer object that we are going to use to interact with the environment.. 
 visualizer = BaxterVisualizer()
 
@@ -40,20 +40,27 @@ for k, v in enumerate(x):
 		ee_state = np.concatenate(visualizer.baxter_IK_object.controller.ik_robot_eef_joint_cartesian_pose())
 
 		# # Can verify this EE state is okay by running it through IK. 
-		# ee_pose = ee_state
+		ee_pose = ee_state
 		# seed = np.random.random(14)
-		# ik_joint_state = np.array(visualizer.baxter_IK_object.controller.inverse_kinematics(
-		# 		target_position_right=ee_pose[:3],
-		# 		target_orientation_right=ee_pose[3:7],
-		# 		target_position_left=ee_pose[7:10],
-		# 		target_orientation_left=ee_pose[10:],
-		# 		rest_poses=seed))
+
+		# Seed at mean
+		seed = np.array([ 0.42632668,  0.48221445, -1.87011259,  0.94430763, -2.01179089,
+       		-1.43602596,  1.53576452, -0.41248854,  0.40729346,  1.56634601,
+        	1.29183579, -1.15044519,  1.07504698,  1.68546272])
+
+
+		ik_joint_state = np.array(visualizer.baxter_IK_object.controller.inverse_kinematics(
+				target_position_right=ee_pose[:3],
+				target_orientation_right=ee_pose[3:7],
+				target_position_left=ee_pose[7:10],
+				target_orientation_left=ee_pose[10:],
+				rest_poses=seed))
 					
-		# norm = np.linalg.norm(joint_state[:-2] - ik_joint_state)
-		# if norm > 0.001:
-		# 	# print("Embedding in IK")
-		# 	print("Issue at: ", k, t, norm)
-		# 	embed()
+		norm = np.linalg.norm(joint_state[:-2] - ik_joint_state)
+		if norm > 0.01:
+			# print("Embedding in IK")
+			print(k, t, norm)
+			# embed()
 		
 		# Assembly.	
 		# COncatenating in order: right ee pos, right ee q, left ee pos, left ee q, gripper.. 

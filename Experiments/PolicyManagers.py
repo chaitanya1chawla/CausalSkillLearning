@@ -7203,8 +7203,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Set Z Tuple Means...
 			self.differentiable_mean_computation(0)
 			# Also set up Z Tuple GMMs
-			self.Z_Tuple_GMM_list = [self.create_GMM(evaluation_domain=0, mean_point_set=self.source_z_tuple_set, differentiable_points=True), \
-									 self.create_GMM(evaluation_domain=1, mean_point_set=self.target_z_tuple_set, differentiable_points=True)]
+			self.Z_Tuple_GMM_list = [self.create_GMM(evaluation_domain=0, mean_point_set=self.source_z_tuple_set, differentiable_points=True, tuple_GMM=True), \
+									 self.create_GMM(evaluation_domain=1, mean_point_set=self.target_z_tuple_set, differentiable_points=True, tuple_GMM=True)]
 
 	def compute_set_based_supervised_GMM_loss(self, z_set_1, z_set_2, differentiable_outputs=False):
 
@@ -7275,7 +7275,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		return GMM.log_prob(point_set)
 
-	def create_GMM(self, evaluation_domain=0, mean_point_set=None, differentiable_points=False):
+	def create_GMM(self, evaluation_domain=0, mean_point_set=None, differentiable_points=False, tuple_GMM=False):
 
 
 		# Overall algorithm.
@@ -7314,7 +7314,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			else:
 				gmm_means = torch.tensor(mean_point_set).to(device)
 
-		gmm_variances = self.args.gmm_variance_value*torch.ones_like(gmm_means).to(device)
+		if z_tuple_gmm:
+			gmm_variances = self.args.gmm_tuple_variance_value*torch.ones_like(gmm_means).to(device)
+		else:
+			gmm_variances = self.args.gmm_variance_value*torch.ones_like(gmm_means).to(device)
 		
 		# Create a mixture that ignores last dimension.. this should be able to handle both batched and non-batched inputs..
 		self.mixture_distribution = torch.distributions.Categorical(torch.ones(gmm_means.shape[:-1]).to(device))
