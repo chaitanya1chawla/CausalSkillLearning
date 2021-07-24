@@ -7314,7 +7314,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			else:
 				gmm_means = torch.tensor(mean_point_set).to(device)
 
-		if z_tuple_gmm:
+		if tuple_gmm:
 			gmm_variances = self.args.gmm_tuple_variance_value*torch.ones_like(gmm_means).to(device)
 		else:
 			gmm_variances = self.args.gmm_variance_value*torch.ones_like(gmm_means).to(device)
