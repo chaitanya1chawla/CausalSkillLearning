@@ -10876,7 +10876,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 	def create_networks(self):
 		
 		# Create IK network
-		self.IK_network = ContinuousMLP(self.IK_state_size, self.hidden_size, self.IK_state_size, args=self.args, number_layers=self.number_layers)
+		self.IK_network = ContinuousMLP(self.IK_state_size, self.hidden_size, self.IK_state_size, args=self.args, number_layers=self.number_layers).to(device)
 
 	def create_training_ops(self):
 
