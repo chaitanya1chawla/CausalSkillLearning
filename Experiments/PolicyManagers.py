@@ -10865,6 +10865,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 			self.state_size = 8
 			self.IK_state_size = 7
 
+		self.conditional_info_size = 1
 		self.dataset = dataset
 		self.hidden_size = self.args.hidden_size
 		self.number_layers = self.args.number_layers
@@ -10907,38 +10908,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		# embed()
 
 		# Toy Data
-		if self.args.data in ['ContinuousNonZero','DirContNonZero','DeterGoal','ToyContext']:
-
-			# Sample trajectory segment from dataset. 
-			if special_indices is not None:
-				sample_traj, sample_action_seq = self.dataset[special_indices]
-				self.dataset_latent_b_labels, self.dataset_latent_z_labels = self.dataset.get_latent_variables(special_indices)
-			else:
-				sample_traj, sample_action_seq = self.dataset[i:i+self.args.batch_size]
-				indices = np.arange(i,i+self.args.batch_size)
-				self.dataset_latent_b_labels, self.dataset_latent_z_labels = self.dataset.get_latent_variables(indices)
-					
-			# If the collect inputs function is being called from the train function, 
-			# Then we should corrupt the inputs based on how much the input_corruption_noise is set to. 
-			# If it's 0., then no corruption. 
-
-			corrupted_sample_action_seq = self.corrupt_inputs(sample_action_seq)
-			corrupted_sample_traj = self.corrupt_inputs(sample_traj)
-			concatenated_traj = self.concat_state_action(corrupted_sample_traj, corrupted_sample_action_seq)		
-			old_concatenated_traj = self.old_concat_state_action(corrupted_sample_traj, corrupted_sample_action_seq)
-
-			if self.args.data=='DeterGoal':
-				self.conditional_information = np.zeros((self.args.condition_size))
-				self.conditional_information[self.dataset.get_goal(i)] = 1
-				self.conditional_information[4:] = self.dataset.get_goal_position[i]
-			else:
-				self.conditional_information = np.zeros((self.args.condition_size))
-			self.batch_trajectory_lengths = concatenated_traj.shape[1]*np.ones((self.args.batch_size)).astype(int)
-			self.max_batch_traj_length = concatenated_traj.shape[1]
-
-			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
-
-		elif self.args.data in ['MIME','OldMIME'] or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
+		if self.args.data in ['MIME','OldMIME'] or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 					   
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 
