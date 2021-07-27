@@ -10931,6 +10931,9 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 			minl = 10000
 			maxl = 0
 			
+			print("Embed in get js ee")
+			embed()
+
 			for x in range(self.args.batch_size):
 
 				# Doesn't really depend on EE or not..
