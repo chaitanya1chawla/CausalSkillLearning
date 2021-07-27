@@ -10870,7 +10870,10 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		self.hidden_size = self.args.hidden_size
 		self.number_layers = self.args.number_layers
 		self.learning_rate = self.args.learning_rate
-		self.extent = len(self.dataset)
+		self.test_set_size = 100
+		self.extent = len(self.dataset) - self.test_set_size
+
+		# self.extent = (self.extent//self.args.batch_size+1)*self.args.batch_size-self.args.batch_size
 		self.number_epochs = self.args.epochs
 
 	def create_networks(self):
@@ -10932,9 +10935,9 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 			maxl = 0
 			
 
-			if len(data_element)<self.args.batch_size:
-				print("Embed in get js ee")
-				embed()
+			# if len(data_element)<self.args.batch_size:
+			# 	print("Embed in get js ee")
+			# 	embed()
 
 			for x in range(self.args.batch_size):
 
