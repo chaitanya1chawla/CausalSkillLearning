@@ -10870,6 +10870,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		self.number_layers = self.args.number_layers
 		self.learning_rate = self.args.learning_rate
 		self.extent = len(self.dataset)
+		self.number_epochs = self.args.epochs
 
 	def create_networks(self):
 		
