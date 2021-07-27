@@ -10985,6 +10985,9 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		#############################################		
 		# 3) Feed EE states to IK network and get predicted joint states.
 		#############################################
+
+		print("Embedding in IK trainer")
+		embed()
 	
 		update_dictionary['predicted_joint_states'] = self.IK_network(input_dictionary['end_effector_states'])
 
