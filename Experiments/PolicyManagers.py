@@ -10854,7 +10854,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 	def __init__(self, dataset=None, args=None):
 
 		#
-		super(PolicyManager_Pretrain, self).__init__()
+		super(PolicyManager_IKTrainer, self).__init__()
 
 		if self.args.data in ['MIME','OldMIME']:
 			self.state_size = 16
