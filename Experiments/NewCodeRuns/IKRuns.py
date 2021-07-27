@@ -1,0 +1,2 @@
+# Run IK trainer..
+python Master.py --train=1 --setting=pretrain_sub --name=IK_debug --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=0 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/
