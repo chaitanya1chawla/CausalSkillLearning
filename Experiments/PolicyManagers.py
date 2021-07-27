@@ -10979,8 +10979,8 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		# 2) Batch timesteps.
 		#############################################
 
-		input_dictionary['joint_angle_states'] = torch.tensor(input_dictionary['joint_angle_traj'][...,:-2].reshape(-1,self.IK_state_size)).to(device)
-		input_dictionary['end_effector_states'] =  torch.tensor(input_dictionary['end_effector_traj'][...,:-2].reshape(-1,self.IK_state_size)).to(device)
+		input_dictionary['joint_angle_states'] = torch.tensor(input_dictionary['joint_angle_traj'][...,:-2].reshape(-1,self.IK_state_size)).to(device).float()
+		input_dictionary['end_effector_states'] =  torch.tensor(input_dictionary['end_effector_traj'][...,:-2].reshape(-1,self.IK_state_size)).to(device).float()
 
 		#############################################		
 		# 3) Feed EE states to IK network and get predicted joint states.
