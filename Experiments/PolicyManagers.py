@@ -10932,7 +10932,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 			maxl = 0
 			
 
-			if data_element.shape[0]<self.args.batch_size:
+			if len(data_element)<self.args.batch_size:
 				print("Embed in get js ee")
 				embed()
 
