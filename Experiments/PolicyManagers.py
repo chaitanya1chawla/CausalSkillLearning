@@ -10998,7 +10998,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		# 5) Log loss.
 		#############################################
 
-		log_dict['Joint State Loss'] = self.joint_state_loss
+		log_dict['Joint State Loss'] = self.joint_state_loss.detach().cpu().numpy()
 		wandb.log(log_dict, step=counter)
 
 	
