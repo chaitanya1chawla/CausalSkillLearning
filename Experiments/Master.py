@@ -120,7 +120,7 @@ class Master():
 				self.policy_manager = PolicyManager_DensityJointFixEmbedTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 
 		elif self.args.setting in ['iktrainer']:
-			self.policy_manager = PolicyManager_IKTrainer(self.args, self.dataset)			
+			self.policy_manager = PolicyManager_IKTrainer(self.dataset, self.args)
 
 		if self.args.debug:
 			print("Embedding in Master.")
