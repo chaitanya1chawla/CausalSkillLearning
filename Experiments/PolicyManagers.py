@@ -10931,8 +10931,10 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 			minl = 10000
 			maxl = 0
 			
-			print("Embed in get js ee")
-			embed()
+
+			if data_element.shape[0]<self.args.batch_size:
+				print("Embed in get js ee")
+				embed()
 
 			for x in range(self.args.batch_size):
 
