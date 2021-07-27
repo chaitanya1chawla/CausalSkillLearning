@@ -8521,10 +8521,10 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# Compute Aggregate CDSL
 			###################################################
 
-			# self.compute_aggregate_supervised_loss()
+			self.compute_aggregate_supervised_loss()
 			
 			# IGNORING AGGREGATE CDSL FOR NOW.
-			self.aggregate_cdsl_value = 0.
+			# self.aggregate_cdsl_value = 0.
 			# Now log the aggergate CDSL
 			log_dict['Aggregated Supervised Z Error'] = self.aggregate_cdsl_value
 
