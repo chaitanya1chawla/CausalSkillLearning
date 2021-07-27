@@ -43,7 +43,8 @@ class PolicyManager_BaseClass():
 			(self.args.setting=='jointcycletransfer' and isinstance(self, PolicyManager_JointCycleTransfer)) or \
 			(self.args.setting=='jointfixcycle' and isinstance(self, PolicyManager_JointFixEmbedCycleTransfer)) or \
 			(self.args.setting=='densityjointtransfer' and isinstance(self, PolicyManager_DensityJointTransfer)) or \
-			(self.args.setting=='densityjointfixembedtransfer' and isinstance(self, PolicyManager_DensityJointFixEmbedTransfer)):
+			(self.args.setting=='densityjointfixembedtransfer' and isinstance(self, PolicyManager_DensityJointFixEmbedTransfer)) or \
+			(self.args.setting=='iktrainer' and isinstance(self, PolicyManager_IKTrainer)):
 				extent = self.extent
 		else:
 			extent = len(self.dataset)-self.test_set_size
@@ -9241,7 +9242,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# 		embed()
 
 			####
-			self.visualize_low_likelihood_skills(domain, update_dictionary, source_input_dict)
+			# self.visualize_low_likelihood_skills(domain, update_dictionary, source_input_dict)
 
 			#################################################
 			## (4c) If we are using cross domain supervision.
@@ -10847,3 +10848,267 @@ class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 
 		# Encode decode function: First encodes, takes trajectory segment, and outputs latent z. The latent z is then provided to decoder (along with initial state), and then we get SOURCE domain subpolicy inputs. 
 		# Cross domain decoding function: Takes encoded latent z (and start state), and then rolls out with target decoder. Function returns, target trajectory, action sequence, and TARGET domain subpolicy inputs. 
+
+class PolicyManager_IKTrainer(PolicyManager_BaseClass):
+
+	def __init__(self, dataset=None, args=None):
+
+		#
+		super(PolicyManager_Pretrain, self).__init__()
+
+		if self.args.data in ['MIME','OldMIME']:
+			self.state_size = 16
+			self.IK_state_size = 14
+			
+		if self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
+			self.state_size = 8
+			self.IK_state_size = 7
+
+		self.hidden_size = self.args.hidden_size
+		self.number_layers = self.args.number_layers
+		self.learning_rate = self.args.learning_rate
+
+	def create_networks(self):
+		
+		# Create IK network
+		self.IK_network = ContinuousMLP(self.IK_state_size, self.hidden_size, self.IK_state_size, args=self.args, number_layers=self.number_layers):
+
+	def create_training_ops(self):
+
+		# Create parameter list. 
+		self.parameter_list = self.IK_network.parameters()
+
+		# Create optimizer. 
+		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
+
+	def save_all_models(self, suffix):
+
+		logdir = os.path.join(self.args.logdir, self.args.name)
+		savedir = os.path.join(logdir,"saved_models")
+		if not(os.path.isdir(savedir)):
+			os.mkdir(savedir)
+		save_object = {}
+		save_object['IK_Network'] = self.IK_network.state_dict()
+		torch.save(save_object,os.path.join(savedir,"Model_"+suffix))
+
+	def load_all_models(self, path):
+
+		load_object = torch.load(path)
+		self.IK_network.load_state_dict(load_object['IK_Network'])
+
+	# Get batch full trajectory. 
+	def collect_inputs(self, i, get_latents=False, special_indices=None, called_from_train=False):
+
+		# print("# Debug task ID batching")
+		# embed()
+
+		# Toy Data
+		if self.args.data in ['ContinuousNonZero','DirContNonZero','DeterGoal','ToyContext']:
+
+			# Sample trajectory segment from dataset. 
+			if special_indices is not None:
+				sample_traj, sample_action_seq = self.dataset[special_indices]
+				self.dataset_latent_b_labels, self.dataset_latent_z_labels = self.dataset.get_latent_variables(special_indices)
+			else:
+				sample_traj, sample_action_seq = self.dataset[i:i+self.args.batch_size]
+				indices = np.arange(i,i+self.args.batch_size)
+				self.dataset_latent_b_labels, self.dataset_latent_z_labels = self.dataset.get_latent_variables(indices)
+					
+			# If the collect inputs function is being called from the train function, 
+			# Then we should corrupt the inputs based on how much the input_corruption_noise is set to. 
+			# If it's 0., then no corruption. 
+
+			corrupted_sample_action_seq = self.corrupt_inputs(sample_action_seq)
+			corrupted_sample_traj = self.corrupt_inputs(sample_traj)
+			concatenated_traj = self.concat_state_action(corrupted_sample_traj, corrupted_sample_action_seq)		
+			old_concatenated_traj = self.old_concat_state_action(corrupted_sample_traj, corrupted_sample_action_seq)
+
+			if self.args.data=='DeterGoal':
+				self.conditional_information = np.zeros((self.args.condition_size))
+				self.conditional_information[self.dataset.get_goal(i)] = 1
+				self.conditional_information[4:] = self.dataset.get_goal_position[i]
+			else:
+				self.conditional_information = np.zeros((self.args.condition_size))
+			self.batch_trajectory_lengths = concatenated_traj.shape[1]*np.ones((self.args.batch_size)).astype(int)
+			self.max_batch_traj_length = concatenated_traj.shape[1]
+
+			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
+
+		elif self.args.data in ['MIME','OldMIME'] or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
+					   
+			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
+
+				if self.args.task_discriminability:
+
+					# Don't really need to use digitize, we need to digitize with respect to .. 0, 32, 64, ... 8448. 
+					# So.. just use... //32
+					bucket = i//32
+					data_element = self.dataset[np.array(self.task_based_shuffling_blocks[bucket])]
+					self.input_task_id = self.index_task_id_map[bucket]					
+				else:
+					# data_element = self.dataset[i:i+self.args.batch_size]
+					data_element = self.dataset[self.sorted_indices[i:i+self.args.batch_size]]
+
+			else:
+				data_element = self.get_batch_element(i)
+
+			# Get trajectory lengths across batch, to be able to create masks for losses. 
+			self.batch_trajectory_lengths = np.zeros((self.args.batch_size), dtype=int)
+			minl = 10000
+			maxl = 0
+			
+			for x in range(self.args.batch_size):
+
+				if self.args.ee_trajectories:
+					self.batch_trajectory_lengths[x] = data_element[x]['endeffector_trajectory'].shape[0]
+				else:
+					self.batch_trajectory_lengths[x] = data_element[x]['demo'].shape[0]
+				maxl = max(maxl,self.batch_trajectory_lengths[x])
+				minl = min(minl,self.batch_trajectory_lengths[x])
+			# print("For this iteration:",maxl-minl,minl,maxl)
+
+			self.max_batch_traj_length = self.batch_trajectory_lengths.max()
+
+			# Create batch object that stores trajectories. 
+			batch_trajectory = np.zeros((self.args.batch_size, self.max_batch_traj_length, self.state_size))
+			# Copy over data elements into batch_trajectory array.
+			for x in range(self.args.batch_size):
+				if self.args.ee_trajectories:	
+					batch_trajectory[x,:self.batch_trajectory_lengths[x]] = data_element[x]['endeffector_trajectory']
+				else:					
+					batch_trajectory[x,:self.batch_trajectory_lengths[x]] = data_element[x]['demo']
+			
+			# If normalization is set to some value.
+			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
+				batch_trajectory = (batch_trajectory-self.norm_sub_value)/self.norm_denom_value
+
+			# Set condiitonal information. 
+			if self.args.data in ['MIME','OldMIME']:
+				self.conditional_information = np.zeros((self.conditional_info_size))				
+
+			elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
+
+				if self.args.batch_size==1:
+					robot_states = data_element['robot-state']
+					object_states = data_element['object-state']
+
+					self.conditional_information = np.zeros((self.conditional_info_size))
+					
+					# Don't set this if pretraining / baseline.
+					if self.args.setting=='learntsub' or self.args.setting=='imitation':
+						self.conditional_information = np.zeros((len(trajectory),self.conditional_info_size))
+						self.conditional_information[:,:self.cond_robot_state_size] = robot_states
+						# Doing this instead of self.cond_robot_state_size: because the object_states size varies across demonstrations.
+						self.conditional_information[:,self.cond_robot_state_size:self.cond_robot_state_size+object_states.shape[-1]] = object_states	
+						# Setting task ID too.		
+						self.conditional_information[:,-self.number_tasks+data_element['task-id']] = 1.
+				else:
+
+					#####################################################################	
+					# Set a batch element here..				
+					batch_conditional_information = np.zeros((self.args.batch_size, self.max_batch_traj_length, self.conditional_info_size))
+					for x in range(self.args.batch_size):
+
+						if data_element[x]['is_valid']:
+
+							batch_conditional_information[x,:self.batch_trajectory_lengths[x],:self.cond_robot_state_size] = data_element[x]['robot-state']						
+							batch_conditional_information[x,:self.batch_trajectory_lengths[x],self.cond_robot_state_size:self.cond_robot_state_size+data_element[x]['object-state'].shape[-1]] = data_element[x]['object-state']						
+							batch_conditional_information[x,:self.batch_trajectory_lengths[x],-self.number_tasks+data_element[x]['task-id']] = 1.
+ 
+					self.conditional_information = np.zeros((self.conditional_info_size))
+					#####################################################################
+
+			# Compute actions.
+			action_sequence = np.diff(batch_trajectory,axis=1)
+
+			# If the collect inputs function is being called from the train function, 
+			# Then we should corrupt the inputs based on how much the input_corruption_noise is set to. 
+			# If it's 0., then no corruption. 
+			corrupted_action_sequence = self.corrupt_inputs(action_sequence)
+			corrupted_batch_trajectory = self.corrupt_inputs(batch_trajectory)
+
+			concatenated_traj = self.concat_state_action(corrupted_batch_trajectory, corrupted_action_sequence)		
+			old_concatenated_traj = self.old_concat_state_action(corrupted_batch_trajectory, corrupted_action_sequence)
+			# # Concatenate
+			# concatenated_traj = self.concat_state_action(batch_trajectory, action_sequence)
+			# old_concatenated_traj = self.old_concat_state_action(batch_trajectory, action_sequence)
+
+			# Scaling action sequence by some factor.             
+			scaled_action_sequence = self.args.action_scale_factor*action_sequence
+			
+			# If trajectory length is set to something besides -1, restrict trajectory length to this.
+			if self.args.traj_length > -1 :			
+				batch_trajectory = batch_trajectory.transpose((1,0,2))[:self.args.traj_length]
+				scaled_action_sequence = scaled_action_sequence.transpose((1,0,2))[:self.args.traj_length-1]
+				concatenated_traj = concatenated_traj.transpose((1,0,2))[:self.args.traj_length]
+				old_concatenated_traj = old_concatenated_traj.transpose((1,0,2))[:self.args.traj_length]
+
+				for x in range(self.args.batch_size):
+					if self.batch_trajectory_lengths[x] > self.args.traj_length:
+						self.batch_trajectory_lengths[x] = self.args.traj_length
+				self.max_batch_traj_length = self.batch_trajectory_lengths.max()
+
+				return batch_trajectory, scaled_action_sequence, concatenated_traj, old_concatenated_traj
+
+			# If we're using task based discriminability. 
+			if self.args.task_discriminability:
+				# Set the task ID's. 
+				self.batch_task_ids = np.zeros((self.args.batch_size), dtype=int)
+				for k in range(self.args.batch_size):
+					self.batch_task_ids[k] = data_element[k]['task_id']
+				
+				# Figure f we should be implementing.. same task ID stuff... probably more important to do smart batching of trjaectory lengths? 
+				# What will this need? Maybe... making references to the discriminators? And then calling forward on them? 
+
+			return batch_trajectory.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
+			
+	def run_iteration(self, counter, i, return_z=False, and_train=True):
+		
+		# Flow: 
+		# 
+		# 1) Get batch of trajectories. 
+		# 2) Convert to batch of joint angles and ee states. 
+		# 3) Feed to network 
+		# 4) Compute loss and optimize
+
+		#############################################		
+		# 1) Get batch of trajectories.
+		#############################################
+		
+		input_dictionary, update_dictionary, log_dict = {}, {}, {}
+
+		# Get batch of joint angle trajectories. 		
+		self.args.ee_trajectories = 0 		
+		input_dictionary['joint_angle_traj'], _, _, _ = self.collect_inputs(i, called_from_train=True)
+
+		# Get batch of end effector trajectories. 
+		self.args.ee_trajectories = 1	
+		input_dictionary['end_effector_traj'], _, _, _ = self.collect_inputs(i, called_from_train=True)
+
+		#############################################		
+		# 2) Batch timesteps.
+		#############################################
+
+		input_dictionary['joint_angle_states'] = input_dictionary['joint_angle_traj'][...,:-2].reshape(-1,self.IK_state_size)
+		input_dictionary['end_effector_states'] = input_dictionary['end_effector_traj'][...,:-2].reshape(-1,self.IK_state_size)
+
+		#############################################		
+		# 3) Feed EE states to IK network and get predicted joint states.
+		#############################################
+	
+		update_dictionary['predicted_joint_states'] = self.IK_network(input_dictionary['end_effector_states'])
+
+		#############################################
+		# 4) Compute loss.
+		#############################################		
+
+		self.joint_state_loss = ((update_dictionary['predicted_joint_states']-input_dictionary['end_effector_states'])**2).mean()		
+
+		#############################################
+		# 5) Log loss.
+		#############################################
+
+		log_dict['Joint State Loss'] = self.joint_state_loss
+		wandb.log(log_dict, step=counter)
+
+	

@@ -119,6 +119,9 @@ class Master():
 			elif self.args.setting=='densityjointfixembedtransfer':
 				self.policy_manager = PolicyManager_DensityJointFixEmbedTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 
+		elif self.args.setting in ['iktrainer']:
+			self.policy_manager = PolicyManager_IKTrainer(self.args, self.dataset)			
+
 		if self.args.debug:
 			print("Embedding in Master.")
 			embed()
@@ -129,7 +132,7 @@ class Master():
 	def run(self):
 		if self.args.setting in ['pretrain_sub','pretrain_prior','imitation','baselineRL','downstreamRL',\
 			'transfer','cycle_transfer','jointtransfer','fixembed','jointcycletransfer', 'jointfixembed',\
-			'jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
+			'jointfixcycle','densityjointtransfer','densityjointfixembedtransfer','iktrainer']:
 			if self.args.train:
 				if self.args.model:
 					self.policy_manager.train(self.args.model)
