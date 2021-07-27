@@ -10868,6 +10868,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		self.hidden_size = self.args.hidden_size
 		self.number_layers = self.args.number_layers
 		self.learning_rate = self.args.learning_rate
+		self.extent = len(self.dataset)
 
 	def create_networks(self):
 		
