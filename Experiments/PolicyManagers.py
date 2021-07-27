@@ -910,7 +910,7 @@ class PolicyManager_BaseClass():
 		index_range = np.arange(0,extent)
 		# This just needs to be created if we're in joint setting.
 		# if self.args.setting in ['joint','learntsub']:
-		if isinstance(self, PolicyManager_BatchJoint):
+		if isinstance(self, PolicyManager_BatchJoint) or isinstance(self, PolicyManager_IKTrainer):
 			self.sorted_indices = np.argsort(self.dataset.dataset_trajectory_lengths)[::-1]
 
 			# # Bias towards using shorter trajectories if we're debugging.
