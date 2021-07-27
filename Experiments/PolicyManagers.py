@@ -10865,6 +10865,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 			self.state_size = 8
 			self.IK_state_size = 7
 
+		self.dataset = dataset
 		self.hidden_size = self.args.hidden_size
 		self.number_layers = self.args.number_layers
 		self.learning_rate = self.args.learning_rate
