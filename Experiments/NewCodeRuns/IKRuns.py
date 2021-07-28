@@ -24,3 +24,11 @@ python cluster_run.py --name='IK_010' --cmd='python Master.py --train=1 --settin
 python cluster_run.py --name='IK_011' --cmd='python Master.py --train=1 --setting=iktrainer --name=IK_011 --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1'
 
 python cluster_run.py --name='IK_012' --cmd='python Master.py --train=1 --setting=iktrainer --name=IK_012 --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=2 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1'
+
+# 
+python Master.py --train=1 --setting=iktrainer --name=IK_010_Eval --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=0 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --model=ExpWandbLogs/IK_010/saved_models/Model_epoch500 --debug=1
+
+# 
+python Master.py --train=1 --setting=iktrainer --name=IK_013 --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=0 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1
+
+python Master.py --train=1 --setting=iktrainer --name=IK_013_Eval --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=0 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --model=ExpWandbLogs/IK_013/saved_models/Model_epoch135 --debug=1

@@ -14,6 +14,7 @@ import copy, os, imageio, scipy.misc, pdb, math, time, numpy as np
 import matplotlib.pyplot as plt
 from IPython import embed
 from memory_profiler import profile
+from PolicyNetworks import *
 
 # # Mocap viz.
 # import MocapVisualizationUtils
@@ -89,7 +90,7 @@ class SawyerVisualizer():
 
 class BaxterVisualizer():
 
-	def __init__(self, has_display=False):
+	def __init__(self, has_display=False, IK_network_path=None):
 
 		# Create environment.
 		print("Do I have a display?", has_display)
@@ -102,7 +103,21 @@ class BaxterVisualizer():
 
 		# Create kinematics object. 
 		self.baxter_IK_object = IKWrapper(self.base_env)
-		self.environment = self.baxter_IK_object.env        
+		self.environment = self.baxter_IK_object.env  
+
+		if IK_network_path is not None:
+			self.load_IK_network(IK_network_path)
+
+	def load_IK_network(self, path):
+		
+		# Now load the IK network! 
+		self.IK_state_size = 14
+		self.hidden_size = 48
+		self.number_layers = 4
+		self.IK_network = ContinuousMLP(self.IK_state_size, self.hidden_size, self.IK_state_size, args=self.args, number_layers=self.number_layers).to(device)
+
+		load_object = torch.load(path)
+		self.IK_network.load_state_dict(load_object['IK_Network'])
 	
 	def update_state(self):
 		# Updates all joint states
@@ -118,8 +133,11 @@ class BaxterVisualizer():
 		# self.baxter_IK_object.
 
 		if seed is None:
-			# Set seed to current state.
-			seed = self.full_state['joint_pos']
+			# # Set seed to current state.
+			# seed = self.full_state['joint_pos']
+
+			# Feed to IK network
+			seed = self.IK_network.forward(torch.tensor(ee_pose).to(device).float()).detach().cpu().numpy()			
 
 		if arm == 'right':
 			joint_positions = self.baxter_IK_object.controller.inverse_kinematics(
