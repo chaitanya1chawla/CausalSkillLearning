@@ -28,7 +28,10 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	elif args.data=='OldMIME':
 		dataset = MIME_DataLoader.MIME_NewDataset(args, short_traj=args.short_trajectories)
 	elif args.data=='MIME':
-		dataset = MIME_DataLoader.MIME_NewMetaDataset(args, short_traj=args.short_trajectories, traj_length_threshold=args.dataset_traj_length_limit)
+		if args.single_hand is None:
+			dataset = MIME_DataLoader.MIME_NewMetaDataset(args, short_traj=args.short_trajectories, traj_length_threshold=args.dataset_traj_length_limit)
+		else:
+			dataset = MIME_DataLoader.MIME_OneHandedDataset(args, short_traj=args.short_trajectories, traj_length_threshold=args.dataset_traj_length_limit)
 	elif args.data=='Roboturk':		
 		dataset = Roboturk_DataLoader.Roboturk_NewSegmentedDataset(args)
 	elif args.data=='OrigRoboturk':
@@ -80,10 +83,18 @@ class Master():
 		elif self.args.setting=='imitation':
 			self.policy_manager = PolicyManager_Imitation(self.args.number_policies, self.dataset, self.args)
 
-		elif self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer']:
-		
-			source_dataset = return_dataset(self.args, data=self.args.source_domain)
-			target_dataset = return_dataset(self.args, data=self.args.target_domain)
+		elif self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
+
+			# Creating two copies of arguments, in case we're transferring between MIME left and MIME right.
+			source_args = copy.deepcopy(self.args)
+			target_args = copy.deepcopy(self.args)
+			source_args.single_hand = self.args.source_single_hand
+			target_args.single_hand = self.args.target_single_hand
+			source_args.ee_trajectories = self.args.source_ee_trajs
+			target_args.ee_trajectories = self.args.target_ee_trajs
+
+			source_dataset = return_dataset(source_args, data=self.args.source_domain)
+			target_dataset = return_dataset(target_args, data=self.args.target_domain)
 		
 			# If we're creating a variation in the dataset: 
 			if self.args.dataset_variation:
@@ -104,7 +115,12 @@ class Master():
 			elif self.args.setting=='jointcycletransfer':
 				self.policy_manager = PolicyManager_JointCycleTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 			elif self.args.setting=='densityjointtransfer':
-				self.policy_manager = PolicyManager_DensityJointTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)				
+				self.policy_manager = PolicyManager_DensityJointTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
+			elif self.args.setting=='densityjointfixembedtransfer':
+				self.policy_manager = PolicyManager_DensityJointFixEmbedTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
+
+		elif self.args.setting in ['iktrainer']:
+			self.policy_manager = PolicyManager_IKTrainer(self.dataset, self.args)
 
 		if self.args.debug:
 			print("Embedding in Master.")
@@ -115,7 +131,8 @@ class Master():
 
 	def run(self):
 		if self.args.setting in ['pretrain_sub','pretrain_prior','imitation','baselineRL','downstreamRL',\
-			'transfer','cycle_transfer','jointtransfer','fixembed','jointcycletransfer', 'jointfixembed', 'jointfixcycle','densityjointtransfer']:
+			'transfer','cycle_transfer','jointtransfer','fixembed','jointcycletransfer', 'jointfixembed',\
+			'jointfixcycle','densityjointtransfer','densityjointfixembedtransfer','iktrainer']:
 			if self.args.train:
 				if self.args.model:
 					self.policy_manager.train(self.args.model)
@@ -199,6 +216,8 @@ def parse_arguments():
 	# Data parameters. 
 	parser.add_argument('--traj_segments',dest='traj_segments',type=int,default=1) # Defines whether to use trajectory segments for pretraining or entire trajectories. Useful for baseline implementation.
 	parser.add_argument('--gripper',dest='gripper',type=int,default=1) # Whether to use gripper training in roboturk.
+	parser.add_argument('--ee_trajectories',dest='ee_trajectories',type=int,default=0,help='Whether to learn a skill space from end effector trajectories rather than joint space.')
+	parser.add_argument('--single_hand',dest='single_hand',type=str,default=None,help='Whether to use a single hand, if so, which hand. Only for MIME dataset.')
 	parser.add_argument('--ds_freq',dest='ds_freq',type=int,default=1) # Additional downsample frequency.
 	parser.add_argument('--condition_size',dest='condition_size',type=int,default=4)
 	parser.add_argument('--smoothen', dest='smoothen',type=int,default=0) # Whether to smoothen the original dataset. 
@@ -312,6 +331,10 @@ def parse_arguments():
 	# Transfer learning domains, etc. 
 	parser.add_argument('--source_domain',dest='source_domain',type=str,help='What the source domain is in transfer.')
 	parser.add_argument('--target_domain',dest='target_domain',type=str,help='What the target domain is in transfer.')
+	parser.add_argument('--source_single_hand',dest='source_single_hand',type=str,default=None,help='Whether to use a single hand for each domain, if so, which hand. Only for MIME dataset.')
+	parser.add_argument('--target_single_hand',dest='target_single_hand',type=str,default=None,help='Whether to use a single hand for each domain, if so, which hand. Only for MIME dataset.')
+	parser.add_argument('--source_ee_trajs',dest='source_ee_trajs',type=int,default=0,help='Whether to use EE trajectories in source domain or not.')
+	parser.add_argument('--target_ee_trajs',dest='target_ee_trajs',type=int,default=0,help='Whether to use EE trajectories in target domain or not.')
 	parser.add_argument('--source_model',dest='source_model',type=str,help='What model to use for the source domain.',default=None)
 	parser.add_argument('--target_model',dest='target_model',type=str,help='What model to use for the target domain.',default=None)
 	parser.add_argument('--source_subpolicy_model',dest='source_subpolicy_model',type=str,help='What subpolicy model to use for the source domain.',default=None)
@@ -329,10 +352,23 @@ def parse_arguments():
 	parser.add_argument('--equivariance_loss_weight',dest='equivariance_loss_weight',type=float,default=1.,help='Weight associated with the equivariance loss.')
 	parser.add_argument('--cross_domain_supervision',dest='cross_domain_supervision',type=int,default=0,help='Whether to use cross domain supervision when operating in pair of same domains.')
 	parser.add_argument('--cross_domain_supervision_loss_weight',dest='cross_domain_supervision_loss_weight',type=float,default=0.,help='Weight associated with the cross domain supervision loss.')
-	parser.add_argument('--cross_domain_density_loss_weight',dest='cross_domain_density_loss_weight',type=float,default=0.,help='Weight associated with the cross domain density loss.')
+	
 	parser.add_argument('--number_of_supervised_datapoints',dest='number_of_supervised_datapoints',type=int,default=0,help='Number of supervised datapoints to use in training.')
 	parser.add_argument('--cycle_cross_domain_supervision_loss_weight',dest='cycle_cross_domain_supervision_loss_weight',type=float,default=0.,help='Weight associated with the cycle cross domain supervision loss.')
 	parser.add_argument('--z_normalization',dest='z_normalization',type=str,default=None,choices=[None, 'global','ind'],help='What normalization to use for zs.')
+
+	# Density loss terms
+	parser.add_argument('--supervised_set_based_density_loss',dest='supervised_set_based_density_loss',type=int,default=0,help='Whether to use the supervised_set_based_density_loss to train.')
+	parser.add_argument('--supervised_set_based_density_loss_weight',dest='supervised_set_based_density_loss_weight',type=float,default=0.,help='Weight associated with the supervised_set_based_density_loss.')
+	parser.add_argument('--cross_domain_density_loss_weight',dest='cross_domain_density_loss_weight',type=float,default=0.,help='Weight associated with the cross domain density loss.')
+	parser.add_argument('--cross_domain_z_tuple_density_loss_weight',dest='cross_domain_z_tuple_density_loss_weight',type=float,default=0.,help='Weight associated with the z tuple cross domain density loss.')	
+	parser.add_argument('--forward_density_loss_weight',dest='forward_density_loss_weight',type=float,default=0.,help='Weight associated with forward density loss.')
+	parser.add_argument('--backward_density_loss_weight',dest='backward_density_loss_weight',type=float,default=0.,help='Weight associated with backward density loss.')
+	parser.add_argument('--forward_tuple_density_loss_weight',dest='forward_tuple_density_loss_weight',type=float,default=0.,help='Weight associated with forward tuple density loss.')
+	parser.add_argument('--backward_tuple_density_loss_weight',dest='backward_tuple_density_loss_weight',type=float,default=0.,help='Weight associated with backward tuple density loss.')	
+	parser.add_argument('--gmm_variance_value', dest='gmm_variance_value', type=float, default=0.5,help='Variance value for GMM components.')
+	parser.add_argument('--gmm_tuple_variance_value', dest='gmm_tuple_variance_value', type=float, default=0.5,help='Variance value for Z Tuple GMM components.')
+	parser.add_argument('--z_tuple_gmm',dest='z_tuple_gmm',type=int,default=0,help='Whether to use a Z Tuple GMM or not.')
 
 	# Wasserstein GAN
 	parser.add_argument('--wasserstein_gan',dest='wasserstein_gan',type=int,default=0,help='Whether to implement Wasserstein GAN or not.')

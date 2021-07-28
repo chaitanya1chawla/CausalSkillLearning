@@ -20,3 +20,5 @@ Experiments/parse_realroboturk.py
 Experiments/Code_Runs/CycleTransfer_Runs.py
 DataGenerator/DeterministicGoalDirectedTraj.py
 DataGenerator/NewGoalDirectedTraj.py
+Toy_Batching.py
+Toy_Batching.txt

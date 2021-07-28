@@ -93,7 +93,6 @@ class BaxterVisualizer():
 
 		# Create environment.
 		print("Do I have a display?", has_display)
-
 		
 		import robosuite, threading
 		from robosuite.wrappers import IKWrapper
@@ -109,10 +108,14 @@ class BaxterVisualizer():
 		# Updates all joint states
 		self.full_state = self.environment._get_observation()
 
-	def set_ee_pose_return_image(self, ee_pose, arm='right', seed=None):
+	def set_ee_pose(self, ee_pose, arm='both', seed=None):
 
 		# Assumes EE pose is Position in the first three elements, and quaternion in last 4 elements. 
+
+		self.environment.reset()		
 		self.update_state()
+
+		# self.baxter_IK_object.
 
 		if seed is None:
 			# Set seed to current state.
@@ -144,10 +147,17 @@ class BaxterVisualizer():
 				target_orientation_left=ee_pose[10:],
 				rest_poses=seed
 			)
+
+		return joint_positions
+
+	def set_ee_pose_return_image(self, ee_pose, arm='right', seed=None):
+		
+		joint_positions = self.set_ee_pose(ee_pose, arm=arm, seed=seed)
+
 		image = self.set_joint_pose_return_image(joint_positions, arm=arm, gripper=False)
 		return image
 
-	def set_joint_pose_return_image(self, joint_pose, arm='both', gripper=False):
+	def set_joint_pose(self, joint_pose, arm='both', gripper=False):
 
 		# FOR FULL 16 DOF STATE: ASSUMES JOINT_POSE IS <LEFT_JA, RIGHT_JA, LEFT_GRIPPER, RIGHT_GRIPPER>.
 
@@ -187,14 +197,25 @@ class BaxterVisualizer():
 			# Move gripper positions.
 			self.environment.step(action)
 
+	def set_joint_pose_return_image(self, joint_pose, arm='both', gripper=False):
+
+		# Just use the set pose function..
+		self.set_joint_pose(joint_pose=joint_pose, arm=arm, gripper=gripper)
+
 		image = np.flipud(self.environment.sim.render(600, 600, camera_name='vizview1'))
 		return image
 
-	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None):
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False):
 
 		image_list = []
 		for t in range(trajectory.shape[0]):
-			new_image = self.set_joint_pose_return_image(trajectory[t])
+
+			# Check whether it's end effector or joint trajectory. 
+			if end_effector: 
+				new_image = self.set_ee_pose_return_image(trajectory[t])
+			else:
+				new_image = self.set_joint_pose_return_image(trajectory[t])
+
 			image_list.append(new_image)
 
 			# Insert white 

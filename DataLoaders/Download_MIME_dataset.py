@@ -74,4 +74,8 @@ for i in range(8,9):
     command = 'wget --continue --tries=0 {0}'.format(download_links[i])
     subprocess.run([command],shell=True)
 
+<<<<<<< HEAD
 >>>>>>> 8a00d770d9f712d084b48df58682534b799db07c
+=======
+>>>>>>> ddcf14db7e7a00bedcd04c9fe76b238d4fb39ec4
+>>>>>>> f7b5302b4eba9bd3dd37c3c2f56cb21cd3e5cc66
