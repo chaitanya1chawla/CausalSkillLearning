@@ -146,7 +146,9 @@ class BaxterVisualizer():
 				seed = self.full_state['joint_pos']
 			else:
 				# Feed to IK network			
-				seed = self.IK_network.forward(torch.tensor(ee_pose).to(device).float()).detach().cpu().numpy()			
+				seed = self.IK_network.forward(torch.tensor(ee_pose).to(device).float()).detach().cpu().numpy()	
+			# The rest poses / seed only makes a difference when you make the IK_object's controller state get set to this seed....
+			self.baxter_IK_object.controller.sync_ik_robot(seed)
 
 		if arm == 'right':
 			joint_positions = self.baxter_IK_object.controller.inverse_kinematics(
