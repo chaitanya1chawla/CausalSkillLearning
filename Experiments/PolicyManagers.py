@@ -11002,6 +11002,15 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		#############################################		
 
 		self.joint_state_loss = ((update_dictionary['predicted_joint_states']-input_dictionary['end_effector_states'])**2).mean()		
+		self.total_loss = self.joint_state_loss
+
+		#############################################		
+		# 5) Optimize. 
+		#############################################		
+
+		self.optimizer.zero_grad()
+		self.total_loss.backward()
+		self.optimizer.step()
 
 		#############################################
 		# 5) Log loss.
