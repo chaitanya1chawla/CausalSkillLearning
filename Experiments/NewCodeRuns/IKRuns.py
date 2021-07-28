@@ -16,4 +16,4 @@ python cluster_run.py --name='IK_004' --cmd='python Master.py --train=1 --settin
 python cluster_run.py --name='IK_005' --cmd='python Master.py --train=1 --setting=iktrainer --name=IK_006 --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=2 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1'
 
 # Play eval
-python Master.py --train=1 --setting=iktrainer --name=IK_004_Eval --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=0 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --model=ExpWandbLogs/IK_004/saved_models/Model_epoch500
+python Master.py --train=1 --setting=iktrainer --name=IK_004_Eval --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=0 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --model=ExpWandbLogs/IK_004/saved_models/Model_epoch500 --debug=1

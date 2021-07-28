@@ -11001,7 +11001,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		# 4) Compute loss.
 		#############################################		
 
-		self.joint_state_loss = ((update_dictionary['predicted_joint_states']-input_dictionary['end_effector_states'])**2).mean()		
+		self.joint_state_loss = ((update_dictionary['predicted_joint_states']-input_dictionary['joint_angle_states'])**2).mean()		
 		self.total_loss = self.joint_state_loss
 
 		#############################################		
