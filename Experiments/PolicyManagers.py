@@ -5955,8 +5955,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			
 				if self.args.no_mujoco==0:
 
-					print("Embed in traj gif logging")
-					embed()
+					# print("Embed in traj gif logging")
+					# embed()
 
 					# x = self.gif_logs['Traj0_Source_Traj']
 					# x[...,0] = 
