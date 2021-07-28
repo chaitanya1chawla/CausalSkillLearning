@@ -721,7 +721,7 @@ class PolicyManager_BaseClass():
 		return [wandb.Image(image.transpose(1,2,0))]		
 
 	def return_wandb_gif(self, gif):
-		return wandb.Video(gif, fps=4, format='gif')
+		return wandb.Video(gif.transpose((0,3,1,2)), fps=4, format='gif')
 
 	def corrupt_inputs(self, input):
 		# 0.1 seems like a good value for the input corruption noise value, that's basically the standard deviation of the Gaussian distribution form which we sample additive noise.
