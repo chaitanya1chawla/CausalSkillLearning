@@ -15,6 +15,12 @@ import matplotlib.pyplot as plt
 from IPython import embed
 from memory_profiler import profile
 from PolicyNetworks import *
+import torch
+# Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
+use_cuda = torch.cuda.is_available()
+device = torch.device("cuda" if use_cuda else "cpu")
+torch.set_printoptions(sci_mode=False, precision=2)
+
 
 # # Mocap viz.
 # import MocapVisualizationUtils
