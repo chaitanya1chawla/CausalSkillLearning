@@ -138,7 +138,15 @@ class BaxterVisualizer():
 		self.environment.reset()		
 		self.update_state()
 
-		# self.baxter_IK_object.
+		#################################################
+		# Normalize EE pose Quaternions
+		#################################################
+
+		if arm=='both':
+			ee_pose[3:7] = ee_pose[3:7]/np.linalg.norm(ee_pose[3:7])
+			ee_pose[10:14] = ee_pose[10:14]/np.linalg.norm(ee_pose[10:14])
+		else:
+			ee_pose[3:] = ee_pose[3:]/np.linalg.norm(ee_pose[3:])
 
 		if seed is None:
 			if self.IK_network is None:
@@ -146,6 +154,11 @@ class BaxterVisualizer():
 				seed = self.full_state['joint_pos']
 			else:
 				# Feed to IK network			
+				# Nice thing about doing this inside the visualizer is that the trajectories will always be correctly unnormalized w.r.t mean / variance / min max. 
+				# HEre, just normalize the L and R ee quaternions.. important when feeding in ee poses that are predicted, because otherwise domain shift. 			
+
+				# Should do this before feeding to IK Network.
+
 				seed = self.IK_network.forward(torch.tensor(ee_pose).to(device).float()).detach().cpu().numpy()	
 			# The rest poses / seed only makes a difference when you make the IK_object's controller state get set to this seed....
 			self.baxter_IK_object.controller.sync_ik_robot(seed)
