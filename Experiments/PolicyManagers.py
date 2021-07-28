@@ -10548,7 +10548,6 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		
 			self.update_plots(counter, viz_dict, log=True)
 
-
 			print("Embed in RUn ITer")
 			embed()
 
