@@ -16,11 +16,11 @@ from IPython import embed
 from memory_profiler import profile
 from PolicyNetworks import *
 import torch
+
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 torch.set_printoptions(sci_mode=False, precision=2)
-
 
 # # Mocap viz.
 # import MocapVisualizationUtils
@@ -113,6 +113,8 @@ class BaxterVisualizer():
 
 		if IK_network_path is not None:
 			self.load_IK_network(IK_network_path)
+		else:
+			self.IK_network = None
 
 	def load_IK_network(self, path):
 		
@@ -139,11 +141,12 @@ class BaxterVisualizer():
 		# self.baxter_IK_object.
 
 		if seed is None:
-			# # Set seed to current state.
-			# seed = self.full_state['joint_pos']
-
-			# Feed to IK network
-			seed = self.IK_network.forward(torch.tensor(ee_pose).to(device).float()).detach().cpu().numpy()			
+			if self.IK_network is None:
+				# Set seed to current state.
+				seed = self.full_state['joint_pos']
+			else:
+				# Feed to IK network			
+				seed = self.IK_network.forward(torch.tensor(ee_pose).to(device).float()).detach().cpu().numpy()			
 
 		if arm == 'right':
 			joint_positions = self.baxter_IK_object.controller.inverse_kinematics(
