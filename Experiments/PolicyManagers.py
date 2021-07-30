@@ -9259,9 +9259,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				# also log b's.
 				update_dictionary['latent_b'] = source_var_dict['latent_b']
 			
-			print("Embed in run iteration to debug supervision")
-			embed()
-			
+
 			#################################################
 			## (4d) If we are using task based discriminability.
 			#################################################
@@ -10463,6 +10461,11 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			cross_domain_input_dict, cross_domain_var_dict, cross_domain_eval_dict = self.encode_decode_trajectory(self.source_manager, i)
 			update_dictionary['cross_domain_latent_z'] = cross_domain_var_dict['latent_z_indices']
 
+			# 
+			print("Embed in run iteration to debug supervision")
+			embed()
+			
+
 			detached_original_latent_z = update_dictionary['latent_z'].detach()
 			update_dictionary['translated_latent_z'] = self.translate_latent_z(detached_original_latent_z, source_var_dict['latent_b'].detach())
 
@@ -10531,6 +10534,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 			if domain==1:
 				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'], differentiable_outputs=True)
+
+
 
 			################################################
 			# 6) Compute gradients of objective and then update networks / policies.
