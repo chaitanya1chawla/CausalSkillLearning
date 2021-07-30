@@ -96,7 +96,7 @@ class SawyerVisualizer():
 
 class BaxterVisualizer():
 
-	def __init__(self, has_display=False, IK_network_path=None):
+	def __init__(self, has_display=False, IK_network_path="ExpWandbLogs/IK_010/saved_models/Model_epoch500"):
 
 		# Create environment.
 		print("Do I have a display?", has_display)
