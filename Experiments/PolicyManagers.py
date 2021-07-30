@@ -9259,6 +9259,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				# also log b's.
 				update_dictionary['latent_b'] = source_var_dict['latent_b']
 			
+			print("Embed in run iteration to debug supervision")
+			embed()
+			
 			#################################################
 			## (4d) If we are using task based discriminability.
 			#################################################
