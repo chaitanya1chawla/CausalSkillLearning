@@ -76,7 +76,7 @@ class PolicyManager_BaseClass():
 			self.tf_logger = TFLogger.Logger()
 
 		if self.args.data in ['MIME','OldMIME'] and not(self.args.no_mujoco):
-			self.visualizer = BaxterVisualizer()
+			self.visualizer = BaxterVisualizer(args=self.args)
 			# self.state_dim = 16
 		elif (self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk') and not(self.args.no_mujoco):
 			self.visualizer = SawyerVisualizer()
@@ -325,7 +325,7 @@ class PolicyManager_BaseClass():
 		# Set visualizer object. 
 		#####################################################
 		if self.args.data in ['MIME','OldMIME']:
-			self.visualizer = BaxterVisualizer()
+			self.visualizer = BaxterVisualizer(args=self.args)
 			# self.state_dim = 16
 		elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
 			self.visualizer = SawyerVisualizer()
@@ -2042,7 +2042,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			if not(self.args.no_mujoco):
 				# self.visualizer = BaxterVisualizer.MujocoVisualizer()
-				self.visualizer = BaxterVisualizer()
+				self.visualizer = BaxterVisualizer(args=self.args)
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/MIME/MIME_Orig_Mean.npy")

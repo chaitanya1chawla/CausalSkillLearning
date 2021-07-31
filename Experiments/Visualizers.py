@@ -96,7 +96,7 @@ class SawyerVisualizer():
 
 class BaxterVisualizer():
 
-	def __init__(self, has_display=False, IK_network_path="ExpWandbLogs/IK_010/saved_models/Model_epoch500"):
+	def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_010/saved_models/Model_epoch500"):
 
 		# Create environment.
 		print("Do I have a display?", has_display)
@@ -110,7 +110,8 @@ class BaxterVisualizer():
 		# Create kinematics object. 
 		self.baxter_IK_object = IKWrapper(self.base_env)
 		self.environment = self.baxter_IK_object.env  
-
+		self.args = args 
+		
 		if IK_network_path is not None:
 			self.load_IK_network(IK_network_path)
 		else:
