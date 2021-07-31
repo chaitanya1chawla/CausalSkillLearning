@@ -127,6 +127,8 @@ class BaxterVisualizer():
 
 		load_object = torch.load(path)
 		self.IK_network.load_state_dict(load_object['IK_Network'])
+
+		print("Loaded IK Network from: ", path)
 	
 	def update_state(self):
 		# Updates all joint states
