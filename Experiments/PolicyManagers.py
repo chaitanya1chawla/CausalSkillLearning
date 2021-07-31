@@ -10887,6 +10887,9 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		# self.extent = (self.extent//self.args.batch_size+1)*self.args.batch_size-self.args.batch_size
 		self.number_epochs = self.args.epochs
 
+		# Create a Baxter visualizer object to fiddle with and verify things against..
+		self.visualizer = BaxterVisualizer(args=self.args)
+
 	def create_networks(self):
 		
 		# Create IK network
@@ -11032,7 +11035,3 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		if self.args.debug:
 			print("Embedding in run iter")
 			embed()
-
-
-
-	
