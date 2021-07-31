@@ -111,7 +111,7 @@ class BaxterVisualizer():
 		self.baxter_IK_object = IKWrapper(self.base_env)
 		self.environment = self.baxter_IK_object.env  
 		self.args = args 
-		
+
 		if IK_network_path is not None:
 			self.load_IK_network(IK_network_path)
 		else:
@@ -159,6 +159,10 @@ class BaxterVisualizer():
 				# HEre, just normalize the L and R ee quaternions.. important when feeding in ee poses that are predicted, because otherwise domain shift. 			
 
 				# Should do this before feeding to IK Network.
+
+				print("Embed in Viz")
+				embed()
+
 
 				seed = self.IK_network.forward(torch.tensor(ee_pose).to(device).float()).detach().cpu().numpy()	
 			# The rest poses / seed only makes a difference when you make the IK_object's controller state get set to this seed....
