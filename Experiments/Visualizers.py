@@ -160,8 +160,8 @@ class BaxterVisualizer():
 
 				# Should do this before feeding to IK Network.
 			
-				print("Embed in Viz")
-				embed()
+				# print("Embed in Viz")
+				# embed()
 
 				seed = self.IK_network.forward(torch.tensor(ee_pose[:14]).to(device).float()).detach().cpu().numpy()
 			# The rest poses / seed only makes a difference when you make the IK_object's controller state get set to this seed....
@@ -190,7 +190,7 @@ class BaxterVisualizer():
 				target_position_right=ee_pose[:3],
 				target_orientation_right=ee_pose[3:7],
 				target_position_left=ee_pose[7:10],
-				target_orientation_left=ee_pose[10:],
+				target_orientation_left=ee_pose[10:14],
 				rest_poses=seed
 			)
 
