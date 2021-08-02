@@ -11025,9 +11025,9 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 							target_orientation_left=ee_pose[10:14],
 							rest_poses=seed))
 
-				if k==7 and t==33:
-					print("embedding in eval")
-					embed()
+				# if k==7 and t==33:
+				# 	print("embedding in eval")
+				# 	embed()
 
 				errors[t] = (abs(joint_positions-js1)).mean()
 
