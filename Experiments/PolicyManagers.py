@@ -11034,7 +11034,8 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 			array_dataset_vs_IK_ee_pose_error[k] = dataset_vs_IK_ee_pose_error.max()
 
 			# print("BI:", k, array_errors[k], array_dataset_vs_recon_ee_pose_error[k], array_dataset_vs_IK_ee_pose_error[k], js.shape[0])
-		print(array_errors.mean(), array_dataset_vs_recon_ee_pose_error.mean(), array_dataset_vs_IK_ee_pose_error.mean())
+		# print(array_errors.mean(), array_dataset_vs_recon_ee_pose_error.mean(), array_dataset_vs_IK_ee_pose_error.mean()) 
+		print("{:10.2f}".format(array_errors.mean()), "{:10.2f}".format(array_dataset_vs_recon_ee_pose_error.mean()), "{:10.2f}".format(array_dataset_vs_IK_ee_pose_error.mean()))
 		
 
 	def run_iteration(self, counter, i, return_z=False, and_train=True):
@@ -11097,8 +11098,14 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 
 		log_dict['Joint State Loss'] = self.joint_state_loss.detach().cpu().numpy()
 		log_dict['Total Loss'] = self.total_loss.detach().cpu().numpy()
-		log_dict['Absolute Joint State Error'] = abs(self.joint_state_error).detach().cpu().numpy()		
+		log_dict['Absolute Joint State Error'] = abs(self.joint_state_error).detach().cpu().numpy()				
 		wandb.log(log_dict, step=counter)
+
+		#############################################
+		# Evaluate.. 
+		
+		self.eval_IK(input_dictionary, update_dictionary)
+		#############################################
 
 		if self.args.debug:
 			print("Embedding in run iter")
