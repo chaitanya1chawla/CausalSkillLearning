@@ -7,7 +7,7 @@ array_dataset_vs_recon_ee_pose_error = np.zeros(bs)
 array_dataset_vs_IK_ee_pose_error = np.zeros(bs)
 
 for k in range(bs):
-
+    
     js = input_dictionary['joint_angle_traj'][:,k,:14]
     ee = input_dictionary['end_effector_traj'][:,k,:14]
     pjs = update_dictionary['predicted_joint_states'].view(js.shape[0],bs,-1)
@@ -50,7 +50,7 @@ for k in range(bs):
     array_dataset_vs_recon_ee_pose_error[k] = dataset_vs_recon_ee_pose_error.max()
     array_dataset_vs_IK_ee_pose_error[k] = dataset_vs_IK_ee_pose_error.max()
 
-    print("BI:", k, array_errors[k], array_dataset_vs_recon_ee_pose_error[k], array_dataset_vs_IK_ee_pose_error[k])
+    print("BI:", k, array_errors[k], array_dataset_vs_recon_ee_pose_error[k], array_dataset_vs_IK_ee_pose_error[k], js.shape[0])
 
 
     
