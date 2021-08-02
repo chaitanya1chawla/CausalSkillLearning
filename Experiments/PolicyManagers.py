@@ -11024,7 +11024,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		# Actually computing loss, and then masking it.
 		self.joint_state_error = (update_dictionary['predicted_joint_states']-input_dictionary['joint_angle_states'])
 		self.joint_state_loss = (self.joint_state_error**2)
-		self.total_loss = (self.torch_batch_mask*self.joint_state_loss)/self.torch_batch_mask.sum()
+		self.total_loss = (self.torch_batch_mask*self.joint_state_loss).sum()/self.torch_batch_mask.sum()
 
 		#############################################		
 		# 5) Optimize. 

@@ -52,9 +52,17 @@ python cluster_run.py --name='IK_031' --cmd='python Master.py --train=1 --settin
 
 python cluster_run.py --name='IK_032' --cmd='python Master.py --train=1 --setting=iktrainer --name=IK_032 --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=2 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --dataset_traj_length_limit=200'
 
-# Rerunning with masked losses. .# Rerunning after fixing stupid mistake
-python cluster_run.py --name='IK_040' --cmd='python Master.py --train=1 --setting=iktrainer --name=IK_040 --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=0 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --dataset_traj_length_limit=200 --normalization=mixmax'
+# Rerunning with masked losses, 
+# and also logging other metrics
+python cluster_run.py --name='IK_050' --cmd='python Master.py --train=1 --setting=iktrainer --name=IK_050 --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=0 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --dataset_traj_length_limit=200 --epochs=2000' 
 
-python cluster_run.py --name='IK_041' --cmd='python Master.py --train=1 --setting=iktrainer --name=IK_041 --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --dataset_traj_length_limit=200 --normalization=mixmax'
+python cluster_run.py --name='IK_051' --cmd='python Master.py --train=1 --setting=iktrainer --name=IK_051 --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --dataset_traj_length_limit=200 --epochs=2000' 
 
-python cluster_run.py --name='IK_042' --cmd='python Master.py --train=1 --setting=iktrainer --name=IK_042 --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=2 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --dataset_traj_length_limit=200 --normalization=mixmax'
+python cluster_run.py --name='IK_052' --cmd='python Master.py --train=1 --setting=iktrainer --name=IK_052 --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=2 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --dataset_traj_length_limit=200 --epochs=2000' 
+
+# and also logging other metrics
+python cluster_run.py --name='IK_060' --cmd='python Master.py --train=1 --setting=iktrainer --name=IK_060 --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=0 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --dataset_traj_length_limit=200 --normalization=mixmax --epochs=2000'
+
+python cluster_run.py --name='IK_061' --cmd='python Master.py --train=1 --setting=iktrainer --name=IK_061 --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --dataset_traj_length_limit=200 --normalization=mixmax --epochs=2000'
+
+python cluster_run.py --name='IK_062' --cmd='python Master.py --train=1 --setting=iktrainer --name=IK_062 --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=2 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --dataset_traj_length_limit=200 --normalization=mixmax --epochs=2000'
