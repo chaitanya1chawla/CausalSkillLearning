@@ -7151,9 +7151,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# tsne_embedded_zs , _ = self.get_transform(self.target_latent_zs)
 		# densne_embedded_zs , _ = self.get_transform(self.target_latent_zs, projection='densne')
 
-		# if domain==1:
-		# 	print("Embedding in construct density embeddings")
-		# 	embed()
+		if domain==1:
+			print("Embedding in construct density embeddings")
+			embed()
 
 		tsne_image = self.plot_density_embedding(tsne_embedded_zs, colors, "{0} Density Coded TSNE Embeddings.".format(prefix))
 		densne_image = self.plot_density_embedding(densne_embedded_zs, colors, "{0} Density Coded DENSNE Embeddings.".format(prefix))
@@ -11015,7 +11015,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		#############################################		
 
 		self.joint_state_loss = ((update_dictionary['predicted_joint_states']-input_dictionary['joint_angle_states'])**2).mean()		
-		self.total_loss = self.joint_state_loss
+		self.total_loss = self.joint_state_loss	
 
 		#############################################		
 		# 5) Optimize. 
