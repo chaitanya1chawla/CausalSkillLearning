@@ -11018,8 +11018,9 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 							target_orientation_right=ee_pose[3:7],
 							target_position_left=ee_pose[7:10],
 							target_orientation_left=ee_pose[10:14],
-							rest_poses=seed
-						))
+							rest_poses=seed))
+
+				print(k,t)		
 
 				errors[t] = (abs(joint_positions-js1)).mean()
 
