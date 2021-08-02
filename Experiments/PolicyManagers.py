@@ -9235,11 +9235,12 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			else:
 				viz_dict = {}
 
-			# if domain==0:
-			# 	lps = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['latent_z'])
-			# 	if lps.min()<-400:
-			# 		print("Embed in run iter of")
-			# 		embed()
+			if domain==0:
+				lps = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['latent_z'])
+				# if lps.min()<-400:
+				if lps.min()<-80:	
+					print("Embed in run iter of")
+					embed()
 
 			####
 			# self.visualize_low_likelihood_skills(domain, update_dictionary, source_input_dict)
