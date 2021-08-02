@@ -10462,9 +10462,9 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			cross_domain_input_dict, cross_domain_var_dict, cross_domain_eval_dict = self.encode_decode_trajectory(self.source_manager, i)
 			update_dictionary['cross_domain_latent_z'] = cross_domain_var_dict['latent_z_indices']
 
-			# 
-			print("Embed in run iteration to debug supervision")
-			embed()
+			# # 
+			# print("Embed in run iteration to debug supervision")
+			# embed()
 			
 
 			detached_original_latent_z = update_dictionary['latent_z'].detach()
