@@ -11022,7 +11022,8 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		self.torch_batch_mask = torch.tensor(self.batch_mask).to(device).float().reshape(-1,1)
 
 		# Actually computing loss, and then masking it.
-		self.joint_state_loss = ((update_dictionary['predicted_joint_states']-input_dictionary['joint_angle_states'])**2)
+		self.joint_state_error = (update_dictionary['predicted_joint_states']-input_dictionary['joint_angle_states'])
+		self.joint_state_loss = (self.joint_state_error**2)
 		self.total_loss = (self.torch_batch_mask*self.joint_state_loss)/self.torch_batch_mask.sum()
 
 		#############################################		
@@ -11038,6 +11039,8 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		#############################################
 
 		log_dict['Joint State Loss'] = self.joint_state_loss.detach().cpu().numpy()
+		log_dict['Total Loss'] = self.total_loss.detach().cpu().numpy()
+		log_dict['Absolute Joint State Error'] = abs(self.joint_state_error).detach().cpu().numpy()		
 		wandb.log(log_dict, step=counter)
 
 		if self.args.debug:
