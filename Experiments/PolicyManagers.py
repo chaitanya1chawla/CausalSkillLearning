@@ -10993,6 +10993,8 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 			
 			js = input_dictionary['joint_angle_traj'][:,k,:14]
 			ee = input_dictionary['end_effector_traj'][:,k,:14]
+			
+
 			pjs = update_dictionary['predicted_joint_states'].view(js.shape[0],bs,-1)
 			vpjs = pjs[:,k]
 
@@ -11004,6 +11006,9 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 				js1 = js[t]
 				ee1 = ee[t]
 				pjs1 = vpjs[t]
+
+				if (js1==0).all():
+					continue				
 
 				ee_pose = ee1
 				seed = pjs1 
