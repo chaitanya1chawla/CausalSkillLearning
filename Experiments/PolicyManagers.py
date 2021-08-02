@@ -11015,8 +11015,15 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		# 4) Compute loss.
 		#############################################		
 
-		self.joint_state_loss = ((update_dictionary['predicted_joint_states']-input_dictionary['joint_angle_states'])**2).mean()		
-		self.total_loss = self.joint_state_loss	
+		# Compute mask..
+		self.batch_mask = np.zeros((input_dictionary['joint_angle_traj'].shape[0],input_dictionary['joint_angle_traj'].shape[1]))
+		for k in range(self.args.batch_size):
+			self.batch_mask[:self.batch_trajectory_lengths[k],k] = 1. 
+		self.torch_batch_mask = torch.tensor(self.batch_mask).to(device).float().reshape(-1,1)
+
+		# Actually computing loss, and then masking it.
+		self.joint_state_loss = ((update_dictionary['predicted_joint_states']-input_dictionary['joint_angle_states'])**2)
+		self.total_loss = (self.torch_batch_mask*self.joint_state_loss)/self.torch_batch_mask.sum()
 
 		#############################################		
 		# 5) Optimize. 
