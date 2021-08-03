@@ -6472,6 +6472,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Sample from.. 
 		if self.args.number_of_supervised_datapoints==-1:
 			max_value = self.extent
+		else:
+			max_value = self.args.number_of_supervised_datapoints
 
 		index_choices = np.arange(0,max_value,self.args.batch_size)
 		
@@ -8766,9 +8768,16 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# Basically feed in the predicted zs from the translation model, and get likelihoods of the zs from the target domain. 
 		# This can be used as a loss function or as an evaluation metric. 
 
-		# Gather Z statistics.
-		detached_z = update_dictionary['latent_z'].detach()
-		cross_domain_z = update_dictionary['cross_domain_latent_z'].detach()
+
+		if self.args.new_supervision:
+			# Gather Z statistics.
+			detached_z = update_dictionary['supervised_latent_z'].detach()
+			cross_domain_z = update_dictionary['cross_domain_supervised_latent_z'].detach()
+
+		else:
+			# Gather Z statistics.
+			detached_z = update_dictionary['latent_z'].detach()
+			cross_domain_z = update_dictionary['cross_domain_latent_z'].detach()
 
 		# # TRYING Z NORMALIZATION THING! 
 		# if self.args.z_normalization is None:
@@ -10429,40 +10438,6 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			wandb.log(log_dict, step=counter)
 		else:
 			return log_dict
-
-	def compute_cross_domain_supervision_loss(self, update_dictionary, domain=1):
-
-		# Basically feed in the predicted zs from the translation model, and get likelihoods of the zs from the target domain. 
-		# This can be used as a loss function or as an evaluation metric. 
-
-		# Gather Z statistics.
-		detached_z = update_dictionary['supervised_latent_z'].detach()
-		cross_domain_z = update_dictionary['cross_domain_supervised_latent_z'].detach()
-
-		# # TRYING Z NORMALIZATION THING! 
-		# if self.args.z_normalization is None:
-		
-		# 	concat_zs = torch.cat([detached_z,cross_domain_z])
-		# 	z_mean = concat_zs.mean(dim=0)
-		# 	z_std = concat_zs.std(dim=0)
-		# 	normed_zs = (concat_zs-z_mean)/z_std
-		# 	detached_z = normed_zs[:detached_z.shape[0]]
-		# 	cross_domain_z = normed_zs[detached_z.shape[0]:]
-			
-		###############################################	
-		
-		if self.args.recurrent_translation:	
-			unweighted_unmasked_cross_domain_supervision_loss = - self.translation_model_list[domain].get_probabilities(detached_z, epsilon=self.translated_z_epsilon, precomputed_b=update_dictionary['latent_b'], evaluate_value=cross_domain_z)
-		else:
-			unweighted_unmasked_cross_domain_supervision_loss = - self.translation_model_list[domain].get_probabilities(detached_z, action_epsilon=self.translated_z_epsilon, evaluate_value=cross_domain_z)
-
-		###############################################
-
-		# # Clamp these values. 
-		# torch.clamp(unmasked_learnt_subpolicy_loglikelihoods,min=self.args.subpolicy_clamp_value)
-
-		return unweighted_unmasked_cross_domain_supervision_loss
-
 
 	# @gpu_profile_every(1)
 	def run_iteration(self, counter, i, domain=None, skip_viz=False):
