@@ -6461,6 +6461,18 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		else: 
 			return None, None, None, None
 
+	def select_supervised_datapoint_batch_index(self):
+		
+		# Randomly sample a supervised datapoint batch index. 
+		# Sample from.. 
+		if self.args.number_of_supervised_datapoints==-1:
+			max_value = self.extent
+
+		index_choices = np.arange(0,max_value,self.args.batch_size)
+		
+		# Now sample from these choices. 
+		return np.random.choice(index_choices)
+
 	def compute_identity_loss(self, update_dictionary):
 
 		# Feed latent z into translation model, force outputs to be unchanged..
@@ -10413,7 +10425,39 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		else:
 			return log_dict
 
-	# Can inherit update plots, supervised loss, etc..
+	def compute_cross_domain_supervision_loss(self, update_dictionary, domain=1):
+
+		# Basically feed in the predicted zs from the translation model, and get likelihoods of the zs from the target domain. 
+		# This can be used as a loss function or as an evaluation metric. 
+
+		# Gather Z statistics.
+		detached_z = update_dictionary['supervised_latent_z'].detach()
+		cross_domain_z = update_dictionary['cross_domain_supervised_latent_z'].detach()
+
+		# # TRYING Z NORMALIZATION THING! 
+		# if self.args.z_normalization is None:
+		
+		# 	concat_zs = torch.cat([detached_z,cross_domain_z])
+		# 	z_mean = concat_zs.mean(dim=0)
+		# 	z_std = concat_zs.std(dim=0)
+		# 	normed_zs = (concat_zs-z_mean)/z_std
+		# 	detached_z = normed_zs[:detached_z.shape[0]]
+		# 	cross_domain_z = normed_zs[detached_z.shape[0]:]
+			
+		###############################################	
+		
+		if self.args.recurrent_translation:	
+			unweighted_unmasked_cross_domain_supervision_loss = - self.translation_model_list[domain].get_probabilities(detached_z, epsilon=self.translated_z_epsilon, precomputed_b=update_dictionary['latent_b'], evaluate_value=cross_domain_z)
+		else:
+			unweighted_unmasked_cross_domain_supervision_loss = - self.translation_model_list[domain].get_probabilities(detached_z, action_epsilon=self.translated_z_epsilon, evaluate_value=cross_domain_z)
+
+		###############################################
+
+		# # Clamp these values. 
+		# torch.clamp(unmasked_learnt_subpolicy_loglikelihoods,min=self.args.subpolicy_clamp_value)
+
+		return unweighted_unmasked_cross_domain_supervision_loss
+
 
 	# @gpu_profile_every(1)
 	def run_iteration(self, counter, i, domain=None, skip_viz=False):
@@ -10471,7 +10515,6 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			# print("Embed in run iteration to debug supervision")
 			# embed()
 			
-
 			detached_original_latent_z = update_dictionary['latent_z'].detach()
 			update_dictionary['translated_latent_z'] = self.translate_latent_z(detached_original_latent_z, source_var_dict['latent_b'].detach())
 
@@ -10536,12 +10579,38 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			# 5c) Compute supervised loss.
 			################################################
 
-			update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(update_dictionary)
+			# Compute new style of supervised loss.
+			if self.args.new_supervision:
 
-			if domain==1:
-				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'], differentiable_outputs=True)
+				# First, get supervised datapoint index that satisfies number of supervised datapoints.
+				supervised_datapoint_index = self.select_supervised_datapoint_batch_index()
+				
+				# Now collect input and representation for this supervised datapoint.
+				source_supervised_input_dict, source_supervised_var_dict, source_supervised_eval_dict = self.encode_decode_trajectory(self.target_manager, supervised_datapoint_index)
 
+				# Now collect cross domain input and representation for this datapoint. 
+				cross_domain_supervised_input_dict, cross_domain_supervised_var_dict, cross_domain_supervised_eval_dict = self.encode_decode_trajectory(self.source_manager, supervised_datapoint_index)
 
+				# Log these things in update_dictionary for loss computation. 
+				update_dictionary['supervised_latent_z'] = source_supervised_var_dict['latent_z_indices']
+				update_dictionary['cross_domain_supervised_latent_z'] = cross_domain_supervised_var_dict['latent_z_indices']
+
+				# Also translate the supervised source latent z for the set based supervised loss.
+				update_dictionary['translated_supervised_latent_z'] = self.translate_latent_z(update_dictionary['supervised_latent_z'].detach(), source_supervised_var_dict['latent_b'].detach())
+
+				# Now compute supervised loss.
+				update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(update_dictionary)
+
+				if domain==1:
+					update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_supervised_latent_z'], update_dictionary['translated_supervised_latent_z'], differentiable_outputs=True)
+
+			else:
+				# Otherwise just compute superivsed loss directly. 
+				update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(update_dictionary)
+
+				# Compute set based superivsed loss.
+				if domain==1:
+					update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'], differentiable_outputs=True)
 
 			################################################
 			# 6) Compute gradients of objective and then update networks / policies.
