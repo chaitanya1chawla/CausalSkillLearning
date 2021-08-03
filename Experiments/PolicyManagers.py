@@ -10289,7 +10289,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		# Does this need to be masked? 	
 		self.unweighted_unmasked_cross_domain_density_loss = self.weighted_forward_loss + self.weighted_backward_loss
 		# Mask..
-		self.unweighted_masked_cross_domain_density_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_density_loss).sum()/(policy_manager.batch_mask.sum())
+		self.unweighted_masked_cross_domain_density_loss = (self.unsupervised_loss_batch_mask*self.unweighted_unmasked_cross_domain_density_loss).sum()/(policy_manager.batch_mask.sum())
 		# Weight this loss.
 		self.cross_domain_density_loss = self.args.cross_domain_density_loss_weight*self.unweighted_masked_cross_domain_density_loss
 
@@ -10326,7 +10326,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 			# Now mask using batch mask.			
 			# self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
-			self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(policy_manager.batch_mask.sum())
+			self.unweighted_masked_cross_domain_supervision_loss = (self.supervised_loss_batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(policy_manager.batch_mask.sum())
 			# Now zero out if we want to use partial supervision..
 			self.datapoint_masked_cross_domain_supervised_loss = self.supervised_datapoints_multiplier*self.unweighted_masked_cross_domain_supervision_loss
 			# Now weight.			
@@ -10482,6 +10482,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		update_dictionary['subpolicy_inputs'], update_dictionary['latent_z'], update_dictionary['loglikelihood'], update_dictionary['kl_divergence'] = \
 			source_eval_dict['subpolicy_inputs'], source_var_dict['latent_z_indices'], source_eval_dict['learnt_subpolicy_loglikelihoods'], source_var_dict['kl_divergence']
 
+		self.unsupervised_loss_batch_mask = copy.deepcopy(self.target_manager.batch_mask)
+
 		if not(skip_viz):			
 
 			################################################
@@ -10567,6 +10569,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 				
 				# Now collect input and representation for this supervised datapoint.
 				source_supervised_input_dict, source_supervised_var_dict, source_supervised_eval_dict = self.encode_decode_trajectory(self.target_manager, supervised_datapoint_index)
+
+				self.supervised_loss_batch_mask = copy.deepcopy(self.target_manager.batch_mask)
 
 				# Now collect cross domain input and representation for this datapoint. 
 				cross_domain_supervised_input_dict, cross_domain_supervised_var_dict, cross_domain_supervised_eval_dict = self.encode_decode_trajectory(self.source_manager, supervised_datapoint_index)
