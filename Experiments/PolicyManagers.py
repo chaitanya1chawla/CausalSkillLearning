@@ -9114,14 +9114,16 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 	def visualize_low_likelihood_skills(self, domain, update_dictionary, input_dict): 
 	
+
+		
 		self.global_traj_counter_max = 10
 
 		if domain==0 and self.global_traj_counter<self.global_traj_counter_max:
 			lps = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['latent_z'])
-			if lps.min()<-400:	
+			if lps.min()<self.lowlikelihood_threshold:	
 
 				# Get z's for which it's low likelihood. 
-				tindices = torch.where(lps<-400)
+				tindices = torch.where(lps<self.lowlikelihood_threshold)
 				indices = (tindices[0].detach().cpu().numpy(), tindices[1].detach().cpu().numpy())
 
 				# Just directly get the trajectory.
@@ -9235,15 +9237,18 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			else:
 				viz_dict = {}
 
-			if domain==0:
-				lps = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['latent_z'])
-				# if lps.min()<-400:
-				if lps.min()<-80:	
-					print("Embed in run iter of")
-					embed()
+			# if domain==0:
+			# 	lps = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['latent_z'])
+			# 	# if lps.min()<-400:
+			# 	if lps.min()<-80:	
+			# 		print("Embed in run iter of")
+			# 		embed()
 
+			
 			####
-			# self.visualize_low_likelihood_skills(domain, update_dictionary, source_input_dict)
+			self.lowlikelihood_threshold = -80
+			self.visualize_low_likelihood_skills(domain, update_dictionary, source_input_dict)
+
 
 			#################################################
 			## (4c) If we are using cross domain supervision.
@@ -10861,7 +10866,7 @@ class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 		# Encode decode function: First encodes, takes trajectory segment, and outputs latent z. The latent z is then provided to decoder (along with initial state), and then we get SOURCE domain subpolicy inputs. 
 		# Cross domain decoding function: Takes encoded latent z (and start state), and then rolls out with target decoder. Function returns, target trajectory, action sequence, and TARGET domain subpolicy inputs. 
 
-class PolicyManager_IKTrainer(PolicyManager_BaseClass):
+class PolicyManager_IKTrainer(PolicyManager_BaseClass):	
 
 	def __init__(self, dataset=None, args=None):
 
@@ -10999,6 +11004,9 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 			vpjs = pjs[:,k]
 
 			errors = np.zeros(js.shape[0])
+			js_vs_IK_errors = np.zeros(js.shape[0])
+			js_vs_seed_errors = np.zeros(js.shape[0])
+
 			dataset_vs_recon_ee_pose_error = np.zeros(js.shape[0])
 			dataset_vs_IK_ee_pose_error = np.zeros(js.shape[0])
 
@@ -11029,7 +11037,10 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 				# 	print("embedding in eval")
 				# 	embed()
 
-				errors[t] = (abs(joint_positions-js1)).mean()
+				# errors[t] = (abs(joint_positions-js1)).mean()
+
+				js_vs_IK_errors[t] = (abs(joint_positions-js1)).mean()
+				js_vs_seed_errors[t] = (abs(seed-js1)).mean()
 
 				self.visualizer.baxter_IK_object.controller.sync_ik_robot(joint_positions)
 				peep2 = np.concatenate(self.visualizer.baxter_IK_object.controller.ik_robot_eef_joint_cartesian_pose())
