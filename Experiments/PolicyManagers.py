@@ -5506,18 +5506,23 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.source_manager.set_epoch(counter)
 		self.target_manager.set_epoch(counter)
 
-		# Check if i is less than the number of supervised datapoints.
-		# If it is, then set the supervised_datapoints_multiplier to 1, otherwise set it to 0. to make sure the supervised loss isn't used for these datapoints..
-		if self.args.number_of_supervised_datapoints == -1:
-			# If fully supervised case..
+		if self.args.new_supervision:
+			# Always set to 1 if new sup
 			self.supervised_datapoints_multiplier = 1. 
 		else:
-			if i<self.args.number_of_supervised_datapoints:
+			
+			# Check if i is less than the number of supervised datapoints.
+			# If it is, then set the supervised_datapoints_multiplier to 1, otherwise set it to 0. to make sure the supervised loss isn't used for these datapoints..
+			if self.args.number_of_supervised_datapoints == -1:
+				# If fully supervised case..
 				self.supervised_datapoints_multiplier = 1. 
 			else:
-				self.supervised_datapoints_multiplier = 0.
-			
-		# print("Iter: ", i, "Sup L W:", self.supervised_datapoints_multiplier)
+				if i<self.args.number_of_supervised_datapoints:
+					self.supervised_datapoints_multiplier = 1. 
+				else:
+					self.supervised_datapoints_multiplier = 0.
+				
+			# print("Iter: ", i, "Sup L W:", self.supervised_datapoints_multiplier)
 	
 	def create_networks(self):
 
