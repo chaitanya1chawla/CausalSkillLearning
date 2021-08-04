@@ -10567,6 +10567,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 				# First, get supervised datapoint index that satisfies number of supervised datapoints.
 				supervised_datapoint_index = self.select_supervised_datapoint_batch_index()
 				
+				print("Sup DPI:", supervised_datapoint_index)
 				# Now collect input and representation for this supervised datapoint.
 				source_supervised_input_dict, source_supervised_var_dict, source_supervised_eval_dict = self.encode_decode_trajectory(self.target_manager, supervised_datapoint_index)
 
