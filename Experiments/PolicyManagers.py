@@ -3975,7 +3975,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				else:
 					# data_element = self.dataset[i:i+self.args.batch_size]
 
-					print("Index actually going into dataset: ",i,i+self.args.batch_size)
+					# print("Index actually going into dataset: ",i,i+self.args.batch_size)
 					data_element = self.dataset[self.sorted_indices[i:i+self.args.batch_size]]
 
 			else:
@@ -10326,6 +10326,9 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			# Call function to compute this. # This function depends on whether we have a translation model or not.. 
 			self.unweighted_unmasked_cross_domain_supervision_loss = update_dictionary['cross_domain_supervised_loss']
 
+			print("Embedding in supervised loss")
+			embed()
+
 			# Now mask using batch mask.			
 			# self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
 			self.unweighted_masked_cross_domain_supervision_loss = (self.supervised_loss_batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(policy_manager.batch_mask.sum())
@@ -10569,7 +10572,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 				# First, get supervised datapoint index that satisfies number of supervised datapoints.
 				supervised_datapoint_index = self.select_supervised_datapoint_batch_index()
 				
-				print("Sup DPI:", supervised_datapoint_index)
+				# print("Sup DPI:", supervised_datapoint_index)
 				# Now collect input and representation for this supervised datapoint.
 				source_supervised_input_dict, source_supervised_var_dict, source_supervised_eval_dict = self.encode_decode_trajectory(self.target_manager, supervised_datapoint_index)
 
