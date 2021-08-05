@@ -172,7 +172,9 @@ class BaxterVisualizer():
 				seed = np.zeros(14)
 
 			# The rest poses / seed only makes a difference when you make the IK_object's controller state get set to this seed....
-			self.baxter_IK_object.controller.sync_ik_robot(seed)
+
+			# Maybe try not syncing? 
+			# self.baxter_IK_object.controller.sync_ik_robot(seed)
 
 		if arm == 'right':
 			joint_positions = self.baxter_IK_object.controller.inverse_kinematics(
