@@ -96,8 +96,8 @@ class SawyerVisualizer():
 
 class BaxterVisualizer():
 
-	# def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_010/saved_models/Model_epoch500"):
-	def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_050/saved_models/Model_epoch2000"):
+	def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_010/saved_models/Model_epoch500"):
+	# def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_050/saved_models/Model_epoch2000"):
 
 		# Create environment.
 		print("Do I have a display?", has_display)
@@ -163,8 +163,8 @@ class BaxterVisualizer():
 
 				# Should do this before feeding to IK Network.
 			
-				# print("Embed in Viz")
-				# embed()
+				print("Embed in Viz")
+				embed()
 
 				seed = self.IK_network.forward(torch.tensor(ee_pose[:14]).to(device).float()).detach().cpu().numpy()
 				# ditch network and see what happens...
@@ -174,7 +174,7 @@ class BaxterVisualizer():
 			# The rest poses / seed only makes a difference when you make the IK_object's controller state get set to this seed....
 
 			# Maybe try not syncing? 
-			self.baxter_IK_object.controller.sync_ik_robot(seed, simulate=False, sync_last=False)
+			self.baxter_IK_object.controller.sync_ik_robot(seed, simulate=False, sync_last=True)
 
 		if arm == 'right':
 			joint_positions = self.baxter_IK_object.controller.inverse_kinematics(
