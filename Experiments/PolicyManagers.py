@@ -10325,13 +10325,9 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		if self.args.cross_domain_supervision:
 			# Call function to compute this. # This function depends on whether we have a translation model or not.. 
 			self.unweighted_unmasked_cross_domain_supervision_loss = update_dictionary['cross_domain_supervised_loss']
-
-			print("Embedding in supervised loss")
-			embed()
-
 			# Now mask using batch mask.			
 			# self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
-			self.unweighted_masked_cross_domain_supervision_loss = (self.supervised_loss_batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(policy_manager.batch_mask.sum())
+			self.unweighted_masked_cross_domain_supervision_loss = (self.supervised_loss_batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(self.supervised_loss_batch_mask.sum())
 			# Now zero out if we want to use partial supervision..
 			self.datapoint_masked_cross_domain_supervised_loss = self.supervised_datapoints_multiplier*self.unweighted_masked_cross_domain_supervision_loss
 			# Now weight.			
@@ -10576,7 +10572,13 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 				# Now collect input and representation for this supervised datapoint.
 				source_supervised_input_dict, source_supervised_var_dict, source_supervised_eval_dict = self.encode_decode_trajectory(self.target_manager, supervised_datapoint_index)
 
+				# Create supervised loss batch mask. 
 				self.supervised_loss_batch_mask = copy.deepcopy(self.target_manager.batch_mask)
+				if self.args.number_of_supervised_datapoints<self.args.batch_mask:					
+					# Find number of items to zero out. 
+					number_of_items = self.args.batch_size - self.args.number_of_supervised_datapoints
+					# Zero out appropriate number of batch items.
+					self.supervised_loss_batch_mask[:,-number_of_items:] = 0.
 
 				# Now collect cross domain input and representation for this datapoint. 
 				cross_domain_supervised_input_dict, cross_domain_supervised_var_dict, cross_domain_supervised_eval_dict = self.encode_decode_trajectory(self.source_manager, supervised_datapoint_index)
