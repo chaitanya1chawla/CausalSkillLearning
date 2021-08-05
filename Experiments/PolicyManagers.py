@@ -10325,7 +10325,10 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		if self.args.cross_domain_supervision:
 			# Call function to compute this. # This function depends on whether we have a translation model or not.. 
 			self.unweighted_unmasked_cross_domain_supervision_loss = update_dictionary['cross_domain_supervised_loss']
-			# Now mask using batch mask.			
+			# Now mask using batch mask.	
+			print("Embed in supervision..")
+			embed() 
+				
 			# self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
 			self.unweighted_masked_cross_domain_supervision_loss = (self.supervised_loss_batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(self.supervised_loss_batch_mask.sum())
 			# Now zero out if we want to use partial supervision..
