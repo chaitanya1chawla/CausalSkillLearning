@@ -163,8 +163,8 @@ class BaxterVisualizer():
 
 				# Should do this before feeding to IK Network.
 			
-				print("Embed in Viz")
-				embed()
+				# print("Embed in Viz")
+				# embed()
 
 				seed = self.IK_network.forward(torch.tensor(ee_pose[:14]).to(device).float()).detach().cpu().numpy()
 				# ditch network and see what happens...

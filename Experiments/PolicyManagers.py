@@ -3974,6 +3974,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 					self.input_task_id = self.index_task_id_map[bucket]					
 				else:
 					# data_element = self.dataset[i:i+self.args.batch_size]
+
+					print("Index actually going into dataset: ",i,i+self.args.batch_size)
 					data_element = self.dataset[self.sorted_indices[i:i+self.args.batch_size]]
 
 			else:
