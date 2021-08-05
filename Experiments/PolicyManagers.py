@@ -10574,7 +10574,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 				# Create supervised loss batch mask. 
 				self.supervised_loss_batch_mask = copy.deepcopy(self.target_manager.batch_mask)
-				if self.args.number_of_supervised_datapoints<self.args.batch_mask:					
+				if self.args.number_of_supervised_datapoints<self.args.batch_size:					
 					# Find number of items to zero out. 
 					number_of_items = self.args.batch_size - self.args.number_of_supervised_datapoints
 					# Zero out appropriate number of batch items.
