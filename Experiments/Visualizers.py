@@ -96,7 +96,8 @@ class SawyerVisualizer():
 
 class BaxterVisualizer():
 
-	def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_010/saved_models/Model_epoch500"):
+	# def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_010/saved_models/Model_epoch500"):
+	def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_050/saved_models/Model_epoch2000"):
 
 		# Create environment.
 		print("Do I have a display?", has_display)
@@ -196,6 +197,8 @@ class BaxterVisualizer():
 				rest_poses=seed
 			)
 
+		# self.set_joint_pose(joint_positions, arm=arm, gripper=False)
+
 		return joint_positions
 
 	def set_ee_pose_return_image(self, ee_pose, arm='right', seed=None):
@@ -203,6 +206,7 @@ class BaxterVisualizer():
 		joint_positions = self.set_ee_pose(ee_pose, arm=arm, seed=seed)
 
 		image = self.set_joint_pose_return_image(joint_positions, arm=arm, gripper=False)
+
 		return image
 
 	def set_joint_pose(self, joint_pose, arm='both', gripper=False):
