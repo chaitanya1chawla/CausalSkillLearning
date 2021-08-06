@@ -11065,7 +11065,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 			ee = input_dictionary['end_effector_traj'][:,k,:14]
 			
 
-			pjs = update_dictionary['predicted_joint_states'].view(js.shape[0],bs,-1)
+			pjs = update_dictionary['predicted_joint_states'].view(js.shape[0],bs,-1).detach().cpu().numpy()
 			vpjs = pjs[:,k]
 
 			errors = np.zeros(js.shape[0])
@@ -11099,8 +11099,8 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 							rest_poses=seed))
 
 				# if k==7 and t==33:
-				print("embedding in eval")
-				embed()
+				# print("embedding in eval")
+				# embed()
 
 				# errors[t] = (abs(joint_positions-js1)).mean()
 
