@@ -11099,8 +11099,8 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 							rest_poses=seed))
 
 				# if k==7 and t==33:
-				# 	print("embedding in eval")
-				# 	embed()
+				print("embedding in eval")
+				embed()
 
 				# errors[t] = (abs(joint_positions-js1)).mean()
 
