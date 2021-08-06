@@ -170,7 +170,8 @@ class BaxterVisualizer():
 				# ditch network and see what happens...
 				# seed = self.full_state['joint_pos']
 				# seed = np.zeros(14)
-				seed = np.random.random(14)
+				# seed = np.random.random(14)
+				seed = np.ones(14)/2
 
 			# The rest poses / seed only makes a difference when you make the IK_object's controller state get set to this seed....
 
