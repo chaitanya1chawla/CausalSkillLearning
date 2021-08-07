@@ -11062,8 +11062,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		for k in range(bs):
 			
 			js = input_dictionary['joint_angle_traj'][:,k,:14]
-			ee = input_dictionary['end_effector_traj'][:,k,:14]
-			
+			ee = input_dictionary['end_effector_traj'][:,k,:14]		
 
 			pjs = update_dictionary['predicted_joint_states'].view(js.shape[0],bs,-1).detach().cpu().numpy()
 			vpjs = pjs[:,k]
