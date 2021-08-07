@@ -173,9 +173,8 @@ class BaxterVisualizer():
 				# seed = np.random.random(14)
 				# seed = np.ones(14)/2
 
-
 				# Mean position
-				mean_position = np.array([ 0.43,  0.48, -1.87,  0.94, -2.01, -1.44,  1.54, -0.41,  0.41, 1.57,  1.29, -1.15,  1.08,  1.69,  0.69,  0.68])
+				mean_position = np.array([ 0.43,  0.48, -1.87,  0.94, -2.01, -1.44,  1.54, -0.41,  0.41, 1.57,  1.29, -1.15,  1.08,  1.69])
 				seed = mean_position
 
 			# The rest poses / seed only makes a difference when you make the IK_object's controller state get set to this seed....
