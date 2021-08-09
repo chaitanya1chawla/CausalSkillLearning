@@ -55,7 +55,7 @@ python cluster_run.py --name='IK_032' --cmd='python Master.py --train=1 --settin
 # Rerunning with masked losses, 
 # and also logging other metrics
 # debug 
-python Master.py --train=1 --setting=iktrainer --name=IKD --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=0 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --dataset_traj_length_limit=200 --epochs=2000
+python Master.py --train=1 --setting=iktrainer --name=IKD --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=0 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --dataset_traj_length_limit=200 --epochs=2000 --debug=1 
 
 python cluster_run.py --name='IK_050' --cmd='python Master.py --train=1 --setting=iktrainer --name=IK_050 --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=0 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --dataset_traj_length_limit=200 --epochs=2000' 
 
@@ -74,3 +74,6 @@ python cluster_run.py --name='IK_062' --cmd='python Master.py --train=1 --settin
 python Master.py --train=1 --setting=iktrainer --name=IK_060_Eval --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=0 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --dataset_traj_length_limit=200 --normalization=mixmax --epochs=2000 --model=ExpWandbLogs/IK_060/saved_models/Model_epoch2000 --debug=1
 
 python Master.py --train=1 --setting=iktrainer --name=IK_050_Eval --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=0 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --short_trajectories=1 --dataset_traj_length_limit=200 --epochs=2000 --model=ExpWandbLogs/IK_050/saved_models/Model_epoch2000
+
+# 
+python Master.py --train=1 --setting=iktrainer --name=IK_010_Eval --data=MIME --number_layers=4 --hidden_size=48 --batch_size=32 --eval_freq=500 --seed=0 --short_trajectories=1 --model=ExpWandbLogs/IK_010/saved_models/Model_epoch500 --debug=1

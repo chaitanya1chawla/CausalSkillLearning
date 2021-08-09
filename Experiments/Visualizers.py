@@ -163,20 +163,20 @@ class BaxterVisualizer():
 
 				# Should do this before feeding to IK Network.
 			
-				# print("Embed in Viz")
-				# embed()
+				print("Embed in IK Viz")
+				embed()
 
 				# seed = self.IK_network.forward(torch.tensor(ee_pose[:14]).to(device).float()).detach().cpu().numpy()
 				# ditch network and see what happens...
 				# seed = self.full_state['joint_pos']
 				# seed = np.zeros(14)
 				# seed = np.random.random(14)
-				# seed = np.ones(14)/2
+				seed = np.ones(14)*0.5
 
 				# Mean position
 				# mean_position = np.array([ 0.43,  0.48, -1.87,  0.94, -2.01, -1.44,  1.54, -0.41,  0.41, 1.57,  1.29, -1.15,  1.08,  1.69])
-				mean_position = np.array([ 0.21,  0.2 , -1.26,  1.28, -0.96,  0.13,  0.  , -0.3 ,  0.06, 1.33,  1.29,  0.01,  0.26, -0.01])
-				seed = mean_position
+				# mean_position = np.array([ 0.21,  0.2 , -1.26,  1.28, -0.96,  0.13,  0.  , -0.3 ,  0.06, 1.33,  1.29,  0.01,  0.26, -0.01])
+				# seed = mean_position
 
 			# The rest poses / seed only makes a difference when you make the IK_object's controller state get set to this seed....
 
