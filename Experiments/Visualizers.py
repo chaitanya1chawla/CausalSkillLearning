@@ -166,12 +166,12 @@ class BaxterVisualizer():
 				# print("Embed in IK Viz")
 				# embed()
 
-				# seed = self.IK_network.forward(torch.tensor(ee_pose[:14]).to(device).float()).detach().cpu().numpy()
+				seed = self.IK_network.forward(torch.tensor(ee_pose[:14]).to(device).float()).detach().cpu().numpy()
 				# ditch network and see what happens...
 				# seed = self.full_state['joint_pos']
 				# seed = np.zeros(14)
 				# seed = np.random.random(14)
-				seed = np.ones(14)*0.5
+				# seed = np.ones(14)*0.5
 
 				# Mean position
 				# mean_position = np.array([ 0.43,  0.48, -1.87,  0.94, -2.01, -1.44,  1.54, -0.41,  0.41, 1.57,  1.29, -1.15,  1.08,  1.69])
