@@ -218,9 +218,9 @@ class BaxterVisualizer():
 		
 		joint_positions = self.set_ee_pose(ee_pose, arm=arm, seed=seed)
 
-		image = self.set_joint_pose_return_image(joint_positions, arm=arm, gripper=False)
+		image, _ = self.set_joint_pose_return_image(joint_positions, arm=arm, gripper=False)
 
-		return image
+		return image, joint_positions
 
 	def set_joint_pose(self, joint_pose, arm='both', gripper=False):
 
@@ -273,11 +273,13 @@ class BaxterVisualizer():
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False):
 
 		image_list = []
+		previous_joint_positions = None
+
 		for t in range(trajectory.shape[0]):
 
 			# Check whether it's end effector or joint trajectory. 
 			if end_effector: 
-				new_image = self.set_ee_pose_return_image(trajectory[t])
+				new_image, previous_joint_positions = self.set_ee_pose_return_image(trajectory[t], seed=previous_joint_positions)
 			else:
 				new_image = self.set_joint_pose_return_image(trajectory[t])
 
