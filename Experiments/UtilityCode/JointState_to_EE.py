@@ -22,7 +22,7 @@ for k, v in enumerate(x):
 	for t in range(v['demo'].shape[0]):
 
 		# Get joint state. 
-		joint_state = v['demo'][t]
+		joint_state = copy.deepcopy(v['demo'][t])
 
 		# # Set joint state. 
 		# visualizer.set_joint_pose(joint_state)
@@ -36,8 +36,8 @@ for k, v in enumerate(x):
 
 		# Instead of using env... 
 		# Use...
-		visualizer.baxter_IK_object.controller.sync_ik_robot(joint_state[:-2])
-		ee_state = np.concatenate(visualizer.baxter_IK_object.controller.ik_robot_eef_joint_cartesian_pose())
+		visualizer.baxter_IK_object.controller.sync_ik_robot(copy.deepcopy(joint_state[:-2]))
+		ee_state = copy.deepcopy(np.concatenate(visualizer.baxter_IK_object.controller.ik_robot_eef_joint_cartesian_pose()))
 
 		# # Can verify this EE state is okay by running it through IK. 
 		ee_pose = ee_state
@@ -67,9 +67,9 @@ for k, v in enumerate(x):
 		ee_state = np.concatenate([ee_state, joint_state[-2:]])
 		
 		if ee_traj is None:
-			ee_traj = ee_state.reshape(1,-1)
+			ee_traj = copy.deepcopy(ee_state.reshape(1,-1))
 		else: 
-			ee_traj = np.concatenate([ee_traj, ee_state.reshape(1,-1)],axis=0)
+			ee_traj = np.concatenate([ee_traj, copy.deepcopy(ee_state.reshape(1,-1))],axis=0)
 
 	v['endeffector_trajectory'] = ee_traj
 

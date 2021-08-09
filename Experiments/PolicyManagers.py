@@ -76,7 +76,7 @@ class PolicyManager_BaseClass():
 			self.tf_logger = TFLogger.Logger()
 
 		if self.args.data in ['MIME','OldMIME'] and not(self.args.no_mujoco):
-			self.visualizer = BaxterVisualizer()
+			self.visualizer = BaxterVisualizer(args=self.args)
 			# self.state_dim = 16
 		elif (self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk') and not(self.args.no_mujoco):
 			self.visualizer = SawyerVisualizer()
@@ -325,7 +325,7 @@ class PolicyManager_BaseClass():
 		# Set visualizer object. 
 		#####################################################
 		if self.args.data in ['MIME','OldMIME']:
-			self.visualizer = BaxterVisualizer()
+			self.visualizer = BaxterVisualizer(args=self.args)
 			# self.state_dim = 16
 		elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
 			self.visualizer = SawyerVisualizer()
@@ -721,7 +721,7 @@ class PolicyManager_BaseClass():
 		return [wandb.Image(image.transpose(1,2,0))]		
 
 	def return_wandb_gif(self, gif):
-		return wandb.Video(gif, fps=4, format='gif')
+		return wandb.Video(gif.transpose((0,3,1,2)), fps=4, format='gif')
 
 	def corrupt_inputs(self, input):
 		# 0.1 seems like a good value for the input corruption noise value, that's basically the standard deviation of the Gaussian distribution form which we sample additive noise.
@@ -2042,7 +2042,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			if not(self.args.no_mujoco):
 				# self.visualizer = BaxterVisualizer.MujocoVisualizer()
-				self.visualizer = BaxterVisualizer()
+				self.visualizer = BaxterVisualizer(args=self.args)
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/MIME/MIME_Orig_Mean.npy")
@@ -3974,6 +3974,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 					self.input_task_id = self.index_task_id_map[bucket]					
 				else:
 					# data_element = self.dataset[i:i+self.args.batch_size]
+
+					# print("Index actually going into dataset: ",i,i+self.args.batch_size)
 					data_element = self.dataset[self.sorted_indices[i:i+self.args.batch_size]]
 
 			else:
@@ -5506,18 +5508,23 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.source_manager.set_epoch(counter)
 		self.target_manager.set_epoch(counter)
 
-		# Check if i is less than the number of supervised datapoints.
-		# If it is, then set the supervised_datapoints_multiplier to 1, otherwise set it to 0. to make sure the supervised loss isn't used for these datapoints..
-		if self.args.number_of_supervised_datapoints == -1:
-			# If fully supervised case..
+		if self.args.new_supervision:
+			# Always set to 1 if new sup
 			self.supervised_datapoints_multiplier = 1. 
 		else:
-			if i<self.args.number_of_supervised_datapoints:
+			
+			# Check if i is less than the number of supervised datapoints.
+			# If it is, then set the supervised_datapoints_multiplier to 1, otherwise set it to 0. to make sure the supervised loss isn't used for these datapoints..
+			if self.args.number_of_supervised_datapoints == -1:
+				# If fully supervised case..
 				self.supervised_datapoints_multiplier = 1. 
 			else:
-				self.supervised_datapoints_multiplier = 0.
-			
-		# print("Iter: ", i, "Sup L W:", self.supervised_datapoints_multiplier)
+				if i<self.args.number_of_supervised_datapoints:
+					self.supervised_datapoints_multiplier = 1. 
+				else:
+					self.supervised_datapoints_multiplier = 0.
+				
+			# print("Iter: ", i, "Sup L W:", self.supervised_datapoints_multiplier)
 	
 	def create_networks(self):
 
@@ -6460,6 +6467,20 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			
 		else: 
 			return None, None, None, None
+
+	def select_supervised_datapoint_batch_index(self):
+		
+		# Randomly sample a supervised datapoint batch index. 
+		# Sample from.. 
+		if self.args.number_of_supervised_datapoints==-1:
+			max_value = self.extent
+		else:
+			max_value = self.args.number_of_supervised_datapoints
+
+		index_choices = np.arange(0,max_value,self.args.batch_size)
+		
+		# Now sample from these choices. 
+		return np.random.choice(index_choices)
 
 	def compute_identity_loss(self, update_dictionary):
 
@@ -8749,9 +8770,16 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# Basically feed in the predicted zs from the translation model, and get likelihoods of the zs from the target domain. 
 		# This can be used as a loss function or as an evaluation metric. 
 
-		# Gather Z statistics.
-		detached_z = update_dictionary['latent_z'].detach()
-		cross_domain_z = update_dictionary['cross_domain_latent_z'].detach()
+
+		if self.args.new_supervision:
+			# Gather Z statistics.
+			detached_z = update_dictionary['supervised_latent_z'].detach()
+			cross_domain_z = update_dictionary['cross_domain_supervised_latent_z'].detach()
+
+		else:
+			# Gather Z statistics.
+			detached_z = update_dictionary['latent_z'].detach()
+			cross_domain_z = update_dictionary['cross_domain_latent_z'].detach()
 
 		# # TRYING Z NORMALIZATION THING! 
 		# if self.args.z_normalization is None:
@@ -9114,14 +9142,16 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 	def visualize_low_likelihood_skills(self, domain, update_dictionary, input_dict): 
 	
+
+		
 		self.global_traj_counter_max = 10
 
 		if domain==0 and self.global_traj_counter<self.global_traj_counter_max:
 			lps = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['latent_z'])
-			if lps.min()<-400:	
+			if lps.min()<self.lowlikelihood_threshold:	
 
 				# Get z's for which it's low likelihood. 
-				tindices = torch.where(lps<-400)
+				tindices = torch.where(lps<self.lowlikelihood_threshold)
 				indices = (tindices[0].detach().cpu().numpy(), tindices[1].detach().cpu().numpy())
 
 				# Just directly get the trajectory.
@@ -9237,12 +9267,16 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 			# if domain==0:
 			# 	lps = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['latent_z'])
-			# 	if lps.min()<-400:
+			# 	# if lps.min()<-400:
+			# 	if lps.min()<-80:	
 			# 		print("Embed in run iter of")
 			# 		embed()
 
+			
 			####
-			# self.visualize_low_likelihood_skills(domain, update_dictionary, source_input_dict)
+			self.lowlikelihood_threshold = -80
+			self.visualize_low_likelihood_skills(domain, update_dictionary, source_input_dict)
+
 
 			#################################################
 			## (4c) If we are using cross domain supervision.
@@ -9259,6 +9293,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				# also log b's.
 				update_dictionary['latent_b'] = source_var_dict['latent_b']
 			
+
 			#################################################
 			## (4d) If we are using task based discriminability.
 			#################################################
@@ -10256,7 +10291,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		# Does this need to be masked? 	
 		self.unweighted_unmasked_cross_domain_density_loss = self.weighted_forward_loss + self.weighted_backward_loss
 		# Mask..
-		self.unweighted_masked_cross_domain_density_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_density_loss).sum()/(policy_manager.batch_mask.sum())
+		self.unweighted_masked_cross_domain_density_loss = (self.unsupervised_loss_batch_mask*self.unweighted_unmasked_cross_domain_density_loss).sum()/(policy_manager.batch_mask.sum())
 		# Weight this loss.
 		self.cross_domain_density_loss = self.args.cross_domain_density_loss_weight*self.unweighted_masked_cross_domain_density_loss
 
@@ -10290,10 +10325,12 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		if self.args.cross_domain_supervision:
 			# Call function to compute this. # This function depends on whether we have a translation model or not.. 
 			self.unweighted_unmasked_cross_domain_supervision_loss = update_dictionary['cross_domain_supervised_loss']
-
-			# Now mask using batch mask.			
+			# Now mask using batch mask.	
+			# print("Embed in supervision..")
+			# embed() 
+				
 			# self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).mean()
-			self.unweighted_masked_cross_domain_supervision_loss = (policy_manager.batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(policy_manager.batch_mask.sum())
+			self.unweighted_masked_cross_domain_supervision_loss = (self.supervised_loss_batch_mask*self.unweighted_unmasked_cross_domain_supervision_loss).sum()/(self.supervised_loss_batch_mask.sum())
 			# Now zero out if we want to use partial supervision..
 			self.datapoint_masked_cross_domain_supervised_loss = self.supervised_datapoints_multiplier*self.unweighted_masked_cross_domain_supervision_loss
 			# Now weight.			
@@ -10406,8 +10443,6 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		else:
 			return log_dict
 
-	# Can inherit update plots, supervised loss, etc..
-
 	# @gpu_profile_every(1)
 	def run_iteration(self, counter, i, domain=None, skip_viz=False):
 
@@ -10451,6 +10486,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		update_dictionary['subpolicy_inputs'], update_dictionary['latent_z'], update_dictionary['loglikelihood'], update_dictionary['kl_divergence'] = \
 			source_eval_dict['subpolicy_inputs'], source_var_dict['latent_z_indices'], source_eval_dict['learnt_subpolicy_loglikelihoods'], source_var_dict['kl_divergence']
 
+		self.unsupervised_loss_batch_mask = copy.deepcopy(self.target_manager.batch_mask)
+
 		if not(skip_viz):			
 
 			################################################
@@ -10460,6 +10497,10 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			cross_domain_input_dict, cross_domain_var_dict, cross_domain_eval_dict = self.encode_decode_trajectory(self.source_manager, i)
 			update_dictionary['cross_domain_latent_z'] = cross_domain_var_dict['latent_z_indices']
 
+			# # 
+			# print("Embed in run iteration to debug supervision")
+			# embed()
+			
 			detached_original_latent_z = update_dictionary['latent_z'].detach()
 			update_dictionary['translated_latent_z'] = self.translate_latent_z(detached_original_latent_z, source_var_dict['latent_b'].detach())
 
@@ -10524,10 +10565,48 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			# 5c) Compute supervised loss.
 			################################################
 
-			update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(update_dictionary)
+			# Compute new style of supervised loss.
+			if self.args.new_supervision:
 
-			if domain==1:
-				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'], differentiable_outputs=True)
+				# First, get supervised datapoint index that satisfies number of supervised datapoints.
+				supervised_datapoint_index = self.select_supervised_datapoint_batch_index()
+				
+				# print("Sup DPI:", supervised_datapoint_index, "Now embedding in run iter")
+				# embed()
+				# Now collect input and representation for this supervised datapoint.
+				source_supervised_input_dict, source_supervised_var_dict, source_supervised_eval_dict = self.encode_decode_trajectory(self.target_manager, supervised_datapoint_index)
+
+				# Create supervised loss batch mask. 
+				self.supervised_loss_batch_mask = copy.deepcopy(self.target_manager.batch_mask)
+				if self.args.number_of_supervised_datapoints<self.args.batch_size:					
+					# Find number of items to zero out. 
+					number_of_items = self.args.batch_size - self.args.number_of_supervised_datapoints
+					# Zero out appropriate number of batch items.
+					self.supervised_loss_batch_mask[:,-number_of_items:] = 0.
+
+				# Now collect cross domain input and representation for this datapoint. 
+				cross_domain_supervised_input_dict, cross_domain_supervised_var_dict, cross_domain_supervised_eval_dict = self.encode_decode_trajectory(self.source_manager, supervised_datapoint_index)
+
+				# Log these things in update_dictionary for loss computation. 
+				update_dictionary['supervised_latent_z'] = source_supervised_var_dict['latent_z_indices']
+				update_dictionary['cross_domain_supervised_latent_z'] = cross_domain_supervised_var_dict['latent_z_indices']
+
+				# Also translate the supervised source latent z for the set based supervised loss.
+				update_dictionary['translated_supervised_latent_z'] = self.translate_latent_z(update_dictionary['supervised_latent_z'].detach(), source_supervised_var_dict['latent_b'].detach())
+
+				# Now compute supervised loss.
+				update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(update_dictionary)
+
+				if domain==1:
+					update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_supervised_latent_z'], update_dictionary['translated_supervised_latent_z'], differentiable_outputs=True)
+
+			else:
+				# Otherwise just compute superivsed loss directly. 
+				update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(update_dictionary)
+
+				# Compute set based superivsed loss.
+				if domain==1:
+					update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'], differentiable_outputs=True)
 
 			################################################
 			# 6) Compute gradients of objective and then update networks / policies.
@@ -10547,6 +10626,9 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			viz_dict['weighted_forward_density_loss'], viz_dict['weighted_backward_density_loss'] = self.weighted_forward_loss.mean().detach().cpu().numpy(), self.weighted_backward_loss.mean().detach().cpu().numpy()
 		
 			self.update_plots(counter, viz_dict, log=True)
+
+			# print("Embed in RUn ITer")
+			# embed()
 
 class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 
@@ -10849,7 +10931,7 @@ class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 		# Encode decode function: First encodes, takes trajectory segment, and outputs latent z. The latent z is then provided to decoder (along with initial state), and then we get SOURCE domain subpolicy inputs. 
 		# Cross domain decoding function: Takes encoded latent z (and start state), and then rolls out with target decoder. Function returns, target trajectory, action sequence, and TARGET domain subpolicy inputs. 
 
-class PolicyManager_IKTrainer(PolicyManager_BaseClass):
+class PolicyManager_IKTrainer(PolicyManager_BaseClass):	
 
 	def __init__(self, dataset=None, args=None):
 
@@ -10875,6 +10957,9 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 
 		# self.extent = (self.extent//self.args.batch_size+1)*self.args.batch_size-self.args.batch_size
 		self.number_epochs = self.args.epochs
+
+		# Create a Baxter visualizer object to fiddle with and verify things against..
+		self.visualizer = BaxterVisualizer(args=self.args)
 
 	def create_networks(self):
 		
@@ -10965,6 +11050,77 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 
 			return batch_trajectory.transpose((1,0,2)), batch_ee_trajectory.transpose((1,0,2))
 			
+	def eval_IK(self, input_dictionary, update_dictionary):
+				
+		bs = 32
+		np.set_printoptions(precision=2)
+
+		array_errors = np.zeros(bs)
+		array_dataset_vs_recon_ee_pose_error = np.zeros(bs)
+		array_dataset_vs_IK_ee_pose_error = np.zeros(bs)
+
+		for k in range(bs):
+			
+			js = input_dictionary['joint_angle_traj'][:,k,:14]
+			ee = input_dictionary['end_effector_traj'][:,k,:14]		
+
+			pjs = update_dictionary['predicted_joint_states'].view(js.shape[0],bs,-1).detach().cpu().numpy()
+			vpjs = pjs[:,k]
+
+			errors = np.zeros(js.shape[0])
+			js_vs_IK_errors = np.zeros(js.shape[0])
+			js_vs_seed_errors = np.zeros(js.shape[0])
+
+			dataset_vs_recon_ee_pose_error = np.zeros(js.shape[0])
+			dataset_vs_IK_ee_pose_error = np.zeros(js.shape[0])
+
+			for t in range(js.shape[0]):
+				js1 = js[t]
+				ee1 = ee[t]
+				pjs1 = vpjs[t]
+
+				if (js1==0).all():
+					continue				
+
+				ee_pose = ee1
+				seed = pjs1 
+				self.visualizer.baxter_IK_object.controller.sync_ik_robot(seed)
+
+				peep = np.concatenate(self.visualizer.baxter_IK_object.controller.ik_robot_eef_joint_cartesian_pose())
+
+				dataset_vs_recon_ee_pose_error[t] = (abs(peep-ee1)).mean()
+
+				joint_positions = np.array(self.visualizer.baxter_IK_object.controller.inverse_kinematics(
+							target_position_right=ee_pose[:3],
+							target_orientation_right=ee_pose[3:7],
+							target_position_left=ee_pose[7:10],
+							target_orientation_left=ee_pose[10:14],
+							rest_poses=seed))
+
+				# if k==7 and t==33:
+				# print("embedding in eval")
+				# embed()
+
+				# errors[t] = (abs(joint_positions-js1)).mean()
+
+				js_vs_IK_errors[t] = (abs(joint_positions-js1)).mean()
+				js_vs_seed_errors[t] = (abs(seed-js1)).mean()
+
+				self.visualizer.baxter_IK_object.controller.sync_ik_robot(joint_positions)
+				peep2 = np.concatenate(self.visualizer.baxter_IK_object.controller.ik_robot_eef_joint_cartesian_pose())
+				
+				dataset_vs_IK_ee_pose_error[t] = (abs(peep2-ee1)).mean()
+
+			# print("BI:",k,errors.max(),dataset_vs_recon_ee_pose_error.max(),dataset_vs_IK_ee_pose_error.max())
+			array_errors[k] = errors.max()
+			array_dataset_vs_recon_ee_pose_error[k] = dataset_vs_recon_ee_pose_error.max()
+			array_dataset_vs_IK_ee_pose_error[k] = dataset_vs_IK_ee_pose_error.max()
+
+			# print("BI:", k, array_errors[k], array_dataset_vs_recon_ee_pose_error[k], array_dataset_vs_IK_ee_pose_error[k], js.shape[0])
+		# print(array_errors.mean(), array_dataset_vs_recon_ee_pose_error.mean(), array_dataset_vs_IK_ee_pose_error.mean()) 
+		print("{:10.2f}".format(array_errors.mean()), "{:10.2f}".format(array_dataset_vs_recon_ee_pose_error.mean()), "{:10.2f}".format(array_dataset_vs_IK_ee_pose_error.mean()))
+		
+
 	def run_iteration(self, counter, i, return_z=False, and_train=True):
 		
 		# Flow: 
@@ -10993,16 +11149,23 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		#############################################		
 		# 3) Feed EE states to IK network and get predicted joint states.
 		#############################################
-	
-	
+		
 		update_dictionary['predicted_joint_states'] = self.IK_network(input_dictionary['end_effector_states'])
 
 		#############################################
 		# 4) Compute loss.
 		#############################################		
 
-		self.joint_state_loss = ((update_dictionary['predicted_joint_states']-input_dictionary['joint_angle_states'])**2).mean()		
-		self.total_loss = self.joint_state_loss
+		# Compute mask..
+		self.batch_mask = np.zeros((input_dictionary['joint_angle_traj'].shape[0],input_dictionary['joint_angle_traj'].shape[1]))
+		for k in range(self.args.batch_size):
+			self.batch_mask[:self.batch_trajectory_lengths[k],k] = 1. 
+		self.torch_batch_mask = torch.tensor(self.batch_mask).to(device).float().reshape(-1,1)
+
+		# Actually computing loss, and then masking it.
+		self.joint_state_error = (update_dictionary['predicted_joint_states']-input_dictionary['joint_angle_states'])
+		self.joint_state_loss = (self.joint_state_error**2)
+		self.total_loss = (self.torch_batch_mask*self.joint_state_loss).sum()/self.torch_batch_mask.sum()
 
 		#############################################		
 		# 5) Optimize. 
@@ -11017,12 +11180,16 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		#############################################
 
 		log_dict['Joint State Loss'] = self.joint_state_loss.detach().cpu().numpy()
+		log_dict['Total Loss'] = self.total_loss.detach().cpu().numpy()
+		log_dict['Absolute Joint State Error'] = abs(self.joint_state_error).detach().cpu().numpy()				
 		wandb.log(log_dict, step=counter)
+
+		#############################################
+		# Evaluate.. 
+		
+		self.eval_IK(input_dictionary, update_dictionary)
+		#############################################
 
 		if self.args.debug:
 			print("Embedding in run iter")
 			embed()
-
-
-
-	
