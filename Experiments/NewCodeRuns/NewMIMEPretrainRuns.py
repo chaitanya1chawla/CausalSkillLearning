@@ -214,3 +214,5 @@ python Master.py --train=0 --setting=pretrain_sub --name=MPE_010_debug --data=MI
 
 # 
 python Master.py --train=0 --setting=pretrain_sub --name=MPE_010_debug --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --normalization=minmax --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --ee_trajectories=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --model=ExpWandbLogs/MPE_010/saved_models/Model_epoch500
+
+python Master.py --train=0 --setting=pretrain_sub --name=MPE_010_debug --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --normalization=minmax --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --ee_trajectories=1 --model=ExpWandbLogs/MPE_010/saved_models/Model_epoch500
