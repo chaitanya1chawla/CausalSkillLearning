@@ -7473,11 +7473,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				# Otherwise set to dummy. 
 				else:					
 					self.source_per_task_datapoints.append([])
-					self.target_per_task_datapoints.append([])
-		
+					self.target_per_task_datapoints.append([])			
 
-		
 
+		print("Embedding in task based supervision setup")
+		embed()
 
 	def train(self, model=None):
 
@@ -7493,7 +7493,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 			# Setup task supervision. 
 			self.setup_task_supervision()
-
 
 		if self.args.setting in ['densityjointfixembedtransfer']:
 			# Specially for this setting, now run initialize_training_batches again without skipping GMM steps.
