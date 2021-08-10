@@ -7430,6 +7430,55 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# For differentiabiity, return tuple of trajectory, actions, state actions, and subpolicy_inputs. 
 		return [differentiable_trajectory, differentiable_action_seq, differentiable_state_action_seq, subpolicy_inputs]
 
+	def setup_task_supervision(self):
+
+		# First construct task lists. 
+		self.source_dataset.task_list = np.zeros(len(self.source_dataset))
+		self.target_dataset.task_list = np.zeros(len(self.target_dataset))
+
+		for k, v in enumerate(self.source_dataset):
+			self.source_dataset.task_list[k] = v['task_id']
+		for k, v in enumerate(self.target_dataset):
+			self.target_dataset.task_list[k] = v['task_id']
+
+		# Now check for tasks that have trajectories in both domains. 
+		# Do we need to do this.. or should we just do this lazily? 
+
+		####################################################
+		# Create index lists of tasks and datapoints here. 
+		####################################################
+		
+		# Well.. we don't want to sample tasks that don't have any trajectories across domains..
+		if self.args.source_data=='MIME' or self.args.target_data=='MIME':
+			self.task_feasibility = np.zeros(20)
+			
+			# Create lists of datapoints in each domain that address each task. 
+			self.source_per_task_datapoints = []
+			self.target_per_task_datapoints = []
+
+			for k in range(20):
+
+				valid_source_indices = (self.source_dataset.task_list==k)
+				valid_target_indices = (self.target_dataset.task_list==k)
+				num_source_tasks = valid_source_indices.sum()
+				num_target_tasks = valid_target_indices.sum()
+				
+				# Compute feasibility as whether there is at least one trajectory of this task in both domains.
+				self.task_feasibility[k] = (num_source_tasks>0) and (num_target_tasks>0)
+
+				# If feasible, log datapoints..
+				if self.task_feasibility[k]:
+					self.source_per_task_datapoints.append(list(np.where(valid_source_indices)[0]))
+					self.target_per_task_datapoints.append(list(np.where(valid_target_indices)[0]))
+				# Otherwise set to dummy. 
+				else:					
+					self.source_per_task_datapoints.append([])
+					self.target_per_task_datapoints.append([])
+		
+
+		
+
+
 	def train(self, model=None):
 
 		# Run some initialization process to manage GPU memory with variable sized batches.
@@ -7438,7 +7487,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# Setup GMM.
 		self.setup_GMM()
-		
+
+		# If we're using task based supervision. 
+		if self.args.task_based_supervision:
+
+			# Setup task supervision. 
+			self.setup_task_supervision()
+
+
 		if self.args.setting in ['densityjointfixembedtransfer']:
 			# Specially for this setting, now run initialize_training_batches again without skipping GMM steps.
 			self.initialize_training_batches(skip=False)
@@ -10487,7 +10543,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			source_eval_dict['subpolicy_inputs'], source_var_dict['latent_z_indices'], source_eval_dict['learnt_subpolicy_loglikelihoods'], source_var_dict['kl_divergence']
 
 		self.unsupervised_loss_batch_mask = copy.deepcopy(self.target_manager.batch_mask)
-
+	
 		if not(skip_viz):			
 
 			################################################
