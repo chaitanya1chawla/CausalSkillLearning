@@ -7449,7 +7449,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		####################################################
 		
 		# Well.. we don't want to sample tasks that don't have any trajectories across domains..
-		if self.args.source_data=='MIME' or self.args.target_data=='MIME':
+		if self.args.source_domain=='MIME' or self.args.target_domain=='MIME':
 			self.task_feasibility = np.zeros(20)
 			
 			# Create lists of datapoints in each domain that address each task. 
