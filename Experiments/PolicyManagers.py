@@ -849,7 +849,7 @@ class PolicyManager_BaseClass():
 			while j < self.task_id_count[k]-self.args.batch_size:
 				# Add a whole batch.
 				block = []
-
+				# While we still have items to add to this batch.
 				while len(block)<self.args.batch_size:				
 
 					# # Append index to block..
@@ -867,18 +867,15 @@ class PolicyManager_BaseClass():
 
 			# Now that we don't have an entire batch to add. 			
 			# Get number of samples we need to add, and check if we need to add at all. 
-			number_of_samples = self.args.batch_size-(self.task_id_count[k]-j)
-			
+			number_of_samples = self.args.batch_size-(self.task_id_count[k]-j)			
 
-			if number_of_samples>0:
+			# Adding check to ssee if there are actually any elements in this task id... 
+			# Otherwise just skip.
+			if number_of_samples>0 and self.task_id_count[k]>0:
 				# Set pool to sample from. 
 				# end_index = -1 if (k+1 >= self.args.number_of_tasks) else k+1
 				# random_sample_pool = np.arange(self.cummulative_count[k],self.cummulative_count[end_index])
 				random_sample_pool = np.arange(self.cummulative_count[k],self.cummulative_count[k+1])
-
-				# Randomly sample the required number of datapoints. 
-				print("Embedding in task based shuffling")
-				embed()
 
 				samples = np.random.randint(self.cummulative_count[k],high=self.cummulative_count[k+1],size=number_of_samples)
 				
@@ -901,6 +898,11 @@ class PolicyManager_BaseClass():
 				# Finally append block to block list. 
 				self.task_based_shuffling_blocks.append(block)
 				self.index_task_id_map.append(k)
+
+		# Randomly sample the required number of datapoints. 
+		print("Embedding in task based shuffling")
+		embed()
+
 
 		#######################################################################
 		# New extent...
