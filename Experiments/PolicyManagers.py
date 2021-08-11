@@ -3118,7 +3118,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		else:
 			return None, None
 
-	def run_iteration(self, counter, i, skip_iteration=False, return_dicts=False, special_indices=None, train=True, input_dictionary=None):
+	def run_iteration(self, counter, i, skip_iteration=False, return_dicts=False, special_indices=None, train=True, input_dictionary=None, bucket_index=None):
 
 		# With learnt discrete subpolicy: 
 
@@ -3140,7 +3140,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		if input_dictionary is None:
 			input_dictionary = {}
-			input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], input_dictionary['concatenated_traj'], input_dictionary['old_concatenated_traj'] = self.collect_inputs(i, special_indices=special_indices, called_from_train=True)
+			input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], input_dictionary['concatenated_traj'], input_dictionary['old_concatenated_traj'] = self.collect_inputs(i, special_indices=special_indices, called_from_train=True, bucket_index=bucket_index)
 			if self.args.task_discriminability:
 				input_dictionary['sample_task_id'] = self.input_task_id
 
@@ -3936,7 +3936,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			self.batch_mask[:self.batch_trajectory_lengths[b], b] = 1.
 
 	# Get batch full trajectory. 
-	def collect_inputs(self, i, get_latents=False, special_indices=None, called_from_train=False):
+	def collect_inputs(self, i, get_latents=False, special_indices=None, called_from_train=False, bucket_index=None):
 
 		# print("# Debug task ID batching")
 		# embed()
@@ -3981,7 +3981,11 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 					# Don't really need to use digitize, we need to digitize with respect to .. 0, 32, 64, ... 8448. 
 					# So.. just use... //32
-					bucket = i//32
+					if bucket_index is None:
+						bucket = i//32
+					else:
+						bucket = bucket_index
+						
 					data_element = self.dataset[np.array(self.task_based_shuffling_blocks[bucket])]
 					self.input_task_id = self.index_task_id_map[bucket]					
 				else:
@@ -8771,7 +8775,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		return latent_z_transformation_vector, latent_z_transformation_weights, None
 
-	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False, domain=None, initialize_run=False):
+	def encode_decode_trajectory(self, policy_manager, i, return_trajectory=False, domain=None, initialize_run=False, bucket_index=None):
 
 		# Check if the index is too big. If yes, just sample randomly.		
 		if i >= len(policy_manager.dataset):
@@ -8780,7 +8784,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		# Since the joint training manager nicely lets us get dictionaries, just use it, but remember not to train. 
 		# This does all the steps we need.
-		source_input_dict, source_var_dict, source_eval_dict = policy_manager.run_iteration(self.counter, i, return_dicts=True, train=False)
+		source_input_dict, source_var_dict, source_eval_dict = policy_manager.run_iteration(self.counter, i, return_dicts=True, train=False, bucket_index=bucket_index)
 
 		if self.args.z_normalization and not(initialize_run):
 			if domain==0:
@@ -10578,7 +10582,10 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 		# Get datapoints in source and target domains for the sampled task ID. 
 		# Efficiently doing this requires index to block maps..
-		pass
+		source_bucket = np.random.choice(self.source_manager.block_index_list_for_task[sampled_task_id])
+		target_bucket = np.random.choice(self.target_manager.block_index_list_for_task[sampled_task_id])
+
+		return source_bucket, target_bucket
 
 	def compute_task_based_supervision_loss(self, update_dictionary):
 
@@ -10592,12 +10599,15 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		# 2) Select a batch of datapoints in both domains from this feasible task. 
 		###########################################################
 
-		source_datapoint_index = np.random.choice(self.source_per_task_datapoints[sampled_task],size=self.args.batch_size)
+		source_bucket, target_bucket = self.get_task_datapoint_indices(sampled_task)		
 		
+		###########################################################
 		# 3) Now implement set based losses on this pair of datapoints.
+		###########################################################
 
-
-		 
+		# Remember, these are bucket indices, not datapoint indices. 
+		self.encode_decode_trajectory(self.source_manager, i, bucket_index=source_bucket)
+		self.encode_decode_trajectory(self.target_manager, i, bucket_index=target_bucket)
 
 	# @gpu_profile_every(1)	
 	def run_iteration(self, counter, i, domain=None, skip_viz=False):
