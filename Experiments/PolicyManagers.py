@@ -801,7 +801,6 @@ class PolicyManager_BaseClass():
 		# Implement task ID based shuffling / batching here... 
 		self.task_id_map = -np.ones(extent,dtype=int)
 		self.task_id_count = np.zeros(self.args.number_of_tasks, dtype=int)		
-		
 
 		for k in range(extent):
 			self.task_id_map[k] = self.dataset[k]['task_id']
@@ -828,6 +827,8 @@ class PolicyManager_BaseClass():
 		
 		# Concatenate this into array. 
 		# This allows us to use existing blocking code, and just directly index into this! 
+		print("Embedding in task based shuffling")
+		embed()
 		self.concatenated_task_id_sorted_indices = np.concatenate(task_sorted_indices_collection)
 
 		#######################################################################
@@ -7456,15 +7457,23 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.source_per_task_datapoints = []
 			self.target_per_task_datapoints = []
 
+			# Number of datapoints per task..
+			self.source_number_of_task_datapoints = np.zeros(20)
+			self.target_number_of_task_datapoints = np.zeros(20)
+
 			for k in range(20):
 
 				valid_source_indices = (self.source_dataset.task_list==k)
 				valid_target_indices = (self.target_dataset.task_list==k)
-				num_source_tasks = valid_source_indices.sum()
-				num_target_tasks = valid_target_indices.sum()
+				# num_source_tasks = valid_source_indices.sum()
+				# num_target_tasks = valid_target_indices.sum()
 				
+				self.source_number_of_task_datapoints[k] = valid_source_indices.sum()
+				self.target_number_of_task_datapoints[k] = valid_target_indices.sum()
+
 				# Compute feasibility as whether there is at least one trajectory of this task in both domains.
-				self.task_feasibility[k] = (num_source_tasks>0) and (num_target_tasks>0)
+				# self.task_feasibility[k] = (num_source_tasks>0) and (num_target_tasks>0)
+				self.task_feasibility[k] = (self.source_number_of_task_datapoints[k]>0) and (self.target_number_of_task_datapoints[k]>0)				
 
 				# If feasible, log datapoints..
 				if self.task_feasibility[k]:
@@ -7473,11 +7482,19 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				# Otherwise set to dummy. 
 				else:					
 					self.source_per_task_datapoints.append([])
-					self.target_per_task_datapoints.append([])			
+					self.target_per_task_datapoints.append([])
 
+			# Task Frequencies..
+			self.task_datapoint_counts = self.task_feasibility*np.min([self.source_number_of_task_datapoints,self.target_number_of_task_datapoints],axis=0)
 
-		print("Embedding in task based supervision setup")
-		embed()
+			# Listing out task indices that we know are bimanual....
+			self.bimanual_indices = [12,14,15]
+			# Create a mask that is true for non bimanual tasks..
+			self.nonbimanual_tasks = np.ones(20)
+			self.nonbimanual_tasks[self.bimanual_indices] = 0
+
+			prefreq = self.task_datapoint_counts*self.nonbimanual_tasks
+			self.task_frequencies = prefreq/prefreq.sum()
 
 	def train(self, model=None):
 
@@ -10498,7 +10515,71 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		else:
 			return log_dict
 
-	# @gpu_profile_every(1)
+	def compute_cross_domain_supervision_loss(self, update_dictionary):
+
+		# Compute new style of supervised loss.
+		if self.args.new_supervision:
+
+			# First, get supervised datapoint index that satisfies number of supervised datapoints.
+			supervised_datapoint_index = self.select_supervised_datapoint_batch_index()
+			
+			# print("Sup DPI:", supervised_datapoint_index, "Now embedding in run iter")
+			# embed()
+			# Now collect input and representation for this supervised datapoint.
+			source_supervised_input_dict, source_supervised_var_dict, source_supervised_eval_dict = self.encode_decode_trajectory(self.target_manager, supervised_datapoint_index)
+
+			# Create supervised loss batch mask. 
+			self.supervised_loss_batch_mask = copy.deepcopy(self.target_manager.batch_mask)
+			if self.args.number_of_supervised_datapoints<self.args.batch_size and not(self.args.number_of_supervised_datapoints==-1):
+				# Find number of items to zero out. 
+				number_of_items = self.args.batch_size - self.args.number_of_supervised_datapoints
+				# Zero out appropriate number of batch items.
+				self.supervised_loss_batch_mask[:,-number_of_items:] = 0.
+
+			# Now collect cross domain input and representation for this datapoint. 
+			cross_domain_supervised_input_dict, cross_domain_supervised_var_dict, cross_domain_supervised_eval_dict = self.encode_decode_trajectory(self.source_manager, supervised_datapoint_index)
+
+			# Log these things in update_dictionary for loss computation. 
+			update_dictionary['supervised_latent_z'] = source_supervised_var_dict['latent_z_indices']
+			update_dictionary['cross_domain_supervised_latent_z'] = cross_domain_supervised_var_dict['latent_z_indices']
+
+			# Also translate the supervised source latent z for the set based supervised loss.
+			update_dictionary['translated_supervised_latent_z'] = self.translate_latent_z(update_dictionary['supervised_latent_z'].detach(), source_supervised_var_dict['latent_b'].detach())
+
+			# Now compute supervised loss.
+			update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(update_dictionary)
+
+			if domain==1:
+				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_supervised_latent_z'], update_dictionary['translated_supervised_latent_z'], differentiable_outputs=True)
+
+		else:
+			# Otherwise just compute superivsed loss directly. 
+			update_dictionary['cross_domain_supervised_loss'] = super().compute_cross_domain_supervision_loss(update_dictionary)
+
+			# Compute set based superivsed loss.
+			if domain==1:
+				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'], differentiable_outputs=True)
+
+	def compute_task_based_supervision_loss(self, update_dictionary):
+
+		###########################################################
+		# 1) Select a feasbile task. 
+		###########################################################
+		task_list = np.arange(0,20)
+		sampled_task = np.random.choice(task_list, size=1, p=self.task_frequencies)[0]
+		
+		###########################################################
+		# 2) Select a batch of datapoints in both domains from this feasible task. 
+		###########################################################
+
+		source_datapoint_index = np.random.choice(self.source_per_task_datapoints[sampled_task],size=self.args.batch_size)
+		
+		# 3) Now implement set based losses on this pair of datapoints.
+
+
+		 
+
+	# @gpu_profile_every(1)	
 	def run_iteration(self, counter, i, domain=None, skip_viz=False):
 
 		# Overall algorithm.
@@ -10620,48 +10701,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			# 5c) Compute supervised loss.
 			################################################
 
-			# Compute new style of supervised loss.
-			if self.args.new_supervision:
-
-				# First, get supervised datapoint index that satisfies number of supervised datapoints.
-				supervised_datapoint_index = self.select_supervised_datapoint_batch_index()
-				
-				# print("Sup DPI:", supervised_datapoint_index, "Now embedding in run iter")
-				# embed()
-				# Now collect input and representation for this supervised datapoint.
-				source_supervised_input_dict, source_supervised_var_dict, source_supervised_eval_dict = self.encode_decode_trajectory(self.target_manager, supervised_datapoint_index)
-
-				# Create supervised loss batch mask. 
-				self.supervised_loss_batch_mask = copy.deepcopy(self.target_manager.batch_mask)
-				if self.args.number_of_supervised_datapoints<self.args.batch_size and not(self.args.number_of_supervised_datapoints==-1):
-					# Find number of items to zero out. 
-					number_of_items = self.args.batch_size - self.args.number_of_supervised_datapoints
-					# Zero out appropriate number of batch items.
-					self.supervised_loss_batch_mask[:,-number_of_items:] = 0.
-
-				# Now collect cross domain input and representation for this datapoint. 
-				cross_domain_supervised_input_dict, cross_domain_supervised_var_dict, cross_domain_supervised_eval_dict = self.encode_decode_trajectory(self.source_manager, supervised_datapoint_index)
-
-				# Log these things in update_dictionary for loss computation. 
-				update_dictionary['supervised_latent_z'] = source_supervised_var_dict['latent_z_indices']
-				update_dictionary['cross_domain_supervised_latent_z'] = cross_domain_supervised_var_dict['latent_z_indices']
-
-				# Also translate the supervised source latent z for the set based supervised loss.
-				update_dictionary['translated_supervised_latent_z'] = self.translate_latent_z(update_dictionary['supervised_latent_z'].detach(), source_supervised_var_dict['latent_b'].detach())
-
-				# Now compute supervised loss.
-				update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(update_dictionary)
-
-				if domain==1:
-					update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_supervised_latent_z'], update_dictionary['translated_supervised_latent_z'], differentiable_outputs=True)
-
-			else:
-				# Otherwise just compute superivsed loss directly. 
-				update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(update_dictionary)
-
-				# Compute set based superivsed loss.
-				if domain==1:
-					update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'], differentiable_outputs=True)
+			self.compute_cross_domain_supervision_loss(update_dictionary)
 
 			################################################
 			# 6) Compute gradients of objective and then update networks / policies.
