@@ -252,7 +252,7 @@ class PolicyManager_BaseClass():
 			self.shuffle(extent)
 			self.batch_indices_sizes = []
 
-			if self.args.task_discriminability:
+			if self.args.task_discriminability or self.args.task_based_supervision:
 				extent = self.extent
 
 			t1 = time.time()
@@ -954,7 +954,7 @@ class PolicyManager_BaseClass():
 		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk']:
 	
 
-			if self.args.task_discriminability:
+			if self.args.task_discriminability or self.args.task_based_supervision:
 
 				# If we're in the BatchJoint setting, actually run task_based_shuffling.
 				if isinstance(self, PolicyManager_BatchJoint):						
@@ -3141,7 +3141,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		if input_dictionary is None:
 			input_dictionary = {}
 			input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], input_dictionary['concatenated_traj'], input_dictionary['old_concatenated_traj'] = self.collect_inputs(i, special_indices=special_indices, called_from_train=True, bucket_index=bucket_index)
-			if self.args.task_discriminability:
+			if self.args.task_discriminability or self.args.task_based_supervision:
 				input_dictionary['sample_task_id'] = self.input_task_id
 
 			# if not(torch.is_tensor(input_dictionary['old_concatenated_traj'])):
@@ -3977,7 +3977,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 					   
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 
-				if self.args.task_discriminability:
+				if self.args.task_discriminability or self.args.task_based_supervision:
 
 					# Don't really need to use digitize, we need to digitize with respect to .. 0, 32, 64, ... 8448. 
 					# So.. just use... //32
@@ -3985,7 +3985,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 						bucket = i//32
 					else:
 						bucket = bucket_index
-						
+
 					data_element = self.dataset[np.array(self.task_based_shuffling_blocks[bucket])]
 					self.input_task_id = self.index_task_id_map[bucket]					
 				else:
@@ -4096,7 +4096,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				return batch_trajectory, scaled_action_sequence, concatenated_traj, old_concatenated_traj
 
 			# If we're using task based discriminability. 
-			if self.args.task_discriminability:
+			if self.args.task_discriminability or self.args.task_based_supervision:
 				# Set the task ID's. 
 				self.batch_task_ids = np.zeros((self.args.batch_size), dtype=int)
 				for k in range(self.args.batch_size):
@@ -9299,7 +9299,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		update_dictionary['subpolicy_inputs'], update_dictionary['latent_z'], update_dictionary['loglikelihood'], update_dictionary['kl_divergence'] = \
 			source_eval_dict['subpolicy_inputs'], source_var_dict['latent_z_indices'], source_eval_dict['learnt_subpolicy_loglikelihoods'], source_var_dict['kl_divergence']
 		
-		if self.args.task_discriminability:
+		if self.args.task_discriminability or self.args.task_based_supervision:
 			update_dictionary['sample_task_id'] = source_input_dict['sample_task_id']
 
 		if update_dictionary['latent_z'] is not None:
@@ -10587,7 +10587,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 		return source_bucket, target_bucket
 
-	def compute_task_based_supervision_loss(self, update_dictionary):
+	def compute_task_based_supervision_loss(self, update_dictionary, i):
 
 		###########################################################
 		# 1) Select a feasbile task. 
@@ -10602,12 +10602,19 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		source_bucket, target_bucket = self.get_task_datapoint_indices(sampled_task)		
 		
 		###########################################################
-		# 3) Now implement set based losses on this pair of datapoints.
+		# 3) Run skill learning pipeline on this pair of datapoints.
 		###########################################################
 
-		# Remember, these are bucket indices, not datapoint indices. 
-		self.encode_decode_trajectory(self.source_manager, i, bucket_index=source_bucket)
-		self.encode_decode_trajectory(self.target_manager, i, bucket_index=target_bucket)
+		source_sup_input_dict, source_sup_var_dict, source_sup_eval_dict = self.encode_decode_trajectory(self.source_manager, i, bucket_index=source_bucket)
+		target_sup_input_dict, target_sup_var_dict, target_sup_eval_dict = self.encode_decode_trajectory(self.target_manager, i, bucket_index=target_bucket)
+
+		###########################################################
+		# 4) Now implement set based losses on this pair of datapoints.
+		###########################################################
+
+		# Remember, now we need to implement tuple based version of set loss..
+		print("Embed in compute task based supervision loss")
+		embed()
 
 	# @gpu_profile_every(1)	
 	def run_iteration(self, counter, i, domain=None, skip_viz=False):
@@ -11128,7 +11135,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 					   
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 
-				if self.args.task_discriminability:
+				if self.args.task_discriminability or self.args.task_based_supervision:
 
 					# Don't really need to use digitize, we need to digitize with respect to .. 0, 32, 64, ... 8448. 
 					# So.. just use... //32
