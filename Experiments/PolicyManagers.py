@@ -10550,7 +10550,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			update_dictionary['translated_supervised_latent_z'] = self.translate_latent_z(update_dictionary['supervised_latent_z'].detach(), source_supervised_var_dict['latent_b'].detach())
 
 			# Now compute supervised loss.
-			update_dictionary['cross_domain_supervised_loss'] = self.compute_cross_domain_supervision_loss(update_dictionary)
+			update_dictionary['cross_domain_supervised_loss'] = super().compute_cross_domain_supervision_loss(update_dictionary)
 
 			if domain==1:
 				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_supervised_latent_z'], update_dictionary['translated_supervised_latent_z'], differentiable_outputs=True)
