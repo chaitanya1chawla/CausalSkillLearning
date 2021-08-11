@@ -827,8 +827,7 @@ class PolicyManager_BaseClass():
 		
 		# Concatenate this into array. 
 		# This allows us to use existing blocking code, and just directly index into this! 
-		print("Embedding in task based shuffling")
-		embed()
+		
 		self.concatenated_task_id_sorted_indices = np.concatenate(task_sorted_indices_collection)
 
 		#######################################################################
@@ -878,6 +877,9 @@ class PolicyManager_BaseClass():
 				random_sample_pool = np.arange(self.cummulative_count[k],self.cummulative_count[k+1])
 
 				# Randomly sample the required number of datapoints. 
+				print("Embedding in task based shuffling")
+				embed()
+
 				samples = np.random.randint(self.cummulative_count[k],high=self.cummulative_count[k+1],size=number_of_samples)
 				
 				# Create last block. 
