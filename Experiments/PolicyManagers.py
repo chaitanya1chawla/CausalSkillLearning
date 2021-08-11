@@ -10740,6 +10740,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 			if self.args.task_based_supervision:
 				self.compute_task_based_supervision_loss(update_dictionary)
+				# For deubgz
+				update_dictionary['cross_domain_supervised_loss'] = 0.
 			else:
 				self.compute_cross_domain_supervision_loss(update_dictionary)
 
