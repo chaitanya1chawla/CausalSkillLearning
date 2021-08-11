@@ -10578,6 +10578,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 		# Get datapoints in source and target domains for the sampled task ID. 
 		# Efficiently doing this requires index to block maps..
+		pass
 
 	def compute_task_based_supervision_loss(self, update_dictionary):
 
