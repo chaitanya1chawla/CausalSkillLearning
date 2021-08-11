@@ -899,6 +899,17 @@ class PolicyManager_BaseClass():
 				self.task_based_shuffling_blocks.append(block)
 				self.index_task_id_map.append(k)
 
+		# Also create a block - task ID map.., for easy sampling.. 
+		# This is a list of bucket indices for each task that can index into self.task_based_shuffling_blocks...
+		self.block_index_list_for_task = []
+		
+		self.index_task_id_map_array = np.array(self.index_task_id_map)
+
+		for k in range(self.args.number_of_tasks):
+
+			temp_indices = np.where(self.index_task_id_map_array==k)[0]			
+			self.block_index_list_for_task.append(temp_indices)	
+
 		# Randomly sample the required number of datapoints. 
 		#######################################################################
 		# New extent...
@@ -10562,6 +10573,11 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			# Compute set based superivsed loss.
 			if domain==1:
 				update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = self.compute_set_based_supervised_GMM_loss(update_dictionary['cross_domain_latent_z'], update_dictionary['translated_latent_z'], differentiable_outputs=True)
+
+	def get_task_datapoint_indices(self, sampled_task_id):
+
+		# Get datapoints in source and target domains for the sampled task ID. 
+		# Efficiently doing this requires index to block maps..
 
 	def compute_task_based_supervision_loss(self, update_dictionary):
 
