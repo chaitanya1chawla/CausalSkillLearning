@@ -900,10 +900,6 @@ class PolicyManager_BaseClass():
 				self.index_task_id_map.append(k)
 
 		# Randomly sample the required number of datapoints. 
-		print("Embedding in task based shuffling")
-		embed()
-
-
 		#######################################################################
 		# New extent...
 		self.extent = len(np.concatenate(self.task_based_shuffling_blocks))
@@ -7499,6 +7495,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 			prefreq = self.task_datapoint_counts*self.nonbimanual_tasks
 			self.task_frequencies = prefreq/prefreq.sum()
+
+			print("Embedding in setup task blah")
+			embed()
 
 	def train(self, model=None):
 
