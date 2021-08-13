@@ -10440,10 +10440,20 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			self.cross_domain_supervision_loss = 0.
 
 		###########################################################
-		# (1d) Finally, compute total loss.
+		# (1d) If active, compute the task based density loss.
 		###########################################################
 
-		self.total_VAE_loss = self.cross_domain_supervision_loss + self.cross_domain_density_loss + self.cross_domain_z_tuple_density_loss
+		if self.args.task_based_supervision:
+			self.unweighted_task_based_supervised_loss = self.forward_supervised_set_tuple_based_loss + self.backward_supervised_set_tuple_based_loss			
+		else:
+			self.unweighted_task_based_supervised_loss = 0.
+		self.task_based_supervised_loss = self.args.task_based_supervised_loss_weight*self.unweighted_task_based_supervised_loss
+
+		###########################################################
+		# (1e) Finally, compute total loss.
+		###########################################################
+
+		self.total_VAE_loss = self.cross_domain_supervision_loss + self.cross_domain_density_loss + self.cross_domain_z_tuple_density_loss + self.task_based_supervised_loss
 
 		# Go backward through the generator (encoder / decoder), and take a step. 
 		self.total_VAE_loss.backward()
@@ -10536,6 +10546,12 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			log_dict['Unweighted Backward Z Tuple Density Loss'] = self.unweighted_backward_z_tuple_density_loss			
 			log_dict['Unweighted Z Tuple Density Loss'] = self.unweighted_masked_cross_domain_z_tuple_density_loss
 			log_dict['Z Tuple Density Loss'] = self.cross_domain_z_tuple_density_loss 
+
+		if self.args.task_based_supervision:
+
+			# Log task based supervised loss. 
+			log_dict['Unweighted Task Based Supervised Loss'] = self.unweighted_task_based_supervised_loss.detach().cpu().numpy()
+			log_dict['Task Based Supervised Loss'] = self.task_based_supervised_loss.detach().cpu().numpy()
 
 		# Actually log. 
 		if log:
@@ -10778,9 +10794,9 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			if self.args.task_based_supervision:
 				self.compute_task_based_supervision_loss(update_dictionary, i)
 				# For deubgz
-				update_dictionary['cross_domain_supervised_loss'] = 0.
-			else:
-				self.compute_cross_domain_supervision_loss(update_dictionary)
+				# update_dictionary['cross_domain_supervised_loss'] = 0.
+			
+			self.compute_cross_domain_supervision_loss(update_dictionary)
 
 			################################################
 			# 6) Compute gradients of objective and then update networks / policies.
