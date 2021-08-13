@@ -5832,7 +5832,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 			if self.args.setting in ['densityjointtransfer','densityjointfixembedtransfer'] and self.args.z_gmm:
 				log_dict['Unweighted Cross Domain Density Loss'] = self.unweighted_masked_cross_domain_density_loss.mean()
-				log_dict['Cross Domain Density Loss'] = self.cro]ss_domain_density_loss.mean()
+				log_dict['Cross Domain Density Loss'] = self.cross_domain_density_loss.mean()
 
 				if self.args.setting in ['densityjointfixembedtransfer'] and self.args.z_gmm:
 					log_dict['Forward GMM Density Loss'] = viz_dict['forward_density_loss']
