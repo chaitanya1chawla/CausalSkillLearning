@@ -387,7 +387,7 @@ def parse_arguments():
 	parser.add_argument('--task_discriminator_weight',dest='task_discriminator_weight',type=float,default=0.,help='Loss weight associated with task discriminator(s)')
 	parser.add_argument('--task_based_supervision',dest='task_based_supervision',type=int,default=0,help='Whether or not we are using task based supervision.')
 	
-	parser.add_argument('--pure_supervision',dest='pure_supervision',tye=int,default=0,help='Whether or not to use pure supervision and ignore unsupervised losses.')
+	parser.add_argument('--pure_supervision',dest='pure_supervision',type=int,default=0,help='Whether or not to use pure supervision and ignore unsupervised losses.')
 	parser.add_argument('--task_based_supervised_loss_weight',dest='task_based_supervised_loss_weight',type=float,default=0.,help='Loss weight associated with the task based supervised loss.')
 
 	# Parameters for contextual training. 
