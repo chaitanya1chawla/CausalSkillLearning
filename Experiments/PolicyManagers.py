@@ -10795,8 +10795,9 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 				self.compute_task_based_supervision_loss(update_dictionary, i)
 				# For deubgz
 				# update_dictionary['cross_domain_supervised_loss'] = 0.
-			
-			self.compute_cross_domain_supervision_loss(update_dictionary)
+			if self.args.cross_domain_supervision:
+				self.compute_cross_domain_supervision_loss(update_dictionary)
+				update_dictionary['cross_domain_supervised_loss'] = 0.
 
 			################################################
 			# 6) Compute gradients of objective and then update networks / policies.
