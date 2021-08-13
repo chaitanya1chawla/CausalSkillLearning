@@ -370,6 +370,7 @@ def parse_arguments():
 	parser.add_argument('--gmm_variance_value', dest='gmm_variance_value', type=float, default=0.5,help='Variance value for GMM components.')
 	parser.add_argument('--gmm_tuple_variance_value', dest='gmm_tuple_variance_value', type=float, default=0.5,help='Variance value for Z Tuple GMM components.')
 	parser.add_argument('--z_tuple_gmm',dest='z_tuple_gmm',type=int,default=0,help='Whether to use a Z Tuple GMM or not.')
+	parser.add_argument('--z_gmm',dest='z_gmm',type=int,default=0,help='Whether to use a Z GMM or not.')
 
 	# Wasserstein GAN
 	parser.add_argument('--wasserstein_gan',dest='wasserstein_gan',type=int,default=0,help='Whether to implement Wasserstein GAN or not.')

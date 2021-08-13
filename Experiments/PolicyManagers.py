@@ -10384,17 +10384,21 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		###########################################################
 		# (1a) First compute cross domain density. 
 		###########################################################
+		if self.args.z_gmm:
+			self.weighted_forward_loss = - self.args.forward_density_loss_weight*update_dictionary['forward_density_loss']
+			self.weighted_backward_loss = - self.args.backward_density_loss_weight*update_dictionary['backward_density_loss']
 
-		self.weighted_forward_loss = - self.args.forward_density_loss_weight*update_dictionary['forward_density_loss']
-		self.weighted_backward_loss = - self.args.backward_density_loss_weight*update_dictionary['backward_density_loss']
+			# Does this need to be masked? 	
+			self.unweighted_unmasked_cross_domain_density_loss = self.weighted_forward_loss + self.weighted_backward_loss
+			# Mask..
+			self.unweighted_masked_cross_domain_density_loss = (self.unsupervised_loss_batch_mask*self.unweighted_unmasked_cross_domain_density_loss).sum()/(policy_manager.batch_mask.sum())
 
-		# Does this need to be masked? 	
-		self.unweighted_unmasked_cross_domain_density_loss = self.weighted_forward_loss + self.weighted_backward_loss
-		# Mask..
-		self.unweighted_masked_cross_domain_density_loss = (self.unsupervised_loss_batch_mask*self.unweighted_unmasked_cross_domain_density_loss).sum()/(policy_manager.batch_mask.sum())
+		else:
+			self.unweighted_masked_cross_domain_density_loss = 0.
+		
 		# Weight this loss.
 		self.cross_domain_density_loss = self.args.cross_domain_density_loss_weight*self.unweighted_masked_cross_domain_density_loss
-
+		
 		###########################################################
 		# (1b) Compute cross domain z tuple density. 
 		###########################################################
