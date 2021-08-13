@@ -5830,9 +5830,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				log_dict['Datapoint Masked Cross Domain Supervision Loss'] = self.datapoint_masked_cross_domain_supervised_loss
 				log_dict['Cross Domain Superivision Loss'] = self.cross_domain_supervision_loss
 
-			if self.args.setting in ['densityjointtransfer','densityjointfixembedtransfer']:
-				log_dict['Unweighted Cross Domain Density Loss'] = self.unweighted_masked_cross_domain_density_loss.mean()
-				log_dict['Cross Domain Density Loss'] = self.cross_domain_density_loss.mean()
+			if self.args.setting in ['densityjointtransfer','densityjointfixembedtransfer'] and self.args.z_gmm:
+				log_dict['Unweighted Cross Domain Density Loss' = self.unweighted_masked_cross_domain_density_loss.mean()
+				log_dict['Cross Domain Density Loss'] = self.cro]ss_domain_density_loss.mean()
 
 				if self.args.setting in ['densityjointfixembedtransfer'] and self.args.z_gmm:
 					log_dict['Forward GMM Density Loss'] = viz_dict['forward_density_loss']
@@ -10626,8 +10626,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		task_list = np.arange(0,20)
 		sampled_task = np.random.choice(task_list, size=1, p=self.task_frequencies)[0]
 		
-		print("Embed in getting index")
-		embed()
+		# print("Embed in getting index")
+		# embed()
 		###########################################################
 		# 2) Select a batch of datapoints in both domains from this feasible task. 
 		###########################################################
