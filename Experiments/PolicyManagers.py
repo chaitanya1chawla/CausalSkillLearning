@@ -7261,6 +7261,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Now query log probabilities.
 		if len(z_set_1.shape)>2 and len(z_set_1.shape)>2:
 
+			#######################################################
+			# THIS TRANSPOSING IS WHAT IS WEIRD! 
+			#######################################################
+
 			diff_forward_logprobs = torch.transpose(forward_gmm.log_prob(torch.transpose(z_set_2,1,0)),1,0)
 			diff_backward_logprobs = torch.transpose(backward_gmm.log_prob(torch.transpose(z_set_1,1,0)),1,0)
 
@@ -7347,6 +7351,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			mean_point_set = policy_manager.latent_z_set
 			gmm_means = torch.tensor(np.concatenate(mean_point_set)).to(device)
 		else:
+
+			print("Embedding in GMM creation")
+			embed()
+
 			if differentiable_points:
 				gmm_means = mean_point_set
 			else:
@@ -10609,12 +10617,33 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		target_sup_input_dict, target_sup_var_dict, target_sup_eval_dict = self.encode_decode_trajectory(self.target_manager, i, bucket_index=target_bucket)
 
 		###########################################################
-		# 4) Now implement set based losses on this pair of datapoints.
+		# 4) Need to get Z transformations for this rather than the z's themselves.
+		###########################################################
+
+		update_dictionary['source_sup_z_transformations'], update_dictionary['source_sup_z_transformation_weights'], _ = self.get_z_transformation(source_sup_var_dict['latent_z_indices'], source_sup_var_dict['latent_b'])
+		update_dictionary['target_sup_z_transformations'], update_dictionary['target_sup_z_transformation_weights'], _ = self.get_z_transformation(target_sup_var_dict['latent_z_indices'], target_sup_var_dict['latent_b'])
+
+		###########################################################
+		# 5) Create forward and backward GMMs. 
 		###########################################################
 
 		# Remember, now we need to implement tuple based version of set loss..
 		print("Embed in compute task based supervision loss")
 		embed()
+
+		self.supervised_z_tuple_GMM_list = [self.create_GMM(evaluation_domain=0, mean_point_set=update_dictionary['source_sup_z_transformations'], differentiable_points=True, tuple_GMM=True), \
+									 		self.create_GMM(evaluation_domain=1, mean_point_set=update_dictionary['target_sup_z_transformations'], differentiable_points=True, tuple_GMM=True)]
+
+		###########################################################
+		# 6) Now implement tuple / set based losses, by querying these GMMs for likelihoods. 
+		###########################################################
+
+		self.forward_supervised_set_tuple_based_loss = self.query_GMM_density(evaluation_domain=0, point_set=update_dictionary['target_sup_z_transformations'], differentiable_points=True, GMM=self.supervised_z_tuple_GMM_list[0])
+		self.backard_supervised_set_tuple_based_loss = self.query_GMM_density(evaluation_domain=1, point_set=update_dictionary['source_sup_z_transformations'], differentiable_points=True, GMM=self.supervised_z_tuple_GMM_list[1])
+
+		
+
+
 
 	# @gpu_profile_every(1)	
 	def run_iteration(self, counter, i, domain=None, skip_viz=False):
