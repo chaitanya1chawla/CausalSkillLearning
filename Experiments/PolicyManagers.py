@@ -10626,6 +10626,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		task_list = np.arange(0,20)
 		sampled_task = np.random.choice(task_list, size=1, p=self.task_frequencies)[0]
 		
+		print("Sampled Task: ",sampled_task)
+		
 		# print("Embed in getting index")
 		# embed()
 		###########################################################
