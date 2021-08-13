@@ -8639,7 +8639,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 			###################################################
 			# Compute Aggregate CDSL
-			###################################################
+			###################################################	
 
 			if self.args.eval_transfer_metrics:
 				self.compute_aggregate_supervised_loss()
@@ -10626,6 +10626,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		task_list = np.arange(0,20)
 		sampled_task = np.random.choice(task_list, size=1, p=self.task_frequencies)[0]
 		
+		print("Embed in getting index")
+		embed()
 		###########################################################
 		# 2) Select a batch of datapoints in both domains from this feasible task. 
 		###########################################################
