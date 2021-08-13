@@ -7352,8 +7352,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			gmm_means = torch.tensor(np.concatenate(mean_point_set)).to(device)
 		else:
 
-			print("Embedding in GMM creation")
-			embed()
+			# print("Embedding in GMM creation")
+			# embed()
 
 			if differentiable_points:
 				gmm_means = mean_point_set
@@ -10627,16 +10627,21 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		# 5) Create forward and backward GMMs. 
 		###########################################################
 
-		# Remember, now we need to implement tuple based version of set loss..
-		print("Embed in compute task based supervision loss")
-		embed()
-
+		# Remember, now transposing the supervised_z_transformation objects, because we need this to handle the batches / timesteps of the z sets correctly. 		
 		self.supervised_z_tuple_GMM_list = [self.create_GMM(evaluation_domain=0, mean_point_set=update_dictionary['source_sup_z_transformations'].transpose(1,0), differentiable_points=True, tuple_GMM=True), \
 									 		self.create_GMM(evaluation_domain=1, mean_point_set=update_dictionary['target_sup_z_transformations'].transpose(1,0), differentiable_points=True, tuple_GMM=True)]
 
 		###########################################################
 		# 6) Now implement tuple / set based losses, by querying these GMMs for likelihoods. 
 		###########################################################
+
+		# We DON'T actually want to transpose the z transformation objects here, because they have to be the opposite shape as the mean / component distributons in the GMM's..
+		# The likelihoods from this are going to be the same shape as the query, i.e. of the cross domain z transformation object.
+
+		# Remember, now we need to implement tuple based version of set loss..
+		print("Embed in compute task based supervision loss")
+		embed()
+
 
 		self.forward_supervised_set_tuple_based_loss = self.query_GMM_density(evaluation_domain=0, point_set=update_dictionary['target_sup_z_transformations'], differentiable_points=True, GMM=self.supervised_z_tuple_GMM_list[0])
 		self.backard_supervised_set_tuple_based_loss = self.query_GMM_density(evaluation_domain=1, point_set=update_dictionary['source_sup_z_transformations'], differentiable_points=True, GMM=self.supervised_z_tuple_GMM_list[1])
