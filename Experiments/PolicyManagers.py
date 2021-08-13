@@ -9229,8 +9229,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		# 4) Compute gradient of discriminator output with respect to inputs. 
 		gradients = torch.autograd.grad(outputs=interpolated_discriminator_probabilities, inputs=interpolated_zs_with_grads,
-                               grad_outputs=torch.ones(interpolated_discriminator_probabilities.size()).to(device),
-                               create_graph=True, retain_graph=True)[0]
+							   grad_outputs=torch.ones(interpolated_discriminator_probabilities.size()).to(device),
+							   create_graph=True, retain_graph=True)[0]
 
 		# 5) Compute norm of gradients.
 		gradient_norm = torch.sqrt( (gradients**2).sum(dim=1) + 1e-6)
