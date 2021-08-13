@@ -10647,15 +10647,11 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		# The likelihoods from this are going to be the same shape as the query, i.e. of the cross domain z transformation object.
 
 		# Remember, now we need to implement tuple based version of set loss..
-		print("Embed in compute task based supervision loss")
-		embed()
-
 		self.unmasked_forward_supervised_set_tuple_based_logprobabilities = self.query_GMM_density(evaluation_domain=0, point_set=update_dictionary['target_sup_z_transformations'], differentiable_points=True, GMM=self.supervised_z_tuple_GMM_list[0])
 		self.unmasked_backward_supervised_set_tuple_based_logprobabilities = self.query_GMM_density(evaluation_domain=1, point_set=update_dictionary['source_sup_z_transformations'], differentiable_points=True, GMM=self.supervised_z_tuple_GMM_list[1])
 
 		self.forward_supervised_set_tuple_based_loss = - (update_dictionary['target_sup_z_transformation_weights']*self.unmasked_forward_supervised_set_tuple_based_logprobabilities).sum()/update_dictionary['target_sup_z_transformation_weights'].sum()
-		self.backard_supervised_set_tuple_based_loss = - (update_dictionary['source_sup_z_transformation_weights']*self.unmasked_backward_supervised_set_tuple_based_logprobabilities).sum()/update_dictionary['source_sup_z_transformation_weights'].sum()
-
+		self.backward_supervised_set_tuple_based_loss = - (update_dictionary['source_sup_z_transformation_weights']*self.unmasked_backward_supervised_set_tuple_based_logprobabilities).sum()/update_dictionary['source_sup_z_transformation_weights'].sum()	
 
 	# @gpu_profile_every(1)	
 	def run_iteration(self, counter, i, domain=None, skip_viz=False):
