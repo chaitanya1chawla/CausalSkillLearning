@@ -7519,8 +7519,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			prefreq = self.task_datapoint_counts*self.nonbimanual_tasks
 			self.task_frequencies = prefreq/prefreq.sum()
 
-			print("Embedding in setup task blah")
-			embed()
+			# print("Embedding in setup task blah")
+			# embed()
 
 	def train(self, model=None):
 
@@ -10631,8 +10631,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		print("Embed in compute task based supervision loss")
 		embed()
 
-		self.supervised_z_tuple_GMM_list = [self.create_GMM(evaluation_domain=0, mean_point_set=update_dictionary['source_sup_z_transformations'], differentiable_points=True, tuple_GMM=True), \
-									 		self.create_GMM(evaluation_domain=1, mean_point_set=update_dictionary['target_sup_z_transformations'], differentiable_points=True, tuple_GMM=True)]
+		self.supervised_z_tuple_GMM_list = [self.create_GMM(evaluation_domain=0, mean_point_set=update_dictionary['source_sup_z_transformations'].transpose(1,0), differentiable_points=True, tuple_GMM=True), \
+									 		self.create_GMM(evaluation_domain=1, mean_point_set=update_dictionary['target_sup_z_transformations'].transpose(1,0), differentiable_points=True, tuple_GMM=True)]
 
 		###########################################################
 		# 6) Now implement tuple / set based losses, by querying these GMMs for likelihoods. 
