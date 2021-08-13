@@ -5834,7 +5834,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				log_dict['Unweighted Cross Domain Density Loss'] = self.unweighted_masked_cross_domain_density_loss.mean()
 				log_dict['Cross Domain Density Loss'] = self.cross_domain_density_loss.mean()
 
-				if self.args.setting in ['densityjointfixembedtransfer']:
+				if self.args.setting in ['densityjointfixembedtransfer'] and self.args.z_gmm:
 					log_dict['Forward GMM Density Loss'] = viz_dict['forward_density_loss']
 					log_dict['Backward GMM Density Loss'] = viz_dict['backward_density_loss']
 					log_dict['Weighted Forward GMM Density Loss'] = viz_dict['weighted_forward_density_loss']
@@ -10818,8 +10818,9 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 			if self.args.supervised_set_based_density_loss:
 				viz_dict['forward_set_based_supervised_loss'], viz_dict['backward_set_based_supervised_loss'] = update_dictionary['forward_set_based_supervised_loss'].mean().detach().cpu().numpy(), update_dictionary['backward_set_based_supervised_loss'].mean().detach().cpu().numpy()
-			viz_dict['forward_density_loss'], viz_dict['backward_density_loss'] = update_dictionary['forward_density_loss'].mean().detach().cpu().numpy(), update_dictionary['backward_density_loss'].mean().detach().cpu().numpy()
-			viz_dict['weighted_forward_density_loss'], viz_dict['weighted_backward_density_loss'] = self.weighted_forward_loss.mean().detach().cpu().numpy(), self.weighted_backward_loss.mean().detach().cpu().numpy()
+			if self.args.z_gmm:
+				viz_dict['forward_density_loss'], viz_dict['backward_density_loss'] = update_dictionary['forward_density_loss'].mean().detach().cpu().numpy(), update_dictionary['backward_density_loss'].mean().detach().cpu().numpy()
+				viz_dict['weighted_forward_density_loss'], viz_dict['weighted_backward_density_loss'] = self.weighted_forward_loss.mean().detach().cpu().numpy(), self.weighted_backward_loss.mean().detach().cpu().numpy()
 		
 			self.update_plots(counter, viz_dict, log=True)
 
