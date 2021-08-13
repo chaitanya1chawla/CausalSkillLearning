@@ -10619,14 +10619,20 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		target_sup_input_dict, target_sup_var_dict, target_sup_eval_dict = self.encode_decode_trajectory(self.target_manager, i, bucket_index=target_bucket)
 
 		###########################################################
-		# 4) Need to get Z transformations for this rather than the z's themselves.
+		# 4) Translate the target domain z's before constructing GMMs. 
 		###########################################################
 
-		update_dictionary['source_sup_z_transformations'], update_dictionary['source_sup_z_transformation_weights'], _ = self.get_z_transformation(source_sup_var_dict['latent_z_indices'], source_sup_var_dict['latent_b'])
-		update_dictionary['target_sup_z_transformations'], update_dictionary['target_sup_z_transformation_weights'], _ = self.get_z_transformation(target_sup_var_dict['latent_z_indices'], target_sup_var_dict['latent_b'])
+		update_dictionary['translated_supervised_target_domain_zs'] = self.translate_latent_z(target_sup_var_dict['latent_z_indices'].detach(), target_sup_var_dict['latent_b'].detach())		
 
 		###########################################################
-		# 5) Create forward and backward GMMs. 
+		# 5) Need to get Z transformations for this rather than the z's themselves.
+		###########################################################
+
+		update_dictionary['source_sup_z_transformations'], update_dictionary['source_sup_z_transformation_weights'], _ = self.get_z_transformation(source_sup_var_dict['latent_z_indices'].detach(), source_sup_var_dict['latent_b'].detach())
+		update_dictionary['target_sup_z_transformations'], update_dictionary['target_sup_z_transformation_weights'], _ = self.get_z_transformation(update_dictionary['translated_supervised_target_domain_zs'], target_sup_var_dict['latent_b'].detach())
+
+		###########################################################
+		# 6) Create forward and backward GMMs. 
 		###########################################################
 
 		# Remember, now transposing the supervised_z_transformation objects, because we need this to handle the batches / timesteps of the z sets correctly. 		
@@ -10634,7 +10640,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 									 		self.create_GMM(evaluation_domain=1, mean_point_set=update_dictionary['target_sup_z_transformations'].transpose(1,0), differentiable_points=True, tuple_GMM=True)]
 
 		###########################################################
-		# 6) Now implement tuple / set based losses, by querying these GMMs for likelihoods. 
+		# 7) Now implement tuple / set based losses, by querying these GMMs for likelihoods. 
 		###########################################################
 
 		# We DON'T actually want to transpose the z transformation objects here, because they have to be the opposite shape as the mean / component distributons in the GMM's..
