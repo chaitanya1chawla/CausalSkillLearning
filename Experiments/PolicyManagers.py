@@ -8779,7 +8779,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		postpadded_z = torch.cat([latent_z, torch.zeros((1,self.args.batch_size,self.args.z_dimensions)).to(device)])
 		
 		latent_z_transformation_vector = torch.cat([prepadded_z, postpadded_z], dim=-1)
-		latent_z_transformation_weights = torch.cat([latent_b, torch.zeros(1,self.args.batch_size).to(device)])
+		# latent_z_transformation_weights = torch.cat([latent_b, torch.zeros(1,self.args.batch_size).to(device)])
+		# Forgot to change the masks… The mask should now consider the last z tuple / transition, because it is the (z_n,0) pair, not a (z_n,z_n) dummy pair?
+		latent_z_transformation_weights = torch.cat([latent_b, torch.ones(1,self.args.batch_size).to(device)])
 
 		return latent_z_transformation_vector, latent_z_transformation_weights, None
 
@@ -10642,12 +10644,11 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		print("Embed in compute task based supervision loss")
 		embed()
 
+		self.unmasked_forward_supervised_set_tuple_based_logprobabilities = self.query_GMM_density(evaluation_domain=0, point_set=update_dictionary['target_sup_z_transformations'], differentiable_points=True, GMM=self.supervised_z_tuple_GMM_list[0])
+	 	self.unmasked_backward_supervised_set_tuple_based_logprobabilities = self.query_GMM_density(evaluation_domain=1, point_set=update_dictionary['source_sup_z_transformations'], differentiable_points=True, GMM=self.supervised_z_tuple_GMM_list[1])
 
-		self.forward_supervised_set_tuple_based_loss = self.query_GMM_density(evaluation_domain=0, point_set=update_dictionary['target_sup_z_transformations'], differentiable_points=True, GMM=self.supervised_z_tuple_GMM_list[0])
-		self.backard_supervised_set_tuple_based_loss = self.query_GMM_density(evaluation_domain=1, point_set=update_dictionary['source_sup_z_transformations'], differentiable_points=True, GMM=self.supervised_z_tuple_GMM_list[1])
-
-		
-
+		self.forward_supervised_set_tuple_based_loss = - (update_dictionary['target_sup_z_transformation_weights']*self.unmasked_forward_supervised_set_tuple_based_logprobabilities).sum()/update_dictionary['target_sup_z_transformation_weights'].sum()
+		self.backard_supervised_set_tuple_based_loss = - (update_dictionary['source_sup_z_transformation_weights']*self.unmasked_backward_supervised_set_tuple_based_logprobabilities).sum()/update_dictionary['source_sup_z_transformation_weights'].sum()
 
 
 	# @gpu_profile_every(1)	
