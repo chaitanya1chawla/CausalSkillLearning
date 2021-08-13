@@ -10816,7 +10816,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			viz_dict = {}
 			viz_dict['domain'] = domain
 
-			viz_dict['forward_set_based_supervised_loss'], viz_dict['backward_set_based_supervised_loss'] = update_dictionary['forward_set_based_supervised_loss'].mean().detach().cpu().numpy(), update_dictionary['backward_set_based_supervised_loss'].mean().detach().cpu().numpy()
+			if self.args.supervised_set_based_density_loss:
+				viz_dict['forward_set_based_supervised_loss'], viz_dict['backward_set_based_supervised_loss'] = update_dictionary['forward_set_based_supervised_loss'].mean().detach().cpu().numpy(), update_dictionary['backward_set_based_supervised_loss'].mean().detach().cpu().numpy()
 			viz_dict['forward_density_loss'], viz_dict['backward_density_loss'] = update_dictionary['forward_density_loss'].mean().detach().cpu().numpy(), update_dictionary['backward_density_loss'].mean().detach().cpu().numpy()
 			viz_dict['weighted_forward_density_loss'], viz_dict['weighted_backward_density_loss'] = self.weighted_forward_loss.mean().detach().cpu().numpy(), self.weighted_backward_loss.mean().detach().cpu().numpy()
 		
