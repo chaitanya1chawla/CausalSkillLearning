@@ -7522,8 +7522,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			print(self.source_manager.block_index_list_for_task)
 			print(self.target_manager.block_index_list_for_task)
 
-			# print("Embedding in setup task blah")
-			# embed()
+			print("Embedding in setup task blah")
+			embed()
 
 	def train(self, model=None):
 
