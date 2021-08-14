@@ -7541,8 +7541,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.prefreq = self.task_datapoint_counts*self.nonbimanual_tasks
 			self.task_frequencies = self.prefreq/self.prefreq.sum()
 
-			print(self.source_manager.block_index_list_for_task)
-			print(self.target_manager.block_index_list_for_task)
+			# print(self.source_manager.block_index_list_for_task)
+			# print(self.target_manager.block_index_list_for_task)
 
 			# print("Embedding in setup task blah")
 			# embed()
@@ -10655,8 +10655,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		# print()
 		# print(self.target_manager.block_index_list_for_task[sampled_task])
 		# if len(self.source_manager.block_index_list_for_task[sampled_task])==0 or len(self.target_manager.block_index_list_for_task[sampled_task])==0:
-		print("Embed in getting index")
-		embed()
+		# print("Embed in getting index")
+		# embed()
 		###########################################################
 		# 2) Select a batch of datapoints in both domains from this feasible task. 
 		###########################################################
