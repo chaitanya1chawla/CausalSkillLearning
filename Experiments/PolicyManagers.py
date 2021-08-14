@@ -834,6 +834,8 @@ class PolicyManager_BaseClass():
 
 		#######################################################################
 		# Create blocks..
+		#######################################################################
+
 		# Strategy - create blocks from each task ID using task_count, and then just add in more trajectories at random to make it a full batch (if needed).		
 		
 		self.task_based_shuffling_blocks = []
@@ -842,43 +844,55 @@ class PolicyManager_BaseClass():
 		task_blocks = []
 		counter = 0	
 
+		#######################################################################
 		# We're going to create blocks, then pick one of the blocks, maybe based on which bucket the index falls into?
+		#######################################################################
+
 		for k in range(self.args.number_of_tasks):
 			
 			j = 0			 		
 
-			# Well this is making a mistake.. 
-			# IT only runs this loop if and when the task_id_count has MORE than batch size.. which is wrong..
-			#  While we have an entire batch left to add. 
+			####################################
+			# Only try to add an entire batch without resampling if we have more than or exactly enough elements for an entire batch.
+			####################################
+
 			while j <= self.task_id_count[k]-self.args.batch_size:
+							
 				# Add a whole batch.
 				block = []
+
+				####################################
 				# While we still have items to add to this batch.
+				####################################
+
 				while len(block)<self.args.batch_size:				
 
-					# # Append index to block..
-					# block.append(self.cummulative_count[k]+j)
-					# Append TASK SORTED INDEX to block..
+					# Append index to block.., i.e. TASK SORTED INDEX to block..
 					block.append(self.concatenated_task_id_sorted_indices[self.cummulative_count[k]+j])
-
 					j += 1				
 
+				####################################
 				# Append this block to the block list. 
+				####################################
+
 				if shuffle:
 					np.random.shuffle(block)
+
 				self.task_based_shuffling_blocks.append(block)
 				self.index_task_id_map.append(k)
 
+			####################################
 			# Now that we don't have an entire batch to add. 			
 			# Get number of samples we need to add, and check if we need to add at all. 
-			# number_of_samples = self.args.batch_size-(self.task_id_count[k]-j)
-			# SHould this be j+1? 
-			number_of_samples = self.args.batch_size-(self.task_id_count[k]-(j+1))
-			
+			####################################
 
+			# If j is ==self.args.batch_size-1, skip this.	
+			number_of_samples = self.args.batch_size-(self.task_id_count[k]-j)
+			
 			# Adding check to ssee if there are actually any elements in this task id... 
 			# Otherwise just skip.
-			if number_of_samples>0 and self.task_id_count[k]>0 and number_of_samples<self.args.batch_size:
+			# if number_of_samples>0 and self.task_id_count[k]>0 and number_of_samples<self.args.batch_size:
+			if number_of_samples>0 and self.task_id_count[k]>0 and not(j==self.args.batch_size-1):
 				# Set pool to sample from. 
 				# end_index = -1 if (k+1 >= self.args.number_of_tasks) else k+1
 				# random_sample_pool = np.arange(self.cummulative_count[k],self.cummulative_count[end_index])
@@ -7524,11 +7538,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.nonbimanual_tasks = np.ones(20)
 			self.nonbimanual_tasks[self.bimanual_indices] = 0
 
-			prefreq = self.task_datapoint_counts*self.nonbimanual_tasks
-			self.task_frequencies = prefreq/prefreq.sum()
+			self.prefreq = self.task_datapoint_counts*self.nonbimanual_tasks
+			self.task_frequencies = self.prefreq/self.prefreq.sum()
 
-			# print(self.source_manager.block_index_list_for_task)
-			# print(self.target_manager.block_index_list_for_task)
+			print(self.source_manager.block_index_list_for_task)
+			print(self.target_manager.block_index_list_for_task)
 
 			# print("Embedding in setup task blah")
 			# embed()
