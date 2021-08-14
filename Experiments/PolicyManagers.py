@@ -10640,9 +10640,9 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		# print("Sampled Task: ",sampled_task)		
 		# print()
 		# print(self.target_manager.block_index_list_for_task[sampled_task])
-		if len(self.source_manager.block_index_list_for_task[sampled_task])==0 or len(self.target_manager.block_index_list_for_task[sampled_task])==0:
-			print("Embed in getting index")
-			embed()
+		# if len(self.source_manager.block_index_list_for_task[sampled_task])==0 or len(self.target_manager.block_index_list_for_task[sampled_task])==0:
+		print("Embed in getting index")
+		embed()
 		###########################################################
 		# 2) Select a batch of datapoints in both domains from this feasible task. 
 		###########################################################
