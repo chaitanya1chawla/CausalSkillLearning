@@ -871,11 +871,14 @@ class PolicyManager_BaseClass():
 
 			# Now that we don't have an entire batch to add. 			
 			# Get number of samples we need to add, and check if we need to add at all. 
-			number_of_samples = self.args.batch_size-(self.task_id_count[k]-j)			
+			# number_of_samples = self.args.batch_size-(self.task_id_count[k]-j)
+			# SHould this be j+1? 
+			number_of_samples = self.args.batch_size-(self.task_id_count[k]-(j+1))
+			
 
 			# Adding check to ssee if there are actually any elements in this task id... 
 			# Otherwise just skip.
-			if number_of_samples>0 and self.task_id_count[k]>0:
+			if number_of_samples>0 and self.task_id_count[k]>0 and number_of_samples<self.args.batch_size:
 				# Set pool to sample from. 
 				# end_index = -1 if (k+1 >= self.args.number_of_tasks) else k+1
 				# random_sample_pool = np.arange(self.cummulative_count[k],self.cummulative_count[end_index])
