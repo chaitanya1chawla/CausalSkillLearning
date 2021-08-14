@@ -922,8 +922,8 @@ class PolicyManager_BaseClass():
 		# New extent...
 		self.extent = len(np.concatenate(self.task_based_shuffling_blocks))
 		# self.new_index_task_id_map = np.zeros(self.extent//32,dtype=int)
-		print("Embedding in task based shuffling")			
-		embed()	
+		# print("Embedding in task based shuffling")			
+		# embed()	
 
 	def trajectory_length_based_shuffling(self, extent, shuffle=True):
 		
@@ -7527,11 +7527,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			prefreq = self.task_datapoint_counts*self.nonbimanual_tasks
 			self.task_frequencies = prefreq/prefreq.sum()
 
-			print(self.source_manager.block_index_list_for_task)
-			print(self.target_manager.block_index_list_for_task)
+			# print(self.source_manager.block_index_list_for_task)
+			# print(self.target_manager.block_index_list_for_task)
 
-			print("Embedding in setup task blah")
-			embed()
+			# print("Embedding in setup task blah")
+			# embed()
 
 	def train(self, model=None):
 
@@ -10637,9 +10637,9 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		task_list = np.arange(0,20)
 		sampled_task = np.random.choice(task_list, size=1, p=self.task_frequencies)[0]
 
-		print("Sampled Task: ",sampled_task)		
-		print(self.source_manager.block_index_list_for_task[sampled_task])
-		print(self.target_manager.block_index_list_for_task[sampled_task])
+		# print("Sampled Task: ",sampled_task)		
+		# print(self.source_manager.block_index_list_for_task[sampled_task])
+		# print(self.target_manager.block_index_list_for_task[sampled_task])
 		# print("Embed in getting index")
 		# embed()
 		###########################################################
