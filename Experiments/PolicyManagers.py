@@ -806,6 +806,8 @@ class PolicyManager_BaseClass():
 			self.task_id_map[k] = self.dataset[k]['task_id']
 		for k in range(self.args.number_of_tasks):
 			self.task_id_count[k] = (self.task_id_map==k).sum()
+		
+		# What is this doing?! 
 		self.cummulative_count = np.concatenate([np.zeros(1,dtype=int),np.cumsum(self.task_id_count)])
 
 		#######################################################################
@@ -845,8 +847,10 @@ class PolicyManager_BaseClass():
 			
 			j = 0			 		
 
-			# While we have an entire batch left to add. 
-			while j < self.task_id_count[k]-self.args.batch_size:
+			# Well this is making a mistake.. 
+			# IT only runs this loop if and when the task_id_count has MORE than batch size.. which is wrong..
+			#  While we have an entire batch left to add. 
+			while j <= self.task_id_count[k]-self.args.batch_size:
 				# Add a whole batch.
 				block = []
 				# While we still have items to add to this batch.
