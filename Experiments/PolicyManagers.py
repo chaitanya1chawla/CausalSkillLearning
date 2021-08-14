@@ -915,7 +915,8 @@ class PolicyManager_BaseClass():
 		# New extent...
 		self.extent = len(np.concatenate(self.task_based_shuffling_blocks))
 		# self.new_index_task_id_map = np.zeros(self.extent//32,dtype=int)
-		print("Embedding in task based shuffling")				
+		print("Embedding in task based shuffling")			
+		embed()	
 
 	def trajectory_length_based_shuffling(self, extent, shuffle=True):
 		
