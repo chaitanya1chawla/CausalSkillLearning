@@ -7519,6 +7519,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			prefreq = self.task_datapoint_counts*self.nonbimanual_tasks
 			self.task_frequencies = prefreq/prefreq.sum()
 
+			print(self.source_manager.block_index_list_for_task)
+			print(self.target_manager.block_index_list_for_task)
+
 			# print("Embedding in setup task blah")
 			# embed()
 
