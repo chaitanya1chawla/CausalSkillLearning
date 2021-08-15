@@ -10580,6 +10580,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		if self.args.task_based_supervision:
 
 			# Log task based supervised loss. 
+			log_dict['Forward Supervised Set Tuple Based Loss'] = self.forward_supervised_set_tuple_based_loss.detach().cpu().numpy()
+			log_dict['Backward Supervised Set Tuple Based Loss'] = self.backward_supervised_set_tuple_based_loss.detach().cpu().numpy()
 			log_dict['Unweighted Task Based Supervised Loss'] = self.unweighted_task_based_supervised_loss.detach().cpu().numpy()
 			log_dict['Task Based Supervised Loss'] = self.task_based_supervised_loss.detach().cpu().numpy()
 
@@ -10697,7 +10699,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		self.unmasked_backward_supervised_set_tuple_based_logprobabilities = self.query_GMM_density(evaluation_domain=1, point_set=update_dictionary['source_sup_z_transformations'], differentiable_points=True, GMM=self.supervised_z_tuple_GMM_list[1])
 
 		self.forward_supervised_set_tuple_based_loss = - (update_dictionary['target_sup_z_transformation_weights']*self.unmasked_forward_supervised_set_tuple_based_logprobabilities).sum()/update_dictionary['target_sup_z_transformation_weights'].sum()
-		self.backward_supervised_set_tuple_based_loss = - (update_dictionary['source_sup_z_transformation_weights']*self.unmasked_backward_supervised_set_tuple_based_logprobabilities).sum()/update_dictionary['source_sup_z_transformation_weights'].sum()	
+		self.backward_supervised_set_tuple_based_loss = - (update_dictionary['source_sup_z_transformation_weights']*self.unmasked_backward_supervised_set_tuple_based_logprobabilities).sum()/update_dictionary['source_sup_z_transformation_weights'].sum()
 
 	# @gpu_profile_every(1)	
 	def run_iteration(self, counter, i, domain=None, skip_viz=False):
