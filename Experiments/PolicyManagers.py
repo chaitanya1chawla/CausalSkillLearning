@@ -10593,6 +10593,12 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 	def compute_cross_domain_supervision_loss(self, update_dictionary):
 
+		if self.args.number_of_supervised_datapoints==0:
+			update_dictionary['cross_domain_supervised_loss'] = 0.
+			update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = 0., 0.
+
+			return 
+			
 		# Compute new style of supervised loss.
 		if self.args.new_supervision:
 
