@@ -10598,7 +10598,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			update_dictionary['forward_set_based_supervised_loss'], update_dictionary['backward_set_based_supervised_loss'] = 0., 0.
 
 			return 
-			
+
 		# Compute new style of supervised loss.
 		if self.args.new_supervision:
 
@@ -10835,7 +10835,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 				# update_dictionary['cross_domain_supervised_loss'] = 0.
 			if self.args.cross_domain_supervision:
 				self.compute_cross_domain_supervision_loss(update_dictionary)
-				update_dictionary['cross_domain_supervised_loss'] = 0.
+				# update_dictionary['cross_domain_supervised_loss'] = 0.
 
 			################################################
 			# 6) Compute gradients of objective and then update networks / policies.
