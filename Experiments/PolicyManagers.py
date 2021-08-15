@@ -10799,9 +10799,6 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 				update_dictionary['source_z_transformations'], update_dictionary['source_z_trajectory_weights'], _ = self.get_z_transformation(update_dictionary['cross_domain_latent_z'], cross_domain_var_dict['latent_b'])
 				# update_dictionary['z_trajectory'] = update_dictionary['z_transformations']
 
-				print("Embedding in z tuple thing")
-				embed()
-
 				################################################
 				# 5b2) Compute likelihood of target z encoding tuples under the source domain Z Tuple GMM. 			
 				################################################
