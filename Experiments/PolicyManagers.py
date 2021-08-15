@@ -10651,12 +10651,6 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		task_list = np.arange(0,20)
 		sampled_task = np.random.choice(task_list, size=1, p=self.task_frequencies)[0]
 
-		# print("Sampled Task: ",sampled_task)		
-		# print()
-		# print(self.target_manager.block_index_list_for_task[sampled_task])
-		# if len(self.source_manager.block_index_list_for_task[sampled_task])==0 or len(self.target_manager.block_index_list_for_task[sampled_task])==0:
-		# print("Embed in getting index")
-		# embed()
 		###########################################################
 		# 2) Select a batch of datapoints in both domains from this feasible task. 
 		###########################################################
@@ -10804,6 +10798,9 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 				update_dictionary['target_z_transformations'], update_dictionary['target_z_trajectory_weights'], _ = self.get_z_transformation(update_dictionary['translated_latent_z'], source_var_dict['latent_b'])
 				update_dictionary['source_z_transformations'], update_dictionary['source_z_trajectory_weights'], _ = self.get_z_transformation(update_dictionary['cross_domain_latent_z'], cross_domain_var_dict['latent_b'])
 				# update_dictionary['z_trajectory'] = update_dictionary['z_transformations']
+
+				print("Embedding in z tuple thing")
+				embed()
 
 				################################################
 				# 5b2) Compute likelihood of target z encoding tuples under the source domain Z Tuple GMM. 			
