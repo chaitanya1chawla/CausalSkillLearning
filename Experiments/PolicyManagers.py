@@ -6319,6 +6319,19 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.samedomain_shared_embedding_image = None
 			return self.source_image, self.target_image, self.shared_image, self.samedomain_shared_embedding_image
 
+		########################################
+		# Also visualize tuples of Z's.. 
+		########################################
+
+		# Remember, the objects we are interested in are : self.source_z_trajectory_set, and self.target_z_trajectory_set. 
+		# The visualize_embedded_z_trajectories function tells us how to parse this. 
+
+
+
+
+
+
+
 	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False, viz_domain=None, return_fig=False):	
 		
 		# print("Running plot embedding", title, viz_domain)
@@ -8662,6 +8675,13 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# 	# log_dict["DENSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10"] = self.return_wandb_image(self.viz_dictionary['densne_transsource_origtarget_traj_p10'])
 			# 	# log_dict["DENSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30"] = self.return_wandb_image(self.viz_dictionary['densne_transsource_origtarget_traj_p30'])
 
+			##################################################
+			# Now visualize TUPLES of Z's.
+			##################################################
+
+			# Remember, whatever is plotting z trajectories can also plot z tuple embeddings.
+
+
 			###################################################
 			# Compute Aggregate CDSL
 			###################################################	
@@ -10685,6 +10705,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		update_dictionary['source_sup_z_transformations'], update_dictionary['source_sup_z_transformation_weights'], _ = self.get_z_transformation(source_sup_var_dict['latent_z_indices'].detach(), source_sup_var_dict['latent_b'].detach())
 		update_dictionary['target_sup_z_transformations'], update_dictionary['target_sup_z_transformation_weights'], _ = self.get_z_transformation(update_dictionary['translated_supervised_target_domain_zs'], target_sup_var_dict['latent_b'].detach())
 
+		print("Debugging mask")
+		embed()
 		###########################################################
 		# 6) Create forward and backward GMMs. 
 		###########################################################
