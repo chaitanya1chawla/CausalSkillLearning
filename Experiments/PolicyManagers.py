@@ -8585,7 +8585,15 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# Construct translated_target_z_trajectory_set! 
 		# make z tuple objects set to the translated ones! 
 		self.construct_translated_target_z_trajectory_set()
+
+		print("Embed before construct tup embedz")
+		embed()
+
 		self.construct_tuple_embeddings(translated_target=True)
+
+		print("Embed after construct tup embedz")
+		embed()
+		
 
 		if domain==1:
 			############################################################
