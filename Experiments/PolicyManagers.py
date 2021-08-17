@@ -8582,19 +8582,6 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.source_latent_zs = copy.deepcopy(self.original_source_latent_z_set)
 		self.target_latent_zs = copy.deepcopy(self.original_target_latent_z_set)
 
-		# Construct translated_target_z_trajectory_set! 
-		# make z tuple objects set to the translated ones! 
-		self.construct_translated_target_z_trajectory_set()
-
-		print("Embed before construct tup embedz")
-		embed()
-
-		self.construct_tuple_embeddings(translated_target=True)
-
-		print("Embed after construct tup embedz")
-		embed()
-		
-
 		if domain==1:
 			############################################################
 			# Use original source latent set, and translated target latent set. 		
@@ -8611,6 +8598,11 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				self.target_latent_zs = self.backward_translation_model.forward(torch.tensor(self.original_target_latent_z_set).to(device).float()).detach().cpu().numpy()
 
 			self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
+
+			# Construct translated_target_z_trajectory_set! 
+			# make z tuple objects set to the translated ones! 
+			self.construct_translated_target_z_trajectory_set()
+			self.construct_tuple_embeddings(translated_target=True)
 
 			# Get embeddings of source, and backward translated target latent_zs. 			
 			_ , self.viz_dictionary['tsne_transtarget_p30'], self.viz_dictionary['tsne_origsource_transtarget_p05'], self.viz_dictionary['tsne_origsource_transtarget_p10'], self.viz_dictionary['tsne_origsource_transtarget_p30'], \
@@ -8646,6 +8638,11 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				self.source_latent_zs = self.forward_translation_model.forward(torch.tensor(self.original_source_latent_z_set).to(device).float()).detach().cpu().numpy()
 
 			self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
+
+			# Construct translated_target_z_trajectory_set! 
+			# make z tuple objects set to the translated ones! 
+			self.construct_translated_target_z_trajectory_set()
+			self.construct_tuple_embeddings(translated_target=True)
 
 			# # Get embeddings of forward translated source, and original target latent_zs. 	
 			# ############################################################
