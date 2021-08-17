@@ -6288,6 +6288,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		self.samedomain_shared_embedding_image = None
 
+
+		print("Embed to construct new tuple embeddings")
+		embed()
+
 		if projection=='tsne' or projection=='densne':
 
 			if self.check_toy_dataset():
@@ -6317,6 +6321,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.samedomain_shared_embedding_image = self.plot_embedding(shared_embedded_zs, "SameDomain_Shared_Traj_Embedding", shared=True, trajectory=True)
 			else:
 				self.samedomain_shared_embedding_image = None
+		
 			return self.source_image, self.target_image, self.shared_image, self.samedomain_shared_embedding_image
 
 		########################################
@@ -6327,8 +6332,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# The visualize_embedded_z_trajectories function tells us how to parse this using the existing embeddings..
 		# We want new embeddings
 
-		print("Embed to construct new tuple embeddings")
-		embed()
 
 	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False, viz_domain=None, return_fig=False):	
 		
