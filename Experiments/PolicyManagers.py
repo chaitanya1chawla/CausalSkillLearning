@@ -6020,8 +6020,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			log_dict['Source Z Trajectory PCA Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_pca_image)
 			log_dict['Target Z Trajectory PCA Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_pca_image)
 
-			log_dict['Source Z Trajectory JointSourceTranslated DENSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_densne_image)
-			log_dict['Target Z Trajectory JointSourceTranslated DENSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_densne_image)
+			log_dict['Source Z Trajectory Joint DENSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_densne_image)
+			log_dict['Target Z Trajectory Joint DENSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_densne_image)
 
 			##################################################
 			# Visualize z tuple embeddings
@@ -6211,7 +6211,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.source_z_tuples = self.construct_tuples_from_z_traj_set(self.source_z_trajectory_set)
 		self.target_z_tuples = self.construct_tuples_from_z_traj_set(self.target_z_trajectory_set)
 
+		# First construct shared original tuples. 
 		self.shared_z_tuples = np.concatenate([self.source_z_tuples,self.target_z_tuples])
+		
+		# Now construct shared source and translated target tuples. 
+		# Basically just translate... 
 		
 		# Next construct embeddings of these tuples. Probably sufficient to just do one joint color coded embeddings.
 		self.tsne_embedded_z_tuples, _ = self.get_transform(self.shared_z_tuples)
@@ -6369,8 +6373,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				self.samedomain_shared_embedding_image = None
 		
 			return self.source_image, self.target_image, self.shared_image, self.samedomain_shared_embedding_image
-
-
 
 	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False, viz_domain=None, return_fig=False, source_length=None):	
 		
@@ -8634,6 +8636,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				self.viz_dictionary['tsne_transsource_traj_p30'] = self.source_traj_image
 				# self.viz_dictionary['densne_transsource_traj_p30'] = self.source_traj_image
 
+		# Now also ... 
+
 		self.z_last_set_by = 'set_translated_z_sets'
 		self.set_trans_z +=1
 
@@ -8662,13 +8666,13 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 			self.set_translated_z_sets()
 
-			log_dict['Source Z Trajectory JointTargetTranslated TSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_tsne_image)
-			log_dict['Target Z Trajectory JointTargetTranslated TSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_tsne_image)
+			log_dict['Source Z Trajectory Joint TargetTranslated TSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_tsne_image)
+			log_dict['Target Z Trajectory Joint TargetTranslated TSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_tsne_image)
 			# log_dict['Source Z Trajectory JointTargetTranslated PCA Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_pca_image)
 			log_dict['Target Z Trajectory JointTargetTranslated PCA Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_pca_image)
 
-			log_dict['Source Z Trajectory JointTargetTranslated DENSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_densne_image)
-			log_dict['Target Z Trajectory JointTargetTranslated DENSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_densne_image)
+			log_dict['Source Z Trajectory Joint TargetTranslated DENSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_densne_image)
+			log_dict['Target Z Trajectory Joint TargetTranslated DENSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_densne_image)
 
 			##################################################
 			# Now log combined source and translated target visualizations, and if we want, target and translated source.
@@ -8723,7 +8727,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			##################################################
 
 			# Remember, whatever is plotting z trajectories can also plot z tuple embeddings.
-
+			log_dict['Joint Target Translated Z Tuple TSNE Embeddings'] = self.return_wandb_image(self.z_tuple_embedding_image)
 
 			###################################################
 			# Compute Aggregate CDSL
