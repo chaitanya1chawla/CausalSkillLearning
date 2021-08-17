@@ -8573,6 +8573,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 	def set_translated_z_sets(self, domain=1):
 
+		print("About to run translate")
+		embed()
+
 		self.viz_dictionary = {}
 
 		# No need to copy these sets over, they have been set in set_z_objects. Not changing them here ensures we're not messing around.
@@ -8651,6 +8654,9 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				# self.viz_dictionary['densne_transsource_traj_p30'] = self.source_traj_image
 
 		# Now also ... 
+
+		print("Just fin run translate")
+		embed()
 
 		self.z_last_set_by = 'set_translated_z_sets'
 		self.set_trans_z +=1
