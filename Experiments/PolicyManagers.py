@@ -6134,9 +6134,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.target_latent_zs = (self.target_latent_zs-self.target_z_mean.detach().cpu().numpy())/self.target_z_std.detach().cpu().numpy()
 
 			# These are the same z's... this object just retains sequence info. Should be able to find some indexing of concatenate...? 
-			self.source_z_trajectory_set = self.source_manager.latent_z_set
-
-			print("Setting target z traj object")
+			self.source_z_trajectory_set = self.source_manager.latent_z_set			
 			self.target_z_trajectory_set = self.target_manager.latent_z_set
 
 		else:
@@ -6157,6 +6155,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.original_target_latent_z_set = copy.deepcopy(self.target_latent_zs)
 
 		self.shared_latent_zs = np.concatenate([self.source_latent_zs,self.target_latent_zs],axis=0)
+
+		# Also make sure z tuple objects are set
+		self.construct_tuple_embeddings(translated_target=False)
+
 		self.z_last_set_by = 'set_z_objects'
 
 	def visualize_embedded_z_trajectories(self, domain, shared_z_embedding, z_trajectory_set_object, projection='tsne'):
@@ -6208,11 +6210,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		return image	
 
-	def construct_tuple_embeddings(self):
+	def construct_tuple_embeddings(self, translated_target=False):
 
 		# First construct tuples from self.source_z_trajectory_set and self.target_z_trajectory_set		
 		self.source_z_tuples = self.construct_tuples_from_z_traj_set(self.source_z_trajectory_set)
-		self.target_z_tuples = self.construct_tuples_from_z_traj_set(self.target_z_trajectory_set)
+		if translated_target: 
+			self.target_z_tuples = self.construct_tuples_from_z_traj_set(self.translated_target_z_trajectory_set)
+		else:
+			self.target_z_tuples = self.construct_tuples_from_z_traj_set(self.target_z_trajectory_set)
 
 		# First construct shared original tuples. 
 		self.shared_z_tuples = np.concatenate([self.source_z_tuples,self.target_z_tuples])
@@ -6329,10 +6334,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Remember, the objects we are interested in are : self.source_z_trajectory_set, and self.target_z_trajectory_set. 
 		# First construct necessary tuples
 		
-		self.construct_tuple_embeddings()
-
-		# print("Debugging viz")
-		# embed()
+		# self.construct_tuple_embeddings()		
 		self.z_tuple_embedding_image = self.plot_embedding(self.tsne_embedded_z_tuples, "TSNE Z Tuple Embedding", shared=True, source_length=len(self.source_z_tuples))
 		# self.z_tuple_embedding_image = self.plot_embedding(self.tsne_embedded_z_tuples, "TSNE Z Tuple Embedding", shared=True, source_length=len(self.source_z_tuples))
 
@@ -8580,6 +8582,11 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.source_latent_zs = copy.deepcopy(self.original_source_latent_z_set)
 		self.target_latent_zs = copy.deepcopy(self.original_target_latent_z_set)
 
+		# Construct translated_target_z_trajectory_set! 
+		# make z tuple objects set to the translated ones! 
+		self.construct_translated_target_z_trajectory_set()
+		self.construct_tuple_embeddings(translated_target=True)
+
 		if domain==1:
 			############################################################
 			# Use original source latent set, and translated target latent set. 		
@@ -8650,11 +8657,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			if self.check_toy_dataset():
 				self.viz_dictionary['tsne_transsource_traj_p30'] = self.source_traj_image
 				# self.viz_dictionary['densne_transsource_traj_p30'] = self.source_traj_image
-
-		# Now also ... 
-
-		# Construct translated_target_z_trajectory_set! 
-		self.construct_translated_target_z_trajectory_set()
+	
 
 		self.z_last_set_by = 'set_translated_z_sets'
 		self.set_trans_z +=1
@@ -8672,24 +8675,21 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		domain = 1
 		add_value = len(self.source_latent_zs)*domain
 
-		# for i, z_traj in enumerate(self.target_z_trajectory_set):
-		# # for i in range(10):
-		# 	# z_traj = z_trajectory_set_object[i]				
+		self.translated_target_z_trajectory_set = []
+
+		for i, z_traj in enumerate(self.target_z_trajectory_set):
 		
-		# 	# First get length of this z_trajectory.
-		# 	z_traj_len = len(z_traj)
+			# First get length of this z_trajectory.
+			z_traj_len = len(z_traj)
 
-		# 	# Should just be able to get the corresponding embedded z by manipulating indices.. 
-		# 	# Assuming len of z_traj is consistent across all elements in z_trajectory_set_object, which would have needed to have been true 
-		# 	# for the concatenate in set_z_objects to work.
-		# 	# embedded_z_traj = shared_z_embedding[i*z_traj_len:(i+1)*z_traj_len]
-		# 	embedded_z_traj = shared_z_embedding[add_value+i*z_traj_len:add_value+(i+1)*z_traj_len]
+			# Should just be able to get the corresponding embedded z by manipulating indices.. 
+			# Assuming len of z_traj is consistent across all elements in z_trajectory_set_object, which would have needed to have been true 
+			# for the concatenate in set_z_objects to work.
 
+			# Translated z traj
+			translated_z_traj = self.shared_latent_zs[add_value+i*z_traj_len:add_value+(i+1)*z_traj_len]
 
-
-
-		print("Embedding in translated target z trajectory set")	
-		embed()
+			self.translated_target_z_trajectory_set.append(translated_z_traj)	
 
 	def update_plots(self, counter, viz_dict, log=False):
 
