@@ -6023,6 +6023,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			log_dict['Source Z Trajectory JointSourceTranslated DENSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_densne_image)
 			log_dict['Target Z Trajectory JointSourceTranslated DENSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_densne_image)
 
+			##################################################
+			# Visualize z tuple embeddings
+			##################################################
+		
+			log_dict['Joint Z Tuple TSNE Embeddings'] = self.return_wandb_image(self.z_tuple_embedding_image)
+
 			##################################################			
 			# Clean up objects consuming memory. 			
 			##################################################
@@ -6208,7 +6214,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.shared_z_tuples = np.concatenate([self.source_z_tuples,self.target_z_tuples])
 		
 		# Next construct embeddings of these tuples. Probably sufficient to just do one joint color coded embeddings.
-		self.tsne_embedded_z_tuples = self.get_transform(self.shared_z_tuples)
+		self.tsne_embedded_z_tuples, _ = self.get_transform(self.shared_z_tuples)
 				
 	def construct_tuples_from_z_traj_set(self, z_trajectory_set):
 
@@ -6315,9 +6321,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# Remember, the objects we are interested in are : self.source_z_trajectory_set, and self.target_z_trajectory_set. 
 		# First construct necessary tuples
-
-		print("embedding in construction of tuple embed")
-		embed()
 		
 		self.construct_tuple_embeddings()
 		self.z_tuple_embedding_image = self.plot_embedding(self.tsne_embedded_z_tuples, "TSNE Z Tuple Embedding", shared=True, source_length=len(self.source_z_tuples))
