@@ -6027,7 +6027,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Visualize z tuple embeddings
 			##################################################
 		
-			log_dict['Joint Z Tuple TSNE Embeddings'] = self.return_wandb_image(self.z_tuple_embedding_image)
+			log_dict['Joint Z Tuple TSNE Embeddings'] = self.return_wandb_image(copy.deepcopy(self.z_tuple_embedding_image))
 
 			##################################################			
 			# Clean up objects consuming memory. 			
@@ -8727,7 +8727,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			##################################################
 
 			# Remember, whatever is plotting z trajectories can also plot z tuple embeddings.
-			log_dict['Joint Target Translated Z Tuple TSNE Embeddings'] = self.return_wandb_image(self.z_tuple_embedding_image)
+			log_dict['Joint Target Translated Z Tuple TSNE Embeddings'] = self.return_wandb_image(copy.deepcopy(self.z_tuple_embedding_image))
 
 			###################################################
 			# Compute Aggregate CDSL
