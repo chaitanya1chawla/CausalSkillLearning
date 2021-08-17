@@ -7301,6 +7301,64 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 	def construct_single_directional_z_tuple_density_embeddings(self, log_dict, domain):
 		
+			##################################################
+		# Plot density coded embeddings. 
+		##################################################
+		
+		if domain==0:
+			point_set = self.target_z_tuples
+			opp_point_set_length = len(self.source_z_tuples)
+			prefix = "Forward"
+		else:
+			point_set = self.source_z_tuples
+			opp_point_set_length = len(self.target_z_tuples)
+			prefix = "Backward"
+
+		# Evaluate log_probs of target..
+		log_probs = self.query_GMM_density(evaluation_domain=domain, point_set=point_set, GMM=self.Z_Tuple_GMM_list[domain]).detach().cpu().numpy()
+		color_scale = 50
+
+		# print("Embedding in update plots of dnesity based thing..")		
+
+		# Colors that count sizes..
+		if domain==0:
+			colors = np.concatenate([color_scale*np.ones(opp_point_set_length), log_probs])
+		else:
+			colors = np.concatenate([log_probs, color_scale*np.ones(opp_point_set_length)])
+
+		# # This assumes same number of z's in both ... This may not be true.. 
+		# if domain==0:
+		# 	colors = np.concatenate([color_scale*np.ones_like(log_probs), log_probs])
+		# else:
+		# 	colors = np.concatenate([log_probs, color_scale*np.ones_like(log_probs)])
+
+		# Embed and transform - just the target_z_tensor? 
+		# Do this with just the perplexity set to 30 for now.. 
+
+		tsne_embedded_zs , _ = self.get_transform(self.shared_z_tuples)
+		densne_embedded_zs , _ = self.get_transform(self.shared_z_tuples, projection='densne')
+		pca_embedded_zs , _ = self.get_transform(self.shared_z_tuples, projection='pca')
+
+		# tsne_embedded_zs , _ = self.get_transform(self.target_latent_zs)
+		# densne_embedded_zs , _ = self.get_transform(self.target_latent_zs, projection='densne')
+
+		# if domain==1:
+		# 	print("Embedding in construct density embeddings")
+		# 	embed()
+
+		tsne_image = self.plot_density_embedding(tsne_embedded_zs, colors, "{0} Density Coded Z Tuple TSNE Embeddings.".format(prefix))
+		densne_image = self.plot_density_embedding(densne_embedded_zs, colors, "{0} Density Coded Z Tuple DENSNE Embeddings.".format(prefix))
+		pca_image = self.plot_density_embedding(pca_embedded_zs, colors, "{0} Density Coded Z Tuple PCA Embeddings.".format(prefix))
+
+		##################################################
+		# Now add to wandb log_dict.
+		##################################################
+
+		log_dict['{0} Density Coded Z Tuple TSNE Embeddings Perp30'.format(prefix)] = self.return_wandb_image(tsne_image)
+		log_dict['{0} Density Coded Z Tuple DENSNE Embeddings Perp30'.format(prefix)] = self.return_wandb_image(densne_image)
+		log_dict['{0} Density Coded Z Tuple PCA Embeddings'.format(prefix)] = self.return_wandb_image(pca_image)
+	
+
 		return log_dict
 
 	def plot_density_embedding(self, embedded_zs, colors, title): 
