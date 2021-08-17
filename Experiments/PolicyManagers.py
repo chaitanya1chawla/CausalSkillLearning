@@ -9729,7 +9729,7 @@ class PolicyManager_JointFixEmbedCycleTransfer(PolicyManager_JointFixEmbedTransf
 			##################################################
 
 			self.set_translated_z_sets(domain=0)
-			self.construct_tuple_embeddings()
+			# self.construct_tuple_embeddings()
 
 			log_dict['Source Z Trajectory JointSourceTranslated TSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_tsne_image)
 			log_dict['Target Z Trajectory JointSourceTranslated TSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_tsne_image)
