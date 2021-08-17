@@ -8668,6 +8668,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# Copying over some of visualize_embedded_z_trajectories...
 		# Add this value to indexing shared_z_embedding, assuming we're actually providing a shared embedding. 		
 		# If source, viz_domain = 0, so don't add anything, but if target, add the length of the soruce_latent_z to skip these.
+
+		domain = 1
 		add_value = len(self.source_latent_zs)*domain
 
 		# for i, z_traj in enumerate(self.target_z_trajectory_set):
