@@ -6327,6 +6327,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# First construct necessary tuples
 		
 		self.construct_tuple_embeddings()
+
+		print("Debugging viz")
+		embed()
 		self.z_tuple_embedding_image = self.plot_embedding(self.tsne_embedded_z_tuples, "TSNE Z Tuple Embedding", shared=True, source_length=len(self.source_z_tuples))
 		# self.z_tuple_embedding_image = self.plot_embedding(self.tsne_embedded_z_tuples, "TSNE Z Tuple Embedding", shared=True, source_length=len(self.source_z_tuples))
 
@@ -7220,8 +7223,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 	def construct_density_embeddings(self, log_dict):
 
+		# Construct density coded embeddings of Z's
 		log_dict = self.construct_single_directional_density_embeddings(log_dict, domain=0)
 		log_dict = self.construct_single_directional_density_embeddings(log_dict, domain=1)
+
+		# Now construct Z Tuple GMM density coded embeddings of Z Tuples. 
+		log_dict = self.construct_single_directional_z_tuple_density_embeddings(log_dict, domain=0)
+		log_dict = self.construct_single_directional_z_tuple_density_embeddings(log_dict, domain=1)
 
 		return log_dict
 
@@ -7285,6 +7293,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		log_dict['{0} Density Coded PCA Embeddings'.format(prefix)] = self.return_wandb_image(pca_image)
 
 		return log_dict
+
+	def construct_single_directional_z_tuple_density_embeddings(self, log_dict):
+
 
 	def plot_density_embedding(self, embedded_zs, colors, title): 
 
