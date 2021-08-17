@@ -6160,6 +6160,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.z_last_set_by = 'set_z_objects'
 
 	def visualize_embedded_z_trajectories(self, domain, shared_z_embedding, z_trajectory_set_object, projection='tsne'):
+		
 		# Visualize a set of z trajectories over the shared z embedding space.
 
 		# Get the figure and axes objects, so we can overlay images on to this. 
@@ -8572,10 +8573,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 				self.source_z_seq_set.append(distinct_source_zs)
 
 	def set_translated_z_sets(self, domain=1):
-
-		print("About to run translate")
-		embed()
-
+	
 		self.viz_dictionary = {}
 
 		# No need to copy these sets over, they have been set in set_z_objects. Not changing them here ensures we're not messing around.
@@ -8655,11 +8653,41 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		# Now also ... 
 
-		print("Just fin run translate")
-		embed()
+		# Construct translated_target_z_trajectory_set! 
+		self.construct_translated_target_z_trajectory_set()
 
 		self.z_last_set_by = 'set_translated_z_sets'
 		self.set_trans_z +=1
+
+	def construct_translated_target_z_trajectory_set(self):
+
+		# Use same indexing as what the visualize_embedded_z_trajectories uses to go
+		# from elements in self.target_z_trajectory_set to the right elements in ... not self.shared_embedded_zs, but .. self.target_latent_zs / self.shared_latent_zs! 
+		# THis is because we need to actually embed these differently. 
+
+		# Copying over some of visualize_embedded_z_trajectories...
+		# Add this value to indexing shared_z_embedding, assuming we're actually providing a shared embedding. 		
+		# If source, viz_domain = 0, so don't add anything, but if target, add the length of the soruce_latent_z to skip these.
+		add_value = len(self.source_latent_zs)*domain
+
+		# for i, z_traj in enumerate(self.target_z_trajectory_set):
+		# # for i in range(10):
+		# 	# z_traj = z_trajectory_set_object[i]				
+		
+		# 	# First get length of this z_trajectory.
+		# 	z_traj_len = len(z_traj)
+
+		# 	# Should just be able to get the corresponding embedded z by manipulating indices.. 
+		# 	# Assuming len of z_traj is consistent across all elements in z_trajectory_set_object, which would have needed to have been true 
+		# 	# for the concatenate in set_z_objects to work.
+		# 	# embedded_z_traj = shared_z_embedding[i*z_traj_len:(i+1)*z_traj_len]
+		# 	embedded_z_traj = shared_z_embedding[add_value+i*z_traj_len:add_value+(i+1)*z_traj_len]
+
+
+
+
+		print("Embedding in translated target z trajectory set")	
+		embed()
 
 	def update_plots(self, counter, viz_dict, log=False):
 
