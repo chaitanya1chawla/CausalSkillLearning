@@ -6199,6 +6199,37 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		return image	
 
+	def construct_tuple_embeddings(self):
+
+		# First construct tuples from self.source_z_trajectory_set and self.target_z_trajectory_set		
+		self.source_z_tuples = self.construct_tuples_from_z_traj_set(self.source_z_trajectory_set)
+		self.target_z_tuples = self.construct_tuples_from_z_traj_set(self.target_z_trajectory_set)
+
+		self.shared_z_tuples = np.concatenate([self.source_z_tuples,self.target_z_tuples])
+		
+		# Next construct embeddings of these tuples. Probably sufficient to just do one joint color coded embeddings.
+		self.tsne_embedded_z_tuples = self.get_transform(self.shared_z_tuples)
+				
+	def construct_tuples_from_z_traj_set(self, z_trajectory_set):
+
+		z_tuple_list = []
+
+		for k, v in enumerate(z_trajectory_set):
+
+			# First add (0,z_1) tuple. 
+			z_tuple_list.append(np.concatenate([np.zeros(self.args.z_dimensions),v[0]]).reshape(1,-1))
+
+			# Add intermediate tuples..
+			for j in range(len(v)-1):
+				z_tuple_list.append(np.concatenate([v[j],v[j+1]]).reshape(1,-1))
+
+			# Finally, add (z_n,0) tuple.
+			z_tuple_list.append(np.concatenate([v[-1],np.zeros(self.args.z_dimensions)]).reshape(1,-1))
+		
+		z_tuple_array = np.concatenate(z_tuple_list)
+
+		return z_tuple_array
+
 	def get_embeddings(self, projection='tsne', computed_sets=False):
 		# Function to visualize source, target, and combined embeddings: 
 	
@@ -6279,6 +6310,21 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.target_image = self.plot_embedding(shared_embedded_zs,"Target_Embedding",viz_domain='target')
 
 		########################################
+		# Also visualize tuples of Z's.. 
+		########################################
+
+		# Remember, the objects we are interested in are : self.source_z_trajectory_set, and self.target_z_trajectory_set. 
+		# First construct necessary tuples
+
+		print("embedding in construction of tuple embed")
+		embed()
+		
+		self.construct_tuple_embeddings()
+		self.z_tuple_embedding_image = self.plot_embedding(self.tsne_embedded_z_tuples, "TSNE Z Tuple Embedding", shared=True, source_length=len(self.source_z_tuples))
+		# self.z_tuple_embedding_image = self.plot_embedding(self.tsne_embedded_z_tuples, "TSNE Z Tuple Embedding", shared=True, source_length=len(self.source_z_tuples))
+
+		
+		########################################
 		# Single domain data point visualization with trajectories.
 		########################################
 
@@ -6288,9 +6334,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		self.samedomain_shared_embedding_image = None
 
-
-		print("Embed to construct new tuple embeddings")
-		embed()
 
 		if projection=='tsne' or projection=='densne':
 
@@ -6324,16 +6367,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		
 			return self.source_image, self.target_image, self.shared_image, self.samedomain_shared_embedding_image
 
-		########################################
-		# Also visualize tuples of Z's.. 
-		########################################
-
-		# Remember, the objects we are interested in are : self.source_z_trajectory_set, and self.target_z_trajectory_set. 
-		# The visualize_embedded_z_trajectories function tells us how to parse this using the existing embeddings..
-		# We want new embeddings
 
 
-	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False, viz_domain=None, return_fig=False):	
+	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False, viz_domain=None, return_fig=False, source_length=None):	
 		
 		# print("Running plot embedding", title, viz_domain)
 		############################################################
@@ -6352,7 +6388,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			colors = 0.2*np.ones((embedded_zs.shape[0]))
 			# colors[embedded_zs.shape[0]//2:] = 0.8
 			# TRY REPLACE Z.SHAPE//2 by [len(self.source_latent_zs):]
-			colors[len(self.source_latent_zs):] = 0.8
+			if source_length is not None:
+				colors[source_length:] = 0.8
+			else:
+				colors[len(self.source_latent_zs):] = 0.8
 		else:
 			if viz_domain=='source':
 				colors = 0.2*np.ones((embedded_zs.shape[0]))
