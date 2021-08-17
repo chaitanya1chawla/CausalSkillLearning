@@ -6324,13 +6324,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		########################################
 
 		# Remember, the objects we are interested in are : self.source_z_trajectory_set, and self.target_z_trajectory_set. 
-		# The visualize_embedded_z_trajectories function tells us how to parse this. 
+		# The visualize_embedded_z_trajectories function tells us how to parse this using the existing embeddings..
+		# We want new embeddings
 
-
-
-
-
-
+		print("Embed to construct new tuple embeddings")
+		embed()
 
 	def plot_embedding(self, embedded_zs, title, shared=False, trajectory=False, viz_domain=None, return_fig=False):	
 		
