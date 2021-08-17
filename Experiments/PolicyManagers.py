@@ -7295,7 +7295,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		return log_dict
 
 	def construct_single_directional_z_tuple_density_embeddings(self, log_dict):
-
+		pass
 
 	def plot_density_embedding(self, embedded_zs, colors, title): 
 
