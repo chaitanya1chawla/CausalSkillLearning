@@ -6135,6 +6135,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 			# These are the same z's... this object just retains sequence info. Should be able to find some indexing of concatenate...? 
 			self.source_z_trajectory_set = self.source_manager.latent_z_set
+
+			print("Setting target z traj object")
 			self.target_z_trajectory_set = self.target_manager.latent_z_set
 
 		else:
@@ -6328,8 +6330,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		
 		self.construct_tuple_embeddings()
 
-		print("Debugging viz")
-		embed()
+		# print("Debugging viz")
+		# embed()
 		self.z_tuple_embedding_image = self.plot_embedding(self.tsne_embedded_z_tuples, "TSNE Z Tuple Embedding", shared=True, source_length=len(self.source_z_tuples))
 		# self.z_tuple_embedding_image = self.plot_embedding(self.tsne_embedded_z_tuples, "TSNE Z Tuple Embedding", shared=True, source_length=len(self.source_z_tuples))
 
@@ -9691,6 +9693,7 @@ class PolicyManager_JointFixEmbedCycleTransfer(PolicyManager_JointFixEmbedTransf
 			##################################################
 
 			self.set_translated_z_sets(domain=0)
+			self.construct_tuple_embeddings()
 
 			log_dict['Source Z Trajectory JointSourceTranslated TSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_tsne_image)
 			log_dict['Target Z Trajectory JointSourceTranslated TSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_tsne_image)
