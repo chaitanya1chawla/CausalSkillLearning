@@ -10703,8 +10703,6 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		update_dictionary['source_sup_z_transformations'], update_dictionary['source_sup_z_transformation_weights'], _ = self.get_z_transformation(source_sup_var_dict['latent_z_indices'].detach(), source_sup_var_dict['latent_b'].detach())
 		update_dictionary['target_sup_z_transformations'], update_dictionary['target_sup_z_transformation_weights'], _ = self.get_z_transformation(update_dictionary['translated_supervised_target_domain_zs'], target_sup_var_dict['latent_b'].detach())
 
-		print("Debugging mask")
-		embed()
 		###########################################################
 		# 6) Create forward and backward GMMs. 
 		###########################################################
