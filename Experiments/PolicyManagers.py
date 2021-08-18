@@ -5985,19 +5985,27 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			if self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:
 				
 				# Visualize Source and Translated Target trajectory GIFs, irrespective of whether or not we've same domains. 
-				self.evaluate_translated_trajectory_distances(just_visualizing=True)
+				self.visualize_translated_trajectories()
 
 				# Log these GIFs assuming we have MUJOCO.
 				if self.args.no_mujoco==0:
-					log_dict['Trajectory 0 Source GIF'] = self.return_wandb_gif(self.gif_logs['Traj0_Source_Traj'])
-					log_dict['Trajectory 0 Target GIF'] = self.return_wandb_gif(self.gif_logs['Traj0_Target_Traj'])
-					log_dict['Trajectory 1 Source GIF'] = self.return_wandb_gif(self.gif_logs['Traj1_Source_Traj'])
-					log_dict['Trajectory 1 Target GIF'] = self.return_wandb_gif(self.gif_logs['Traj1_Target_Traj'])
+					log_dict['Trajectory 0 Original Target GIF'] = self.return_wandb_gif(self.gif_logs['Traj0_OriginalTarget_Traj'])
+					log_dict['Trajectory 1 Original Target GIF'] = self.return_wandb_gif(self.gif_logs['Traj1_OriginalTarget_Traj'])					
+					log_dict['Trajectory 0 Translated Target GIF'] = self.return_wandb_gif(self.gif_logs['Traj0_TranslatedTarget_Traj'])
+					log_dict['Trajectory 1 Translated Target GIF'] = self.return_wandb_gif(self.gif_logs['Traj1_TranslatedTarget_Traj'])
 
 				# If we are actually in same domain, also evaluate average trajectory reconstruction error.
 				if self.check_same_domains():
 					self.evaluate_correspondence_metrics()
 					log_dict['Target To Source Translation Trajectory Error'] = self.average_translated_trajectory_reconstruction_error
+
+					# Log these GIFs assuming we have MUJOCO.
+					if self.args.no_mujoco==0:
+						log_dict['Trajectory 0 Source GIF'] = self.return_wandb_gif(self.gif_logs['Traj0_Source_Traj'])
+						log_dict['Trajectory 0 Target GIF'] = self.return_wandb_gif(self.gif_logs['Traj0_Target_Traj'])
+						log_dict['Trajectory 1 Source GIF'] = self.return_wandb_gif(self.gif_logs['Traj1_Source_Traj'])
+						log_dict['Trajectory 1 Target GIF'] = self.return_wandb_gif(self.gif_logs['Traj1_Target_Traj'])
+
 
 			# if self.check_same_domains() and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:
 								
@@ -6937,6 +6945,58 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		self.source_target_trajectory_normalized_distance = self.source_target_trajectory_distance/(np.linalg.norm(source_traj_actions, axis=2).mean())
 		self.target_source_trajectory_normalized_distance = self.target_source_trajectory_distance/(np.linalg.norm(target_traj_actions, axis=2).mean())		
+
+	def visualize_translated_trajectories(self):
+
+		# Basically overall flow: (remember, this will be computationally pretty expensive.)
+		# 1) For N input trajectories:
+		# 	# 0) Get source trajectory (for start state for now).
+		# 	# 1) Get target trajectory. 
+		# 	# 2) Encode target trajectory as sequence of target z's. 
+		#	# 3) Translate sequence of target z's from target domain to source domain. 
+		# 	# 4) Feed translated sequence of target z's., along with start state of source trajectory into cross_domain decoding, and decode into a translated target-> source trajectory. 
+		# 	# 5) Visualize original target trajectory, and the translated target to source trajectory. 
+
+		with torch.no_grad():
+
+			for i in range(1):
+
+				# 0) Get source trajectory.				
+				source_input_dict, _, _ = self.encode_decode_trajectory(self.source_manager, i)
+
+				# 1) Get target trajectory. 
+				# 2) Encode target trajectory as sequence of target z's. 
+				target_input_dict, target_var_dict, _ = self.encode_decode_trajectory(self.target_manager, i)
+
+				# 3) Translate sequence of target z's from target domain to source domain. 
+				translated_latent_z = self.translate_latent_z(target_var_dict['latent_z_indices'], latent_b=target_var_dict['latent_b'])
+
+				# 4) Feed translated sequence of target z's., along with start state of source trajectory into cross_domain decoding, and decode into a translated target-> source trajectory. 
+				# Remember, must decode in the output domain of the translation model - usually the source domain (unless cycle setting.)
+				cross_domain_decoding_dict = self.cross_domain_decoding(0, self.source_manager, translated_latent_z, start_state=source_input_dict['sample_traj'][0], rollout_length=translated_latent_z.shape[0])
+
+				# Also visualize trajectories 0 and 1 if we have mujoco.
+				if self.args.no_mujoco==0 and i==0:
+
+					self.traj_viz_dir_name = os.path.join(self.args.logdir,self.args.name,"TrajVizDict")
+
+					if not(os.path.isdir(self.traj_viz_dir_name)):
+						os.mkdir(self.traj_viz_dir_name)
+									
+					# First unnormalize the trajectories.
+					unnormalized_original_target_traj = (target_input_dict['sample_traj']*self.target_manager.norm_denom_value)+self.target_manager.norm_sub_value														
+					# unnormalized_target_traj = (cross_domain_decoding_dict['differentiable_trajectory'].detach().cpu().numpy()*self.target_manager.norm_denom_value)+self.target_manager.norm_sub_value
+					# Remember, the cross domain trajectory needs to be unnormalized with the source normalization values.. 
+					unnormalized_translated_target_traj = (cross_domain_decoding_dict['differentiable_trajectory'].detach().cpu().numpy()*self.source_manager.norm_denom_value)+self.source_manager.norm_sub_value
+
+					self.gif_logs = {}
+					# Now for these many trajectories:
+					for k in range(2):
+						# Now visualize the source trajectory. 
+						self.gif_logs['Traj{0}_OriginalTarget_Traj'.format(k)] = np.array(self.visualizer.visualize_joint_trajectory(unnormalized_original_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_OriginalTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
+
+						# Now visualize the translated target trajectory. 
+						self.gif_logs['Traj{0}_TranslatedTarget_Traj'.format(k)] = np.array(self.visualizer.visualize_joint_trajectory(unnormalized_translated_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TranslatedTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
 
 	def evaluate_translated_trajectory_distances(self, just_visualizing=False):
 
