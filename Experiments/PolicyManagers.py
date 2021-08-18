@@ -6961,7 +6961,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			
 			# self.eval_extent = self.extent
 			if just_visualizing:
-				self.eval_extent = 0
+				self.eval_extent = 1
 			else:
 				self.eval_extent = 500 		
 
