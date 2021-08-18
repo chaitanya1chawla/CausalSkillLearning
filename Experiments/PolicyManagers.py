@@ -5982,33 +5982,45 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			log_dict['Source Trajectory Reconstruction Error'], log_dict['Target Trajectory Reconstruction Error'] = \
 				self.source_manager.avg_reconstruction_error, self.target_manager.avg_reconstruction_error
 
-			if self.check_same_domains() and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:
-				pass
-				# # self.evaluate_correspondence_metrics(computed_sets=False)
+			if self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:
 				
-				# # Actually, we've probably computed trajectory and latent sets. 
-				# if counter>0:
-				self.evaluate_correspondence_metrics()
+				# Visualize Source and Translated Target trajectory GIFs, irrespective of whether or not we've same domains. 
+				self.evaluate_translated_trajectory_distances(just_visualizing=True)
 
-				# 	log_dict['Source To Target Translation Trajectory Error'] = self.source_target_trajectory_distance
-				# 	log_dict['Target To Source Translation Trajectory Error'] = self.target_source_trajectory_distance
-				log_dict['Target To Source Translation Trajectory Error'] = self.average_translated_trajectory_reconstruction_error
-				# 	log_dict['Source To Target Translation Trajectory Normalized Error'] = self.source_target_trajectory_normalized_distance
-				# 	log_dict['Target To Source Translation Trajectory Normalized Error'] = self.target_source_trajectory_normalized_distance
-				# 	log_dict['Average Corresponding Z Sequence Error'] = self.average_corresponding_z_sequence_error.mean()
-				# 	log_dict['Average Corresponding Z Transition Sequence Error'] = self.average_corresponding_z_transition_sequence_error.mean()
-			
+				# Log these GIFs assuming we have MUJOCO.
 				if self.args.no_mujoco==0:
-
-					# print("Embed in traj gif logging")
-					# embed()
-
-					# x = self.gif_logs['Traj0_Source_Traj']
-					# x[...,0] = 
 					log_dict['Trajectory 0 Source GIF'] = self.return_wandb_gif(self.gif_logs['Traj0_Source_Traj'])
 					log_dict['Trajectory 0 Target GIF'] = self.return_wandb_gif(self.gif_logs['Traj0_Target_Traj'])
 					log_dict['Trajectory 1 Source GIF'] = self.return_wandb_gif(self.gif_logs['Traj1_Source_Traj'])
 					log_dict['Trajectory 1 Target GIF'] = self.return_wandb_gif(self.gif_logs['Traj1_Target_Traj'])
+
+				# If we are actually in same domain, also evaluate average trajectory reconstruction error.
+				if self.check_same_domains():
+					self.evaluate_correspondence_metrics()
+					log_dict['Target To Source Translation Trajectory Error'] = self.average_translated_trajectory_reconstruction_error
+
+			# if self.check_same_domains() and self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0:
+								
+			# 	# # self.evaluate_correspondence_metrics(computed_sets=False)
+				
+			# 	# # Actually, we've probably computed trajectory and latent sets. 
+			# 	# if counter>0:
+			# 	self.evaluate_correspondence_metrics()
+
+			# 	# 	log_dict['Source To Target Translation Trajectory Error'] = self.source_target_trajectory_distance
+			# 	# 	log_dict['Target To Source Translation Trajectory Error'] = self.target_source_trajectory_distance
+			# 	log_dict['Target To Source Translation Trajectory Error'] = self.average_translated_trajectory_reconstruction_error
+			# 	# 	log_dict['Source To Target Translation Trajectory Normalized Error'] = self.source_target_trajectory_normalized_distance
+			# 	# 	log_dict['Target To Source Translation Trajectory Normalized Error'] = self.target_source_trajectory_normalized_distance
+			# 	# 	log_dict['Average Corresponding Z Sequence Error'] = self.average_corresponding_z_sequence_error.mean()
+			# 	# 	log_dict['Average Corresponding Z Transition Sequence Error'] = self.average_corresponding_z_transition_sequence_error.mean()
+			
+			# 	if self.args.no_mujoco==0:
+
+			# 		log_dict['Trajectory 0 Source GIF'] = self.return_wandb_gif(self.gif_logs['Traj0_Source_Traj'])
+			# 		log_dict['Trajectory 0 Target GIF'] = self.return_wandb_gif(self.gif_logs['Traj0_Target_Traj'])
+			# 		log_dict['Trajectory 1 Source GIF'] = self.return_wandb_gif(self.gif_logs['Traj1_Source_Traj'])
+			# 		log_dict['Trajectory 1 Target GIF'] = self.return_wandb_gif(self.gif_logs['Traj1_Target_Traj'])
 
 			##################################################
 			# Visualize Z Trajectories.
@@ -6926,7 +6938,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.source_target_trajectory_normalized_distance = self.source_target_trajectory_distance/(np.linalg.norm(source_traj_actions, axis=2).mean())
 		self.target_source_trajectory_normalized_distance = self.target_source_trajectory_distance/(np.linalg.norm(target_traj_actions, axis=2).mean())		
 
-	def evaluate_translated_trajectory_distances(self):
+	def evaluate_translated_trajectory_distances(self, just_visualizing=False):
 
 		# Basically overall flow: (remember, this will be computationally pretty expensive.)
 		# 1) For N input trajectories:
@@ -6948,7 +6960,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Copy this range over from,.... train.
 			
 			# self.eval_extent = self.extent
-			self.eval_extent = 500 
+			if just_visualizing:
+				self.eval_extent = 0
+			else:
+				self.eval_extent = 500 		
+
 			for i in range(0,self.eval_extent,self.args.batch_size):
 
 				# t3 = time.time()
@@ -6970,11 +6986,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 				# 8) Evaluate L2 distance between the reconstructed source trajectory and the reconstructed translated target->source trjaectory. 				
 				# OR:
 				# 8) Evaluate L2 distance between the original source trajectory and the reconstructed translated target->source trjaectory. 
-				traj_recon_error = ((cross_domain_decoding_dict['differentiable_trajectory'].detach().cpu().numpy() - source_input_dict['sample_traj'])**2).mean(axis=(0,2)).sum()
+				if just_visualizing:
+					traj_recon_error = 0.
+				else:
+					traj_recon_error = ((cross_domain_decoding_dict['differentiable_trajectory'].detach().cpu().numpy() - source_input_dict['sample_traj'])**2).mean(axis=(0,2)).sum()
 				average_trajectory_reconstruction_error += traj_recon_error
 				
-				# print("Embedding in average trajectory reconstruction error computation")
-				# embed()
 				
 				# Also visualize trajectories 0 and 1 if we have mujoco.
 				if self.args.no_mujoco==0 and i==0:
@@ -7386,7 +7403,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		return image
 
-	# @gpu_profile_every(1)
 	def setup_GMM(self):
 
 		self.GMM_list = [self.create_GMM(evaluation_domain=0), self.create_GMM(evaluation_domain=1)]
@@ -7448,7 +7464,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		return forward_density.detach().cpu().numpy(), reverse_density.detach().cpu().numpy()
 
-	# @gpu_profile_every(1)
 	def query_GMM_density(self, evaluation_domain=0, point_set=None, differentiable_points=False, GMM=None):
 		
 		# if GMM is None:
@@ -7531,8 +7546,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		return GMM
 
-	# Copying over cross domain decoding and the differntiable rollout functions from JointCycleTransfer, because we want to use them in fix embed. 
-	# And eventually in JointFixEmbedCycleTransfer.
 	def cross_domain_decoding(self, domain, domain_manager, latent_z, start_state=None, rollout_length=None):
 
 		# If start state is none, first get start state, else use the argument. 
