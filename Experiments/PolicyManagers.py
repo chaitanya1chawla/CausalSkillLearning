@@ -6255,6 +6255,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		for k, v in enumerate(z_trajectory_set):
 
 			# First add (0,z_1) tuple. 
+			if len(v)==0 or v.shape[0]==0:
+				print("Embedding in construction")
+				embed()
 			z_tuple_list.append(np.concatenate([np.zeros(self.args.z_dimensions),v[0]]).reshape(1,-1))
 
 			# Add intermediate tuples..
