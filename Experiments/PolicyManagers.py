@@ -6154,7 +6154,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.target_latent_zs = (self.target_latent_zs-self.target_z_mean.detach().cpu().numpy())/self.target_z_std.detach().cpu().numpy()
 
 			# These are the same z's... this object just retains sequence info. Should be able to find some indexing of concatenate...? 
-			self.source_z_trajectory_set = self.source_manager.latent_z_set			
+			self.source_z_trajectory_set = self.source_manager.latent_z_set
 			self.target_z_trajectory_set = self.target_manager.latent_z_set
 
 		else:
@@ -6255,9 +6255,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		for k, v in enumerate(z_trajectory_set):
 
 			# First add (0,z_1) tuple. 
-			if len(v)==0 or v.shape[0]==0:
-				print("Embedding in construction")
-				embed()
 			z_tuple_list.append(np.concatenate([np.zeros(self.args.z_dimensions),v[0]]).reshape(1,-1))
 
 			# Add intermediate tuples..
@@ -8826,9 +8823,13 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# for the concatenate in set_z_objects to work.
 
 			# Translated z traj
-			translated_z_traj = self.shared_latent_zs[add_value+i*z_traj_len:add_value+(i+1)*z_traj_len]
+			# If we've passed the valid number of z's.. just skip.
+			if add_value+i*z_traj_len>len(self.shared_latent_zs):
+				pass
+			else:
+				translated_z_traj = self.shared_latent_zs[add_value+i*z_traj_len:min(add_value+(i+1)*z_traj_len,len(self.shared_latent_zs))]
 
-			self.translated_target_z_trajectory_set.append(translated_z_traj)	
+				self.translated_target_z_trajectory_set.append(translated_z_traj)	
 
 	def update_plots(self, counter, viz_dict, log=False):
 
