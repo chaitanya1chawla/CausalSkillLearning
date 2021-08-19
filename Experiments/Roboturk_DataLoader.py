@@ -23,6 +23,7 @@ class Roboturk_Dataset(Dataset):
 	def __init__(self, args):
 		# self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'		
 		
+		self.args = args
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
 			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
@@ -30,7 +31,7 @@ class Roboturk_Dataset(Dataset):
 		else:
 			self.dataset_directory = self.args.datadir	
 		
-		self.args = args
+		
 		# Require a task list. 
 
 		# The task name is needed for setting the environment, rendering. 
@@ -374,7 +375,7 @@ class Roboturk_SegmentedDataset(Roboturk_Dataset):
 		super(Roboturk_SegmentedDataset, self).__init__()
 		
 
-		
+		self.args = args
 		# self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
@@ -429,6 +430,7 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		
 		# self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'
 		# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/Roboturk/'
+		self.args = args
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
 			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
