@@ -92,7 +92,10 @@ class Master():
 			target_args.single_hand = self.args.target_single_hand
 			source_args.ee_trajectories = self.args.source_ee_trajs
 			target_args.ee_trajectories = self.args.target_ee_trajs
-
+			if self.args.source_datadir is not None:
+				source_args.datadir = self.args.source_datadir
+			if self.args.target_datadir is not None:
+				target_args.datadir = self.args.target_datadir				
 			source_dataset = return_dataset(source_args, data=self.args.source_domain)
 			target_dataset = return_dataset(target_args, data=self.args.target_domain)
 		
@@ -331,6 +334,8 @@ def parse_arguments():
 	# Transfer learning domains, etc. 
 	parser.add_argument('--source_domain',dest='source_domain',type=str,help='What the source domain is in transfer.')
 	parser.add_argument('--target_domain',dest='target_domain',type=str,help='What the target domain is in transfer.')
+	parser.add_argument('--source_datadir',dest='source_datadir',type=str,default=None,help='What the directory of the source dataset is. Defaults to args.datadir.')
+	parser.add_argument('--target_datadir',dest='target_datadir',type=str,default=None,help='What the directory of the target dataset is. Defaults to args.datadir.')
 	parser.add_argument('--source_single_hand',dest='source_single_hand',type=str,default=None,help='Whether to use a single hand for each domain, if so, which hand. Only for MIME dataset.')
 	parser.add_argument('--target_single_hand',dest='target_single_hand',type=str,default=None,help='Whether to use a single hand for each domain, if so, which hand. Only for MIME dataset.')
 	parser.add_argument('--source_ee_trajs',dest='source_ee_trajs',type=int,default=0,help='Whether to use EE trajectories in source domain or not.')
