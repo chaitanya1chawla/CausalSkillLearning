@@ -8926,7 +8926,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 			# Compute Aggregate CDSL
 			###################################################	
 
-			if self.args.eval_transfer_metrics:
+			# if self.args.eval_transfer_metrics:
+			if self.args.eval_transfer_metrics and counter%self.args.metric_eval_freq==0 and self.check_same_domains():
 				self.compute_aggregate_supervised_loss()
 			
 				# IGNORING AGGREGATE CDSL FOR NOW.
