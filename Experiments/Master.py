@@ -99,10 +99,7 @@ class Master():
 				target_args.datadir = self.args.target_datadir				
 			source_dataset = return_dataset(source_args, data=self.args.source_domain)
 			target_dataset = return_dataset(target_args, data=self.args.target_domain)
-		
-			print("Embedding in dataset creation")
-			embed()
-
+				
 			# # If we're creating a variation in the dataset: 
 			# if self.args.dataset_variation:
 			# 	target_dataset = return_dataset(self.args, data=self.args.target_domain, create_dataset_variation=create_dataset_variation)
