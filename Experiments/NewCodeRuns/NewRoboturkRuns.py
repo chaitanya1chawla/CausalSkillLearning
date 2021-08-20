@@ -2,6 +2,9 @@
 # CUDA_VISIBLE_DEVICES=1 python Master.py --train=1 --setting=learntsub --name=MJ_111 --normalization=minmax --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=MIME  --subpolicy_model=ExpWandbLogs/MBP_094/saved_models/Model_epoch470 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=0 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=100
 
 # Roboturk Joint Runs
+from shutil import SpecialFileError
+
+
 CUDA_VISIBLE_DEVICES=1 python Master.py --train=1 --setting=learntsub --name=RT_001 --normalization=minmax --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=Roboturk  --subpolicy_model=ExpWandbLogs/RTP_001/saved_models/Model_epoch500 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=0 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=100
 
 CUDA_VISIBLE_DEVICES=0 python Master.py --train=1 --setting=learntsub --name=RT_002 --normalization=minmax --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=Roboturk  --subpolicy_model=ExpWandbLogs/RTP_002/saved_models/Model_epoch500 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=1 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=100
@@ -28,4 +31,13 @@ CUDA_VISIBLE_DEVICES=1 python Master.py --train=0 --setting=learntsub --name=RT_
 # # Reviving Roboturk
 python Master.py --train=0 --setting=learntsub --name=RT_001_eval_notrain_butsmoo --normalization=minmax --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=Roboturk  --subpolicy_model=ExpWandbLogs/RTP_001/saved_models/Model_epoch500 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=0 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=100 --model=ExpWandbLogs/RT_001/saved_models/Model_epoch500 --dataset_traj_length_limit=100 --smoothen=1
 
+# viz latent spae
+CUDA_VISIBLE_DEVICES=1 python Master.py --train=1 --setting=learntsub --name=RT_001_eval_notrain_butsmoo_viz --normalization=minmax --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=Roboturk  --subpolicy_model=ExpWandbLogs/RTP_001/saved_models/Model_epoch500 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=0 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=100 --model=ExpWandbLogs/RT_001/saved_models/Model_epoch500 --dataset_traj_length_limit=100 --smoothen=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk
+
 python Master.py --train=0 --setting=learntsub --name=RT_002_eval --normalization=minmax --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=Roboturk  --subpolicy_model=ExpWandbLogs/RTP_002/saved_models/Model_epoch500 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=1 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=100 --model=ExpWandbLogs/RT_002/saved_models/Model_epoch500
+
+
+
+###############################
+# Eval RTP_001 to viz SpecialFileError
+# python Master.py --train=1 --setting=learntsub --name=RT_001_viz --normalization=minmax --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=Roboturk  --subpolicy_model=ExpWandbLogs/RTP_001/saved_models/Model_epoch500 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=0 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=100 --model=ExpWandbLogs/RTP_001/saved_models/Model_epoch500

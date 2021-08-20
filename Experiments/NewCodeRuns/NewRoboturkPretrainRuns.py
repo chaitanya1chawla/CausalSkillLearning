@@ -83,3 +83,9 @@ python Master.py --train=1 --setting=pretrain_sub --name=RTP_010 --data=FullRobo
 
 # Try... 
 python Master.py --train=1 --setting=pretrain_sub --name=RTP_debug --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=0 --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --epochs=2000 --smoothen=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/
+
+
+
+
+################
+python Master.py --train=1 --setting=pretrain_sub --name=RTP_001_viz --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=1 --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --model=ExpWandbLogs/RTP_001/saved_models/Model_epoch500
