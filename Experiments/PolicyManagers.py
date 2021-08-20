@@ -8655,10 +8655,6 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.source_manager = PolicyManager_BatchJoint(number_policies=4, dataset=self.source_dataset, args=self.source_args)
 		self.target_manager = PolicyManager_BatchJoint(number_policies=4, dataset=self.target_dataset, args=self.target_args)
 
-		print("Embedding in PM creation")
-		embed()
-
-
 		self.source_dataset_size = len(self.source_manager.dataset) - self.source_manager.test_set_size
 		self.target_dataset_size = len(self.target_manager.dataset) - self.target_manager.test_set_size
 
