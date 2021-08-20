@@ -1742,7 +1742,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Embed plots. 
 
 		# Set N:
-		self.N = 100
+		self.N = 500
 
 		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
 			
