@@ -21,9 +21,17 @@ class Roboturk_Dataset(Dataset):
 
 	# Class implementing instance of Roboturk dataset. 
 	def __init__(self, args):
-		# self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'
-		self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/Roboturk/'
+		# self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'		
+		
 		self.args = args
+		if self.args.datadir is None:
+			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
+			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
+			self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/Roboturk/'
+		else:
+			self.dataset_directory = self.args.datadir	
+		
+		
 		# Require a task list. 
 
 		# The task name is needed for setting the environment, rendering. 
@@ -305,8 +313,11 @@ class Roboturk_Dataset(Dataset):
 		np.save("Roboturk_Vel_Max.npy", vel_max_value)
 
 class Roboturk_FullDataset(Roboturk_Dataset):
+	
 	def __init__(self, args):
+		
 		super(Roboturk_FullDataset, self).__init__(args)
+		
 		self.environment_names = ["SawyerPickPlaceBread","SawyerPickPlaceCan","SawyerPickPlaceCereal","SawyerPickPlace","SawyerPickPlaceMilk","SawyerNutAssembly", "SawyerNutAssemblyRound","SawyerNutAssemblySquare"]
 
 	def setup(self):
@@ -366,8 +377,16 @@ class Roboturk_SegmentedDataset(Roboturk_Dataset):
 
 		super(Roboturk_SegmentedDataset, self).__init__()
 		
-		self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'
 
+		self.args = args
+		# self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'
+		if self.args.datadir is None:
+			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
+			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
+			self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/Roboturk/'
+		else:
+			self.dataset_directory = self.args.datadir	
+		
 		# Require a task list. 
 		# The task name is needed for setting the environment, rendering. 
 		# We shouldn't need the environment for .. training though, should we? 
@@ -413,7 +432,15 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		super(Roboturk_NewSegmentedDataset, self).__init__()
 		
 		# self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'
-		self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/Roboturk/'
+		# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/Roboturk/'
+		self.args = args
+		if self.args.datadir is None:
+			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
+			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
+			self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/Roboturk/'
+		else:
+			self.dataset_directory = self.args.datadir	
+		
 		self.args = args
 		# Require a task list. 
 		# The task name is needed for setting the environment, rendering. 
