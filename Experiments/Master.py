@@ -100,9 +100,12 @@ class Master():
 			source_dataset = return_dataset(source_args, data=self.args.source_domain)
 			target_dataset = return_dataset(target_args, data=self.args.target_domain)
 		
-			# If we're creating a variation in the dataset: 
-			if self.args.dataset_variation:
-				target_dataset = return_dataset(self.args, data=self.args.target_domain, create_dataset_variation=create_dataset_variation)
+			print("Embedding in dataset creation")
+			embed()
+
+			# # If we're creating a variation in the dataset: 
+			# if self.args.dataset_variation:
+			# 	target_dataset = return_dataset(self.args, data=self.args.target_domain, create_dataset_variation=create_dataset_variation)
 
 			if self.args.setting=='transfer':
 				self.policy_manager = PolicyManager_Transfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
