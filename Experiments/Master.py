@@ -50,8 +50,9 @@ class Master():
 
 	def __init__(self, arguments):
 		self.args = arguments 
-		
-		self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)
+
+		if self.args.setting not in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
+			self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)
 
 		# Now define policy manager.
 		if self.args.setting=='learntsub' or self.args.setting=='joint':
