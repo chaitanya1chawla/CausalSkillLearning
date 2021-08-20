@@ -6995,11 +6995,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					self.gif_logs = {}
 					# Now for these many trajectories:
 					for k in range(2):
-						# Now visualize the source trajectory. 
-						self.gif_logs['Traj{0}_OriginalTarget_Traj'.format(k)] = np.array(self.visualizer.visualize_joint_trajectory(unnormalized_original_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_OriginalTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
+						# Now visualize the original .. target trajectory. 
+						self.gif_logs['Traj{0}_OriginalTarget_Traj'.format(k)] = np.array(self.target_manager.visualizer.visualize_joint_trajectory(unnormalized_original_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_OriginalTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
 
 						# Now visualize the translated target trajectory. 
-						self.gif_logs['Traj{0}_TranslatedTarget_Traj'.format(k)] = np.array(self.visualizer.visualize_joint_trajectory(unnormalized_translated_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TranslatedTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
+						self.gif_logs['Traj{0}_TranslatedTarget_Traj'.format(k)] = np.array(self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_translated_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TranslatedTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
 
 	def evaluate_translated_trajectory_distances(self, just_visualizing=False):
 
@@ -7065,16 +7065,17 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 									
 					# First unnormalize the trajectories.
 					unnormalized_source_traj = (source_input_dict['sample_traj']*self.source_manager.norm_denom_value)+self.source_manager.norm_sub_value														
-					unnormalized_target_traj = (cross_domain_decoding_dict['differentiable_trajectory'].detach().cpu().numpy()*self.target_manager.norm_denom_value)+self.target_manager.norm_sub_value
+					unnormalized_translatedtarget_traj = (cross_domain_decoding_dict['differentiable_trajectory'].detach().cpu().numpy()*self.target_manager.norm_denom_value)+self.target_manager.norm_sub_value
 
 					self.gif_logs = {}
 					# Now for these many trajectories:
 					for k in range(2):
 						# Now visualize the source trajectory. 
-						self.gif_logs['Traj{0}_Source_Traj'.format(k)] = np.array(self.visualizer.visualize_joint_trajectory(unnormalized_source_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_SourceTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
+						self.gif_logs['Traj{0}_Source_Traj'.format(k)] = np.array(self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_source_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_SourceTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
 
 						# Now visualize the target trajectory. 
-						self.gif_logs['Traj{0}_Target_Traj'.format(k)] = np.array(self.visualizer.visualize_joint_trajectory(unnormalized_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TargetTranslatedTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
+						# THIS IS ACTUALLY IN SOURCE DOMAIN... USE SOURCE VISUALIZER.
+						self.gif_logs['Traj{0}_Target_Traj'.format(k)] = np.array(self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_translatedtarget_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TargetTranslatedTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
 
 		average_trajectory_reconstruction_error /= (self.extent//self.args.batch_size+1)*self.args.batch_size
 
