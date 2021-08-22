@@ -89,3 +89,63 @@ python Master.py --train=1 --setting=pretrain_sub --name=RTP_debug --data=FullRo
 
 ################
 python Master.py --train=1 --setting=pretrain_sub --name=RTP_001_viz --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=1 --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --model=ExpWandbLogs/RTP_001/saved_models/Model_epoch500
+
+################################################################################
+################################################################################
+# Running new RTP runs with more epochs..
+
+python cluster_run.py --name='RTP_021' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_021 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/'
+
+python cluster_run.py --name='RTP_022' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_022 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=1 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/'
+
+python cluster_run.py --name='RTP_023' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_023 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=2 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/'
+
+# Now with smoothen
+python cluster_run.py --name='RTP_031' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_031 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --epochs=2000 --smoothen=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/'
+
+python cluster_run.py --name='RTP_032' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_032 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=1 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --epochs=2000 --smoothen=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/'
+
+python cluster_run.py --name='RTP_033' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_033 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=2 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --epochs=2000 --smoothen=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/'
+
+# Now with smoothen and action scaling
+python cluster_run.py --name='RTP_041' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_041 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --epochs=2000 --smoothen=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/ --action_scale_factor=10'
+
+python cluster_run.py --name='RTP_042' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_042 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=1 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --epochs=2000 --smoothen=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/ --action_scale_factor=10'
+
+python cluster_run.py --name='RTP_043' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_043 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=2 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --epochs=2000 --smoothen=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/ --action_scale_factor=10'
+
+##########################################
+# Now run with higher eps.
+python cluster_run.py --name='RTP_051' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_051 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/'
+
+python cluster_run.py --name='RTP_052' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_052 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=1 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/'
+
+python cluster_run.py --name='RTP_053' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_053 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=2 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/'
+
+# Higher eps, higher KL..
+python cluster_run.py --name='RTP_061' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_061 --data=FullRoboturk --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/'
+
+python cluster_run.py --name='RTP_062' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_062 --data=FullRoboturk --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=1 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/'
+
+python cluster_run.py --name='RTP_063' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_063 --data=FullRoboturk --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=2 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/'
+
+# Higher eps, even higher KL..
+python cluster_run.py --name='RTP_071' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_071 --data=FullRoboturk --kl_weight=0.1 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/'
+
+python cluster_run.py --name='RTP_072' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_072 --data=FullRoboturk --kl_weight=0.1 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=1 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/'
+
+python cluster_run.py --name='RTP_073' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_073 --data=FullRoboturk --kl_weight=0.1 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=2 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/'
+
+# Eval 22
+python Master.py --train=0 --setting=pretrain_sub --name=RTP_022 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=1 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/ --model=ExpWandbLogs/RTP_022/saved_models/Model_epoch75
+
+#########################
+# Eval 50 series
+python Master.py --train=0 --setting=pretrain_sub --name=RTP_051_eval_p10 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/ --model=ExpWandbLogs/RTP_051/saved_models/Model_epoch340 --perplexity=10
+
+python Master.py --train=0 --setting=pretrain_sub --name=RTP_052_eval_p10 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/ --model=ExpWandbLogs/RTP_052/saved_models/Model_epoch340 --perplexity=10
+
+# +/- 5model
+python Master.py --train=0 --setting=pretrain_sub --name=RTP_051_eval_p10_m335 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/ --model=ExpWandbLogs/RTP_051/saved_models/Model_epoch335 --perplexity=10
+
+CUDA_VISIBLE_DEVICES=1 python Master.py --train=0 --setting=pretrain_sub --name=RTP_052_eval_p10_m335 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/ --model=ExpWandbLogs/RTP_052/saved_models/Model_epoch335 --perplexity=10
