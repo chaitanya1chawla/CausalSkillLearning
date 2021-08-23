@@ -511,6 +511,7 @@ class Roboturk_NewSegmentedDataset(Dataset):
 			self.full_cummulative_num_demos = copy.deepcopy(self.cummulative_num_demos)
 			self.full_num_demos = copy.deepcopy(self.num_demos)
 			self.full_files = copy.deepcopy(self.files)
+			self.files = [[] for i in range(len(self.task_list))]
 			self.full_dataset_trajectory_lengths = copy.deepcopy(self.dataset_trajectory_lengths)
 
 			for index in range(self.full_length):
@@ -520,14 +521,18 @@ class Roboturk_NewSegmentedDataset(Dataset):
 				new_index = index-self.full_cummulative_num_demos[max(task_index,0)]
 
 				# Check the length of this particular trajectory and its validity. 
-				if (self.dataset_trajectory_lengths[index] < self.args.dataset_traj_length_limit) and (index not in self.bad_original_index_list):
-					pass
+				if (self.full_dataset_trajectory_lengths[index] < self.args.dataset_traj_length_limit) and (index not in self.bad_original_index_list):
+					# Add from old list to new. 
+					self.files[task_index].append(self.full_files[task_index][new_index])
 				else:
 					# Reduce count. 
 					self.num_demos[task_index] -= 1
-					# Pop item from files. It's still saved in full_files. 					
-					# self.files[task_index].pop(new_index)
-					self.files[task_index] = np.delete(self.files[task_index],new_index)
+					
+					# # Pop item from files. It's still saved in full_files. 					
+					# # self.files[task_index].pop(new_index)
+					# self.files[task_index] = np.delete(self.files[task_index],new_index)
+					# Approach with opposite pattern.. instead of deleting invalid files, add valid ones.
+					
 					# Pop item from dataset_trajectory_lengths. 
 					self.dataset_trajectory_lengths = np.delete(self.dataset_trajectory_lengths, index)
 
