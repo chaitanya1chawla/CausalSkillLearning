@@ -546,6 +546,11 @@ class Roboturk_NewSegmentedDataset(Dataset):
 			self.cummulative_num_demos = self.num_demos.cumsum()	
 			# Set new total length.
 			self.total_length = self.cummulative_num_demos[-1]
+			# Make array.
+			self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)
+
+			for t in range(len(self.task_list)):
+				self.files[t] = np.array(self.files[t])
 
 			# By popping element from files / dataset_traj_lengths, we now don't need to change indexing.
 	
