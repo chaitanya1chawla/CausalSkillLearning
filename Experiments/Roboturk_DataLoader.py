@@ -565,7 +565,7 @@ class Roboturk_NewSegmentedDataset(Dataset):
 
 		self.kernel_bandwidth = self.args.smoothing_kernel_bandwidth
 
-		if resample_length<=1 or ((index in self.bad_original_index_list) and self.args.dataset_traj_length_limit==-1):
+		if resample_length<=1 or ((index in self.bad_original_index_list) and ((self.args.dataset_traj_length_limit==-1) or (self.args.dataset_traj_length_limit>self.full_max_length)):
 			# Only skip elements here if we didn't artificially shorten trajs
 			data_element['is_valid'] = False			
 		else:
