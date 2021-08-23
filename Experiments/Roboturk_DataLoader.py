@@ -553,7 +553,8 @@ class Roboturk_NewSegmentedDataset(Dataset):
 				self.files[t] = np.array(self.files[t])
 
 			# By popping element from files / dataset_traj_lengths, we now don't need to change indexing.
-	
+			embed()
+			
 	def __len__(self):
 		return self.total_length
 
@@ -566,6 +567,8 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		# Get bucket that index falls into based on num_demos array. 
 		task_index = np.searchsorted(self.cummulative_num_demos, index, side='right')-1
 		
+		
+
 		# Decide task ID, and new index modulo num_demos.
 		# Subtract number of demonstrations in cumsum until then, and then 				
 		new_index = index-self.cummulative_num_demos[max(task_index,0)]		
