@@ -526,6 +526,7 @@ class Roboturk_NewSegmentedDataset(Dataset):
 					# Reduce count. 
 					self.num_demos[task_index] -= 1
 					# Pop item from files. It's still saved in full_files. 
+					embed()
 					self.files[task_index].pop(new_index)
 					# Pop item from dataset_trajectory_lengths. 
 					self.dataset_trajectory_lengths = np.delete(self.dataset_trajectory_lengths, index)
