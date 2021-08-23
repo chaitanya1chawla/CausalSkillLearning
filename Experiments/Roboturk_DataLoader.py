@@ -543,7 +543,8 @@ class Roboturk_NewSegmentedDataset(Dataset):
 					# self.dataset_trajectory_lengths = np.delete(self.dataset_trajectory_lengths, index)
 
 			# Set new cummulative num demos. 
-			self.cummulative_num_demos = self.num_demos.cumsum()	
+			self.cummulative_num_demos = self.num_demos.cumsum()
+			self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
 			# Set new total length.
 			self.total_length = self.cummulative_num_demos[-1]
 			# Make array.
@@ -553,8 +554,8 @@ class Roboturk_NewSegmentedDataset(Dataset):
 				self.files[t] = np.array(self.files[t])
 
 			# By popping element from files / dataset_traj_lengths, we now don't need to change indexing.
-			embed()
-			
+		
+
 	def __len__(self):
 		return self.total_length
 
