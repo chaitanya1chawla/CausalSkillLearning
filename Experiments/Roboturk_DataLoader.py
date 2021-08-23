@@ -514,7 +514,7 @@ class Roboturk_NewSegmentedDataset(Dataset):
 			self.files = [[] for i in range(len(self.task_list))]
 			self.full_dataset_trajectory_lengths = copy.deepcopy(self.dataset_trajectory_lengths)
 			self.dataset_trajectory_lengths = []
-			self.num_demos = np.zeros(len(self.task_list))
+			self.num_demos = np.zeros(len(self.task_list),dtype=int)
 
 			for index in range(self.full_length):
 				# Get bucket that index falls into based on num_demos array. 
@@ -530,7 +530,7 @@ class Roboturk_NewSegmentedDataset(Dataset):
 					self.num_demos[task_index] += 1
 				else:
 					pass
-				
+
 					# Reduce count. 
 					# self.num_demos[task_index] -= 1
 					
