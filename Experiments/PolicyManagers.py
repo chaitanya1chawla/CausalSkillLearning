@@ -1645,8 +1645,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				print("Embedding in Train.")
 				embed()
 
-			print("Embedding in Train.")
-			embed()
+			# print("Embedding in Train.")
+			# embed()
 
 			############# (3) #############
 			# Update parameters. 
