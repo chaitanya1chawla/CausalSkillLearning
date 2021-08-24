@@ -316,9 +316,12 @@ class PolicyManager_BaseClass():
 		# NOT RUNNING AUTO EVAL FOR NOW.
 		# subprocess.Popen([base_command],shell=True)
 
-	def visualize_robot_data(self, load_sets=False):
+	def visualize_robot_data(self, load_sets=False, number_of_trajectories_to_visualize=None):
 
-		self.N = 100
+		if number_of_trajectories_to_visualize is not None:
+			self.N = number_of_trajectories_to_visualize
+		else:
+			self.N = 100
 		self.rollout_timesteps = self.args.traj_length
 	
 		#####################################################
@@ -1264,6 +1267,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			log_dict["Embedded Z Space Perplexity 5"] = self.return_wandb_image(image_perp5)
 			log_dict["Embedded Z Space Perplexity 10"] =  self.return_wandb_image(image_perp10)
 			log_dict["Embedded Z Space Perplexity 30"] =  self.return_wandb_image(image_perp30)
+
+		if counter%self.args.metric_eval_freq==0:
+			self.visualize_robot_data(load_sets=False, number_of_trajectories_to_visualize=10)
 
 		wandb.log(log_dict, step=counter)
 
