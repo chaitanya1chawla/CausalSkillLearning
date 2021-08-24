@@ -155,6 +155,9 @@ CUDA_VISIBLE_DEVICES=1 python Master.py --train=0 --setting=pretrain_sub --name=
 
 # Now finetune on smoothened things...
 # Now run with higher eps.
+# Debug
+python Master.py --train=1 --setting=pretrain_sub --name=RTP_debug_load --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/ --model=ExpWandbLogs/RTP_051/saved_models/Model_epoch340 --smoothen=1
+
 python cluster_run.py --name='RTP_101' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_101 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/ --model=ExpWandbLogs/RTP_051/saved_models/Model_epoch340 --smoothen=1'
 
 python cluster_run.py --name='RTP_102' --cmd='python Master.py --train=1 --setting=pretrain_sub --name=RTP_102 --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=1 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/Roboturk/ --model=ExpWandbLogs/RTP_052/saved_models/Model_epoch340 --smoothen=1'
