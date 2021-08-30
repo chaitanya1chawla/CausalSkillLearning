@@ -451,6 +451,9 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		self.num_demos = np.array([1069, 1069, 1069, 1069, 1144, 1145])
 		self.cummulative_num_demos = self.num_demos.cumsum()
 		self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
+
+		self.bad_original_index_list = [4900,537]
+		
 		# Append -1 to the start of cummulative_num_demos. This has two purposes. 
 		# The first is that when we are at index 0 of the dataset, if we appended 0, np.searchsorted returns 0, rather than 1. 
 		# For index 1, it returns 1. This was becoming inconsistent behavior for demonstrations in the same task. 
@@ -467,7 +470,7 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		self.files = []
 		# for i in range(len(self.task_list)):
 		for i in range(len(self.task_list)):
-			self.files.append( np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
+			self.files.append(np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
 
 		# # Seems to follow joint angles order:
 		# # ('time','right_j0', 'head_pan', 'right_j1', 'right_j2', 'right_j3', 'right_j4', 'right_j5', 'right_j6', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'Milk0', 'Bread0', 'Cereal0', 'Can0').
@@ -482,7 +485,6 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		# # gripper_open = [0.0115, -0.0115]
 		# # gripper_closed = [-0.020833, 0.020833]
 
-
 		# Get dataset trajectory lengths for smart batching
 		self.dataset_trajectory_lengths = np.zeros(self.total_length)
 		for index in range(self.total_length):
@@ -496,6 +498,64 @@ class Roboturk_NewSegmentedDataset(Dataset):
 
 			self.dataset_trajectory_lengths[index] = len(data_element['demo'])
 
+		######################################################
+		# Now implementing dataset_trajectory_length_limits. 
+		######################################################
+		
+		if self.args.dataset_traj_length_limit>0:
+			# Essentially will need new self.cummulative_num_demos and new .. file index map list things. 
+			# Also will need to set total_length. 
+
+			self.full_max_length = self.dataset_trajectory_lengths.max()
+			self.full_length = copy.deepcopy(self.total_length)
+			self.full_cummulative_num_demos = copy.deepcopy(self.cummulative_num_demos)
+			self.full_num_demos = copy.deepcopy(self.num_demos)
+			self.full_files = copy.deepcopy(self.files)
+			self.files = [[] for i in range(len(self.task_list))]
+			self.full_dataset_trajectory_lengths = copy.deepcopy(self.dataset_trajectory_lengths)
+			self.dataset_trajectory_lengths = []
+			self.num_demos = np.zeros(len(self.task_list),dtype=int)
+
+			for index in range(self.full_length):
+				# Get bucket that index falls into based on num_demos array. 
+				task_index = np.searchsorted(self.full_cummulative_num_demos, index, side='right')-1
+				# Get the demo index in this task list. 
+				new_index = index-self.full_cummulative_num_demos[max(task_index,0)]
+
+				# Check the length of this particular trajectory and its validity. 
+				if (self.full_dataset_trajectory_lengths[index] < self.args.dataset_traj_length_limit) and (index not in self.bad_original_index_list):
+					# Add from old list to new. 
+					self.files[task_index].append(self.full_files[task_index][new_index])
+					self.dataset_trajectory_lengths.append(self.full_dataset_trajectory_lengths[index])
+					self.num_demos[task_index] += 1
+				else:
+					pass
+
+					# Reduce count. 
+					# self.num_demos[task_index] -= 1
+					
+					# # Pop item from files. It's still saved in full_files. 					
+					# # self.files[task_index].pop(new_index)
+					# self.files[task_index] = np.delete(self.files[task_index],new_index)
+					# Approach with opposite pattern.. instead of deleting invalid files, add valid ones.
+					
+					# # Pop item from dataset_trajectory_lengths. 
+					# self.dataset_trajectory_lengths = np.delete(self.dataset_trajectory_lengths, index)
+
+			# Set new cummulative num demos. 
+			self.cummulative_num_demos = self.num_demos.cumsum()
+			self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
+			# Set new total length.
+			self.total_length = self.cummulative_num_demos[-1]
+			# Make array.
+			self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)
+
+			for t in range(len(self.task_list)):
+				self.files[t] = np.array(self.files[t])
+
+			# By popping element from files / dataset_traj_lengths, we now don't need to change indexing.
+		
+
 	def __len__(self):
 		return self.total_length
 
@@ -508,6 +568,8 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		# Get bucket that index falls into based on num_demos array. 
 		task_index = np.searchsorted(self.cummulative_num_demos, index, side='right')-1
 		
+		
+
 		# Decide task ID, and new index modulo num_demos.
 		# Subtract number of demonstrations in cumsum until then, and then 				
 		new_index = index-self.cummulative_num_demos[max(task_index,0)]		
@@ -518,7 +580,8 @@ class Roboturk_NewSegmentedDataset(Dataset):
 
 		self.kernel_bandwidth = self.args.smoothing_kernel_bandwidth
 
-		if resample_length<=1 or (index==4900 or index==537):
+		if resample_length<=1 or ((index in self.bad_original_index_list) and ((self.args.dataset_traj_length_limit==-1) or (self.args.dataset_traj_length_limit>self.full_max_length))):
+			# Only skip elements here if we didn't artificially shorten trajs
 			data_element['is_valid'] = False			
 		else:
 			data_element['is_valid'] = True
