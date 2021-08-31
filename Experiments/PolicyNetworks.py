@@ -118,19 +118,31 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		# The output size here must be mean+variance for each dimension. 
 		# This is output_size*2. 
 		self.args = args
+		if self.args is None:
+			self.debug = False
+			self.latent_z_dimensions = 16
+			self.dropout = 0.
+		else:
+			self.latent_z_dimensions = self.args.z_dimensions
+			self.dropout = self.args.dropout
+			self.debug = self.args.debug
+
 		self.output_size = output_size
 		self.num_layers = number_layers
 		self.batch_size = self.args.batch_size
+
 		
 		if whether_latentb_input:
-			self.input_size = input_size+self.args.z_dimensions+1
+			# self.input_size = input_size+self.args.z_dimensions+1
+			self.input_size = input_size+self.latent_z_dimensions+1
 		else:
 			if zero_z_dim:
 				self.input_size = input_size
 			else:
-				self.input_size = input_size+self.args.z_dimensions
+				# self.input_size = input_size+self.args.z_dimensions
+				self.input_size = input_size+self.latent_z_dimensions
 		# Create LSTM Network. 
-		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers, dropout=self.args.dropout)
+		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers, dropout=self.dropout)
 
 		# Define output layers for the LSTM, and activations for this output layer. 
 		self.mean_output_layer = torch.nn.Linear(self.hidden_size,self.output_size)
