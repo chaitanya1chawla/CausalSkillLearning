@@ -84,7 +84,7 @@ class Master():
 		elif self.args.setting=='imitation':
 			self.policy_manager = PolicyManager_Imitation(self.args.number_policies, self.dataset, self.args)
 
-		elif self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
+		elif self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer','downstreamtasktransfer']:
 
 			# Creating two copies of arguments, in case we're transferring between MIME left and MIME right.
 			source_args = copy.deepcopy(self.args)
@@ -122,6 +122,8 @@ class Master():
 				self.policy_manager = PolicyManager_DensityJointTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 			elif self.args.setting=='densityjointfixembedtransfer':
 				self.policy_manager = PolicyManager_DensityJointFixEmbedTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
+			elif self.args.setting=='downstreamtasktransfer':
+				self.policy_manager = PolicyManager_DownstreamTaskTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 
 		elif self.args.setting in ['iktrainer']:
 			self.policy_manager = PolicyManager_IKTrainer(self.dataset, self.args)
@@ -136,7 +138,7 @@ class Master():
 	def run(self):
 		if self.args.setting in ['pretrain_sub','pretrain_prior','imitation','baselineRL','downstreamRL',\
 			'transfer','cycle_transfer','jointtransfer','fixembed','jointcycletransfer', 'jointfixembed',\
-			'jointfixcycle','densityjointtransfer','densityjointfixembedtransfer','iktrainer']:
+			'jointfixcycle','densityjointtransfer','densityjointfixembedtransfer','iktrainer', 'downstreamtasktransfer']:
 			if self.args.train:
 				if self.args.model:
 					self.policy_manager.train(self.args.model)

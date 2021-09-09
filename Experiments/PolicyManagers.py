@@ -6,6 +6,8 @@
 
 from headers import *
 from PolicyNetworks import *
+from RL_headers import *
+from PPO_Utilities import PPOBuffer
 from Visualizers import BaxterVisualizer, SawyerVisualizer, ToyDataVisualizer #, MocapVisualizer
 import TFLogger, DMP, RLUtils
 
@@ -44,7 +46,8 @@ class PolicyManager_BaseClass():
 			(self.args.setting=='jointfixcycle' and isinstance(self, PolicyManager_JointFixEmbedCycleTransfer)) or \
 			(self.args.setting=='densityjointtransfer' and isinstance(self, PolicyManager_DensityJointTransfer)) or \
 			(self.args.setting=='densityjointfixembedtransfer' and isinstance(self, PolicyManager_DensityJointFixEmbedTransfer)) or \
-			(self.args.setting=='iktrainer' and isinstance(self, PolicyManager_IKTrainer)):
+			(self.args.setting=='iktrainer' and isinstance(self, PolicyManager_IKTrainer)) or \
+			(self.args.setting=='downstreamtasktransfer' and isinstance(self, PolicyManager_DownstreamTaskTransfer)):
 				extent = self.extent
 		else:
 			extent = len(self.dataset)-self.test_set_size
@@ -59,7 +62,8 @@ class PolicyManager_BaseClass():
 			self.args.setting in ['fixembed'] and isinstance(self, PolicyManager_FixEmbedCycleConTransfer) or \
 			self.args.setting in ['jointfixcycle'] and isinstance(self, PolicyManager_JointFixEmbedCycleTransfer) or \
 			self.args.setting in ['densityjointtransfer'] and isinstance(self, PolicyManager_DensityJointTransfer) or \
-			self.args.setting in ['densityjointfixembedtransfer'] and isinstance(self, PolicyManager_DensityJointFixEmbedTransfer):
+			self.args.setting in ['densityjointfixembedtransfer'] and isinstance(self, PolicyManager_DensityJointFixEmbedTransfer) or \
+			self.args.setting in ['downstreamtasktransfer'] and isinstance(self, PolicyManager_DownstreamTaskTransfer):
 			self.load_domain_models()
 
 	def initialize_plots(self):
@@ -10656,6 +10660,28 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 	def __init__(self, args=None, source_dataset=None, target_dataset=None):
 
 		super(PolicyManager_DensityJointFixEmbedTransfer, self).__init__(args, source_dataset, target_dataset)
+	
+	def save_all_models(self, suffix):
+
+		self.logdir = os.path.join(self.args.logdir, self.args.name)
+		self.savedir = os.path.join(self.logdir,"saved_models")
+		if not(os.path.isdir(self.savedir)):
+			os.mkdir(self.savedir)
+
+		self.save_object = {}
+
+		# self.save_object['forward_translation_model'] = self.forward_translation_model.state_dict()
+		self.save_object['backward_translation_model'] = self.backward_translation_model.state_dict()
+
+		# Overwrite the save from super. 
+		torch.save(self.save_object,os.path.join(self.savedir,"Model_"+suffix))
+
+	def load_all_models(self, path):
+		self.load_object = torch.load(path)
+
+		# Load translation model.
+		# self.forward_translation_model.load_state_dict(self.load_object['forward_translation_model'])
+		self.backward_translation_model.load_state_dict(self.load_object['backward_translation_model'])
 
 	# @gpu_profile_every(1)
 	def update_networks(self, domain, policy_manager, update_dictionary):		
@@ -11624,7 +11650,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		
 
 	def run_iteration(self, counter, i, return_z=False, and_train=True):
-		
+				
 		# Flow: 
 		# 
 		# 1) Get batch of trajectories. 
@@ -11695,3 +11721,116 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 		if self.args.debug:
 			print("Embedding in run iter")
 			embed()
+
+class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTransfer):
+
+	def __init__(self, args=None, source_dataset=None, target_dataset=None):
+
+		# Should this inherit from DJFE PM? 
+		# Or just have an instance of it... 
+		# Difference is probably... how easily it will be to interact with self objects of this class. 
+		# Still have access to all of the DJFE PM functions / objects either way... 
+
+		# Inheritance probably easier from a creation of PM point of view?
+
+		super(PolicyManager_DownstreamTaskTransfer, self).__init__(args, source_dataset, target_dataset)
+		
+	def setup(self):
+		
+		# Run super set up to construct networks, load domain models, etc. 
+		super(PolicyManager_DownstreamTaskTransfer, self).setup()
+
+		# Also load the translation model trained in DJFE PM. 
+		self.load_all_models(self.args.model)
+
+		# Now set things up for running PPO. 
+		self.setup_ppo()
+
+	def setup_ppo(self):
+		
+		####################################################
+		# This function should essentially replicate what the Run_Robosuite_PPO file does.
+		####################################################
+
+		if self.args.mujoco:
+			import robosuite
+
+		####################################################
+		# Create the base environment.
+		####################################################
+
+		if self.args.environment in ['Door','Wipe'] and float(robosuite.__version__[:3])>1.:        
+			# Specify that we're going to use the Sawyer here..
+			self.base_env = robosuite.make(self.args.environment, robots="Sawyer", has_renderer=False, has_offscreen_renderer=False, use_camera_obs=False, reward_shaping=True)        
+		else:
+			self.base_env = robosuite.make(self.args.environment, has_renderer=False, use_camera_obs=False, reward_shaping=True)			
+		
+		# Now make a GymWrapped version of that environment.
+		self.gym_env = GymWrapper(self.base_env)
+
+		####################################################		
+		# Create a log directory.
+		####################################################
+
+		self.RL_logdir = "Logs/{0}".format(args.name+"_"+args.environment)
+
+		#################################################### 
+		# Create a policy / critic. 
+		####################################################
+
+		self.ActorCritic = partial(exercise1_2_auxiliary.ExerciseActorCritic, actor=MLPGaussianActor)
+
+		####################################################
+		# Set some parameters.
+		####################################################
+
+		obs_dim = self.gym_env.observation_space.shape
+		act_dim = self.gym_env.action_space.shape
+
+		####################################################
+		# Initialize things needed for PPO, that were in the PPO Init block.
+		####################################################		
+
+		# Special function to avoid certain slowdowns from PyTorch + MPI combo.
+		setup_pytorch_for_mpi()
+
+		# Set up logger and save configuration		
+		self.ppo_logger = EpochLogger(dict(output_dir=self.RL_logdir))
+		self.ppo_logger.save_config(locals())
+	
+
+	# def train(self, model=None):
+
+	# 	# We've already loaded model presumably. 
+
+	# 	# Now actually run PPO. 
+	# 	if self.args.train:
+	# 		print("Beginning Training.")
+			
+	# 		# Actually call PPO.		
+	# 		if self.args.hierarchical:
+	# 			hierarchical_ppo(lambda : self.gym_env, 
+	# 			ac_kwargs=dict(hidden_sizes=(64,)), 
+	# 			steps_per_epoch=1000, epochs=self.args.epochs,
+	# 			logger_kwargs=dict(output_dir=self.RL_logdir), args=self.args, target_kl=self.args.target_kl)
+	# 		else:
+	# 			ppo(env_fn = lambda : self.gym_env,
+	# 				actor_critic=ActorCritic,
+	# 				ac_kwargs=dict(hidden_sizes=(64,)),
+	# 				steps_per_epoch=1000, epochs=self.args.epochs, logger_kwargs=dict(output_dir=self.RL_logdir))
+
+	# 		# Get scores from last five epochs to evaluate success.
+	# 		data = pd.read_table(os.path.join(self.RL_logdir,'progress.txt'))
+	# 		last_scores = data['AverageEpRet'][-5:]
+
+	# 		# Now evaluate last model over 100 episodes. 
+	# 		# Load model while evaluating. 
+	# 		_ , policy = load_policy_and_env(self.RL_logdir)
+			
+	# 		# Now run the policy.
+	# 		if args.hierarchical:
+	# 			# Now run the policy.
+	# 			hierarchical_run_policy(self.gym_env, policy, render=False, args=self.args)
+	# 		else:
+	# 			run_policy(self.gym_env, policy, render=False)
+
