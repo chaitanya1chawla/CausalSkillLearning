@@ -2310,14 +2310,14 @@ def mlp(sizes, activation, output_activation=torch.nn.Identity):
     layers = []
     for j in range(len(sizes)-1):
         act = activation if j < len(sizes)-2 else output_activation
-        layers += [nn.Linear(sizes[j], sizes[j+1]), act()]
-    return nn.Sequential(*layers)
+        layers += [torch.nn.Linear(sizes[j], sizes[j+1]), act()]
+    return torch.nn.Sequential(*layers)
 
 def gaussian_likelihood(x, mu, log_std):
     pre_sum = -0.5 * (((x-mu)/(torch.exp(log_std)+EPS))**2 + 2*log_std + np.log(2*np.pi))
     return pre_sum.sum(axis=-1)
 
-class MLPGaussianActor(nn.Module):
+class MLPGaussianActor(torch.nn.Module):
 
 
     def __init__(self, obs_dim, act_dim, hidden_sizes, activation):
