@@ -11735,6 +11735,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 		super(PolicyManager_DownstreamTaskTransfer, self).__init__(args, source_dataset, target_dataset)
 		
+		
 	def setup(self):
 		
 		# Run super set up to construct networks, load domain models, etc. 
@@ -11745,6 +11746,9 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 		# Now set things up for running PPO. 
 		self.setup_ppo()
+
+		# Now create training ops for PPO. 
+		self.setup_ppo_training_ops()
 
 	def setup_ppo(self):
 		
@@ -11784,8 +11788,8 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		# Set some parameters.
 		####################################################
 
-		obs_dim = self.gym_env.observation_space.shape
-		act_dim = self.gym_env.action_space.shape
+		self.ppo_obs_dim = self.gym_env.observation_space.shape
+		self.ppo_act_dim = self.gym_env.action_space.shape
 
 		####################################################
 		# Initialize things needed for PPO, that were in the PPO Init block.
@@ -11798,6 +11802,432 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		self.ppo_logger = EpochLogger(dict(output_dir=self.RL_logdir))
 		self.ppo_logger.save_config(locals())
 	
+
+		#####################################################
+		# Changing to implementing as an MLPactorcritic but with a few additional functions.. 
+		#####################################################
+		
+		if True:
+			latent_z_dimension = 16 
+			# Creating a special action space. 
+			action_space_bound = np.ones(latent_z_dimension)*np.inf
+			action_space = Box(-action_space_bound, action_space_bound)
+
+			self.actor_critic = self.ActorCritic(self.gym_env.observation_space, action_space, ac_kwargs=dict(hidden_sizes=(64,)))
+
+		#####################################################
+		# Also now instantiate low level policy. 		
+		#####################################################
+
+		# Here, we don't actually need to create this, because the DJFE PM has done this for us. Just reference this appropriately. 
+		# Need to verify that it's the source policy we want to reference here..
+		self.lowlevel_policy = self.source_manager.policy_network
+
+		#####################################################
+		# Sync params across processes
+		#####################################################
+		sync_params(self.actor_critic)
+
+		# Count variables
+		var_counts = tuple(core.count_vars(module) for module in [self.actor_critic.pi, self.actor_critic.v])
+		self.ppo_logger.log('\nNumber of parameters: \t pi: %d, \t v: %d\n'%var_counts)
+
+		#####################################################
+		# Set up experience buffer
+		#####################################################
+
+		local_steps_per_epoch = int(steps_per_epoch / num_procs())
+		self.ppo_buffer = PPOBuffer(self.ppo_obs_dim, self.ppo_act_dim, local_steps_per_epoch, gamma, lam)
+			
+	def setup_ppo_training_ops(self):
+		
+		#######################################################
+		# Set up optimizers for policy and value function
+		#######################################################
+		
+		# CHANGED: Use all parameters.     
+		# Can't just use the ac.parameters(), because we need separate optimizers for the latent and low-level policy optimizers. 
+		self.pi_optimizer = Adam(self.actor_critic.pi.parameters(), lr=self.args.rl_policy_learning_rate)
+
+		self.vf_optimizer = Adam(self.actor_critic.v.parameters(), lr=self.args.rl_critic_learning_rate)
+
+		# Set up model saving
+		self.ppo_logger.setup_pytorch_saver(self.actor_critic)
+
+	def compute_loss_pi(self, data):
+		
+		#######################################################
+		# Set up function for computing PPO policy loss
+		#######################################################
+
+		# CHANGED TO sampling just z. 
+		# Since we don't need a separate function for evaluating batch_logprob, just use ac.pi.
+		obs, z_act, adv, logp_old = data['obs'], data['act'], data['adv'], data['logp']
+		# print("embedding in loss")
+		# embed()
+		pi, logp = self.actor_critic.pi(obs, z_act)
+
+		ratio = torch.exp(logp - logp_old)
+		clip_adv = torch.clamp(ratio, 1-clip_ratio, 1+clip_ratio) * adv
+		loss_pi = -(torch.min(ratio * adv, clip_adv)).mean()
+
+		# Useful extra info
+		approx_kl = (logp_old - logp).mean().item()
+
+		# CHANGE: NOTE: This is entropy of the low level policy distribution. Since this is only used for logging and not training, this is fine. 
+		ent = pi.entropy().mean().item()
+		clipped = ratio.gt(1+clip_ratio) | ratio.lt(1-clip_ratio)
+		clipfrac = torch.as_tensor(clipped, dtype=torch.float32).mean().item()
+		pi_info = dict(kl=approx_kl, ent=ent, cf=clipfrac)
+
+		return loss_pi, pi_info
+	
+	def compute_loss_v(self, data):
+
+		#######################################################
+		# Critic function loss
+		#######################################################
+				
+		obs, ret = data['obs'], data['ret']
+		return ((ac.v(obs) - ret)**2).mean()
+
+	def update(self):	
+
+		# Copying over update function definition from hierarchical PPO.
+
+		data = self.ppo_buffer.get()
+
+		pi_l_old, pi_info_old = self.compute_loss_pi(data)
+		pi_l_old = pi_l_old.item()
+		v_l_old = self.compute_loss_v(data).item()
+
+		# Train policy with multiple steps of gradient descent
+		for i in range(train_pi_iters):
+			self.pi_optimizer.zero_grad()
+			loss_pi, pi_info = self.compute_loss_pi(data)
+			kl = mpi_avg(pi_info['kl'])
+			if kl > 1.5 * target_kl:
+				self.ppo_logger.log('Early stopping at step %d due to reaching max kl.'%i)
+				break
+			
+			loss_pi.backward()
+			mpi_avg_grads(ac.pi)    # average grads across MPI processes
+			self.pi_optimizer.step()
+
+		self.ppo_logger.store(StopIter=i)
+
+		# Value function learning
+		for i in range(train_v_iters):
+			self.vf_optimizer.zero_grad()
+			loss_v = compute_loss_v(data)
+			loss_v.backward()
+			mpi_avg_grads(ac.v)    # average grads across MPI processes
+			self.vf_optimizer.step()
+
+		# Log changes from update
+		kl, ent, cf = pi_info['kl'], pi_info_old['ent'], pi_info['cf']
+		self.ppo_logger.store(LossPi=pi_l_old, LossV=v_l_old,
+					 KL=kl, Entropy=ent, ClipFrac=cf,
+					 DeltaLossPi=(loss_pi.item() - pi_l_old),
+					 DeltaLossV=(loss_v.item() - v_l_old))
+
+	def rollout(evaluate=False, visualize=False):
+
+		#######################################################
+		# Implementing a rollout fucnction. 
+		#######################################################
+
+		# 1) Initialize. 
+		# 2) While we haven't exceeded timelimit and are still non-terminal:
+		#   # 3) Sample z from z policy. 
+		#   # 4) While we haven't exceeded skill timelimit and are still non terminal, and haven't exceeded overall timelimit. 
+		#       # 5) Sample low-level action a from low-level policy. 
+		#       # 6) Step in environment. 
+		#       # 7) Increment counters, reset states, log cummulative rewards, etc. 
+		#   # 8) Reset episode if necessary.           
+	
+		##########################################
+		# 1) Initialize / reset. (State is actually already reset here.)
+		##########################################
+    
+
+		t = 0 
+		# reset hidden state for incremental policy forward.
+		hidden = None
+		terminal = False
+		o, ep_ret, ep_len = self.gym_env.reset(), 0, 0			
+		image_list = []
+
+		##########################################
+		# 2) While we haven't exceeded timelimit and are still non-terminal:
+		##########################################
+
+		while t<local_steps_per_epoch and not(terminal) and t<eval_time_limit:
+			##########################################
+			# 3) Sample z from z policy. 
+			##########################################                
+
+			# Now no longer need a hierarchical actor critic? 
+			# Probably can implement as usual - just assemble appropriate inputs and query high level policy. 
+			# And then query low level policy....? Hmmmmmm, how does update work? 
+			# Probably need to feed high-level policy log probabilities to PPO to get it to work. 
+
+			# Revert to regular forward of Z AC (not receiving tuples).
+			# action_tuple, v, logp_tuple = ac.step(torch.as_tensor(o, dtype=torch.float32))
+			z_action, v, z_logp = self.actor_critic.step(torch.as_tensor(o, dtype=torch.float32))
+			
+			# # FOR NOW
+			# zset = np.load("/home/tshankar/Research/Code/Z_Set.npy")
+			# if t<len(zset):
+			if self.args.evaluate_translated_zs:
+				z_action = translated_zs[t//downsample_freq]
+
+			# First reset skill timer. 
+			t_skill = 0
+
+			##########################################
+			# 4) While we haven't exceeded skill timelimit and are still non terminal, and haven't exceeded overall timelimit. 
+			##########################################
+			
+
+			while t_skill<skill_time_limit and not(terminal) and t<local_steps_per_epoch:
+									
+				##########################################
+				# 5) Sample low-level action a from low-level policy. 
+				##########################################
+
+				# 5a) Get joint state from observation.
+				
+				obs_spec = self.gym_env.observation_spec()
+				max_gripper_state = 0.042
+
+				if float(robosuite.__version__[:3])>1.:
+					pure_joint_state = self.gym_env.sim.get_state()[1][:7]						
+					
+					if args.environment=='Wipe':
+						# here, no gripper, so set dummy joint pos
+						gripper_state = np.array([max_gripper_state/2])
+					else:
+
+						# if args.env_name[:3] == 'Bax':
+
+						# 	# Assembel gripper state from both left and right gripper states. 
+						# 	left_gripper_state = np.array([obs_spec['left_gripper_qpos'][0]-obs_spec['left_gripper_qpos'][1]])
+						# 	right_gripper_state = np.array([obs_spec['right_gripper_qpos'][0]-obs_spec['right_gripper_qpos'][1]])
+						# 	gripper_state = np.concatenate([right_gripper_state, left_gripper_state])
+
+						# else:
+						# 	gripper_state = np.array([obs_spec['robot0_gripper_qpos'][0]-obs_spec['robot0_gripper_qpos'][1]])
+						gripper_state = np.array([obs_spec['robot0_gripper_qpos'][0]-obs_spec['robot0_gripper_qpos'][1]])
+				else:
+									
+					if self.args.environment[:3] =='Bax':
+
+						# Assembel gripper state from both left and right gripper states. 
+						left_gripper_state = np.array([obs_spec['left_gripper_qpos'][0]-obs_spec['left_gripper_qpos'][1]])
+						right_gripper_state = np.array([obs_spec['right_gripper_qpos'][0]-obs_spec['right_gripper_qpos'][1]])
+						gripper_state = np.concatenate([right_gripper_state, left_gripper_state])
+
+						# Assemble joint states by flipping left and right hands. 
+						pure_joint_state = np.zeros(14)
+						pure_joint_state[:7] = obs_spec['joint_pos'][7:14]
+						pure_joint_state[7:14] = obs_spec['joint_pos'][:7]
+
+					else:
+						pure_joint_state = obs_spec['joint_pos']
+						gripper_state = np.array([obs_spec['gripper_qpos'][0]-obs_spec['gripper_qpos'][1]])
+				
+				# Norm gripper state from 0 to 1
+				gripper_state = gripper_state/max_gripper_state
+				# Norm gripper state from -1 to 1. 
+				gripper_state = 2*gripper_state-1
+				joint_state = np.concatenate([pure_joint_state, gripper_state])
+				
+				# Normalize joint state according to joint limits (minmax normaization).
+				normalized_joint_state = (joint_state - lower_joint_limits)/joint_limit_range
+
+				# 5b) Assemble input. 
+				if t==0:
+					low_level_action_numpy = np.zeros_like(normalized_joint_state)                    
+				assembled_states = np.concatenate([normalized_joint_state,low_level_action_numpy])
+				assembled_input = np.concatenate([assembled_states, z_action])
+				torch_assembled_input = torch.tensor(assembled_input).to(device).float().view(-1,1,input_size+latent_z_dimension)
+
+				# 5c) Now actually retrieve action.
+				low_level_action, hidden = self.lowlevel_policy.incremental_reparam_get_actions(torch_assembled_input, greedy=True, hidden=hidden)
+				low_level_action_numpy = low_level_action.detach().squeeze().squeeze().cpu().numpy()
+
+				# 5d) Unnormalize 
+				# unnormalized_low_level_action_numpy = *joint_limit_range 
+				# UNNORMALIZING ACTIONS! WE'VE NEVER ..DONE THIS BEFORE? 
+				# JUST SCALE UP FOR NOW
+				unnormalized_low_level_action_numpy = self.args.action_scaling * low_level_action_numpy
+				# 5d) Normalize action for benefit of environment. 
+				# Output of policy is minmax normalized, which is 0-1 range. 
+				# Change to -1 to 1 range. 
+
+				if self.args.environment[:3]=='Bax':
+					# If we're in a baxter environmnet, flip the left and right hand actions.
+					normalized_low_level_action = np.zeros(16)
+					normalized_low_level_action[:7] = unnormalized_low_level_action_numpy[7:14]
+					normalized_low_level_action[7:14] = unnormalized_low_level_action_numpy[:7]
+					normalized_low_level_action[14:] = unnormalized_low_level_action_numpy[14:]
+				else:					
+					normalized_low_level_action = unnormalized_low_level_action_numpy
+
+				##########################################
+				# 6) Step in environment. 
+				##########################################
+
+				# Set low level action.
+				# print("Embed before step..")
+				# embed()
+
+				if self.args.environment=='Wipe':
+					next_o, r, d, _ = self.gym_env.step(normalized_low_level_action[:-1])
+				else:
+					next_o, r, d, _ = self.gym_env.step(normalized_low_level_action)
+								
+				# Logging images
+				if (self.args.evaluate_translated_zs or visualize) and t%10==0:
+
+					# if float(robosuite.__version__[:3])>1.:
+						# image_list.append(np.flipud(env.sim.render(600,600,camera_name='agentview')))
+					# else:
+					image_list.append(np.flipud(self.gym_env.sim.render(600,600,camera_name='vizview1')))
+
+				##########################################
+				# 7) Increment counters, reset states, log cummulative rewards, etc. 
+				##########################################
+
+				ep_ret += r
+				ep_len += 1
+				ep_ret_copy, ep_len_copy = copy.deepcopy(ep_ret), copy.deepcopy(ep_len)
+
+
+				# save and log
+				# CHANGED: Saving the action tuple in the buffer instead of just the action..
+				# buf.store(o, action_tuple, r, v, logp_tuple)
+				# CHANGING TO STORING Z ACTION AND Z LOGP.   
+				
+				if evaluate==False:
+					self.ppo_buffer.store(o, z_action, r, v, z_logp)
+
+				self.ppo_logger.store(VVals=v)
+				
+				# Update obs (critical!)
+				o = next_o
+
+				timeout = ep_len == max_ep_len
+				terminal = d or timeout
+				epoch_ended = t==local_steps_per_epoch-1
+
+				# Also adding to the skill time and overall time, since we're in a while loop now.
+				t_skill += 1                    
+				t+=1
+
+				if terminal or epoch_ended or t>=eval_time_limit:
+
+					if self.args.evaluate_translated_zs:
+						print("Embed at end of epoch")
+						embed()						
+					
+					if epoch_ended and not(terminal):
+						print('Warning: trajectory cut off by epoch at %d steps.'%ep_len, flush=True)
+					# if trajectory didn't reach terminal state, bootstrap value target
+					if timeout or epoch_ended:
+						_, v, _ = self.actor_critic.step(torch.as_tensor(o, dtype=torch.float32))
+					else:
+						v = 0
+					self.ppo_buffer.finish_path(v)
+					if terminal:
+						# only save EpRet / EpLen if trajectory finished
+						self.ppo_logger.store(EpRet=ep_ret, EpLen=ep_len)
+					o, ep_ret, ep_len = self.gym_env.reset(), 0, 0
+			
+		if evaluate:			
+			return ep_ret_copy, ep_len_copy, image_list
+
+	def setup_train(self):
+		
+		# Set global skill time limit.
+		skill_time_limit = 14
+
+		eval_time_limit = 10000000
+		downsample_freq = 20
+
+		if args.evaluate_translated_zs:
+			epochs = 1
+			image_list = []
+			batch_index = 0			
+			translated_zs = np.load(args.translated_z_file)[:,batch_index]
+			# source_variational_dict = np.load(args.source_variational_dict,allow_pickle=True).item()
+			# source_latent_bs = source_variational_dict['latent_b'][:,batch_index]
+			skill_time_limit = 16
+			eval_time_limit = translated_zs.shape[0]*downsample_freq
+
+		skill_time_limit *= downsample_freq
+		eval_episodes = 100
+
+	def train(self, model=None):
+
+		#######################################################
+		# Actual train loop block.
+		#######################################################
+
+		start_time = time.time()
+
+		print("#######################################################")
+		print("Starting to run training.")
+		print("#######################################################")
+
+		for epoch in range(self.args.epochs):		
+
+			# Rollout. 			
+			print("#######################################################")
+			print("Runing Epoch #: ",epoch)        
+			print("#######################################################")
+
+			print("Running Rollout.")
+			self.rollout(visualize=self.args.render)
+			
+			##########################################
+			# 8) Save, update, and log. 
+			##########################################
+
+			# Save model        
+			if (epoch % save_freq == 0) or (epoch == epochs-1):
+				self.ppo_logger.save_state({'env': env}, None)
+					
+			# Perform PPO update if we have enough buffer items. 
+			# print("Embed before update.")
+			# embed()
+			
+			# if buf.ptr>=buf.max_size:
+			print("Running update.")
+			self.update()
+
+			# Log info about epoch
+			self.ppo_logger.log_tabular('Epoch', epoch)
+			self.ppo_logger.log_tabular('EpRet', with_min_and_max=True)
+			self.ppo_logger.log_tabular('EpLen', average_only=True)
+			self.ppo_logger.log_tabular('VVals', with_min_and_max=True)
+			self.ppo_logger.log_tabular('TotalEnvInteracts', (epoch+1)*steps_per_epoch)
+			self.ppo_logger.log_tabular('LossPi', average_only=True)
+			self.ppo_logger.log_tabular('LossV', average_only=True)
+			self.ppo_logger.log_tabular('DeltaLossPi', average_only=True)
+			self.ppo_logger.log_tabular('DeltaLossV', average_only=True)
+			self.ppo_logger.log_tabular('Entropy', average_only=True)
+			self.ppo_logger.log_tabular('KL', average_only=True)
+			self.ppo_logger.log_tabular('ClipFrac', average_only=True)
+			self.ppo_logger.log_tabular('StopIter', average_only=True)
+			self.ppo_logger.log_tabular('Time', time.time()-start_time)
+			self.ppo_logger.dump_tabular()
+
+		print("#######################################################")
+		print("Finished running training.")
+		print("#######################################################")
+
 
 	# def train(self, model=None):
 
