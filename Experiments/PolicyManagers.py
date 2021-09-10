@@ -11911,7 +11911,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 				break
 			
 			loss_pi.backward()
-			mpi_avg_grads(ac.pi)    # average grads across MPI processes
+			mpi_avg_grads(self.actor_critic.pi)    # average grads across MPI processes
 			self.pi_optimizer.step()
 
 		self.ppo_logger.store(StopIter=i)
@@ -11921,7 +11921,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			self.vf_optimizer.zero_grad()
 			loss_v = compute_loss_v(data)
 			loss_v.backward()
-			mpi_avg_grads(ac.v)    # average grads across MPI processes
+			mpi_avg_grads(self.actor_critic.v)    # average grads across MPI processes
 			self.vf_optimizer.step()
 
 		# Log changes from update
@@ -11950,19 +11950,19 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		# 1) Initialize / reset. (State is actually already reset here.)
 		##########################################
     
-
 		t = 0 
 		# reset hidden state for incremental policy forward.
 		hidden = None
 		terminal = False
 		o, ep_ret, ep_len = self.gym_env.reset(), 0, 0			
-		image_list = []
+		self.image_list = []
 
 		##########################################
 		# 2) While we haven't exceeded timelimit and are still non-terminal:
 		##########################################
 
 		while t<local_steps_per_epoch and not(terminal) and t<eval_time_limit:
+			
 			##########################################
 			# 3) Sample z from z policy. 
 			##########################################                
@@ -11974,13 +11974,15 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 			# Revert to regular forward of Z AC (not receiving tuples).
 			# action_tuple, v, logp_tuple = ac.step(torch.as_tensor(o, dtype=torch.float32))
+			
 			z_action, v, z_logp = self.actor_critic.step(torch.as_tensor(o, dtype=torch.float32))
 			
 			# # FOR NOW
 			# zset = np.load("/home/tshankar/Research/Code/Z_Set.npy")
 			# if t<len(zset):
-			if self.args.evaluate_translated_zs:
-				z_action = translated_zs[t//downsample_freq]
+
+			# if self.args.evaluate_translated_zs:
+			# 	z_action = self.translated_zs[t//self.downsample_freq]
 
 			# First reset skill timer. 
 			t_skill = 0
@@ -11989,22 +11991,20 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			# 4) While we haven't exceeded skill timelimit and are still non terminal, and haven't exceeded overall timelimit. 
 			##########################################
 			
-
 			while t_skill<skill_time_limit and not(terminal) and t<local_steps_per_epoch:
 									
 				##########################################
 				# 5) Sample low-level action a from low-level policy. 
 				##########################################
 
-				# 5a) Get joint state from observation.
-				
+				# 5a) Get joint state from observation.				
 				obs_spec = self.gym_env.observation_spec()
 				max_gripper_state = 0.042
-
+				
 				if float(robosuite.__version__[:3])>1.:
 					pure_joint_state = self.gym_env.sim.get_state()[1][:7]						
 					
-					if args.environment=='Wipe':
+					if self.args.environment=='Wipe':
 						# here, no gripper, so set dummy joint pos
 						gripper_state = np.array([max_gripper_state/2])
 					else:
@@ -12051,7 +12051,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 					low_level_action_numpy = np.zeros_like(normalized_joint_state)                    
 				assembled_states = np.concatenate([normalized_joint_state,low_level_action_numpy])
 				assembled_input = np.concatenate([assembled_states, z_action])
-				torch_assembled_input = torch.tensor(assembled_input).to(device).float().view(-1,1,input_size+latent_z_dimension)
+				torch_assembled_input = torch.tensor(assembled_input).to(device).float().view(-1,1,self.input_size+self.latent_z_dimension)
 
 				# 5c) Now actually retrieve action.
 				low_level_action, hidden = self.lowlevel_policy.incremental_reparam_get_actions(torch_assembled_input, greedy=True, hidden=hidden)
@@ -12089,12 +12089,13 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 					next_o, r, d, _ = self.gym_env.step(normalized_low_level_action)
 								
 				# Logging images
-				if (self.args.evaluate_translated_zs or visualize) and t%10==0:
+				# if (self.args.evaluate_translated_zs or visualize) and t%10==0:
+				if (visualize) and t%10==0:					
 
 					# if float(robosuite.__version__[:3])>1.:
-						# image_list.append(np.flipud(env.sim.render(600,600,camera_name='agentview')))
+						# self.image_list.append(np.flipud(env.sim.render(600,600,camera_name='agentview')))
 					# else:
-					image_list.append(np.flipud(self.gym_env.sim.render(600,600,camera_name='vizview1')))
+					self.image_list.append(np.flipud(self.gym_env.sim.render(600,600,camera_name='vizview1')))
 
 				##########################################
 				# 7) Increment counters, reset states, log cummulative rewards, etc. 
@@ -12128,9 +12129,9 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 				if terminal or epoch_ended or t>=eval_time_limit:
 
-					if self.args.evaluate_translated_zs:
-						print("Embed at end of epoch")
-						embed()						
+					# if self.args.evaluate_translated_zs:
+					# 	print("Embed at end of epoch")
+					# 	embed()						
 					
 					if epoch_ended and not(terminal):
 						print('Warning: trajectory cut off by epoch at %d steps.'%ep_len, flush=True)
@@ -12140,40 +12141,43 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 					else:
 						v = 0
 					self.ppo_buffer.finish_path(v)
+					
 					if terminal:
 						# only save EpRet / EpLen if trajectory finished
 						self.ppo_logger.store(EpRet=ep_ret, EpLen=ep_len)
 					o, ep_ret, ep_len = self.gym_env.reset(), 0, 0
 			
 		if evaluate:			
-			return ep_ret_copy, ep_len_copy, image_list
+			return ep_ret_copy, ep_len_copy, self.image_list
 
 	def setup_train(self):
 		
 		# Set global skill time limit.
-		skill_time_limit = 14
+		self.skill_time_limit = 14
 
-		eval_time_limit = 10000000
-		downsample_freq = 20
+		self.eval_time_limit = 10000000
+		self.downsample_freq = 20
 
-		if args.evaluate_translated_zs:
-			epochs = 1
-			image_list = []
-			batch_index = 0			
-			translated_zs = np.load(args.translated_z_file)[:,batch_index]
-			# source_variational_dict = np.load(args.source_variational_dict,allow_pickle=True).item()
-			# source_latent_bs = source_variational_dict['latent_b'][:,batch_index]
-			skill_time_limit = 16
-			eval_time_limit = translated_zs.shape[0]*downsample_freq
+		# if self.args.evaluate_translated_zs:
+		# 	self.args.epochs = 1
+		# 	self.image_list = []
+		# 	self.batch_index = 0			
+		# 	self.translated_zs = np.load(self.args.translated_z_file)[:,self.batch_index]
+		# 	# source_variational_dict = np.load(args.source_variational_dict,allow_pickle=True).item()
+		# 	# source_latent_bs = source_variational_dict['latent_b'][:,batch_index]
+		# 	self.skill_time_limit = 16
+		# 	self.eval_time_limit = self.translated_zs.shape[0]*self.downsample_freq
 
-		skill_time_limit *= downsample_freq
-		eval_episodes = 100
+		self.skill_time_limit *= self.downsample_freq
+		self.eval_episodes = 100
 
 	def train(self, model=None):
-
+		
 		#######################################################
 		# Actual train loop block.
 		#######################################################
+
+		self.setup_train()
 
 		start_time = time.time()
 
@@ -12189,7 +12193,8 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			print("#######################################################")
 
 			print("Running Rollout.")
-			self.rollout(visualize=self.args.render)
+			# self.rollout(visualize=self.args.render)
+			self.rollout()
 			
 			##########################################
 			# 8) Save, update, and log. 
@@ -12197,7 +12202,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 			# Save model        
 			if (epoch % save_freq == 0) or (epoch == epochs-1):
-				self.ppo_logger.save_state({'env': env}, None)
+				self.ppo_logger.save_state({'env': self.gym_env}, None)
 					
 			# Perform PPO update if we have enough buffer items. 
 			# print("Embed before update.")
@@ -12227,7 +12232,6 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		print("#######################################################")
 		print("Finished running training.")
 		print("#######################################################")
-
 
 	# def train(self, model=None):
 
