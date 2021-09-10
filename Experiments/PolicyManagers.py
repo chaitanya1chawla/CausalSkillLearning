@@ -11762,7 +11762,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		# This function should essentially replicate what the Run_Robosuite_PPO file does.
 		####################################################
 
-		if self.args.mujoco:
+		if not(self.args.no_mujoco):
 			import robosuite
 
 		####################################################
