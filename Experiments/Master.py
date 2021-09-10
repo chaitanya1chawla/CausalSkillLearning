@@ -407,8 +407,8 @@ def parse_arguments():
 	parser.add_argument('--eval_transfer_metrics',dest='eval_transfer_metrics',type=int,default=0,help='Whether to evaluate correspondence metrics in transfer setting.')
 
 	# Parameters for downstream PPO. 
-	parser.add_argument('--rl_policy_learning_rate', dest='--rl_policy_learning_rate', type=float, default=3e-4, help='Learning rate for RL Policy.')
-	parser.add_argument('--rl_critic_learning_rate', dest='--rl_critic_learning_rate', type=float, default=1e-3, help='Learning rate for RL Critic.')
+	parser.add_argument('--rl_policy_learning_rate', dest='rl_policy_learning_rate', type=float, default=3e-4, help='Learning rate for RL Policy.')
+	parser.add_argument('--rl_critic_learning_rate', dest='rl_critic_learning_rate', type=float, default=1e-3, help='Learning rate for RL Critic.')
 
 	return parser.parse_args()
 

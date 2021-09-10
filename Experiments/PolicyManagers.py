@@ -11743,7 +11743,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		super(PolicyManager_DownstreamTaskTransfer, self).__init__(args, source_dataset, target_dataset)
 		
 	def setup(self):
-		
+				
 		# Run super set up to construct networks, load domain models, etc. 
 		super(PolicyManager_DownstreamTaskTransfer, self).setup()
 
@@ -11753,17 +11753,22 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		# Now set things up for running PPO. 
 		self.setup_ppo()
 
+		print("Finished Setup PPO.")
+
 		# Now create training ops for PPO. 
 		self.setup_ppo_training_ops()
+
+		print("Done runinng Downstream Task Setup.")
 
 	def setup_ppo(self):
 		
 		####################################################
 		# This function should essentially replicate what the Run_Robosuite_PPO file does.
 		####################################################
-
+		
 		if not(self.args.no_mujoco):
 			import robosuite
+			from robosuite.wrappers import GymWrapper
 
 		####################################################
 		# Create the base environment.
@@ -11778,11 +11783,31 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		# Now make a GymWrapped version of that environment.
 		self.gym_env = GymWrapper(self.base_env)
 
+		####################################################
+		# Set some parameters.
+		####################################################
+
+		self.latent_z_dimension = 16
+		self.steps_per_epoch = 1000
+		self.local_steps_per_epoch = int(self.steps_per_epoch / num_procs())
+		self.gamma = 0.99
+		self.lam = 0.97
+		self.clip_ratio = 0.2
+		self.target_kl = 0.01
+		self.train_v_iters = 80
+			
+		# Logging defaults
+		# def hierarchical_ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0, 
+		# 		steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
+		# 		vf_lr=1e-3, train_pi_iters=80, train_v_iters=80, lam=0.97, max_ep_len=1000,
+		# 		target_kl=0.01, logger_kwargs=dict(), save_freq=10, args=None):
+
+
 		####################################################		
 		# Create a log directory.
 		####################################################
 
-		self.RL_logdir = "Logs/{0}".format(args.name+"_"+args.environment)
+		self.RL_logdir = "Logs/{0}".format(self.args.name+"_"+self.args.environment)
 
 		#################################################### 
 		# Create a policy / critic. 
@@ -11805,10 +11830,12 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		setup_pytorch_for_mpi()
 
 		# Set up logger and save configuration		
-		self.ppo_logger = EpochLogger(dict(output_dir=self.RL_logdir))
-		self.ppo_logger.save_config(locals())
+		# print("Embed before logger creation")
+		# embed()
+		logger_kwargs = dict(output_dir=self.RL_logdir)
+		self.ppo_logger = EpochLogger(**logger_kwargs)
+		# self.ppo_logger.save_config(locals())
 	
-
 		#####################################################
 		# Changing to implementing as an MLPactorcritic but with a few additional functions.. 
 		#####################################################
@@ -11816,10 +11843,10 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		if True:
 			latent_z_dimension = 16 
 			# Creating a special action space. 
-			action_space_bound = np.ones(latent_z_dimension)*np.inf
+			action_space_bound = np.ones(self.latent_z_dimension)*np.inf
 			action_space = Box(-action_space_bound, action_space_bound)
 
-			self.actor_critic = self.ActorCritic(self.gym_env.observation_space, action_space, ac_kwargs=dict(hidden_sizes=(64,)))
+			self.actor_critic = self.ActorCritic(self.gym_env.observation_space, action_space, **dict(hidden_sizes=(64,)))
 
 		#####################################################
 		# Also now instantiate low level policy. 		
@@ -11832,6 +11859,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		#####################################################
 		# Sync params across processes
 		#####################################################
+		
 		sync_params(self.actor_critic)
 
 		# Count variables
@@ -11842,9 +11870,17 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		# Set up experience buffer
 		#####################################################
 
-		local_steps_per_epoch = int(steps_per_epoch / num_procs())
-		self.ppo_buffer = PPOBuffer(self.ppo_obs_dim, self.ppo_act_dim, local_steps_per_epoch, gamma, lam)
+		# self.local_steps_per_epoch = int(self.steps_per_epoch / num_procs())
+		self.ppo_buffer = PPOBuffer(self.ppo_obs_dim, self.ppo_act_dim, self.local_steps_per_epoch, self.gamma, self.lam)
 			
+		#####################################################
+		# Set up joint limits
+		#####################################################
+
+		self.lower_joint_limits = self.source_manager.norm_sub_value
+		# self.upper_joint_limits = self.source_manager.norm_denom_value
+		self.joint_limit_range = self.source_manager.norm_denom_value
+
 	def setup_ppo_training_ops(self):
 		
 		#######################################################
@@ -11874,7 +11910,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		pi, logp = self.actor_critic.pi(obs, z_act)
 
 		ratio = torch.exp(logp - logp_old)
-		clip_adv = torch.clamp(ratio, 1-clip_ratio, 1+clip_ratio) * adv
+		clip_adv = torch.clamp(ratio, 1-self.clip_ratio, 1+self.clip_ratio) * adv
 		loss_pi = -(torch.min(ratio * adv, clip_adv)).mean()
 
 		# Useful extra info
@@ -11882,7 +11918,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 		# CHANGE: NOTE: This is entropy of the low level policy distribution. Since this is only used for logging and not training, this is fine. 
 		ent = pi.entropy().mean().item()
-		clipped = ratio.gt(1+clip_ratio) | ratio.lt(1-clip_ratio)
+		clipped = ratio.gt(1+self.clip_ratio) | ratio.lt(1-self.clip_ratio)
 		clipfrac = torch.as_tensor(clipped, dtype=torch.float32).mean().item()
 		pi_info = dict(kl=approx_kl, ent=ent, cf=clipfrac)
 
@@ -11912,7 +11948,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			self.pi_optimizer.zero_grad()
 			loss_pi, pi_info = self.compute_loss_pi(data)
 			kl = mpi_avg(pi_info['kl'])
-			if kl > 1.5 * target_kl:
+			if kl > 1.5 * self.target_kl:
 				self.ppo_logger.log('Early stopping at step %d due to reaching max kl.'%i)
 				break
 			
@@ -11923,7 +11959,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		self.ppo_logger.store(StopIter=i)
 
 		# Value function learning
-		for i in range(train_v_iters):
+		for i in range(self.train_v_iters):
 			self.vf_optimizer.zero_grad()
 			loss_v = compute_loss_v(data)
 			loss_v.backward()
@@ -11937,7 +11973,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 					 DeltaLossPi=(loss_pi.item() - pi_l_old),
 					 DeltaLossV=(loss_v.item() - v_l_old))
 
-	def rollout(evaluate=False, visualize=False):
+	def rollout(self, evaluate=False, visualize=False):
 
 		#######################################################
 		# Implementing a rollout fucnction. 
@@ -11967,7 +12003,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		# 2) While we haven't exceeded timelimit and are still non-terminal:
 		##########################################
 
-		while t<local_steps_per_epoch and not(terminal) and t<eval_time_limit:
+		while t<self.local_steps_per_epoch and not(terminal) and t<self.eval_time_limit:
 			
 			##########################################
 			# 3) Sample z from z policy. 
@@ -11997,7 +12033,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			# 4) While we haven't exceeded skill timelimit and are still non terminal, and haven't exceeded overall timelimit. 
 			##########################################
 			
-			while t_skill<skill_time_limit and not(terminal) and t<local_steps_per_epoch:
+			while t_skill<self.skill_time_limit and not(terminal) and t<self.local_steps_per_epoch:
 									
 				##########################################
 				# 5) Sample low-level action a from low-level policy. 
@@ -12050,7 +12086,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 				joint_state = np.concatenate([pure_joint_state, gripper_state])
 				
 				# Normalize joint state according to joint limits (minmax normaization).
-				normalized_joint_state = (joint_state - lower_joint_limits)/joint_limit_range
+				normalized_joint_state = (joint_state - self.lower_joint_limits)/self.joint_limit_range
 
 				# 5b) Assemble input. 
 				if t==0:
@@ -12125,15 +12161,15 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 				# Update obs (critical!)
 				o = next_o
 
-				timeout = ep_len == max_ep_len
+				timeout = ep_len == self.max_ep_len
 				terminal = d or timeout
-				epoch_ended = t==local_steps_per_epoch-1
+				epoch_ended = t==self.local_steps_per_epoch-1
 
 				# Also adding to the skill time and overall time, since we're in a while loop now.
 				t_skill += 1                    
 				t+=1
 
-				if terminal or epoch_ended or t>=eval_time_limit:
+				if terminal or epoch_ended or t>=self.eval_time_limit:
 
 					# if self.args.evaluate_translated_zs:
 					# 	print("Embed at end of epoch")
@@ -12223,7 +12259,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			self.ppo_logger.log_tabular('EpRet', with_min_and_max=True)
 			self.ppo_logger.log_tabular('EpLen', average_only=True)
 			self.ppo_logger.log_tabular('VVals', with_min_and_max=True)
-			self.ppo_logger.log_tabular('TotalEnvInteracts', (epoch+1)*steps_per_epoch)
+			self.ppo_logger.log_tabular('TotalEnvInteracts', (epoch+1)*self.steps_per_epoch)
 			self.ppo_logger.log_tabular('LossPi', average_only=True)
 			self.ppo_logger.log_tabular('LossV', average_only=True)
 			self.ppo_logger.log_tabular('DeltaLossPi', average_only=True)
