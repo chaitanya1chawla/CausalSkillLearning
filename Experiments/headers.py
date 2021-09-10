@@ -50,7 +50,7 @@ from scipy.ndimage.filters import gaussian_filter1d
 from scipy.signal import find_peaks, argrelextrema
 
 from sklearn.neighbors import NearestNeighbors
-from pytorch3d.loss import chamfer_distance
+# from pytorch3d.loss import chamfer_distance
 import random
 # Removing robosuite from headers file so that we can only import it when we have a mujoco installation.
 # import robosuite

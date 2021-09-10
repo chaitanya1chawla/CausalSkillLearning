@@ -10661,6 +10661,13 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 		super(PolicyManager_DensityJointFixEmbedTransfer, self).__init__(args, source_dataset, target_dataset)
 	
+	def create_networks(self):
+		
+		 # Call super create networks, to create all the necessary networks. 
+		super().create_networks()
+
+		self.backward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
+
 	def save_all_models(self, suffix):
 
 		self.logdir = os.path.join(self.args.logdir, self.args.name)
@@ -11734,7 +11741,6 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		# Inheritance probably easier from a creation of PM point of view?
 
 		super(PolicyManager_DownstreamTaskTransfer, self).__init__(args, source_dataset, target_dataset)
-		
 		
 	def setup(self):
 		
