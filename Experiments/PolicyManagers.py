@@ -4069,6 +4069,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
 
 				if self.args.batch_size==1:
+
+
 					robot_states = data_element['robot-state']
 					object_states = data_element['object-state']
 
@@ -7771,7 +7773,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# Run some initialization process to manage GPU memory with variable sized batches.
 		self.current_epoch_running = 0
-		self.initialize_training_batches()
+
+		if self.args.setting not in ['downstreamtasktransfer']:
+			self.initialize_training_batches()
 
 		# Setup GMM.
 		self.setup_GMM()
@@ -11795,6 +11799,8 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		self.clip_ratio = 0.2
 		self.target_kl = 0.01
 		self.train_v_iters = 80
+		self.train_pi_iters = 80
+		self.max_ep_len = 1000
 			
 		# Logging defaults
 		# def hierarchical_ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0, 
@@ -11855,6 +11861,8 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		# Here, we don't actually need to create this, because the DJFE PM has done this for us. Just reference this appropriately. 
 		# Need to verify that it's the source policy we want to reference here..
 		self.lowlevel_policy = self.source_manager.policy_network
+		self.lowlevel_policy.args.batch_size = 1
+		self.lowlevel_policy.batch_size = 1
 
 		#####################################################
 		# Sync params across processes
@@ -11931,7 +11939,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		#######################################################
 				
 		obs, ret = data['obs'], data['ret']
-		return ((ac.v(obs) - ret)**2).mean()
+		return ((self.actor_critic.v(obs) - ret)**2).mean()
 
 	def update(self):	
 
@@ -11944,7 +11952,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		v_l_old = self.compute_loss_v(data).item()
 
 		# Train policy with multiple steps of gradient descent
-		for i in range(train_pi_iters):
+		for i in range(self.train_pi_iters):
 			self.pi_optimizer.zero_grad()
 			loss_pi, pi_info = self.compute_loss_pi(data)
 			kl = mpi_avg(pi_info['kl'])
@@ -11961,7 +11969,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		# Value function learning
 		for i in range(self.train_v_iters):
 			self.vf_optimizer.zero_grad()
-			loss_v = compute_loss_v(data)
+			loss_v = self.compute_loss_v(data)
 			loss_v.backward()
 			mpi_avg_grads(self.actor_critic.v)    # average grads across MPI processes
 			self.vf_optimizer.step()
@@ -12103,7 +12111,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 				# unnormalized_low_level_action_numpy = *joint_limit_range 
 				# UNNORMALIZING ACTIONS! WE'VE NEVER ..DONE THIS BEFORE? 
 				# JUST SCALE UP FOR NOW
-				unnormalized_low_level_action_numpy = self.args.action_scaling * low_level_action_numpy
+				unnormalized_low_level_action_numpy = self.args.action_scale_factor * low_level_action_numpy
 				# 5d) Normalize action for benefit of environment. 
 				# Output of policy is minmax normalized, which is 0-1 range. 
 				# Change to -1 to 1 range. 
@@ -12243,7 +12251,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			##########################################
 
 			# Save model        
-			if (epoch % save_freq == 0) or (epoch == epochs-1):
+			if (epoch % self.args.save_freq == 0) or (epoch == self.args.epochs-1):
 				self.ppo_logger.save_state({'env': self.gym_env}, None)
 					
 			# Perform PPO update if we have enough buffer items. 
@@ -12297,7 +12305,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 	# 		# Get scores from last five epochs to evaluate success.
 	# 		data = pd.read_table(os.path.join(self.RL_logdir,'progress.txt'))
-	# 		last_scores = data['AverageEpRet'][-5:]
+	# 		last_scores = data['AverageEpRet'][-5:]	
 
 	# 		# Now evaluate last model over 100 episodes. 
 	# 		# Load model while evaluating. 
