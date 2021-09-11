@@ -22,3 +22,4 @@ from gym.spaces import Box, Discrete
 
 import robosuite
 from robosuite.wrappers import GymWrapper
+import imageio

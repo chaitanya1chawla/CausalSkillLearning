@@ -35,13 +35,16 @@ class SawyerVisualizer():
 		print("Do I have a display?", has_display)
 
 		import robosuite, threading
-		from robosuite.wrappers import IKWrapper
 
 		# self.base_env = robosuite.make('BaxterLift', has_renderer=has_display)
 		self.base_env = robosuite.make("SawyerViz",has_renderer=has_display)
 
 		# Create kinematics object. 
-		self.sawyer_IK_object = IKWrapper(self.base_env)
+		if float(robosuite.__version__[:3])<1.:
+			from robosuite.wrappers import IKWrapper					
+			self.sawyer_IK_object = IKWrapper(self.base_env)
+		else:
+			self.sawyer_IK_object = None
 		self.environment = self.sawyer_IK_object.env        
 
 	def update_state(self):

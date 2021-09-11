@@ -12101,7 +12101,8 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 					low_level_action_numpy = np.zeros_like(normalized_joint_state)                    
 				assembled_states = np.concatenate([normalized_joint_state,low_level_action_numpy])
 				assembled_input = np.concatenate([assembled_states, z_action])
-				torch_assembled_input = torch.tensor(assembled_input).to(device).float().view(-1,1,self.input_size+self.latent_z_dimension)
+				
+				torch_assembled_input = torch.tensor(assembled_input).to(device).float().view(-1,1,self.source_manager.input_size+self.latent_z_dimension)
 
 				# 5c) Now actually retrieve action.
 				low_level_action, hidden = self.lowlevel_policy.incremental_reparam_get_actions(torch_assembled_input, greedy=True, hidden=hidden)
@@ -12221,6 +12222,39 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		self.skill_time_limit *= self.downsample_freq
 		self.eval_episodes = 100
 
+	def evaluate_policy(self):
+
+		# Evaluate policy across #self.eval_episodes number of episodes. 
+		self.ppo_eval_logger = EpochLogger()
+
+		self.eval_episodes = 100
+		
+		for k in range(self.eval_episodes):
+			
+			# print("Rollout #",epoch,(epoch==0))
+			ep_ret, ep_len, image_list = self.rollout(evaluate=True, visualize=(k==0))
+
+			if k==0:
+
+				logdir = "Logs/{0}".format(self.args.name+"_"+self.args.environment)
+
+				path = os.path.join(logdir, "Rollout_Gifs")
+				if not(os.path.isdir(path)):
+					os.mkdir(path)
+
+				print("Saving Render!")
+				imageio.mimsave(os.path.join(path,"Rollout.gif"), image_list)
+				print("Finished Saving Render!")
+
+			print('Episode %d \t EpRet %.3f \t EpLen %d'%(k, ep_ret, ep_len))
+
+		# Log info about epoch
+		self.ppo_eval_logger.log_tabular('Epoch', k)
+		self.ppo_eval_logger.log_tabular('EpRet', with_min_and_max=True)
+		self.ppo_eval_logger.log_tabular('EpLen', average_only=True)
+		self.ppo_eval_logger.dump_tabular()
+
+
 	def train(self, model=None):
 		
 		#######################################################
@@ -12282,6 +12316,12 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		print("#######################################################")
 		print("Finished running training.")
 		print("#######################################################")
+
+		print("#######################################################")
+		print("About to evaluate policy.")
+		print("#######################################################")
+
+		self.evaluate_policy()
 
 	# def train(self, model=None):
 
