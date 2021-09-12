@@ -11762,7 +11762,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		# Now create training ops for PPO. 
 		self.setup_ppo_training_ops()
 
-		print("Done runinng Downstream Task Setup.")
+		print("Done running Downstream Task Setup.")
 
 	def setup_ppo(self):
 		
@@ -12222,12 +12222,12 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		self.skill_time_limit *= self.downsample_freq
 		self.eval_episodes = 100
 
-	def evaluate_policy(self):
+	def evaluate_policy(self, eval_episodes=10):
 
 		# Evaluate policy across #self.eval_episodes number of episodes. 
 		self.ppo_eval_logger = EpochLogger()
 
-		self.eval_episodes = 100
+		self.eval_episodes = eval_episodes
 		
 		for k in range(self.eval_episodes):
 			
@@ -12253,7 +12253,6 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		self.ppo_eval_logger.log_tabular('EpRet', with_min_and_max=True)
 		self.ppo_eval_logger.log_tabular('EpLen', average_only=True)
 		self.ppo_eval_logger.dump_tabular()
-
 
 	def train(self, model=None):
 		
@@ -12287,6 +12286,14 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			# Save model        
 			if (epoch % self.args.save_freq == 0) or (epoch == self.args.epochs-1):
 				self.ppo_logger.save_state({'env': self.gym_env}, None)
+			
+			if (epoch%self.args.eval_freq==0):
+
+				print("#######################################################")
+				print("About to evaluate policy over 10 episodes.")
+				print("#######################################################")
+
+				self.evaluate_policy(eval_episodes=10)
 					
 			# Perform PPO update if we have enough buffer items. 
 			# print("Embed before update.")
@@ -12318,43 +12325,12 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		print("#######################################################")
 
 		print("#######################################################")
-		print("About to evaluate policy.")
+		print("About to evaluate policy over 100 episodes.")
 		print("#######################################################")
 
-		self.evaluate_policy()
+		self.evaluate_policy(eval_episodes=100)
 
-	# def train(self, model=None):
-
-	# 	# We've already loaded model presumably. 
-
-	# 	# Now actually run PPO. 
-	# 	if self.args.train:
-	# 		print("Beginning Training.")
-			
-	# 		# Actually call PPO.		
-	# 		if self.args.hierarchical:
-	# 			hierarchical_ppo(lambda : self.gym_env, 
-	# 			ac_kwargs=dict(hidden_sizes=(64,)), 
-	# 			steps_per_epoch=1000, epochs=self.args.epochs,
-	# 			logger_kwargs=dict(output_dir=self.RL_logdir), args=self.args, target_kl=self.args.target_kl)
-	# 		else:
-	# 			ppo(env_fn = lambda : self.gym_env,
-	# 				actor_critic=ActorCritic,
-	# 				ac_kwargs=dict(hidden_sizes=(64,)),
-	# 				steps_per_epoch=1000, epochs=self.args.epochs, logger_kwargs=dict(output_dir=self.RL_logdir))
-
-	# 		# Get scores from last five epochs to evaluate success.
-	# 		data = pd.read_table(os.path.join(self.RL_logdir,'progress.txt'))
-	# 		last_scores = data['AverageEpRet'][-5:]	
-
-	# 		# Now evaluate last model over 100 episodes. 
-	# 		# Load model while evaluating. 
-	# 		_ , policy = load_policy_and_env(self.RL_logdir)
-			
-	# 		# Now run the policy.
-	# 		if args.hierarchical:
-	# 			# Now run the policy.
-	# 			hierarchical_run_policy(self.gym_env, policy, render=False, args=self.args)
-	# 		else:
-	# 			run_policy(self.gym_env, policy, render=False)
-
+	# Here's how we're going to get prior from same tasks... 
+	# Get high performing z traj from high level policy on source domain.. 
+	# Translate
+	# Feed z's.
