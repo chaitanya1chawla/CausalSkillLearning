@@ -99,7 +99,8 @@ class SawyerVisualizer():
 
 class BaxterVisualizer():
 
-	def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_010/saved_models/Model_epoch500"):
+	# def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_010/saved_models/Model_epoch500"):
+	def __init__(self, has_display=False, args=None, IK_network_path=None):		
 	# def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_050/saved_models/Model_epoch2000"):
 
 		# Create environment.
@@ -453,3 +454,4 @@ if __name__ == '__main__':
 	visualizer = MujocoVisualizer()
 	# img = visualizer.set_ee_pose_return_image(end_eff_pose, arm='right')
 	# scipy.misc.imsave('mj_vis.png', img)
+

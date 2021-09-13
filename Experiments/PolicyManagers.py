@@ -4,6 +4,7 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
+from os import environ
 from headers import *
 from PolicyNetworks import *
 from RL_headers import *
@@ -11764,7 +11765,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 		print("Done running Downstream Task Setup.")
 
-	def setup_ppo(self):
+	def setup_ppo(self, source_or_target='source'):
 		
 		####################################################
 		# This function should essentially replicate what the Run_Robosuite_PPO file does.
@@ -11778,14 +11779,12 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		# Create the base environment.
 		####################################################
 
-		if self.args.environment in ['Door','Wipe'] and float(robosuite.__version__[:3])>1.:        
-			# Specify that we're going to use the Sawyer here..
-			self.base_env = robosuite.make(self.args.environment, robots="Sawyer", has_renderer=False, has_offscreen_renderer=False, use_camera_obs=False, reward_shaping=True)        
+		self.source_or_target = source_or_target
+		if source_or_target=='source':
+			env = self.args.environment
 		else:
-			self.base_env = robosuite.make(self.args.environment, has_renderer=False, use_camera_obs=False, reward_shaping=True)			
-		
-		# Now make a GymWrapped version of that environment.
-		self.gym_env = GymWrapper(self.base_env)
+			env = self.args.target_environment
+		self.set_environment(env)
 
 		####################################################
 		# Set some parameters.
@@ -11855,16 +11854,6 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			self.actor_critic = self.ActorCritic(self.gym_env.observation_space, action_space, **dict(hidden_sizes=(64,)))
 
 		#####################################################
-		# Also now instantiate low level policy. 		
-		#####################################################
-
-		# Here, we don't actually need to create this, because the DJFE PM has done this for us. Just reference this appropriately. 
-		# Need to verify that it's the source policy we want to reference here..
-		self.lowlevel_policy = self.source_manager.policy_network
-		self.lowlevel_policy.args.batch_size = 1
-		self.lowlevel_policy.batch_size = 1
-
-		#####################################################
 		# Sync params across processes
 		#####################################################
 		
@@ -11882,12 +11871,37 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		self.ppo_buffer = PPOBuffer(self.ppo_obs_dim, self.ppo_act_dim, self.local_steps_per_epoch, self.gamma, self.lam)
 			
 		#####################################################
-		# Set up joint limits
+		# Depending on whether we're in source or target domain...
 		#####################################################
 
-		self.lower_joint_limits = self.source_manager.norm_sub_value
-		# self.upper_joint_limits = self.source_manager.norm_denom_value
-		self.joint_limit_range = self.source_manager.norm_denom_value
+		#####################################################
+		# Instantiate low level policy, and set up joint limits.
+		#####################################################
+
+		if self.source_or_target=='source':
+			# Instantiate low level policy from the source domain.
+			self.lowlevel_policy = self.source_manager.policy_network
+
+			# Set up joint limits and state size.
+			self.lower_joint_limits = self.source_manager.norm_sub_value
+			# self.upper_joint_limits = self.source_manager.norm_denom_value
+			self.joint_limit_range = self.source_manager.norm_denom_value
+			self.state_input_size = self.source_manager.input_size
+		else:
+			# Instantiate low level policy from the source domain.
+			self.lowlevel_policy = self.target_manager.policy_network
+
+			# Set up joint limits and state size.
+			self.lower_joint_limits = self.target_manager.norm_sub_value
+			# self.upper_joint_limits = self.source_manager.norm_denom_value
+			self.joint_limit_range = self.target_manager.norm_denom_value
+			self.state_input_size = self.target_manager.input_size
+						
+		# Here, we don't actually need to create this, because the DJFE PM has done this for us. Just reference this appropriately. 
+		# Need to verify that it's the source policy we want to reference here..
+		
+		self.lowlevel_policy.args.batch_size = 1
+		self.lowlevel_policy.batch_size = 1
 
 	def setup_ppo_training_ops(self):
 		
@@ -11981,7 +11995,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 					 DeltaLossPi=(loss_pi.item() - pi_l_old),
 					 DeltaLossV=(loss_v.item() - v_l_old))
 
-	def rollout(self, evaluate=False, visualize=False):
+	def rollout(self, evaluate=False, visualize=False, z_trajectory=None):
 
 		#######################################################
 		# Implementing a rollout fucnction. 
@@ -12007,6 +12021,11 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		o, ep_ret, ep_len = self.gym_env.reset(), 0, 0			
 		self.image_list = []
 
+		if self.source_or_target=='source':
+			environment = self.args.environment
+		else:
+			environment = self.args.target_environment
+
 		##########################################
 		# 2) While we haven't exceeded timelimit and are still non-terminal:
 		##########################################
@@ -12025,14 +12044,23 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			# Revert to regular forward of Z AC (not receiving tuples).
 			# action_tuple, v, logp_tuple = ac.step(torch.as_tensor(o, dtype=torch.float32))
 			
-			z_action, v, z_logp = self.actor_critic.step(torch.as_tensor(o, dtype=torch.float32))
+			# z_action, v, z_logp = self.actor_critic.step(torch.as_tensor(o, dtype=torch.float32))
 			
 			# # FOR NOW
 			# zset = np.load("/home/tshankar/Research/Code/Z_Set.npy")
 			# if t<len(zset):
 
 			# if self.args.evaluate_translated_zs:
-			# 	z_action = self.translated_zs[t//self.downsample_freq]
+			if z_trajectory is not None:
+				# z_action = self.translated_zs[t//self.downsample_freq]
+
+				# Remember, this time no need to downsample, because they're aligned temporally for now...
+				# Well... the inner loop executes the z for the right number of timesteps...
+				# So just indexing with t is good..
+				z_action, v, logp = z_trajectory[t], 1., 1.
+				
+			else:
+				z_action, v, z_logp = self.actor_critic.step(torch.as_tensor(o, dtype=torch.float32))
 
 			# First reset skill timer. 
 			t_skill = 0
@@ -12054,7 +12082,8 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 				if float(robosuite.__version__[:3])>1.:
 					pure_joint_state = self.gym_env.sim.get_state()[1][:7]						
 					
-					if self.args.environment=='Wipe':
+					# if self.args.environment=='Wipe':
+					if environment=='Wipe':
 						# here, no gripper, so set dummy joint pos
 						gripper_state = np.array([max_gripper_state/2])
 					else:
@@ -12071,7 +12100,8 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 						gripper_state = np.array([obs_spec['robot0_gripper_qpos'][0]-obs_spec['robot0_gripper_qpos'][1]])
 				else:
 									
-					if self.args.environment[:3] =='Bax':
+					# if self.args.environment[:3] =='Bax':
+					if environment[:3] =='Bax':
 
 						# Assembel gripper state from both left and right gripper states. 
 						left_gripper_state = np.array([obs_spec['left_gripper_qpos'][0]-obs_spec['left_gripper_qpos'][1]])
@@ -12102,7 +12132,8 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 				assembled_states = np.concatenate([normalized_joint_state,low_level_action_numpy])
 				assembled_input = np.concatenate([assembled_states, z_action])
 				
-				torch_assembled_input = torch.tensor(assembled_input).to(device).float().view(-1,1,self.source_manager.input_size+self.latent_z_dimension)
+				torch_assembled_input = torch.tensor(assembled_input).to(device).float().view(-1,1,self.state_input_size+self.latent_z_dimension)
+				# torch_assembled_input = torch.tensor(assembled_input).to(device).float().view(-1,1,self.lowlevel_policy.input_size+self.latent_z_dimension)
 
 				# 5c) Now actually retrieve action.
 				low_level_action, hidden = self.lowlevel_policy.incremental_reparam_get_actions(torch_assembled_input, greedy=True, hidden=hidden)
@@ -12117,7 +12148,8 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 				# Output of policy is minmax normalized, which is 0-1 range. 
 				# Change to -1 to 1 range. 
 
-				if self.args.environment[:3]=='Bax':
+				# if self.args.environment[:3]=='Bax':
+				if environment[:3]=='Bax':
 					# If we're in a baxter environmnet, flip the left and right hand actions.
 					normalized_low_level_action = np.zeros(16)
 					normalized_low_level_action[:7] = unnormalized_low_level_action_numpy[7:14]
@@ -12130,17 +12162,13 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 				# 6) Step in environment. 
 				##########################################
 
-				# Set low level action.
-				# print("Embed before step..")
-				# embed()
-
-				if self.args.environment=='Wipe':
+				# if self.args.environment=='Wipe':
+				if environment=='Wipe':
 					next_o, r, d, _ = self.gym_env.step(normalized_low_level_action[:-1])
 				else:
 					next_o, r, d, _ = self.gym_env.step(normalized_low_level_action)
 								
-				# Logging images
-				# if (self.args.evaluate_translated_zs or visualize) and t%10==0:
+				# Logging images				
 				if (visualize) and t%10==0:					
 
 					# if float(robosuite.__version__[:3])>1.:
@@ -12198,8 +12226,8 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 						self.ppo_logger.store(EpRet=ep_ret, EpLen=ep_len)
 					o, ep_ret, ep_len = self.gym_env.reset(), 0, 0
 			
-		if evaluate:			
-			return ep_ret_copy, ep_len_copy, self.image_list
+		# if evaluate	
+		return ep_ret_copy, ep_len_copy, self.image_list
 
 	def setup_train(self):
 		
@@ -12248,19 +12276,18 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 			print('Episode %d \t EpRet %.3f \t EpLen %d'%(k, ep_ret, ep_len))
 
-		# Log info about epoch
-		self.ppo_eval_logger.log_tabular('Epoch', k)
-		self.ppo_eval_logger.log_tabular('EpRet', with_min_and_max=True)
-		self.ppo_eval_logger.log_tabular('EpLen', average_only=True)
-		self.ppo_eval_logger.dump_tabular()
+			# # Log info about epoch
+			# self.ppo_eval_logger.log_tabular('Epoch', k)
+			# self.ppo_eval_logger.log_tabular('EpRet', with_min_and_max=True)
+			# self.ppo_eval_logger.log_tabular('EpLen', average_only=True)
+			# self.ppo_eval_logger.dump_tabular()
 
-	def train(self, model=None):
+	def train_RL(self, model=None):
 		
 		#######################################################
 		# Actual train loop block.
 		#######################################################
 
-		self.setup_train()
 
 		start_time = time.time()
 
@@ -12287,7 +12314,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			if (epoch % self.args.save_freq == 0) or (epoch == self.args.epochs-1):
 				self.ppo_logger.save_state({'env': self.gym_env}, None)
 			
-			if (epoch%self.args.eval_freq==0):
+			if (epoch%self.args.eval_freq==0) and (epoch>0):
 
 				print("#######################################################")
 				print("About to evaluate policy over 10 episodes.")
@@ -12325,11 +12352,93 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		print("#######################################################")
 
 		print("#######################################################")
-		print("About to evaluate policy over 100 episodes.")
+		print("About to evaluate policy over 10 episodes.")
 		print("#######################################################")
 
-		self.evaluate_policy(eval_episodes=100)
+		self.evaluate_policy(eval_episodes=10)
 
+	def set_environment(self, env):
+
+		if self.args.environment in ['Door','Wipe'] and float(robosuite.__version__[:3])>1.:        
+			# Specify that we're going to use the Sawyer here..
+			self.base_env = robosuite.make(env, robots="Sawyer", has_renderer=False, has_offscreen_renderer=False, use_camera_obs=False, reward_shaping=True)        
+		else:
+			self.base_env = robosuite.make(env, has_renderer=False, use_camera_obs=False, reward_shaping=True)			
+		
+		# Now make a GymWrapped version of that environment.
+		self.gym_env = GymWrapper(self.base_env)
+
+	# def train(self, model=None):
+	def evaluate_alignment(self):
+
+		#################################################
+		# Assume we've trained an alignment model.
+		#################################################
+
+		#################################################
+		# Construct z trajectory set in source domain.
+		#################################################
+
+		print("#################################################")
+		print("About to evaluate alignment!")
+		print("#################################################")
+
+		self.z_trajectory_set = []
+		self.orig_ep_returns = []
+		self.eval_episodes = 10
+		for k in range(self.eval_episodes):
+					
+			# 1) Get a z trajectory from a rollout.
+			orig_ep_return, _, _ = self.rollout()
+			self.orig_ep_returns.append(orig_ep_return)
+		
+			# 2) Get all data from PPO buffer. 		
+			data = self.ppo_buffer.get()
+
+			# 3) Get z trajectory from the data.
+			z_traj = data['act']
+
+			# 4) Add z trajectory to set.
+			self.z_trajectory_set.append(z_traj)					
+
+		# 4) Reset PPO policy, environment etc. with  target environment.
+		self.setup_ppo(source_or_target='target')
+		self.setup_ppo_training_ops()
+		
+
+		#################################################
+		# Now translate and evaluate all of the trajectories in the z trajectory set.
+		#################################################		
+		
+		for k in range(self.eval_episodes):
+
+			# 5) Translate the source z trajectory. 
+		
+			# Retrieve z traj. 
+			orig_z_trajectory = self.z_trajectory_set[k]
+			# Torch. 
+			torch_orig_z_trajectory = torch.tensor(orig_z_trajectory).to(device).float()			
+			# Translate.			
+			translated_z_trajectory = self.backward_translation_model(torch_orig_z_trajectory).detach().cpu().numpy()
+
+			# 6) Evaluate the original and translated z trajectory in the target domain.
+			source_z_ep_ret, _, source_z_traj_image_list = self.rollout(z_trajectory=orig_z_trajectory, evaluate=True, visualize=True)
+
+			translated_ep_ret, _, translated_image_list = self.rollout(z_trajectory=translated_z_trajectory, evaluate=True, visualize=True)
+
+			print("Episode: ",k," Original Return: %3.2f"%self.orig_ep_returns[k], " Source Z Return: %3.2f"%source_z_ep_ret, " Translated Z Return: %3.2f"%translated_ep_ret)
+			
+	def train(self, model=None):
+
+		# Setup training either way. 
+		self.setup_train()
+
+		# Actually train RL.
+		self.train_RL(model=model)
+
+		# Evaluate alignment over x episodes. 
+		self.evaluate_alignment()
+		
 	# Here's how we're going to get prior from same tasks... 
 	# Get high performing z traj from high level policy on source domain.. 
 	# Translate

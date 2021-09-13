@@ -218,6 +218,7 @@ def parse_arguments():
 	parser.add_argument('--batch_norm',dest='batch_norm',type=int,default=0,help='Whether to use batch norm.')
 	parser.add_argument('--leaky_relu',dest='leaky_relu',type=int,default=0,help='Whether to use leaky relu (or just vanilla relu).')
 	parser.add_argument('--environment',dest='environment',type=str,default='SawyerLift') # Defines robosuite environment for RL.
+	parser.add_argument('--target_environment',dest='target_environment',type=str,default='SawyerLift') # Defines robosuite environment for RL.
 	
 	# Data parameters. 
 	parser.add_argument('--traj_segments',dest='traj_segments',type=int,default=1) # Defines whether to use trajectory segments for pretraining or entire trajectories. Useful for baseline implementation.
