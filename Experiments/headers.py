@@ -35,7 +35,7 @@ from matplotlib.offsetbox import (TextArea, DrawingArea, OffsetImage,
                                   AnnotationBbox)
 from matplotlib.animation import FuncAnimation
 import mpl_toolkits
-import tensorflow as tf
+# import tensorflow as tf
 import tempfile
 import moviepy.editor as mpy
 import subprocess
