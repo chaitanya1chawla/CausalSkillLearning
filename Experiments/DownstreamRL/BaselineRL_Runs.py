@@ -16,10 +16,16 @@ CUDA_VISIBLE_DEVICES=0 python Run_Robosuite_PPO.py --run_name="HRL_271" --hierar
 # Just running flat baselines...
 CUDA_VISIBLE_DEVICES=0 python Run_Robosuite_PPO.py --run_name="RLB_Saw_101" --hierarchical=0 --env="SawyerPush" --data=Roboturk
 
+CUDA_VISIBLE_DEVICES=0 python Run_Robosuite_PPO.py --run_name="RLB_Saw_101" --hierarchical=0 --env="SawyerPush" --data=Roboturk --no-train
+
 CUDA_VISIBLE_DEVICES=1 python Run_Robosuite_PPO.py --run_name="RLB_Saw_102" --hierarchical=0 --env="SawyerReach" --data=Roboturk
+
+CUDA_VISIBLE_DEVICES=1 python Run_Robosuite_PPO.py --run_name="RLB_Saw_102" --hierarchical=0 --env="SawyerReach" --data=Roboturk --no-train --render=1
 
 # 
 CUDA_VISIBLE_DEVICES=1 python Run_Robosuite_PPO.py --run_name="RLB_LBax_103" --hierarchical=0 --env="BaxterLeftHandPush"
+
+CUDA_VISIBLE_DEVICES=1 python Run_Robosuite_PPO.py --run_name="RLB_LBax_103" --hierarchical=0 --env="BaxterLeftHandPush" --no-train --render=1
 
 CUDA_VISIBLE_DEVICES=0 python Run_Robosuite_PPO.py --run_name="RLB_LBax_104" --hierarchical=0 --env="BaxterLeftHandReach"
 

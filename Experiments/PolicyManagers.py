@@ -11851,7 +11851,15 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			action_space_bound = np.ones(self.latent_z_dimension)*np.inf
 			action_space = Box(-action_space_bound, action_space_bound)
 
-			self.actor_critic = self.ActorCritic(self.gym_env.observation_space, action_space, **dict(hidden_sizes=(64,)))
+			# If there is an RL model provided, load that instead of instantiating the actor critic... if we're in source env.
+			if self.args.RL_model_path is not None and self.source_or_target=='source':
+				
+				# Feed to load policy and env with return policy set to True.
+				_, _, self.actor_critic = load_policy_and_env(self.args.RL_model_path, return_policy=True)
+			else:
+
+				# Otherwise instantiate an actor critic.
+				self.actor_critic = self.ActorCritic(self.gym_env.observation_space, action_space, **dict(hidden_sizes=(64,)))
 
 		#####################################################
 		# Sync params across processes
@@ -12389,7 +12397,17 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		for k in range(self.eval_episodes):
 					
 			# 1) Get a z trajectory from a rollout.
-			orig_ep_return, _, _ = self.rollout()
+			viz = ((k==0) and self.args.viz_latent_rollout)
+			orig_ep_return, _, image_list = self.rollout(visualize=viz)
+
+			# Whether we are visualizing this trajectory. 
+			if viz:
+				path = os.path.join(self.RL_logdir, "Images")
+				if not(os.path.isdir(path)):
+					os.mkdir(path)
+
+				imageio.mimsave(os.path.join(path,"Trained_Rollout.gif"), image_list)
+
 			self.orig_ep_returns.append(orig_ep_return)
 		
 			# 2) Get all data from PPO buffer. 		
@@ -12422,9 +12440,15 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			translated_z_trajectory = self.backward_translation_model(torch_orig_z_trajectory).detach().cpu().numpy()
 
 			# 6) Evaluate the original and translated z trajectory in the target domain.
-			source_z_ep_ret, _, source_z_traj_image_list = self.rollout(z_trajectory=orig_z_trajectory, evaluate=True, visualize=True)
+			viz = ((k==0) and self.args.viz_latent_rollout)
+			source_z_ep_ret, _, source_z_traj_image_list = self.rollout(z_trajectory=orig_z_trajectory, evaluate=True, visualize=viz)
 
-			translated_ep_ret, _, translated_image_list = self.rollout(z_trajectory=translated_z_trajectory, evaluate=True, visualize=True)
+			translated_ep_ret, _, translated_image_list = self.rollout(z_trajectory=translated_z_trajectory, evaluate=True, visualize=viz)
+
+			# IF we are visualizing..
+			if viz:
+				imageio.mimsave(os.path.join(path,"Target_Rollout_source_zs.gif"), source_z_traj_image_list)
+				imageio.mimsave(os.path.join(path,"Target_Rollout_translated_zs.gif"), translated_image_list)
 
 			print("Episode: ",k," Original Return: %3.2f"%self.orig_ep_returns[k], " Source Z Return: %3.2f"%source_z_ep_ret, " Translated Z Return: %3.2f"%translated_ep_ret)
 			
@@ -12443,3 +12467,13 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 	# Get high performing z traj from high level policy on source domain.. 
 	# Translate
 	# Feed z's.
+
+	def evaluate(self, model=None):
+
+		# Setup training either way. 
+		self.setup_train()
+
+		# Evaluate alignment over x episodes. 
+		self.evaluate_alignment()
+		
+		
