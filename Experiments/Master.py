@@ -84,7 +84,7 @@ class Master():
 		elif self.args.setting=='imitation':
 			self.policy_manager = PolicyManager_Imitation(self.args.number_policies, self.dataset, self.args)
 
-		elif self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
+		elif self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer','downstreamtasktransfer']:
 
 			# Creating two copies of arguments, in case we're transferring between MIME left and MIME right.
 			source_args = copy.deepcopy(self.args)
@@ -122,6 +122,8 @@ class Master():
 				self.policy_manager = PolicyManager_DensityJointTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 			elif self.args.setting=='densityjointfixembedtransfer':
 				self.policy_manager = PolicyManager_DensityJointFixEmbedTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
+			elif self.args.setting=='downstreamtasktransfer':
+				self.policy_manager = PolicyManager_DownstreamTaskTransfer(args=self.args, source_dataset=source_dataset, target_dataset=target_dataset)
 
 		elif self.args.setting in ['iktrainer']:
 			self.policy_manager = PolicyManager_IKTrainer(self.dataset, self.args)
@@ -136,7 +138,7 @@ class Master():
 	def run(self):
 		if self.args.setting in ['pretrain_sub','pretrain_prior','imitation','baselineRL','downstreamRL',\
 			'transfer','cycle_transfer','jointtransfer','fixembed','jointcycletransfer', 'jointfixembed',\
-			'jointfixcycle','densityjointtransfer','densityjointfixembedtransfer','iktrainer']:
+			'jointfixcycle','densityjointtransfer','densityjointfixembedtransfer','iktrainer', 'downstreamtasktransfer']:
 			if self.args.train:
 				if self.args.model:
 					self.policy_manager.train(self.args.model)
@@ -197,6 +199,7 @@ def parse_arguments():
 	parser.add_argument('--setting',dest='setting',type=str,default='gtsub')
 	parser.add_argument('--test_code',dest='test_code',type=int,default=0)
 	parser.add_argument('--model',dest='model',type=str)
+	parser.add_argument('--RL_model_path',dest='RL_model_path',type=str,help='High level policy model.')
 	# parser.add_argument('--logdir',dest='logdir',type=str,default='Experiment_Logs/')
 	parser.add_argument('--logdir',dest='logdir',type=str,default='ExpWandbLogs/')
 	parser.add_argument('--epochs',dest='epochs',type=int,default=500) # Number of epochs to train for. Reduce for Mocap.
@@ -216,6 +219,7 @@ def parse_arguments():
 	parser.add_argument('--batch_norm',dest='batch_norm',type=int,default=0,help='Whether to use batch norm.')
 	parser.add_argument('--leaky_relu',dest='leaky_relu',type=int,default=0,help='Whether to use leaky relu (or just vanilla relu).')
 	parser.add_argument('--environment',dest='environment',type=str,default='SawyerLift') # Defines robosuite environment for RL.
+	parser.add_argument('--target_environment',dest='target_environment',type=str,default='SawyerLift') # Defines robosuite environment for RL.
 	
 	# Data parameters. 
 	parser.add_argument('--traj_segments',dest='traj_segments',type=int,default=1) # Defines whether to use trajectory segments for pretraining or entire trajectories. Useful for baseline implementation.
@@ -403,6 +407,10 @@ def parse_arguments():
 	parser.add_argument('--new_context',dest='new_context',type=int,default=1,help='Whether to implement new contextual embedding model or original one.')
 	parser.add_argument('--ELMO_embeddings',dest='ELMO_embeddings',type=int,default=0,help='Whether to implement ELMO style embeddings.')
 	parser.add_argument('--eval_transfer_metrics',dest='eval_transfer_metrics',type=int,default=0,help='Whether to evaluate correspondence metrics in transfer setting.')
+
+	# Parameters for downstream PPO. 
+	parser.add_argument('--rl_policy_learning_rate', dest='rl_policy_learning_rate', type=float, default=3e-4, help='Learning rate for RL Policy.')
+	parser.add_argument('--rl_critic_learning_rate', dest='rl_critic_learning_rate', type=float, default=1e-3, help='Learning rate for RL Critic.')
 
 	return parser.parse_args()
 

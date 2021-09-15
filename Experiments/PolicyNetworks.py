@@ -118,19 +118,31 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		# The output size here must be mean+variance for each dimension. 
 		# This is output_size*2. 
 		self.args = args
+		if self.args is None:
+			self.debug = False
+			self.latent_z_dimensions = 16
+			self.dropout = 0.
+		else:
+			self.latent_z_dimensions = self.args.z_dimensions
+			self.dropout = self.args.dropout
+			self.debug = self.args.debug
+
 		self.output_size = output_size
 		self.num_layers = number_layers
 		self.batch_size = self.args.batch_size
+
 		
 		if whether_latentb_input:
-			self.input_size = input_size+self.args.z_dimensions+1
+			# self.input_size = input_size+self.args.z_dimensions+1
+			self.input_size = input_size+self.latent_z_dimensions+1
 		else:
 			if zero_z_dim:
 				self.input_size = input_size
 			else:
-				self.input_size = input_size+self.args.z_dimensions
+				# self.input_size = input_size+self.args.z_dimensions
+				self.input_size = input_size+self.latent_z_dimensions
 		# Create LSTM Network. 
-		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers, dropout=self.args.dropout)
+		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers, dropout=self.dropout)
 
 		# Define output layers for the LSTM, and activations for this output layer. 
 		self.mean_output_layer = torch.nn.Linear(self.hidden_size,self.output_size)
@@ -2275,4 +2287,57 @@ class DiscreteMLP(torch.nn.Module):
 		return log_probabilities, probabilities
 
 	def get_probabilities(self, input):
+
 		return self.forward(input)
+
+def mlp(sizes, activation, output_activation=torch.nn.Identity):
+    """
+    Build a multi-layer perceptron in PyTorch.
+
+    Args:
+        sizes: Tuple, list, or other iterable giving the number of units
+            for each layer of the MLP. 
+
+        activation: Activation function for all layers except last.
+
+        output_activation: Activation function for last layer.
+
+    Returns:
+        A PyTorch module that can be called to give the output of the MLP.
+        (Use an nn.Sequential module.)
+
+    """
+    layers = []
+    for j in range(len(sizes)-1):
+        act = activation if j < len(sizes)-2 else output_activation
+        layers += [torch.nn.Linear(sizes[j], sizes[j+1]), act()]
+    return torch.nn.Sequential(*layers)
+
+def gaussian_likelihood(x, mu, log_std):
+    pre_sum = -0.5 * (((x-mu)/(torch.exp(log_std)+EPS))**2 + 2*log_std + np.log(2*np.pi))
+    return pre_sum.sum(axis=-1)
+
+class MLPGaussianActor(torch.nn.Module):
+
+
+    def __init__(self, obs_dim, act_dim, hidden_sizes, activation):
+        super().__init__()
+
+        self.mu_net = mlp([obs_dim] + list(hidden_sizes) + [act_dim], activation)      
+        self.std_net = mlp([obs_dim] + list(hidden_sizes) + [act_dim], activation)
+        self.softplus_activation = torch.nn.Softplus()
+
+    def forward(self, obs, act=None):
+
+        # Create mean and var. 
+        mean = self.mu_net(obs)
+        standard_deviation = self.softplus_activation(self.std_net(obs))
+
+        # Distribution. 
+        dist = torch.distributions.MultivariateNormal(mean, torch.diag_embed(standard_deviation))
+
+        log_prob = None
+        if act is not None:
+            log_prob = dist.log_prob(act)
+
+        return dist, log_prob

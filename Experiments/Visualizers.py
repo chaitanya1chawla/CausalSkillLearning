@@ -35,13 +35,16 @@ class SawyerVisualizer():
 		print("Do I have a display?", has_display)
 
 		import robosuite, threading
-		from robosuite.wrappers import IKWrapper
 
 		# self.base_env = robosuite.make('BaxterLift', has_renderer=has_display)
 		self.base_env = robosuite.make("SawyerViz",has_renderer=has_display)
 
 		# Create kinematics object. 
-		self.sawyer_IK_object = IKWrapper(self.base_env)
+		if float(robosuite.__version__[:3])<1.:
+			from robosuite.wrappers import IKWrapper					
+			self.sawyer_IK_object = IKWrapper(self.base_env)
+		else:
+			self.sawyer_IK_object = None
 		self.environment = self.sawyer_IK_object.env        
 
 	def update_state(self):
@@ -96,7 +99,8 @@ class SawyerVisualizer():
 
 class BaxterVisualizer():
 
-	def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_010/saved_models/Model_epoch500"):
+	# def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_010/saved_models/Model_epoch500"):
+	def __init__(self, has_display=False, args=None, IK_network_path=None):		
 	# def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_050/saved_models/Model_epoch2000"):
 
 		# Create environment.
@@ -450,3 +454,4 @@ if __name__ == '__main__':
 	visualizer = MujocoVisualizer()
 	# img = visualizer.set_ee_pose_return_image(end_eff_pose, arm='right')
 	# scipy.misc.imsave('mj_vis.png', img)
+

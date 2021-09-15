@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> f7b5302b4eba9bd3dd37c3c2f56cb21cd3e5cc66
 # Copyright (c) Facebook, Inc. and its affiliates.
 # All rights reserved.
 
@@ -113,6 +116,8 @@ np.save("B_GMM_Toy.npy",b_array_dataset)
 np.save("A_GMM_Toy.npy",a_array_dataset)
 np.save("G_GMM_Toy.npy",goal_array_dataset)
 
+<<<<<<< HEAD
+=======
 =======
 # Copyright (c) Facebook, Inc. and its affiliates.
 # All rights reserved.
@@ -229,3 +234,4 @@ np.save("A_GMM_Toy.npy",a_array_dataset)
 np.save("G_GMM_Toy.npy",goal_array_dataset)
 
 >>>>>>> ddcf14db7e7a00bedcd04c9fe76b238d4fb39ec4
+>>>>>>> f7b5302b4eba9bd3dd37c3c2f56cb21cd3e5cc66

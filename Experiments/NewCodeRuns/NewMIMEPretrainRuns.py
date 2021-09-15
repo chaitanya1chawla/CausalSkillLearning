@@ -290,3 +290,6 @@ python cluster_run.py --name='MP_LR_026' --cmd='python Master.py --train=1 --set
 # Debug
 
 python Master.py --train=1 --setting=pretrain_sub --name=MP_try --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --normalization=minmax --seed=2 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --datadir=/private/home/tanmayshankar/Research/Code/Data/Datasets/MIME/ --epochs=4000 --save_freq=20
+
+# 
+python Master.py --train=1 --setting=pretrain_sub --name=MP_try --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --normalization=minmax --seed=2 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --datadir=/home/tanmay/Research/Code/Data/Datasets/MIME/ --epochs=4000 --save_freq=20
