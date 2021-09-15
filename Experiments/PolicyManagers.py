@@ -6973,9 +6973,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# 	# 4) Feed translated sequence of target z's., along with start state of source trajectory into cross_domain decoding, and decode into a translated target-> source trajectory. 
 		# 	# 5) Visualize original target trajectory, and the translated target to source trajectory. 
 
+		number_of_batches = 1
+		self.number_of_datapoints_per_batch = 10	
+
 		with torch.no_grad():
 
-			for i in range(1):
+			for i in range(number_of_batches):
 
 				# 0) Get source trajectory.				
 				source_input_dict, _, _ = self.encode_decode_trajectory(self.source_manager, i)
@@ -7006,13 +7009,47 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					unnormalized_translated_target_traj = (cross_domain_decoding_dict['differentiable_trajectory'].detach().cpu().numpy()*self.source_manager.norm_denom_value)+self.source_manager.norm_sub_value
 
 					self.gif_logs = {}
+
+
 					# Now for these many trajectories:
-					for k in range(2):
+					for k in range(self.number_of_datapoints_per_batch):
 						# Now visualize the original .. target trajectory. 
 						self.gif_logs['Traj{0}_OriginalTarget_Traj'.format(k)] = np.array(self.target_manager.visualizer.visualize_joint_trajectory(unnormalized_original_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_OriginalTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
 
 						# Now visualize the translated target trajectory. 
 						self.gif_logs['Traj{0}_TranslatedTarget_Traj'.format(k)] = np.array(self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_translated_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TranslatedTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
+
+		# Segment these GIFs and save them.
+		self.segment_source_target_gifs(target_var_dict['latent_b'])
+
+	def segment_source_target_gifs(self, latent_b):
+
+		# print("embedding in segment source target gifs")
+		# embed()
+
+		self.segmented_gif_logs = {}
+
+		# Remember, we're doing this for 2 batch elements. 
+		for k in range(self.number_of_datapoints_per_batch):
+			# Set source and target gif from gif_logs object.
+			target_gif = self.gif_logs['Traj{0}_OriginalTarget_Traj'.format(k)]
+			translatedtarget_gif = self.gif_logs['Traj{0}_TranslatedTarget_Traj'.format(k)]
+
+			# Now segment these gifs.
+			segmentation_indices = torch.where(latent_b[:,k])[0]
+
+			for j in range(len(segmentation_indices)-1):
+				
+				self.segmented_gif_logs['Traj{0}_OrigTarget_Segment{1}'.format(k,j)] = target_gif[segmentation_indices[j]:segmentation_indices[j+1]]
+				self.segmented_gif_logs['Traj{0}_TranslatedTarget_Segment{1}'.format(k,j)] = translatedtarget_gif[segmentation_indices[j]:segmentation_indices[j+1]]
+
+		# Now save all the gifs we created.
+		for key in self.segmented_gif_logs.keys():			
+			# Save. 
+			imageio.mimsave(os.path.join(self.traj_viz_dir_name,"{0}.gif".format(key)), list(self.segmented_gif_logs[key]))
+
+		# print("embedding in segment source target gifs")
+		# embed()
 
 	def evaluate_translated_trajectory_distances(self, just_visualizing=False):
 
@@ -7084,11 +7121,16 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					# Now for these many trajectories:
 					for k in range(2):
 						# Now visualize the source trajectory. 
-						self.gif_logs['Traj{0}_Source_Traj'.format(k)] = np.array(self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_source_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_SourceTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
+						source_gif = self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_source_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_SourceTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories)
+						self.gif_logs['Traj{0}_Source_Traj'.format(k)] = np.array(source_gif)
 
 						# Now visualize the target trajectory. 
 						# THIS IS ACTUALLY IN SOURCE DOMAIN... USE SOURCE VISUALIZER.
-						self.gif_logs['Traj{0}_Target_Traj'.format(k)] = np.array(self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_translatedtarget_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TargetTranslatedTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
+						target_gif = self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_translatedtarget_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TargetTranslatedTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories)
+						self.gif_logs['Traj{0}_Target_Traj'.format(k)] = np.array(target_gif)
+
+						# Segment up gifs..
+						# self.segment_source_target_gifs(target_var_dict['latent_b'])
 
 		average_trajectory_reconstruction_error /= (self.extent//self.args.batch_size+1)*self.args.batch_size
 
@@ -7218,11 +7260,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		if model is not None: 
 			self.load_all_models(model)
 
-		# Run source policy manager evaluate. 
-		self.source_manager.evaluate(suffix="Source")
+		# # Run source policy manager evaluate. 
+		# self.source_manager.evaluate(suffix="Source")
 
-		# Run target policy manager evaluate. 
-		self.target_manager.evaluate(suffix="Target")
+		# # Run target policy manager evaluate. 
+		# self.target_manager.evaluate(suffix="Target")
 
 		# Evaluate metrics. 
 		self.evaluate_correspondence_metrics()
@@ -7651,6 +7693,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Remember, the differentiable rollout is required because the backtranslation / cycle-consistency loss needs to be propagated through multiple sets of translations. 
 		# Therefore it must pass through the decoder network(s), and through the latent_z's. (It doesn't actually pass through the states / actions?).		
 
+		# print("Embed in differentiable rollout")
+		# embed()
+
 		subpolicy_inputs = torch.zeros((self.args.batch_size,2*policy_manager.state_dim+policy_manager.latent_z_dimensionality)).to(device).float()
 		subpolicy_inputs[:,:policy_manager.state_dim] = torch.tensor(trajectory_start).to(device).float()
 		# subpolicy_inputs[:,2*policy_manager.state_dim:] = torch.tensor(latent_z).to(device).float()
@@ -7676,7 +7721,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			action_to_execute = action_to_execute/self.args.action_scale_factor
 			
 			# Compute next state. 
-			new_state = subpolicy_inputs[t,...,:policy_manager.state_dim]+action_to_execute		
+			new_state = subpolicy_inputs[t,...,:policy_manager.state_dim]+action_to_execute
 
 			# Create new input row. 
 			input_row = torch.zeros((self.args.batch_size, 2*policy_manager.state_dim+policy_manager.latent_z_dimensionality)).to(device).float()
@@ -9022,6 +9067,8 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		self.parameter_list = list(self.backward_translation_model.parameters())
 
 		# Now create optimizer for translation models. 
+		print("Embedding before creating opt")
+		embed()
 		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
 		# self.optimizer = torch.optim.RMSprop(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
 
@@ -10671,7 +10718,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		 # Call super create networks, to create all the necessary networks. 
 		super().create_networks()
 
-		self.backward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
+		# self.backward_translation_model = ContinuousMLP(self.args.z_dimensions, self.args.hidden_size, self.args.z_dimensions, args=self.args, number_layers=self.translation_model_layers).to(device)
+		# self.translation_model_list = [None, self.backward_translation_model]
 
 	def save_all_models(self, suffix):
 
@@ -10789,6 +10837,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		# (1e) Finally, compute total loss.
 		###########################################################
 
+		# print("Embedding in VAE loss")
+		# embed()
 		self.total_VAE_loss = self.cross_domain_supervision_loss + self.cross_domain_density_loss + self.cross_domain_z_tuple_density_loss + self.task_based_supervised_loss
 
 		# Go backward through the generator (encoder / decoder), and take a step. 
@@ -11120,7 +11170,8 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 				# 5b2) Compute likelihood of target z encoding tuples under the source domain Z Tuple GMM. 			
 				################################################
 
-				# print("RUNNING QGMMD Forward Z Tup Den")
+				print("RUNNING QGMMD Forward Z Tup Den")
+				embed()
 				update_dictionary['forward_z_tuple_density_loss'] = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['target_z_transformations'], differentiable_points=True, GMM=self.Z_Tuple_GMM_list[0])
 
 				################################################
