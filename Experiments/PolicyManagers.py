@@ -9066,9 +9066,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		# self.parameter_list = list(self.forward_translation_model.parameters()) + list(self.backward_translation_model.parameters())
 		self.parameter_list = list(self.backward_translation_model.parameters())
 
-		# Now create optimizer for translation models. 
-		print("Embedding before creating opt")
-		embed()
+		# Now create optimizer for translation models. 		
 		self.optimizer = torch.optim.Adam(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
 		# self.optimizer = torch.optim.RMSprop(self.parameter_list, lr=self.learning_rate, weight_decay=self.args.regularization_weight)
 
@@ -11169,9 +11167,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 				################################################
 				# 5b2) Compute likelihood of target z encoding tuples under the source domain Z Tuple GMM. 			
 				################################################
-
-				print("RUNNING QGMMD Forward Z Tup Den")
-				embed()
+				
 				update_dictionary['forward_z_tuple_density_loss'] = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['target_z_transformations'], differentiable_points=True, GMM=self.Z_Tuple_GMM_list[0])
 
 				################################################
