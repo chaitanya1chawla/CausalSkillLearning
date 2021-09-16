@@ -7041,8 +7041,11 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			for j in range(len(segmentation_indices)-1):
 				
 				self.segmented_gif_logs['Traj{0}_OrigTarget_Segment{1}'.format(k,j)] = target_gif[segmentation_indices[j]:segmentation_indices[j+1]]
-				self.segmented_gif_logs['Traj{0}_TranslatedTarget_Segment{1}'.format(k,j)] = translatedtarget_gif[segmentation_indices[j]:segmentation_indices[j+1]]
-
+				self.segmented_gif_logs['Traj{0}_TranslatedTarget_Segment{1}'.format(k,j)] = translatedtarget_gif[segmentation_indices[j]:segmentation_indices[j+1]]			
+			
+			self.segmented_gif_logs['Traj{0}_OrigTarget_Segment{1}'.format(k,len(segmentation_indices))] = target_gif[segmentation_indices[-1]:]			
+			self.segmented_gif_logs['Traj{0}_TranslatedTarget_Segment{1}'.format(k,len(segmentation_indices))] = translatedtarget_gif[segmentation_indices[-1]:]
+			
 		# Now save all the gifs we created.
 		for key in self.segmented_gif_logs.keys():			
 			# Save. 
