@@ -11881,6 +11881,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		self.clip_ratio = 0.2
 		# Increasing target KL
 		self.target_kl = 0.05
+		self.target_kl = self.args.target_KL
 		self.train_v_iters = 80
 		self.train_pi_iters = 80
 		self.max_ep_len = 1000
