@@ -189,6 +189,7 @@ def parse_arguments():
 	parser.add_argument('--datadir', dest='datadir',type=str,default=None)
 	parser.add_argument('--train',dest='train',type=int,default=0)
 	parser.add_argument('--debug',dest='debug',type=int,default=0)
+	parser.add_argument('--debug_RL',dest='debug_RL',type=int,default=0)
 	parser.add_argument('--notes',dest='notes',type=str)
 	parser.add_argument('--name',dest='name',type=str,default=None)
 	parser.add_argument('--fake_batch_size',dest='fake_batch_size',type=int,default=1)

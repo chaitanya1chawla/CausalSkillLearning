@@ -6974,7 +6974,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# 	# 5) Visualize original target trajectory, and the translated target to source trajectory. 
 
 		number_of_batches = 1
-		self.number_of_datapoints_per_batch = 10	
+		self.number_of_datapoints_per_batch = 30	
 
 		with torch.no_grad():
 
@@ -7005,11 +7005,18 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					# First unnormalize the trajectories.
 					unnormalized_original_target_traj = (target_input_dict['sample_traj']*self.target_manager.norm_denom_value)+self.target_manager.norm_sub_value														
 					# unnormalized_target_traj = (cross_domain_decoding_dict['differentiable_trajectory'].detach().cpu().numpy()*self.target_manager.norm_denom_value)+self.target_manager.norm_sub_value
-					# Remember, the cross domain trajectory needs to be unnormalized with the source normalization values.. 
+					# Remember, the cross domain trajectory needs to be unnormalized with the source normalization values.. 					
+
 					unnormalized_translated_target_traj = (cross_domain_decoding_dict['differentiable_trajectory'].detach().cpu().numpy()*self.source_manager.norm_denom_value)+self.source_manager.norm_sub_value
 
-					self.gif_logs = {}
+					# Smoothen trajectories as needed... 
+					if self.args.target_domain in ['Roboturk']:
+						unnormalized_original_target_traj = self.smoothen_sawyer_trajectories(unnormalized_original_target_traj)
+					if self.args.source_domain in ['Roboturk']:
+						# Remember, here, the translated target is in the source domain! 
+						unnormalized_translated_target_traj = self.smoothen_sawyer_trajectories(unnormalized_translated_target_traj)
 
+					self.gif_logs = {}
 
 					# Now for these many trajectories:
 					for k in range(self.number_of_datapoints_per_batch):
@@ -7020,14 +7027,19 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 						self.gif_logs['Traj{0}_TranslatedTarget_Traj'.format(k)] = np.array(self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_translated_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TranslatedTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
 
 		# Segment these GIFs and save them.
-		self.segment_source_target_gifs(target_var_dict['latent_b'])
+		self.segment_source_target_gifs(target_var_dict['latent_b'], latent_zs=translated_latent_z.detach().cpu().numpy())
 
-	def segment_source_target_gifs(self, latent_b):
+	def smoothen_sawyer_trajectories(self, trajectory):
+
+			return gaussian_filter1d(trajectory,self.args.smoothing_kernel_bandwidth,axis=0,mode='nearest')
+
+	def segment_source_target_gifs(self, latent_b, latent_zs=None):
 
 		# print("embedding in segment source target gifs")
 		# embed()
 
 		self.segmented_gif_logs = {}
+		self.translated_latent_zs_for_downstream = []
 
 		# Remember, we're doing this for 2 batch elements. 
 		for k in range(self.number_of_datapoints_per_batch):
@@ -7038,14 +7050,31 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# Now segment these gifs.
 			segmentation_indices = torch.where(latent_b[:,k])[0]
 
+			if latent_zs is not None:
+				latent_zs_for_element = []
+
 			for j in range(len(segmentation_indices)-1):
 				
 				self.segmented_gif_logs['Traj{0}_OrigTarget_Segment{1}'.format(k,j)] = target_gif[segmentation_indices[j]:segmentation_indices[j+1]]
 				self.segmented_gif_logs['Traj{0}_TranslatedTarget_Segment{1}'.format(k,j)] = translatedtarget_gif[segmentation_indices[j]:segmentation_indices[j+1]]			
 			
-			self.segmented_gif_logs['Traj{0}_OrigTarget_Segment{1}'.format(k,len(segmentation_indices))] = target_gif[segmentation_indices[-1]:]			
-			self.segmented_gif_logs['Traj{0}_TranslatedTarget_Segment{1}'.format(k,len(segmentation_indices))] = translatedtarget_gif[segmentation_indices[-1]:]
-			
+				# If we have a latent z object, store the z's... 
+				if latent_zs is not None:
+					latent_zs_for_element.append(latent_zs[segmentation_indices[j],k])
+				
+			self.segmented_gif_logs['Traj{0}_OrigTarget_Segment{1}'.format(k,len(segmentation_indices)-1)] = target_gif[segmentation_indices[-1]:]			
+			self.segmented_gif_logs['Traj{0}_TranslatedTarget_Segment{1}'.format(k,len(segmentation_indices)-1)] = translatedtarget_gif[segmentation_indices[-1]:]
+
+			# If we have a latent z object, store the z's... 
+			if latent_zs is not None:
+				latent_zs_for_element.append(latent_zs[segmentation_indices[-1],k])
+
+			# Now add this to global set.
+			self.translated_latent_zs_for_downstream.append(copy.deepcopy(latent_zs_for_element))
+
+		# Now save this z set. 
+		np.save(os.path.join(self.traj_viz_dir_name,"Translated_Zs.npy"),self.translated_latent_zs_for_downstream)
+
 		# Now save all the gifs we created.
 		for key in self.segmented_gif_logs.keys():			
 			# Save. 
@@ -11802,6 +11831,9 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		# Run super set up to construct networks, load domain models, etc. 
 		super(PolicyManager_DownstreamTaskTransfer, self).setup()
 
+		# print("Embed before model load.")
+		# embed()
+
 		# Also load the translation model trained in DJFE PM. 
 		self.load_all_models(self.args.model)
 
@@ -11812,6 +11844,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 		# Now create training ops for PPO. 
 		self.setup_ppo_training_ops()
+		self.artificial_downsample_factor = 1
 
 		print("Done running Downstream Task Setup.")
 
@@ -11846,10 +11879,16 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		self.gamma = 0.99
 		self.lam = 0.97
 		self.clip_ratio = 0.2
-		self.target_kl = 0.01
+		# Increasing target KL
+		self.target_kl = 0.05
 		self.train_v_iters = 80
 		self.train_pi_iters = 80
 		self.max_ep_len = 1000
+
+		# 
+		self.max_ep_len = 500
+		self.steps_per_epoch = 500
+		self.local_steps_per_epoch = int(self.steps_per_epoch / num_procs())
 			
 		# Logging defaults
 		# def hierarchical_ppo(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0, 
@@ -11945,6 +11984,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			# self.upper_joint_limits = self.source_manager.norm_denom_value
 			self.joint_limit_range = self.source_manager.norm_denom_value
 			self.state_input_size = self.source_manager.input_size
+
 		else:
 			# Instantiate low level policy from the source domain.
 			self.lowlevel_policy = self.target_manager.policy_network
@@ -11955,7 +11995,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			self.joint_limit_range = self.target_manager.norm_denom_value
 			self.state_input_size = self.target_manager.input_size
 						
-		# Here, we don't actually need to create this, because the DJFE PM has done this for us. Just reference this appropriately. 
+		# Here, we don't actuallfy need to create this, because the DJFE PM has done this for us. Just reference this appropriately. 
 		# Need to verify that it's the source policy we want to reference here..
 		
 		self.lowlevel_policy.args.batch_size = 1
@@ -11975,6 +12015,13 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 		# Set up model saving
 		self.ppo_logger.setup_pytorch_saver(self.actor_critic)
+
+		#######################################################
+		# Setup epsilon greedy. 
+		#######################################################
+
+		self.decay_counter = self.args.epsilon_over
+		self.decay_rate = (self.initial_epsilon-self.final_epsilon)/(self.decay_counter)
 
 	def compute_loss_pi(self, data):
 		
@@ -12053,7 +12100,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 					 DeltaLossPi=(loss_pi.item() - pi_l_old),
 					 DeltaLossV=(loss_v.item() - v_l_old))
 
-	def rollout(self, evaluate=False, visualize=False, z_trajectory=None):
+	def rollout(self, evaluate=False, visualize=False, z_trajectory=None, greedy=False):
 
 		#######################################################
 		# Implementing a rollout fucnction. 
@@ -12115,10 +12162,11 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 				# Remember, this time no need to downsample, because they're aligned temporally for now...
 				# Well... the inner loop executes the z for the right number of timesteps...
 				# So just indexing with t is good..
-				z_action, v, logp = z_trajectory[t], 1., 1.
+								
+				z_action, v, logp = z_trajectory[t//self.artificial_downsample_factor], 1., 1.
 				
 			else:
-				z_action, v, z_logp = self.actor_critic.step(torch.as_tensor(o, dtype=torch.float32))
+				z_action, v, z_logp = self.actor_critic.step(torch.as_tensor(o, dtype=torch.float32), greedy=greedy)
 
 			# First reset skill timer. 
 			t_skill = 0
@@ -12168,6 +12216,9 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 						# Assemble joint states by flipping left and right hands. 
 						pure_joint_state = np.zeros(14)
+
+						# State from environment comes in as... RIGHT, LEFT. 
+						# Policy was trained on... LEFT RIGHT. 
 						pure_joint_state[:7] = obs_spec['joint_pos'][7:14]
 						pure_joint_state[7:14] = obs_spec['joint_pos'][:7]
 
@@ -12208,11 +12259,14 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 				# if self.args.environment[:3]=='Bax':
 				if environment[:3]=='Bax':
+				
 					# If we're in a baxter environmnet, flip the left and right hand actions.
 					normalized_low_level_action = np.zeros(16)
 					normalized_low_level_action[:7] = unnormalized_low_level_action_numpy[7:14]
 					normalized_low_level_action[7:14] = unnormalized_low_level_action_numpy[:7]
-					normalized_low_level_action[14:] = unnormalized_low_level_action_numpy[14:]
+					# Flip gripper states too..
+					
+					normalized_low_level_action[14:] = unnormalized_low_level_action_numpy[14:][::-1]
 				else:					
 					normalized_low_level_action = unnormalized_low_level_action_numpy
 
@@ -12294,6 +12348,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 		self.eval_time_limit = 10000000
 		self.downsample_freq = 20
+		
 
 		# if self.args.evaluate_translated_zs:
 		# 	self.args.epochs = 1
@@ -12304,8 +12359,9 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		# 	# source_latent_bs = source_variational_dict['latent_b'][:,batch_index]
 		# 	self.skill_time_limit = 16
 		# 	self.eval_time_limit = self.translated_zs.shape[0]*self.downsample_freq
-
+		self.artificial_downsample_factor = 1
 		self.skill_time_limit *= self.downsample_freq
+		
 		self.eval_episodes = 100
 
 	def evaluate_policy(self, eval_episodes=10):
@@ -12318,7 +12374,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		for k in range(self.eval_episodes):
 			
 			# print("Rollout #",epoch,(epoch==0))
-			ep_ret, ep_len, image_list = self.rollout(evaluate=True, visualize=(k==0))
+			ep_ret, ep_len, image_list = self.rollout(evaluate=True, visualize=(k==0), greedy=True)
 
 			if k==0:
 
@@ -12339,6 +12395,20 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			# self.ppo_eval_logger.log_tabular('EpRet', with_min_and_max=True)
 			# self.ppo_eval_logger.log_tabular('EpLen', average_only=True)
 			# self.ppo_eval_logger.dump_tabular()
+
+	def set_epsilon(self, counter):
+
+		if counter<self.decay_counter:
+			self.epsilon = self.initial_epsilon-self.decay_rate*counter
+		else:
+			self.epsilon = self.final_epsilon	
+
+	def get_greedy(self):
+		
+		if np.random.random()<self.epsilon:
+			greedy = False
+		else:
+			greedy = True
 
 	def train_RL(self, model=None):
 		
@@ -12361,8 +12431,15 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			print("#######################################################")
 
 			print("Running Rollout.")
+			
 			# self.rollout(visualize=self.args.render)
-			self.rollout()
+
+			# Epsilon greedy. 
+			self.set_epsilon(epoch)
+			# Get greedy or not. 
+			greedy = self.get_greedy()
+			
+			self.rollout(greedy=greedy)
 			
 			##########################################
 			# 8) Save, update, and log. 
@@ -12447,8 +12524,8 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		for k in range(self.eval_episodes):
 					
 			# 1) Get a z trajectory from a rollout.
-			viz = ((k==0) and self.args.viz_latent_rollout)
-			orig_ep_return, _, image_list = self.rollout(visualize=viz)
+			viz = (self.args.viz_latent_rollout)
+			orig_ep_return, _, image_list = self.rollout(visualize=viz, greedy=True)
 
 			# Whether we are visualizing this trajectory. 
 			if viz:
@@ -12456,7 +12533,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 				if not(os.path.isdir(path)):
 					os.mkdir(path)
 
-				imageio.mimsave(os.path.join(path,"Trained_Rollout.gif"), image_list)
+				imageio.mimsave(os.path.join(path,"Traj{0}_Source_Rollout.gif".format(k)), image_list)
 
 			self.orig_ep_returns.append(orig_ep_return)
 		
@@ -12473,6 +12550,8 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		self.setup_ppo(source_or_target='target')
 		self.setup_ppo_training_ops()
 		
+		# print("Embed before translated rollouts")
+		# embed()
 
 		#################################################
 		# Now translate and evaluate all of the trajectories in the z trajectory set.
@@ -12487,18 +12566,18 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			# Torch. 
 			torch_orig_z_trajectory = torch.tensor(orig_z_trajectory).to(device).float()			
 			# Translate.			
-			translated_z_trajectory = self.backward_translation_model(torch_orig_z_trajectory).detach().cpu().numpy()
+			translated_z_trajectory = self.backward_translation_model(torch_orig_z_trajectory, greedy=True).detach().cpu().numpy()
 
 			# 6) Evaluate the original and translated z trajectory in the target domain.
-			viz = ((k==0) and self.args.viz_latent_rollout)
-			source_z_ep_ret, _, source_z_traj_image_list = self.rollout(z_trajectory=orig_z_trajectory, evaluate=True, visualize=viz)
+			viz = self.args.viz_latent_rollout
+			source_z_ep_ret, _, source_z_traj_image_list = self.rollout(z_trajectory=orig_z_trajectory, evaluate=True, visualize=viz, greedy=True)
 
-			translated_ep_ret, _, translated_image_list = self.rollout(z_trajectory=translated_z_trajectory, evaluate=True, visualize=viz)
+			translated_ep_ret, _, translated_image_list = self.rollout(z_trajectory=translated_z_trajectory, evaluate=True, visualize=viz, greedy=True)
 
 			# IF we are visualizing..
 			if viz:
-				imageio.mimsave(os.path.join(path,"Target_Rollout_source_zs.gif"), source_z_traj_image_list)
-				imageio.mimsave(os.path.join(path,"Target_Rollout_translated_zs.gif"), translated_image_list)
+				imageio.mimsave(os.path.join(path,"Traj{0}_Target_Rollout_source_zs.gif".format(k)), source_z_traj_image_list)
+				imageio.mimsave(os.path.join(path,"Traj{0}_Target_Rollout_translated_zs.gif".format(k)), translated_image_list)
 
 			print("Episode: ",k," Original Return: %3.2f"%self.orig_ep_returns[k], " Source Z Return: %3.2f"%source_z_ep_ret, " Translated Z Return: %3.2f"%translated_ep_ret)
 			
@@ -12522,6 +12601,10 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 		# Setup training either way. 
 		self.setup_train()
+
+		if self.args.debug_RL:
+			print("Embedding in evaluate function.")
+			embed()
 
 		# Evaluate alignment over x episodes. 
 		self.evaluate_alignment()
