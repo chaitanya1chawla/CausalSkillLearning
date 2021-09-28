@@ -414,6 +414,9 @@ def parse_arguments():
 	parser.add_argument('--rl_policy_learning_rate', dest='rl_policy_learning_rate', type=float, default=3e-4, help='Learning rate for RL Policy.')
 	parser.add_argument('--rl_critic_learning_rate', dest='rl_critic_learning_rate', type=float, default=1e-3, help='Learning rate for RL Critic.')
 	parser.add_argument('--target_KL',dest='target_KL',type=float,default=0.01,help='Target KL value.')
+	parser.add_argument('--finetune_method',dest='finetune_method',type=str,default=None,,choices=[None,'AdaptZ','FullRL','EE'],help='What type of finetuning auxilliary reward to use.')
+	parser.add_argument('--auxilliary_reward_weight',dest='auxilliary_reward_weight',type=float,default=0.,help='Weight associated with the auxilliary reward weight.')
+	parser.add_arguments('--finetune_epochs',dest='finetune_epochs',type=int,default=10,help='NUmber of episodes / epochs to finetune RL for.')
 
 	return parser.parse_args()
 

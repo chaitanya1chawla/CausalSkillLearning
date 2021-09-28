@@ -12101,7 +12101,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 					 DeltaLossPi=(loss_pi.item() - pi_l_old),
 					 DeltaLossV=(loss_v.item() - v_l_old))
 
-	def rollout(self, evaluate=False, visualize=False, z_trajectory=None, greedy=False):
+	def rollout(self, evaluate=False, visualize=False, z_trajectory=None, greedy=False, finetune=False):
 
 		#######################################################
 		# Implementing a rollout fucnction. 
@@ -12116,21 +12116,22 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		#       # 7) Increment counters, reset states, log cummulative rewards, etc. 
 		#   # 8) Reset episode if necessary.           
 	
-		##########################################
+		#######################################################
 		# 1) Initialize / reset. (State is actually already reset here.)
-		##########################################
-    
-		t = 0 
-		# reset hidden state for incremental policy forward.
-		hidden = None
-		terminal = False
-		o, ep_ret, ep_len = self.gym_env.reset(), 0, 0			
-		self.image_list = []
+		#######################################################
 
-		if self.source_or_target=='source':
-			environment = self.args.environment
-		else:
-			environment = self.args.target_environment
+		if True:	
+			t = 0 
+			# reset hidden state for incremental policy forward.
+			hidden = None
+			terminal = False
+			o, ep_ret, ep_len = self.gym_env.reset(), 0, 0			
+			self.image_list = []
+
+			if self.source_or_target=='source':
+				environment = self.args.environment
+			else:
+				environment = self.args.target_environment
 
 		##########################################
 		# 2) While we haven't exceeded timelimit and are still non-terminal:
@@ -12139,35 +12140,30 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		while t<self.local_steps_per_epoch and not(terminal) and t<self.eval_time_limit:
 			
 			##########################################
-			# 3) Sample z from z policy. 
-			##########################################                
+			# Set Z action
+			##########################################			
 
-			# Now no longer need a hierarchical actor critic? 
-			# Probably can implement as usual - just assemble appropriate inputs and query high level policy. 
-			# And then query low level policy....? Hmmmmmm, how does update work? 
-			# Probably need to feed high-level policy log probabilities to PPO to get it to work. 
+			if True:
+				if finetune:
+					if self.args.finetune_method=='FullRL':
+						# Samle action from the high level policy. 
+						z_action, v, z_logp = self.actor_critic.step(torch.as_tensor(o, dtype=torch.float32), greedy=greedy)
+						# Also get the right timestep z from the translated z trajectory.
+						translated_z_action = z_trajectory[t//self.artificial_downsample_factor]
+					elif self.args.finetune_method=='AdaptZ':
+						# How do we set z's here? 
+						# How do we set policy here? 
+						pass
+						# One way to set z's here is create a generative model that repeats z's, and feed in these variables as the parameters to the opitmizer, 
+						# So that if any one of them are updated all of the repeated z's are updated identically. 
+						# The other option is to treat the .. "ADAPTATION" as either a network or an additive modification to the z trajectory
+						# Then we need little change to the code? 
 
-			# Revert to regular forward of Z AC (not receiving tuples).
-			# action_tuple, v, logp_tuple = ac.step(torch.as_tensor(o, dtype=torch.float32))
-			
-			# z_action, v, z_logp = self.actor_critic.step(torch.as_tensor(o, dtype=torch.float32))
-			
-			# # FOR NOW
-			# zset = np.load("/home/tshankar/Research/Code/Z_Set.npy")
-			# if t<len(zset):
-
-			# if self.args.evaluate_translated_zs:
-			if z_trajectory is not None:
-				# z_action = self.translated_zs[t//self.downsample_freq]
-
-				# Remember, this time no need to downsample, because they're aligned temporally for now...
-				# Well... the inner loop executes the z for the right number of timesteps...
-				# So just indexing with t is good..
-								
-				z_action, v, logp = z_trajectory[t//self.artificial_downsample_factor], 1., 1.
-				
-			else:
-				z_action, v, z_logp = self.actor_critic.step(torch.as_tensor(o, dtype=torch.float32), greedy=greedy)
+				else:
+					if z_trajectory is not None:	
+						z_action, v, logp = z_trajectory[t//self.artificial_downsample_factor], 1., 1.					
+					else:
+						z_action, v, z_logp = self.actor_critic.step(torch.as_tensor(o, dtype=torch.float32), greedy=greedy)
 
 			# First reset skill timer. 
 			t_skill = 0
@@ -12182,94 +12178,104 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 				# 5) Sample low-level action a from low-level policy. 
 				##########################################
 
+				##########################################
+				# 5a) Get joint state from observation.				
+				##########################################
+				
 				# 5a) Get joint state from observation.				
 				obs_spec = self.gym_env.observation_spec()
 				max_gripper_state = 0.042
+
+				if True:
+					if float(robosuite.__version__[:3])>1.:
+						pure_joint_state = self.gym_env.sim.get_state()[1][:7]						
+						
+						# if self.args.environment=='Wipe':
+						if environment=='Wipe':
+							# here, no gripper, so set dummy joint pos
+							gripper_state = np.array([max_gripper_state/2])
+						else:
+
+							# if args.env_name[:3] == 'Bax':
+
+							# 	# Assembel gripper state from both left and right gripper states. 
+							# 	left_gripper_state = np.array([obs_spec['left_gripper_qpos'][0]-obs_spec['left_gripper_qpos'][1]])
+							# 	right_gripper_state = np.array([obs_spec['right_gripper_qpos'][0]-obs_spec['right_gripper_qpos'][1]])
+							# 	gripper_state = np.concatenate([right_gripper_state, left_gripper_state])
+
+							# else:
+							# 	gripper_state = np.array([obs_spec['robot0_gripper_qpos'][0]-obs_spec['robot0_gripper_qpos'][1]])
+							gripper_state = np.array([obs_spec['robot0_gripper_qpos'][0]-obs_spec['robot0_gripper_qpos'][1]])
+					else:
+										
+						# if self.args.environment[:3] =='Bax':
+						if environment[:3] =='Bax':
+
+							# Assembel gripper state from both left and right gripper states. 
+							left_gripper_state = np.array([obs_spec['left_gripper_qpos'][0]-obs_spec['left_gripper_qpos'][1]])
+							right_gripper_state = np.array([obs_spec['right_gripper_qpos'][0]-obs_spec['right_gripper_qpos'][1]])
+							gripper_state = np.concatenate([right_gripper_state, left_gripper_state])
+
+							# Assemble joint states by flipping left and right hands. 
+							pure_joint_state = np.zeros(14)
+
+							# State from environment comes in as... RIGHT, LEFT. 
+							# Policy was trained on... LEFT RIGHT. 
+							pure_joint_state[:7] = obs_spec['joint_pos'][7:14]
+							pure_joint_state[7:14] = obs_spec['joint_pos'][:7]
+
+						else:
+							pure_joint_state = obs_spec['joint_pos']
+							gripper_state = np.array([obs_spec['gripper_qpos'][0]-obs_spec['gripper_qpos'][1]])
 				
-				if float(robosuite.__version__[:3])>1.:
-					pure_joint_state = self.gym_env.sim.get_state()[1][:7]						
+				if True:
+					# Norm gripper state from 0 to 1
+					gripper_state = gripper_state/max_gripper_state
+					# Norm gripper state from -1 to 1. 
+					gripper_state = 2*gripper_state-1
+					joint_state = np.concatenate([pure_joint_state, gripper_state])
 					
-					# if self.args.environment=='Wipe':
-					if environment=='Wipe':
-						# here, no gripper, so set dummy joint pos
-						gripper_state = np.array([max_gripper_state/2])
-					else:
+					# Normalize joint state according to joint limits (minmax normaization).
+					normalized_joint_state = (joint_state - self.lower_joint_limits)/self.joint_limit_range
 
-						# if args.env_name[:3] == 'Bax':
-
-						# 	# Assembel gripper state from both left and right gripper states. 
-						# 	left_gripper_state = np.array([obs_spec['left_gripper_qpos'][0]-obs_spec['left_gripper_qpos'][1]])
-						# 	right_gripper_state = np.array([obs_spec['right_gripper_qpos'][0]-obs_spec['right_gripper_qpos'][1]])
-						# 	gripper_state = np.concatenate([right_gripper_state, left_gripper_state])
-
-						# else:
-						# 	gripper_state = np.array([obs_spec['robot0_gripper_qpos'][0]-obs_spec['robot0_gripper_qpos'][1]])
-						gripper_state = np.array([obs_spec['robot0_gripper_qpos'][0]-obs_spec['robot0_gripper_qpos'][1]])
-				else:
-									
-					# if self.args.environment[:3] =='Bax':
-					if environment[:3] =='Bax':
-
-						# Assembel gripper state from both left and right gripper states. 
-						left_gripper_state = np.array([obs_spec['left_gripper_qpos'][0]-obs_spec['left_gripper_qpos'][1]])
-						right_gripper_state = np.array([obs_spec['right_gripper_qpos'][0]-obs_spec['right_gripper_qpos'][1]])
-						gripper_state = np.concatenate([right_gripper_state, left_gripper_state])
-
-						# Assemble joint states by flipping left and right hands. 
-						pure_joint_state = np.zeros(14)
-
-						# State from environment comes in as... RIGHT, LEFT. 
-						# Policy was trained on... LEFT RIGHT. 
-						pure_joint_state[:7] = obs_spec['joint_pos'][7:14]
-						pure_joint_state[7:14] = obs_spec['joint_pos'][:7]
-
-					else:
-						pure_joint_state = obs_spec['joint_pos']
-						gripper_state = np.array([obs_spec['gripper_qpos'][0]-obs_spec['gripper_qpos'][1]])
-				
-				# Norm gripper state from 0 to 1
-				gripper_state = gripper_state/max_gripper_state
-				# Norm gripper state from -1 to 1. 
-				gripper_state = 2*gripper_state-1
-				joint_state = np.concatenate([pure_joint_state, gripper_state])
-				
-				# Normalize joint state according to joint limits (minmax normaization).
-				normalized_joint_state = (joint_state - self.lower_joint_limits)/self.joint_limit_range
-
+				##########################################
 				# 5b) Assemble input. 
-				if t==0:
-					low_level_action_numpy = np.zeros_like(normalized_joint_state)                    
-				assembled_states = np.concatenate([normalized_joint_state,low_level_action_numpy])
-				assembled_input = np.concatenate([assembled_states, z_action])
-				
-				torch_assembled_input = torch.tensor(assembled_input).to(device).float().view(-1,1,self.state_input_size+self.latent_z_dimension)
-				# torch_assembled_input = torch.tensor(assembled_input).to(device).float().view(-1,1,self.lowlevel_policy.input_size+self.latent_z_dimension)
+				##########################################
 
-				# 5c) Now actually retrieve action.
-				low_level_action, hidden = self.lowlevel_policy.incremental_reparam_get_actions(torch_assembled_input, greedy=True, hidden=hidden)
-				low_level_action_numpy = low_level_action.detach().squeeze().squeeze().cpu().numpy()
-
-				# 5d) Unnormalize 
-				# unnormalized_low_level_action_numpy = *joint_limit_range 
-				# UNNORMALIZING ACTIONS! WE'VE NEVER ..DONE THIS BEFORE? 
-				# JUST SCALE UP FOR NOW
-				unnormalized_low_level_action_numpy = self.args.action_scale_factor * low_level_action_numpy
-				# 5d) Normalize action for benefit of environment. 
-				# Output of policy is minmax normalized, which is 0-1 range. 
-				# Change to -1 to 1 range. 
-
-				# if self.args.environment[:3]=='Bax':
-				if environment[:3]=='Bax':
-				
-					# If we're in a baxter environmnet, flip the left and right hand actions.
-					normalized_low_level_action = np.zeros(16)
-					normalized_low_level_action[:7] = unnormalized_low_level_action_numpy[7:14]
-					normalized_low_level_action[7:14] = unnormalized_low_level_action_numpy[:7]
-					# Flip gripper states too..
+				if True:
+					if t==0:
+						low_level_action_numpy = np.zeros_like(normalized_joint_state)                    					
+					assembled_states = np.concatenate([normalized_joint_state,low_level_action_numpy])
+					assembled_input = np.concatenate([assembled_states, z_action])
 					
-					normalized_low_level_action[14:] = unnormalized_low_level_action_numpy[14:][::-1]
-				else:					
-					normalized_low_level_action = unnormalized_low_level_action_numpy
+					torch_assembled_input = torch.tensor(assembled_input).to(device).float().view(-1,1,self.state_input_size+self.latent_z_dimension)
+					# torch_assembled_input = torch.tensor(assembled_input).to(device).float().view(-1,1,self.lowlevel_policy.input_size+self.latent_z_dimension)
+
+					# 5c) Now actually retrieve action.
+					low_level_action, hidden = self.lowlevel_policy.incremental_reparam_get_actions(torch_assembled_input, greedy=True, hidden=hidden)
+					low_level_action_numpy = low_level_action.detach().squeeze().squeeze().cpu().numpy()
+
+					# 5d) Unnormalize 
+					# unnormalized_low_level_action_numpy = *joint_limit_range 
+					# UNNORMALIZING ACTIONS! WE'VE NEVER ..DONE THIS BEFORE? 
+					# JUST SCALE UP FOR NOW
+					unnormalized_low_level_action_numpy = self.args.action_scale_factor * low_level_action_numpy
+					# 5d) Normalize action for benefit of environment. 
+					# Output of policy is minmax normalized, which is 0-1 range. 
+					# Change to -1 to 1 range. 
+
+					# if self.args.environment[:3]=='Bax':
+					if environment[:3]=='Bax':
+					
+						# If we're in a baxter environmnet, flip the left and right hand actions.
+						normalized_low_level_action = np.zeros(16)
+						normalized_low_level_action[:7] = unnormalized_low_level_action_numpy[7:14]
+						normalized_low_level_action[7:14] = unnormalized_low_level_action_numpy[:7]
+						# Flip gripper states too..
+						
+						normalized_low_level_action[14:] = unnormalized_low_level_action_numpy[14:][::-1]
+					else:					
+						normalized_low_level_action = unnormalized_low_level_action_numpy
 
 				##########################################
 				# 6) Step in environment. 
@@ -12280,7 +12286,17 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 					next_o, r, d, _ = self.gym_env.step(normalized_low_level_action[:-1])
 				else:
 					next_o, r, d, _ = self.gym_env.step(normalized_low_level_action)
-								
+
+				##########################################
+				# 6b) If needed, add auxilliary rewards. 
+				##########################################	
+				
+				if self.args.finetune_method is not None: 
+					if self.args.finetune_method in ['AdaptZ','FullRL']:
+						auxilliary_reward = np.linalg.norm((translated_z_action - z_action).detach().cpu().numpy())
+
+					r = r + self.args.auxilliary_reward_weight*auxilliary_reward
+
 				# Logging images				
 				if (visualize) and t%10==0:					
 
@@ -12296,7 +12312,6 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 				ep_ret += r
 				ep_len += 1
 				ep_ret_copy, ep_len_copy = copy.deepcopy(ep_ret), copy.deepcopy(ep_len)
-
 
 				# save and log
 				# CHANGED: Saving the action tuple in the buffer instead of just the action..
@@ -12321,10 +12336,6 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 				if terminal or epoch_ended or t>=self.eval_time_limit:
 
-					# if self.args.evaluate_translated_zs:
-					# 	print("Embed at end of epoch")
-					# 	embed()						
-					
 					if epoch_ended and not(terminal):
 						print('Warning: trajectory cut off by epoch at %d steps.'%ep_len, flush=True)
 					# if trajectory didn't reach terminal state, bootstrap value target
@@ -12411,12 +12422,11 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		else:
 			greedy = True
 
-	def train_RL(self, model=None):
+	def train_RL(self, model=None, finetune_mode=False, z_trajectory=None):
 		
 		#######################################################
 		# Actual train loop block.
 		#######################################################
-
 
 		start_time = time.time()
 
@@ -12424,7 +12434,12 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		print("Starting to run training.")
 		print("#######################################################")
 
-		for epoch in range(self.args.epochs):		
+		if finetune_mode:
+			number_epochs = self.args.finetune_epochs
+		else:
+			number_epochs = self.args.epochs
+
+		for epoch in range(number_epochs):		
 
 			# Rollout. 			
 			print("#######################################################")
@@ -12440,14 +12455,15 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			# Get greedy or not. 
 			greedy = self.get_greedy()
 			
-			self.rollout(greedy=greedy)
+			# Now rollout.
+			self.rollout(greedy=greedy, z_trajectory=z_trajectory, finetune=finetine_mode)			
 			
 			##########################################
 			# 8) Save, update, and log. 
 			##########################################
 
-			# Save model        
-			if (epoch % self.args.save_freq == 0) or (epoch == self.args.epochs-1):
+			# Save model
+			if (epoch % self.args.save_freq == 0) or (epoch == number_epochs-1):
 				self.ppo_logger.save_state({'env': self.gym_env}, None)
 			
 			if (epoch%self.args.eval_freq==0) and (epoch>0):
@@ -12520,7 +12536,9 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		print("#################################################")
 
 		self.z_trajectory_set = []
+		self.translated_z_trajectory_set = []
 		self.orig_ep_returns = []
+		self.translated_z_ep_returns = []
 		self.eval_episodes = 10
 		for k in range(self.eval_episodes):
 					
@@ -12568,12 +12586,15 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			torch_orig_z_trajectory = torch.tensor(orig_z_trajectory).to(device).float()			
 			# Translate.			
 			translated_z_trajectory = self.backward_translation_model(torch_orig_z_trajectory, greedy=True).detach().cpu().numpy()
+			# Add to list. 
+			self.translated_z_trajectory_set.append(translated_z_trajectory)
 
 			# 6) Evaluate the original and translated z trajectory in the target domain.
 			viz = self.args.viz_latent_rollout
 			source_z_ep_ret, _, source_z_traj_image_list = self.rollout(z_trajectory=orig_z_trajectory, evaluate=True, visualize=viz, greedy=True)
 
 			translated_ep_ret, _, translated_image_list = self.rollout(z_trajectory=translated_z_trajectory, evaluate=True, visualize=viz, greedy=True)
+			self.translated_z_ep_returns.append(translated_ep_ret)
 
 			# IF we are visualizing..
 			if viz:
@@ -12581,7 +12602,41 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 				imageio.mimsave(os.path.join(path,"Traj{0}_Target_Rollout_translated_zs.gif".format(k)), translated_image_list)
 
 			print("Episode: ",k," Original Return: %3.2f"%self.orig_ep_returns[k], " Source Z Return: %3.2f"%source_z_ep_ret, " Translated Z Return: %3.2f"%translated_ep_ret)
+
+	def finetune_target_RL(self):
+
+		# Fine-tune for each trajectory in trajectory set... 
+		for k in range(self.eval_episodes):
 			
+			# Are we training a target policy? 
+			# Or adapting Z's? 
+
+			######################################
+			# 1) Recreate training ops. 
+			######################################
+
+			# Depending on whether we are training a target policy or adapting z's, create training ops appropraitely. 
+			# Resetting policy, and then recreating training ops, so that finetuning on one z traj isn't affected by the others. 
+			
+			if self.args.finetune_method == 'AdaptZ':
+				pass
+			if self.args.finetune_method == 'FullRL':
+				
+				# First recreate policy and value function by recreating the actor critic.
+				self.actor_critic = self.ActorCritic(self.gym_env.observation_space, action_space, **dict(hidden_sizes=(64,)))
+
+				# Next, recreate training ops. # Resets optimizers.
+				self.setup_ppo_training_ops()
+
+			######################################
+			# 2) Actually run finetuning. 
+			######################################
+
+			self.train_RL(finetune_mode=True, z_trajectory=self.translated_z_trajectory_set[k])
+						
+
+		pass
+		
 	def train(self, model=None):
 
 		# Setup training either way. 
@@ -12589,10 +12644,13 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 		# Actually train RL.
 		self.train_RL(model=model)
-
-		# Evaluate alignment over x episodes. 
-		self.evaluate_alignment()
 		
+		# Evaluate alignment over x episodes. 		
+		self.evaluate_alignment()
+
+		# Actually train alignment. 
+		self.finetune_target_RL()
+
 	# Here's how we're going to get prior from same tasks... 
 	# Get high performing z traj from high level policy on source domain.. 
 	# Translate
