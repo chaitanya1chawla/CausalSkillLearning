@@ -89,6 +89,7 @@ class OrigRoboMimic_Dataset(Dataset):
 	
 	def __getitem__(self, index):
 
+
 		# if index>=self.total_length:
 		# 	print("Out of bounds of dataset.")
 		# 	return None
