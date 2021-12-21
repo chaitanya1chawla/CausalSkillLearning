@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 from headers import *
-import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, RoboMimic_DataLoader
+import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders
 from PolicyManagers import *
 import TestClass
 
@@ -42,7 +42,7 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	elif args.data=='Mocap':
 		dataset = Mocap_DataLoader.Mocap_Dataset(args)
 	elif args.data=='OrigRoboMimic':
-		dataset = RoboMimic_DataLoader.OrigRoboMimic_Dataset(args)
+		dataset = Robomimic_DataLoaders.OrigRobomimic_Dataset(args)
 
 	# print("Embedding in return dataset to optimize dataset..")
 	# embed()
