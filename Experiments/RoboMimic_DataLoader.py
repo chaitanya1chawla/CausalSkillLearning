@@ -87,7 +87,7 @@ class OrigRoboMimic_Dataset(Dataset):
 		for i in range(len(self.task_list)):
 			# Changing file name.
 			# self.files.append(h5py.File("{0}/{1}/demo.hdf5".format(self.dataset_directory,self.task_list[i]),'r'))
-			self.files.append(h5py.File("{0}/ph/{1}/low_dim.hdf5".format(self.dataset_directory,self.task_list[i]),'r'))
+			self.files.append(h5py.File("{0}/{1}/ph/low_dim.hdf5".format(self.dataset_directory,self.task_list[i]),'r'))
 
 	def __len__(self):
 		return self.total_length
