@@ -198,6 +198,7 @@ class Robomimic_Dataset(Dataset):
 			# For every element in the filelist of the element,
 			for i in range(1,self.num_demos[task_index]+1):
 
+
 				print("Preprocessing task index: ", task_index, " Demo Index: ", i, " of: ", self.num_demos[task_index])
 			
 				# Create list of datapoints for this demonstrations. 
