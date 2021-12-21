@@ -15,7 +15,7 @@ def resample(original_trajectory, desired_number_timepoints):
 	new_timepoints = np.linspace(0, original_traj_len-1, desired_number_timepoints, dtype=int)
 	return original_trajectory[new_timepoints]
 
-class Robomimic_Dataset(Dataset):
+class OrigRoboMimic_Dataset(Dataset):
 
 	# LINK TO DATASET and INFO: https://arise-initiative.github.io/robomimic-web/docs/introduction/results.html#downloading-released-datasets
 
