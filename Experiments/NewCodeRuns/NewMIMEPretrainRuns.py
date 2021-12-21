@@ -293,3 +293,12 @@ python Master.py --train=1 --setting=pretrain_sub --name=MP_try --data=MIME --nu
 
 # 
 python Master.py --train=1 --setting=pretrain_sub --name=MP_try --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --normalization=minmax --seed=2 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --datadir=/home/tanmay/Research/Code/Data/Datasets/MIME/ --epochs=4000 --save_freq=20
+
+##################################
+# Getting labels for MBP_094_viz2
+python Master.py --train=0 --setting=pretrain_sub --name=MBP_094_viz2 --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --normalization=minmax --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --model=ExpWandbLogs/MBP_094/saved_models/Model_epoch500
+
+# 
+python Master.py --train=0 --setting=pretrain_sub --name=MBP_094_LeftLabels --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --normalization=minmax --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --model=ExpWandbLogs/MBP_094/saved_models/Model_epoch500 --single_hand=left
+
+python Master.py --train=0 --setting=pretrain_sub --name=MBP_094_RightLabels --data=MIME --number_layers=4 --hidden_size=48 --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --batch_size=32 --eval_freq=500 --normalization=minmax --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000 --action_scale_factor=1 --model=ExpWandbLogs/MBP_094/saved_models/Model_epoch500 --single_hand=right
