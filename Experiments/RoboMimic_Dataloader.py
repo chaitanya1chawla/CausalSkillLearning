@@ -208,7 +208,7 @@ class Robomimic_Dataset(Dataset):
 				robot_state_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/robot0_joint_pos'.format(i)])
 				gripper_state_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/robot0_gripper_qpos'.format(i)])
 				joint_action_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/robot0_joint_vel'.format(i)])
-				gripper_action_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/robot0_gripper_qvel'.format(i)]))
+				gripper_action_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/robot0_gripper_qvel'.format(i)])
 				object_state_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/object'.format(i)]) 
 
 				# Downsample. 
