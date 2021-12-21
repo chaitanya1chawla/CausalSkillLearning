@@ -36,7 +36,7 @@ class OrigRoboMimic_Dataset(Dataset):
 		# self.task_list = ["can","lift","square","tool_hang","transport"]
 
 		# Each task has 200 demos according to RoboMimic.
-		self.num_demos = 200*np.ones((5))
+		self.num_demos = 200*np.ones((5),dtype=int)
 		self.cummulative_num_demos = self.num_demos.cumsum()
 		self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
 		
@@ -55,11 +55,6 @@ class OrigRoboMimic_Dataset(Dataset):
 		# Seems to follow joint angles order:
 		# ('time','right_j0', 'head_pan', 'right_j1', 'right_j2', 'right_j3', 'right_j4', 'right_j5', 'right_j6', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'Milk0', 'Bread0', 'Cereal0', 'Can0').
 		# Extract these into... 
-
-		########################
-		# TO CHANGE! 
-		# TO CHANGE! 
-		########################
 
 		self.joint_angle_indices = [1,3,4,5,6,7,8]
 		self.gripper_indices = [9,10]	
@@ -196,8 +191,8 @@ class OrigRoboMimic_Dataset(Dataset):
 			task_demo_list = []
 
 			# For every element in the filelist of the element,
-			for i in range(1,self.num_demos[task_index]+1):
-
+			# for i in range(1,self.num_demos[task_index]+1):
+			for i in range(self.num_demos[task_index]):
 
 				print("Preprocessing task index: ", task_index, " Demo Index: ", i, " of: ", self.num_demos[task_index])
 			
