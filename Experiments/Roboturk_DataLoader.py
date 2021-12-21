@@ -29,8 +29,7 @@ class Roboturk_Dataset(Dataset):
 			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
 			self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/Roboturk/'
 		else:
-			self.dataset_directory = self.args.datadir	
-		
+			self.dataset_directory = self.args.datadir			
 		
 		# Require a task list. 
 
@@ -168,6 +167,7 @@ class Roboturk_Dataset(Dataset):
 			obs = self.env._get_observation()
 			robot_state_size = obs['robot-state'].shape[0]
 			object_state_size = obs['object-state'].shape[0]	
+
 
 			# Create list of files for this task. 
 			task_demo_list = []

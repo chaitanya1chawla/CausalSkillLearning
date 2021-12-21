@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 from headers import *
-import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader
+import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, RoboMimic_DataLoader
 from PolicyManagers import *
 import TestClass
 
@@ -40,6 +40,8 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = Roboturk_DataLoader.Roboturk_FullDataset(args)
 	elif args.data=='Mocap':
 		dataset = Mocap_DataLoader.Mocap_Dataset(args)
+	elif args.data=='OrigRoboMimic':
+		dataset = RoboMimic_DataLoader.OrigRoboMimic_Dataset(args)
 
 	# print("Embedding in return dataset to optimize dataset..")
 	# embed()
@@ -52,8 +54,11 @@ class Master():
 		self.args = arguments 
 
 		if self.args.setting not in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
+			print("Creating Datasets")			
 			self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)
-
+			print("Embed after creating dataset.")
+			embed()
+			
 		# Now define policy manager.
 		if self.args.setting=='learntsub' or self.args.setting=='joint':
 			# self.policy_manager = PolicyManager_BatchJoint(self.args.number_policies, self.dataset, self.args)
