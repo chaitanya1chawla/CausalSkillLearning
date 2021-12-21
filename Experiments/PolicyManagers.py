@@ -480,11 +480,18 @@ class PolicyManager_BaseClass():
 		# Save the embeddings in HTML files.
 		#####################################################
 
+		# print("#################################################")
+		# print("Embedding in Visualize robot data in Pretrain PM")
+		# print("#################################################")
+		# embed()
+
 		gt_animation_object = self.visualize_robot_embedding(embedded_z, gt=True)
 		rollout_animation_object = self.visualize_robot_embedding(embedded_z, gt=False)
 
 		self.write_embedding_HTML(gt_animation_object,prefix="GT")
 		self.write_embedding_HTML(rollout_animation_object,prefix="Rollout")
+
+
 
 		# Save webpage. 
 		self.write_results_HTML()
@@ -1186,6 +1193,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 	def load_all_models(self, path, only_policy=False, just_subpolicy=False):
 		load_object = torch.load(path)
+
 		if self.args.train_only_policy and self.args.train: 		
 			self.encoder_network.load_state_dict(load_object['Encoder_Network'])
 		else:
@@ -3393,6 +3401,11 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# Use the dataset to get reasonable trajectories (because without the information bottleneck / KL between N(0,1), cannot just randomly sample.)
 		for i in range(self.N//self.args.batch_size+1):
+
+			print("####################################")
+			print("Embedding in getting Z set")
+			print("####################################")
+			embed()
 
 			# (1) Encoder trajectory. 
 			with torch.no_grad():
@@ -7298,6 +7311,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# # Run target policy manager evaluate. 
 		# self.target_manager.evaluate(suffix="Target")
 
+		# Evaluate semantic labels.
+		self.evaluate_semantic_accuracy()
+
 		# Evaluate metrics. 
 		self.evaluate_correspondence_metrics()
 
@@ -7872,6 +7888,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		print("About to run train function.")
 		super().train(model=model)
 
+	def evaluate_semantic_accuracy(self):
+		pass
 class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 
 	# Inherit from transfer. 
@@ -10773,7 +10791,6 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		# self.forward_translation_model.load_state_dict(self.load_object['forward_translation_model'])
 		self.backward_translation_model.load_state_dict(self.load_object['backward_translation_model'])
 
-	# @gpu_profile_every(1)
 	def update_networks(self, domain, policy_manager, update_dictionary):		
 
 		#########################################################################
@@ -11092,8 +11109,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 		self.forward_supervised_set_tuple_based_loss = - (update_dictionary['target_sup_z_transformation_weights']*self.unmasked_forward_supervised_set_tuple_based_logprobabilities).sum()/update_dictionary['target_sup_z_transformation_weights'].sum()
 		self.backward_supervised_set_tuple_based_loss = - (update_dictionary['source_sup_z_transformation_weights']*self.unmasked_backward_supervised_set_tuple_based_logprobabilities).sum()/update_dictionary['source_sup_z_transformation_weights'].sum()
-
-	# @gpu_profile_every(1)	
+	
 	def run_iteration(self, counter, i, domain=None, skip_viz=False):
 
 		# Overall algorithm.
@@ -11248,6 +11264,83 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 			# print("Embed in RUn ITer")
 			# embed()
+
+	def evaluate_semantic_accuracy(self):
+
+		# Get appropriate set of labels. 
+		# Build KDTree for efficient nearest neighbor queries? 
+
+		# 1) Get source labels.
+		if self.args.source_domain=='MIME':
+			if self.args.source_single_hand=='left':
+				self.source_domain_z_set = np.load("Labelled_Zs/MIME_Left_MBP_094_me500_zs.npy")
+				self.source_domain_z_inverse_labels = np.load("Labelled_Zs/MIME_Left_MBP_094_me500_labels_and_z_indices.npy", allow_pickle=True)
+				self.source_domain_labelled_z_indices = np.load("Labelled_Zs/MIME_Left_MBP_094_me500_labelled_z_indices.npy")				
+				self.source_domain_z_labels = np.load("Labelled_Zs/MIME_Left_MBP_094_me500_labels.npy", allow_pickle=True)
+			elif self.args.source_single_hand=='right':
+				self.source_domain_z_set = np.load("Labelled_Zs/MIME_Right_MBP_094_me500_zs.npy")
+				self.source_domain_z_inverse_labels = np.load("Labelled_Zs/MIME_Right_MBP_094_me500_labels_and_z_indices.npy", allow_pickle=True)
+				self.source_domain_labelled_z_indices = np.load("Labelled_Zs/MIME_Right_MBP_094_me500_labelled_z_indices.npy")
+				self.source_domain_z_labels = np.load("Labelled_Zs/MIME_Right_MBP_094_me500_labels.npy", allow_pickle=True)
+		elif self.args.source_domain=='Roboturk':			
+			self.source_domain_z_set = np.load("Labelled_Zs/Roboturk_RTP_001_me500_zs.npy")
+			self.source_domain_z_inverse_labels = np.load("Labelled_Zs/Roboturk_RTP_001_me500_labels_and_z_indices.npy", allow_pickle=True)
+			self.source_domain_labelled_z_indices = np.load("Labelled_Zs/Roboturk_RTP_001_me500_labelled_z_indices.npy")
+			self.source_domain_z_labels = np.load("Labelled_Zs/Roboturk_RTP_001_me500_labels.npy", allow_pickle=True)
+
+		# 2) Get target labels.
+		if self.args.target_domain=='MIME':
+			if self.args.target_single_hand=='left':
+				self.target_domain_z_set = np.load("Labelled_Zs/MIME_Left_MBP_094_me500_zs.npy")
+				self.target_domain_z_inverse_labels = np.load("Labelled_Zs/MIME_Left_MBP_094_me500_labels_and_z_indices.npy", allow_pickle=True)
+				self.target_domain_labelled_z_indices = np.load("Labelled_Zs/MIME_Left_MBP_094_me500_labelled_z_indices.npy")
+				self.target_domain_z_labels = np.load("Labelled_Zs/MIME_Left_MBP_094_me500_labels.npy", allow_pickle=True)
+			elif self.args.target_single_hand=='right':
+				self.target_domain_z_set = np.load("Labelled_Zs/MIME_Right_MBP_094_me500_zs.npy")
+				self.target_domain_z_inverse_labels = np.load("Labelled_Zs/MIME_Right_MBP_094_me500_labels_and_z_indices.npy", allow_pickle=True)
+				self.target_domain_labelled_z_indices = np.load("Labelled_Zs/MIME_Right_MBP_094_me500_labelled_z_indices.npy")
+				self.target_domain_z_labels = np.load("Labelled_Zs/MIME_Right_MBP_094_me500_labels.npy", allow_pickle=True)
+		elif self.args.target_domain=='Roboturk':			
+			self.target_domain_z_set = np.load("Labelled_Zs/Roboturk_RTP_001_me500_zs.npy")
+			self.target_domain_z_inverse_labels = np.load("Labelled_Zs/Roboturk_RTP_001_me500_labels_and_z_indices.npy", allow_pickle=True)
+			self.target_domain_labelled_z_indices = np.load("Labelled_Zs/Roboturk_RTP_001_me500_labelled_z_indices.npy")
+			self.target_domain_z_labels = np.load("Labelled_Zs/Roboturk_RTP_001_me500_labels.npy", allow_pickle=True)			
+	
+		# Some preprocessing. 
+		number_of_labelled_zs = 50
+		# Need to select 50 labelled z's in each domain.
+		print("######################################")
+		print("Embed in semantic label accuracy eval.")
+		print("######################################")
+		embed()
+
+		self.source_domain_labelled_z_indices = self.source_domain_labelled_z_indices.astype(int)
+		self.target_domain_labelled_z_indices = self.target_domain_labelled_z_indices.astype(int)
+
+		self.source_domain_z_set = self.source_domain_z_set[self.source_domain_labelled_z_indices[:number_of_labelled_zs]]
+		self.target_domain_z_set = self.target_domain_z_set[self.target_domain_labelled_z_indices[:number_of_labelled_zs]]	
+
+		# 3) Translate TARGET DOMAIN Z's to source domain, because translation models are trained to translate from target to source.
+		torch_target_zs = torch.tensor(self.target_domain_z_set).to(device).float()		
+		translated_target_to_source_zs = self.backward_translation_model.forward(torch_target_zs).detach().cpu().numpy()
+
+		# 4) Now for 50 labelled z's... check whether the label of the nearest SOURCE Z (to a given translated target z) matches. 
+		# 4a) First construct KDTree.
+		kdtree = KDTree(self.source_domain_z_set)
+
+		# 4b) Now query KDtree for neighbors.
+		distances, nearest_neighbor_indices = kdtree.query(translated_target_to_source_zs)
+
+		# 4c) Nearest neighbor indices indexes into .. self.source_domain_z_set, which is... length 50. 
+		# Use self.source_domain_labelled_z_indices to get indices for the label set.. 
+		original_index_nearest_neighbors = self.source_domain_labelled_z_indices[nearest_neighbor_indices]
+
+		
+
+
+		# make sure same number of labels across domains, otherwise measuring accuracy across different sets...
+
+		
 
 class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 
@@ -12150,6 +12243,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 						z_action, v, z_logp = self.actor_critic.step(torch.as_tensor(o, dtype=torch.float32), greedy=greedy)
 						# Also get the right timestep z from the translated z trajectory.
 						translated_z_action = z_trajectory[t//self.artificial_downsample_factor]
+					
 					elif self.args.finetune_method=='AdaptZ':
 						# How do we set z's here? 
 						# How do we set policy here? 
@@ -12290,11 +12384,12 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 				##########################################
 				# 6b) If needed, add auxilliary rewards. 
 				##########################################	
-				
-				if self.args.finetune_method is not None: 
-					if self.args.finetune_method in ['AdaptZ','FullRL']:
-						auxilliary_reward = np.linalg.norm((translated_z_action - z_action).detach().cpu().numpy())
 
+				if finetune:					
+					if self.args.finetune_method in ['AdaptZ','FullRL']:
+						# auxilliary_reward = np.linalg.norm((translated_z_action - z_action).detach().cpu().numpy())
+						auxilliary_reward = - np.linalg.norm(translated_z_action - z_action)
+					# print("Relative rewards:", r, auxilliary_reward,  r + self.args.auxilliary_reward_weight*auxilliary_reward)
 					r = r + self.args.auxilliary_reward_weight*auxilliary_reward
 
 				# Logging images				
@@ -12302,7 +12397,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 					# if float(robosuite.__version__[:3])>1.:
 						# self.image_list.append(np.flipud(env.sim.render(600,600,camera_name='agentview')))
-					# else:
+					# else:	
 					self.image_list.append(np.flipud(self.gym_env.sim.render(600,600,camera_name='vizview1')))
 
 				##########################################
@@ -12376,7 +12471,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		
 		self.eval_episodes = 100
 
-	def evaluate_policy(self, eval_episodes=10):
+	def evaluate_policy(self, eval_episodes=10, suffix=""):
 
 		# Evaluate policy across #self.eval_episodes number of episodes. 
 		self.ppo_eval_logger = EpochLogger()
@@ -12386,19 +12481,17 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		for k in range(self.eval_episodes):
 			
 			# print("Rollout #",epoch,(epoch==0))
-			ep_ret, ep_len, image_list = self.rollout(evaluate=True, visualize=(k==0), greedy=True)
+			ep_ret, ep_len, image_list = self.rollout(evaluate=True, visualize=True, greedy=True)
 
-			if k==0:
+			logdir = "Logs/{0}".format(self.args.name+"_"+self.args.environment)
 
-				logdir = "Logs/{0}".format(self.args.name+"_"+self.args.environment)
+			path = os.path.join(logdir, "Images")
+			if not(os.path.isdir(path)):
+				os.mkdir(path)
 
-				path = os.path.join(logdir, "Rollout_Gifs")
-				if not(os.path.isdir(path)):
-					os.mkdir(path)
-
-				print("Saving Render!")
-				imageio.mimsave(os.path.join(path,"Rollout.gif"), image_list)
-				print("Finished Saving Render!")
+			print("Saving Render!")
+			imageio.mimsave(os.path.join(path,"Rollout_{0}_Traj{1}.gif".format(suffix,k)), image_list)
+			print("Finished Saving Render!")
 
 			print('Episode %d \t EpRet %.3f \t EpLen %d'%(k, ep_ret, ep_len))
 
@@ -12456,7 +12549,7 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			greedy = self.get_greedy()
 			
 			# Now rollout.
-			self.rollout(greedy=greedy, z_trajectory=z_trajectory, finetune=finetine_mode)			
+			self.rollout(greedy=greedy, z_trajectory=z_trajectory, finetune=finetune_mode)			
 			
 			##########################################
 			# 8) Save, update, and log. 
@@ -12466,7 +12559,12 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 			if (epoch % self.args.save_freq == 0) or (epoch == number_epochs-1):
 				self.ppo_logger.save_state({'env': self.gym_env}, None)
 			
-			if (epoch%self.args.eval_freq==0) and (epoch>0):
+			if finetune_mode:
+				eval_freq = self.args.finetune_eval_freq
+			else:
+				eval_freq = self.args.eval_freq
+
+			if (epoch%eval_freq==0) and (epoch>0):
 
 				print("#######################################################")
 				print("About to evaluate policy over 10 episodes.")
@@ -12507,7 +12605,12 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		print("About to evaluate policy over 10 episodes.")
 		print("#######################################################")
 
-		self.evaluate_policy(eval_episodes=10)
+		if finetune_mode:
+			suffix = "Finetune"
+		else:
+			suffix = ""
+
+		self.evaluate_policy(eval_episodes=10, suffix=suffix)
 
 	def set_environment(self, env):
 
@@ -12605,8 +12708,13 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 	def finetune_target_RL(self):
 
+		print("##########################################")
+		print("Finetuning RL in Target Domain.")
+		print("##########################################")
+
 		# Fine-tune for each trajectory in trajectory set... 
-		for k in range(self.eval_episodes):
+		# for k in range(self.eval_episodes):
+		for k in range(1):
 			
 			# Are we training a target policy? 
 			# Or adapting Z's? 
@@ -12622,6 +12730,9 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 				pass
 			if self.args.finetune_method == 'FullRL':
 				
+				action_space_bound = np.ones(self.latent_z_dimension)*np.inf
+				action_space = Box(-action_space_bound, action_space_bound)
+
 				# First recreate policy and value function by recreating the actor critic.
 				self.actor_critic = self.ActorCritic(self.gym_env.observation_space, action_space, **dict(hidden_sizes=(64,)))
 
@@ -12634,6 +12745,11 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 
 			self.train_RL(finetune_mode=True, z_trajectory=self.translated_z_trajectory_set[k])
 						
+			# ######################################
+			# # 3) Evaluate finetuned policy.
+			# ######################################
+			
+			# self.evaluate_policy(eval_episodes=10)
 
 		pass
 		
@@ -12648,8 +12764,9 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		# Evaluate alignment over x episodes. 		
 		self.evaluate_alignment()
 
-		# Actually train alignment. 
-		self.finetune_target_RL()
+		if self.args.finetune_method is not None:
+			# Actually train alignment. 
+			self.finetune_target_RL()
 
 	# Here's how we're going to get prior from same tasks... 
 	# Get high performing z traj from high level policy on source domain.. 
