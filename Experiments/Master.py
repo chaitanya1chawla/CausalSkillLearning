@@ -43,6 +43,8 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = Mocap_DataLoader.Mocap_Dataset(args)
 	elif args.data=='OrigRoboMimic':
 		dataset = Robomimic_DataLoaders.OrigRobomimic_Dataset(args)
+	elif args.data=='RoboMimic':
+		dataset = Robomimic_DataLoaders.Robomimic_Dataset(args)
 
 	# print("Embedding in return dataset to optimize dataset..")
 	# embed()

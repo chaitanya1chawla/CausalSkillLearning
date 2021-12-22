@@ -15,7 +15,7 @@ def resample(original_trajectory, desired_number_timepoints):
 	new_timepoints = np.linspace(0, original_traj_len-1, desired_number_timepoints, dtype=int)
 	return original_trajectory[new_timepoints]
 
-class OrigRobomimic_Dataset(Dataset):
+class OrigRobomimic_Dataset(Dataset): 
 
 	# LINK TO DATASET and INFO: https://arise-initiative.github.io/robomimic-web/docs/introduction/results.html#downloading-released-datasets
 
@@ -56,9 +56,10 @@ class OrigRobomimic_Dataset(Dataset):
 		# ('time','right_j0', 'head_pan', 'right_j1', 'right_j2', 'right_j3', 'right_j4', 'right_j5', 'right_j6', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'Milk0', 'Bread0', 'Cereal0', 'Can0').
 		# Extract these into... 
 
-		self.joint_angle_indices = [1,3,4,5,6,7,8]
-		self.gripper_indices = [9,10]	
-		self.ds_freq = 20
+		# self.joint_angle_indices = [1,3,4,5,6,7,8]
+		# self.gripper_indices = [9,10]	
+		self.ds_freq = np.array([ 2.4, 2.4, 2.4, 3.5])
+		# self.ds_freq = 20
 
 		########################
 		# TO CHANGE! 
@@ -165,6 +166,11 @@ class OrigRobomimic_Dataset(Dataset):
 		
 	def preprocess_dataset(self):
 
+
+
+		min_lengths = np.ones((4))*1000
+		max_lengths = np.zeros((4))
+
 		for task_index in range(len(self.task_list)):
 
 			print("#######################################")
@@ -189,7 +195,7 @@ class OrigRobomimic_Dataset(Dataset):
 			robot_state_size = self.files[task_index]['data/demo_0/obs/robot0_joint_pos'].shape[1]
 
 			# Create list of files for this task. 
-			task_demo_list = []
+			task_demo_list = []		
 
 			# For every element in the filelist of the element,
 			# for i in range(1,self.num_demos[task_index]+1):
@@ -209,12 +215,21 @@ class OrigRobomimic_Dataset(Dataset):
 				object_state_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/object'.format(i)]) 
 
 				# Downsample. 
-				flattened_state_sequence = resample(flattened_state_sequence, flattened_state_sequence.shape[0]//self.ds_freq)
-				robot_state_sequence = resample(robot_state_sequence, robot_state_sequence.shape[0]//self.ds_freq)
-				gripper_state_sequence = resample(gripper_state_sequence, gripper_state_sequence.shape[0]//self.ds_freq)
-				object_state_sequence = resample(object_state_sequence, object_state_sequence.shape[0]//self.ds_freq)
-				joint_action_sequence = resample(joint_action_sequence, joint_action_sequence.shape[0]//self.ds_freq)
-				gripper_action_sequence = resample(gripper_action_sequence, gripper_action_sequence.shape[0]//self.ds_freq)
+				number_timesteps = flattened_state_sequence.shape[0]
+				if number_timesteps<min_lengths[task_index]:
+					min_lengths[task_index] = number_timesteps
+				if number_timesteps>max_lengths[task_index]:
+					max_lengths[task_index] = number_timesteps
+				
+				# Number of timesteps to downsample to. 
+				number_timesteps = int(flattened_state_sequence.shape[0]//self.ds_freq[task_index])
+
+				flattened_state_sequence = resample(flattened_state_sequence, number_timesteps)
+				robot_state_sequence = resample(robot_state_sequence, number_timesteps)
+				gripper_state_sequence = resample(gripper_state_sequence, number_timesteps)
+				object_state_sequence = resample(object_state_sequence, number_timesteps)
+				joint_action_sequence = resample(joint_action_sequence, number_timesteps)
+				gripper_action_sequence = resample(gripper_action_sequence, number_timesteps)
 
 				# Normalize gripper values. 
 				# 1 is right finger. 0 is left finger.  # 1-0 is right-left. 						
@@ -223,7 +238,7 @@ class OrigRobomimic_Dataset(Dataset):
 				gripper_values = 2*gripper_values-1
 
 				concatenated_demonstration = np.concatenate([robot_state_sequence,gripper_values.reshape((-1,1))],axis=1)
-				concatenated_actions = np.concatenate([joint_action_sequence,gripper_action_sequence.reshape((-1,1))],axis=1)
+				concatenated_actions = np.concatenate([joint_action_sequence,gripper_action_sequence],axis=1)
 
 				# Put both lists in a dictionary.
 				datapoint['flat-state'] = flattened_state_sequence
@@ -240,3 +255,55 @@ class OrigRobomimic_Dataset(Dataset):
 
 			# Now save this file_demo_list. 
 			np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array.npy"),task_demo_array)
+
+		for j in range(4):
+			print("Lengths:", j, min_lengths[j], max_lengths[j])
+
+
+class Robomimic_Dataset(OrigRobotmimic_Dataset):
+	
+	def __init__(self, args):
+		
+		super(Robomimic_Dataset, self).__init__(args)
+
+	def setup(self):
+		self.files = []
+		for i in range(len(self.task_list)):
+			self.files.append(np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
+
+	def __getitem__(self, index):
+
+		if index>=self.total_length:
+			print("Out of bounds of dataset.")
+			return None
+
+		# Get bucket that index falls into based on num_demos array. 
+		task_index = np.searchsorted(self.cummulative_num_demos, index, side='right')-1
+		
+		# Decide task ID, and new index modulo num_demos.
+		# Subtract number of demonstrations in cumsum until then, and then 				
+		new_index = index-self.cummulative_num_demos[max(task_index,0)]		
+		data_element = self.files[task_index][new_index]
+
+		resample_length = len(data_element['demo'])//self.args.ds_freq
+		# print("Orig:", len(data_element['demo']),"New length:",resample_length)
+
+		self.kernel_bandwidth = self.args.smoothing_kernel_bandwidth
+		
+		# Trivially adding task ID to data element.
+		data_element['task_id'] = task_index
+
+		if resample_length<=1 or data_element['robot-state'].shape[0]<=1:
+			data_element['is_valid'] = False			
+		else:
+			data_element['is_valid'] = True
+
+			if self.args.smoothen: 
+				data_element['demo'] = gaussian_filter1d(data_element['demo'],self.kernel_bandwidth,axis=0,mode='nearest')
+				data_element['robot-state'] = gaussian_filter1d(data_element['robot-state'],self.kernel_bandwidth,axis=0,mode='nearest')
+				data_element['object-state'] = gaussian_filter1d(data_element['object-state'],self.kernel_bandwidth,axis=0,mode='nearest')
+				data_element['flat-state'] = gaussian_filter1d(data_element['flat-state'],self.kernel_bandwidth,axis=0,mode='nearest')
+
+			# data_element['environment-name'] = self.environment_names[task_index]
+
+		return data_element
