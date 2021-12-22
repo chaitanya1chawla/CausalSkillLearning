@@ -324,7 +324,6 @@ class Robomimic_Dataset(OrigRobomimic_Dataset):
 		vel_variance = np.zeros((self.state_size))
 		vel_mins = np.zeros((self.total_length, self.state_size))
 		vel_maxs = np.zeros((self.total_length, self.state_size))
-
 		
 		for i in range(self.total_length):
 

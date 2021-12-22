@@ -143,7 +143,7 @@ class Roboturk_Dataset(Dataset):
 		data_element['is_valid'] = True
 
 		return data_element
-
+	
 	def close(self):
 		for file in self.files:
 			file.close()
