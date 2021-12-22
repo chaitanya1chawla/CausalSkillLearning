@@ -36,7 +36,7 @@ class OrigRobomimic_Dataset(Dataset):
 		# self.task_list = ["can","lift","square","tool_hang","transport"]
 
 		# Each task has 200 demos according to RoboMimic.
-		self.num_demos = 200*np.ones((5),dtype=int)
+		self.num_demos = 200*np.ones((4),dtype=int)
 		self.cummulative_num_demos = self.num_demos.cumsum()
 		self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
 		
@@ -260,7 +260,7 @@ class OrigRobomimic_Dataset(Dataset):
 			print("Lengths:", j, min_lengths[j], max_lengths[j])
 
 
-class Robomimic_Dataset(OrigRobotmimic_Dataset):
+class Robomimic_Dataset(OrigRobomimic_Dataset):
 	
 	def __init__(self, args):
 		

@@ -154,10 +154,10 @@ class PolicyManager_BaseClass():
 				return sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj
 	
 		# elif self.args.data in ['MIME','OldMIME'] or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRobomimic','Robomimic']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
 
 			# If we're imitating... select demonstrations from the particular task.
-			if self.args.setting=='imitation' and (self.args.data in ['Roboturk','Robomimic']):
+			if self.args.setting=='imitation' and (self.args.data in ['Roboturk','RoboMimic']):
 				data_element = self.dataset.get_task_demo(self.demo_task_index, i)
 			else:
 				data_element = self.dataset[i]
@@ -178,7 +178,7 @@ class PolicyManager_BaseClass():
 			if self.args.data in ['MIME','OldMIME']:
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
-			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRobomimic','Robomimic']:
+			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
 				robot_states = data_element['robot-state']
 				object_states = data_element['object-state']
 
@@ -990,7 +990,7 @@ class PolicyManager_BaseClass():
 		# 	print("########### Running shuffle from Transfer PM")
 
 		# If we're in a dataset that will have variable sized data.
-		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','Robomimic','OrigRobomimic']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic']:
 	
 
 			if self.args.task_discriminability or self.args.task_based_supervision:
@@ -1087,7 +1087,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.conditional_info_size = self.cond_robot_state_size+self.cond_object_state_size
 
 		# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
-		elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','Robomimic','OrigRobomimic']:
+		elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','RoboMimic','OrigRoboMimic']:
 			if self.args.gripper:
 				self.state_size = 8
 				self.state_dim = 8
@@ -1436,7 +1436,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 			return concatenated_traj, sample_action_seq, sample_traj
 		
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRobomimic','Robomimic']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
 			data_element = self.dataset[i]
 
 			# If Invalid.
@@ -1564,7 +1564,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		elif self.args.data in ['MIME','OldMIME']:
 			self.state_dim = 16
 			self.rollout_timesteps = self.traj_length
-		if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRobomimic','Robomimic']:
+		if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
 			self.state_dim = 8
 			self.rollout_timesteps = self.traj_length
 
@@ -1728,7 +1728,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.visualize_embedding_space(suffix=suffix)
 
 		# if self.args.data=="MIME" or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRobomimic','Robomimic']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
 			print("Running Evaluation of State Distances on small test set.")
 			# self.evaluate_metrics()		
 
@@ -1778,7 +1778,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			if self.args.data in ['MIME','OldMIME']:
 				self.state_dim = 16
 				self.rollout_timesteps = self.traj_length
-			if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRobomimic','Robomimic']:
+			if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
 				self.state_dim = 8
 				self.rollout_timesteps = self.traj_length		
 
@@ -1932,7 +1932,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 			return concatenated_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), sample_traj.transpose((1,0,2))
 				
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRobomimic','Robomimic']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 				data_element = self.dataset[i:i+self.args.batch_size]
 			else:
@@ -2114,7 +2114,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.conditional_info_size = self.cond_robot_state_size+self.cond_object_state_size
 			self.conditional_viz_env = False
 
-		elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRobomimic','Robomimic']:
+		elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
 			self.state_size = 8	
 			self.state_dim = 8
 			self.input_size = 2*self.state_size	
@@ -2310,7 +2310,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 	def visualize_trajectory(self, trajectory, segmentations=None, i=0, suffix='_Img'):
 
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRobomimic','Robomimic']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 				unnorm_trajectory = (trajectory*self.norm_denom_value)+self.norm_sub_value
 			else:
@@ -2431,7 +2431,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			variational_rollout_image = np.array(variational_rollout_image)
 			latent_rollout_image = np.array(latent_rollout_image)
 			
-			if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRobomimic','Robomimic']:
+			if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
 				# Feeding as list of image because gif_summary.				
 				log_dict['GT Trajectory'] = self.return_wandb_gif(gt_trajectory_image)
 				log_dict['Variational Rollout'] = self.return_wandb_gif(variational_rollout_image)
@@ -3310,7 +3310,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# Visualize space if the subpolicy has been trained...
 		# Running even with the fix_subpolicy, so that we can evaluate joint reconstruction.
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRobomimic','Robomimic']:			
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:			
 			print("Running Visualization on Robot Data.")	
 
 			########################################
@@ -4022,7 +4022,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
 
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRobomimic','Robomimic']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
 					   
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 
@@ -4081,7 +4081,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
-			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRobomimic','Robomimic']:
+			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
 
 				if self.args.batch_size==1:
 
@@ -5199,7 +5199,7 @@ class PolicyManager_DMPBaselines(PolicyManager_Joint):
 				if self.args.data in ['MIME','OldMIME']:
 					sample_traj = sample_traj[:,:-2]
 					self.state_size = 14
-				elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRobomimic','Robomimic']:
+				elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
 					sample_traj = sample_traj[:,:-1]
 					self.state_size = 7					
 					# sample_traj = gaussian_filter1d(sample_traj,3.5,axis=0,mode='nearest')
@@ -11656,7 +11656,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 			self.state_size = 16
 			self.IK_state_size = 14
 			
-		if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRobomimic','Robomimic']:
+		if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
 			self.state_size = 8
 			self.IK_state_size = 7
 
@@ -11710,7 +11710,7 @@ class PolicyManager_IKTrainer(PolicyManager_BaseClass):
 
 		# Toy Data
 		# if self.args.data in ['MIME','OldMIME'] or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRobomimic','Robomimic']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
 			
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 
