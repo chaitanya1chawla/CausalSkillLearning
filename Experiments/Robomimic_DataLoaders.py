@@ -266,6 +266,20 @@ class Robomimic_Dataset(OrigRobomimic_Dataset):
 		
 		super(Robomimic_Dataset, self).__init__(args)
 
+		# Now that we've run setup, compute dataset_trajectory_lengths for smart batching.
+		self.dataset_trajectory_lengths = np.zeros(self.total_length)
+		for index in range(self.total_length):
+			# Get bucket that index falls into based on num_demos array. 
+			task_index = np.searchsorted(self.cummulative_num_demos, index, side='right')-1
+			
+			# Decide task ID, and new index modulo num_demos.
+			# Subtract number of demonstrations in cumsum until then, and then 				
+			new_index = index-self.cummulative_num_demos[max(task_index,0)]		
+			data_element = self.files[task_index][new_index]
+
+			self.dataset_trajectory_lengths[index] = len(data_element['demo'])
+
+
 	def setup(self):
 		self.files = []
 		for i in range(len(self.task_list)):
