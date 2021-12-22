@@ -1101,12 +1101,16 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length
 
 			if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk']:
-				if self.args.normalization=='meanvar':
-					self.norm_sub_value = np.load("Statistics/Roboturk/Roboturk_Mean.npy")
-					self.norm_denom_value = np.load("Statistics/Roboturk/Roboturk_Var.npy")
-				elif self.args.normalization=='minmax':
-					self.norm_sub_value = np.load("Statistics/Roboturk/Roboturk_Min.npy")
-					self.norm_denom_value = np.load("Statistics/Roboturk/Roboturk_Max.npy") - self.norm_sub_value
+				stat_dir_name = "Roboturk"
+			elif self.args.data in ['RoboMimic','OrigRoboMimic']:
+				stat_dir_name = "Robomimic"
+			
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 
 			# Max of robot_state + object_state sizes across all sawyer environments. 
 			# Robot size always 30. Max object state size is... 23. 
@@ -2125,12 +2129,16 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				self.visualizer = SawyerVisualizer()
 
 			if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk']:
-				if self.args.normalization=='meanvar':
-					self.norm_sub_value = np.load("Statistics/Roboturk/Roboturk_Mean.npy")
-					self.norm_denom_value = np.load("Statistics/Roboturk/Roboturk_Var.npy")
-				elif self.args.normalization=='minmax':
-					self.norm_sub_value = np.load("Statistics/Roboturk/Roboturk_Min.npy")
-					self.norm_denom_value = np.load("Statistics/Roboturk/Roboturk_Max.npy") - self.norm_sub_value
+				stat_dir_name = "Roboturk"
+			elif self.args.data in ['RoboMimic','OrigRoboMimic']:
+				stat_dir_name = "Robomimic"
+			
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 
 			# Max of robot_state + object_state sizes across all sawyer environments. 
 			# Robot size always 30. Max object state size is... 23. 
