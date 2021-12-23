@@ -83,7 +83,8 @@ class PolicyManager_BaseClass():
 		if self.args.data in ['MIME','OldMIME'] and not(self.args.no_mujoco):
 			self.visualizer = BaxterVisualizer(args=self.args)
 			# self.state_dim = 16
-		elif (self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk') and not(self.args.no_mujoco):
+		
+		elif (self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']) and not(self.args.no_mujoco):
 			self.visualizer = SawyerVisualizer()
 			# self.state_dim = 8
 		elif self.args.data=='Mocap':
@@ -337,7 +338,7 @@ class PolicyManager_BaseClass():
 		if self.args.data in ['MIME','OldMIME']:
 			self.visualizer = BaxterVisualizer(args=self.args)
 			# self.state_dim = 16
-		elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
+		elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
 			self.visualizer = SawyerVisualizer()
 			# self.state_dim = 8
 		elif self.args.data=='Mocap':
@@ -2125,13 +2126,15 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.output_size = self.state_size
 			self.traj_length = self.args.traj_length
 
-			if not(self.args.no_mujoco):
+			if not(self.args.no_mujoco):				
 				self.visualizer = SawyerVisualizer()
 
 			if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk']:
 				stat_dir_name = "Roboturk"
+				self.conditional_viz_env = True
 			elif self.args.data in ['RoboMimic','OrigRoboMimic']:
 				stat_dir_name = "Robomimic"
+				self.conditional_viz_env = False
 			
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
@@ -2146,7 +2149,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.cond_object_state_size = 23
 			self.number_tasks = 8
 			self.conditional_info_size = self.cond_robot_state_size+self.cond_object_state_size+self.number_tasks
-			self.conditional_viz_env = True
+			
 
 		elif self.args.data=='Mocap':
 			self.state_size = 22*3
@@ -4112,9 +4115,10 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 					#####################################################################	
 					# Set a batch element here..				
 					batch_conditional_information = np.zeros((self.args.batch_size, self.max_batch_traj_length, self.conditional_info_size))
+
 					for x in range(self.args.batch_size):
 
-						if data_element[x]['is_valid']:
+						if data_element[x]['is_valid'] and self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk']:
 
 							batch_conditional_information[x,:self.batch_trajectory_lengths[x],:self.cond_robot_state_size] = data_element[x]['robot-state']						
 							batch_conditional_information[x,:self.batch_trajectory_lengths[x],self.cond_robot_state_size:self.cond_robot_state_size+data_element[x]['object-state'].shape[-1]] = data_element[x]['object-state']						

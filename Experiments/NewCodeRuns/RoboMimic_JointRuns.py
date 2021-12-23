@@ -1,4 +1,8 @@
 # Template MIME run
+python Master.py --train=1 --setting=learntsub --name=MJ_rerun_116 --normalization=minmax --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=MIME  --subpolicy_model=ExpWandbLogs/MBP_111/saved_models/Model_epoch485 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=1 --short_trajectories=1 --epsilon_from=0.4 --epsilon_to=0.01 --epsilon_over=100
+
+# 
 python Master.py --train=1 --setting=learntsub --name=RM_trial --normalization=meanvar --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=RoboMimic  --subpolicy_model=ExpWandbLogs/RMP_004/saved_models/Model_epoch500 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=2 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=200 --epochs=2000
 
-# Template Roboturk run..
+# 
+python Master.py --train=1 --setting=learntsub --name=RM_001 --normalization=meanvar --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=RoboMimic  --subpolicy_model=ExpWandbLogs/RMP_004/saved_models/Model_epoch500 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=2 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=200 --epochs=2000

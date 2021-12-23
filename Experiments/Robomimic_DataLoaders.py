@@ -32,6 +32,7 @@ class OrigRobomimic_Dataset(Dataset):
 		# The task name is needed for setting the environment, rendering. 
 		
 		self.task_list = ["can","lift","square","tool_hang"]
+		self.environment_names = ['PickPlaceCan','Lift','NutAssemblySquare', 'ToolHang']
 		# Excluding the transport task for now, because this has two Franka's. 
 		# self.task_list = ["can","lift","square","tool_hang","transport"]
 
@@ -305,7 +306,8 @@ class Robomimic_Dataset(OrigRobomimic_Dataset):
 		self.kernel_bandwidth = self.args.smoothing_kernel_bandwidth
 		
 		# Trivially adding task ID to data element.
-		data_element['task_id'] = task_index
+		data_element['task-id'] = task_index
+		data_element['environment-name'] = self.environment_names[task_index]
 
 		if resample_length<=1 or data_element['robot-state'].shape[0]<=1:
 			data_element['is_valid'] = False			
@@ -321,7 +323,6 @@ class Robomimic_Dataset(OrigRobomimic_Dataset):
 			# data_element['environment-name'] = self.environment_names[task_index]
 
 		return data_element
-
 	
 	def compute_statistics(self):
 
