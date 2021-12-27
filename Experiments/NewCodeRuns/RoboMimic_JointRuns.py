@@ -19,3 +19,6 @@ CUDA_VISIBLE_DEVICES=1 python Master.py --train=1 --setting=learntsub --name=RM_
 
 # 
 python Master.py --train=1 --setting=learntsub --name=RM_002_cont1 --normalization=meanvar --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=RoboMimic  --model=ExpWandbLogs/RM_002/saved_models/Model_epoch1000 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=2 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=200 --epochs=2000 --normalization=meanvar
+
+# Rerun with the visualization
+python Master.py --train=1 --setting=learntsub --name=RM_testviz --normalization=meanvar --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=RoboMimic  --model=ExpWandbLogs/RM_002/saved_models/Model_epoch1000 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=2 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=200 --epochs=2000 --normalization=meanvar

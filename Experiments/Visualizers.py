@@ -40,10 +40,12 @@ class SawyerVisualizer(object):
 			self.base_env = robosuite.make("SawyerViz",has_renderer=has_display)
 			from robosuite.wrappers import IKWrapper					
 			self.sawyer_IK_object = IKWrapper(self.base_env)
+			self.environment = self.sawyer_IK_object.env
 		else:
 			self.base_env = robosuite.make("Viz",robots=['Sawyer'],has_renderer=has_display)
 			self.sawyer_IK_object = None
-		self.environment = self.sawyer_IK_object.env        
+			self.environment = self.base_env
+		
 
 	def update_state(self):
 		# Updates all joint states
@@ -56,7 +58,10 @@ class SawyerVisualizer(object):
 
 		# Set usual joint angles through set joint positions API.
 		self.environment.reset()
-		self.environment.set_robot_joint_positions(joint_angles[:7])
+		if float(robosuite.__version__[:3])<1.:
+			self.environment.set_robot_joint_positions(joint_angles[:7])
+		else:
+			self.environment.robots[0].set_robot_joint_positions(joint_angles[:7])
 
 		# For gripper, use "step". 
 		# Mujoco requires actions that are -1 for Open and 1 for Close.
@@ -106,13 +111,16 @@ class FrankaVisualizer(SawyerVisualizer):
 		# Create kinematics object. 
 		self.base_env = robosuite.make("Viz",robots=['Panda'],has_renderer=has_display)
 		self.sawyer_IK_object = None
-		self.environment = self.sawyer_IK_object.env        
+		self.environment = self.base_env
 
 	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False):
 
 		# Set usual joint angles through set joint positions API.
 		self.environment.reset()
-		self.environment.set_robot_joint_positions(joint_angles[:7])
+		if float(robosuite.__version__[:3])<1.:
+			self.environment.set_robot_joint_positions(joint_angles[:7])
+		else:
+			self.environment.robots[0].set_robot_joint_positions(joint_angles[:7])
 		actions = np.zeros((8))
 		actions[-1] = joint_angles[-1]
 

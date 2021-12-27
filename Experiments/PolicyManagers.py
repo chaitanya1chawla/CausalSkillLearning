@@ -84,7 +84,7 @@ class PolicyManager_BaseClass():
 			self.visualizer = BaxterVisualizer(args=self.args)
 			# self.state_dim = 16
 		
-		elif (self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk'] and not(self.args.no_mujoco):			
+		elif (self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk']) and not(self.args.no_mujoco):			
 			self.visualizer = SawyerVisualizer()
 		elif (self.args.data in ['OrigRoboMimic','RoboMimic']) and not(self.args.no_mujoco):			
 			self.visualizer = FrankaVisualizer()
@@ -340,7 +340,7 @@ class PolicyManager_BaseClass():
 		if self.args.data in ['MIME','OldMIME']:
 			self.visualizer = BaxterVisualizer(args=self.args)
 			# self.state_dim = 16
-		elif (self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk'] and not(self.args.no_mujoco):			
+		elif (self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk']) and not(self.args.no_mujoco):			
 			self.visualizer = SawyerVisualizer()
 		elif (self.args.data in ['OrigRoboMimic','RoboMimic']) and not(self.args.no_mujoco):			
 			self.visualizer = FrankaVisualizer()
@@ -2128,9 +2128,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.input_size = 2*self.state_size	
 			self.output_size = self.state_size
 			self.traj_length = self.args.traj_length
-
-			if not(self.args.no_mujoco):				
-				
 
 			if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk']:
 				stat_dir_name = "Roboturk"
