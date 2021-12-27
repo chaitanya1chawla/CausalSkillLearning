@@ -8,6 +8,10 @@ from headers import *
 import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders
 from PolicyManagers import *
 import TestClass
+import faulthandler
+
+f = open("SegFDebug2.txt","w+")
+faulthandler.enable(f)
 
 def return_dataset(args, data=None, create_dataset_variation=False):
 	

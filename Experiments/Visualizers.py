@@ -26,24 +26,22 @@ torch.set_printoptions(sci_mode=False, precision=2)
 # import MocapVisualizationUtils
 # from mocap_processing.motion.pfnn import Animation, BVH
 
-class SawyerVisualizer():
+class SawyerVisualizer(object):
 
 	def __init__(self, has_display=False):
-
-		
+	
 		# Create environment.
 		print("Do I have a display?", has_display)
 
 		import robosuite, threading
 
-		# self.base_env = robosuite.make('BaxterLift', has_renderer=has_display)
-		self.base_env = robosuite.make("SawyerViz",has_renderer=has_display)
-
 		# Create kinematics object. 
 		if float(robosuite.__version__[:3])<1.:
+			self.base_env = robosuite.make("SawyerViz",has_renderer=has_display)
 			from robosuite.wrappers import IKWrapper					
 			self.sawyer_IK_object = IKWrapper(self.base_env)
 		else:
+			self.base_env = robosuite.make("Viz",robots=['Sawyer'],has_renderer=has_display)
 			self.sawyer_IK_object = None
 		self.environment = self.sawyer_IK_object.env        
 
@@ -97,7 +95,34 @@ class SawyerVisualizer():
 		else:
 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)            
 
-class BaxterVisualizer():
+class FrankaVisualizer(SawyerVisualizer):
+
+	def __init__(self, has_display=False):
+
+		super(FrankaVisualizer, self).__init__(has_display=has_display)
+
+		import robosuite, threading
+
+		# Create kinematics object. 
+		self.base_env = robosuite.make("Viz",robots=['Panda'],has_renderer=has_display)
+		self.sawyer_IK_object = None
+		self.environment = self.sawyer_IK_object.env        
+
+	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False):
+
+		# Set usual joint angles through set joint positions API.
+		self.environment.reset()
+		self.environment.set_robot_joint_positions(joint_angles[:7])
+		actions = np.zeros((8))
+		actions[-1] = joint_angles[-1]
+
+		# Move gripper positions.
+		self.environment.step(actions)
+
+		image = np.flipud(self.environment.sim.render(600, 600, camera_name='vizview2'))
+		return image
+
+class BaxterVisualizer(object):
 
 	# def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_010/saved_models/Model_epoch500"):
 	def __init__(self, has_display=False, args=None, IK_network_path=None):		

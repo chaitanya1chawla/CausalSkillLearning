@@ -9,7 +9,7 @@ from headers import *
 from PolicyNetworks import *
 from RL_headers import *
 from PPO_Utilities import PPOBuffer
-from Visualizers import BaxterVisualizer, SawyerVisualizer, ToyDataVisualizer #, MocapVisualizer
+from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer #, MocapVisualizer
 import TFLogger, DMP, RLUtils
 
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
@@ -84,9 +84,11 @@ class PolicyManager_BaseClass():
 			self.visualizer = BaxterVisualizer(args=self.args)
 			# self.state_dim = 16
 		
-		elif (self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']) and not(self.args.no_mujoco):
+		elif (self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk'] and not(self.args.no_mujoco):			
 			self.visualizer = SawyerVisualizer()
-			# self.state_dim = 8
+		elif (self.args.data in ['OrigRoboMimic','RoboMimic']) and not(self.args.no_mujoco):			
+			self.visualizer = FrankaVisualizer()
+
 		elif self.args.data=='Mocap':
 			self.visualizer = MocapVisualizer(args=self.args)
 		else: 
@@ -338,9 +340,10 @@ class PolicyManager_BaseClass():
 		if self.args.data in ['MIME','OldMIME']:
 			self.visualizer = BaxterVisualizer(args=self.args)
 			# self.state_dim = 16
-		elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
+		elif (self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk'] and not(self.args.no_mujoco):			
 			self.visualizer = SawyerVisualizer()
-			# self.state_dim = 8
+		elif (self.args.data in ['OrigRoboMimic','RoboMimic']) and not(self.args.no_mujoco):			
+			self.visualizer = FrankaVisualizer()
 		elif self.args.data=='Mocap':
 			self.visualizer = MocapVisualizer(args=self.args)
 			# Because there are just more invalid DP's in Mocap.
@@ -2127,14 +2130,16 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length
 
 			if not(self.args.no_mujoco):				
-				self.visualizer = SawyerVisualizer()
+				
 
 			if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk']:
 				stat_dir_name = "Roboturk"
 				self.conditional_viz_env = True
+				self.visualizer = SawyerVisualizer()
 			elif self.args.data in ['RoboMimic','OrigRoboMimic']:
 				stat_dir_name = "Robomimic"
 				self.conditional_viz_env = False
+				self.visualizer = FrankaVisualizer()
 			
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
