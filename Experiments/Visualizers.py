@@ -32,16 +32,17 @@ class SawyerVisualizer(object):
 	
 		# Create environment.
 		print("Do I have a display?", has_display)
-
+		
 		import robosuite, threading
-
 		# Create kinematics object. 
 		if float(robosuite.__version__[:3])<1.:
+			self.new_robosuite = 0
 			self.base_env = robosuite.make("SawyerViz",has_renderer=has_display)
 			from robosuite.wrappers import IKWrapper					
 			self.sawyer_IK_object = IKWrapper(self.base_env)
 			self.environment = self.sawyer_IK_object.env
 		else:
+			self.new_robosuite = 1
 			self.base_env = robosuite.make("Viz",robots=['Sawyer'],has_renderer=has_display)
 			self.sawyer_IK_object = None
 			self.environment = self.base_env
@@ -58,7 +59,7 @@ class SawyerVisualizer(object):
 
 		# Set usual joint angles through set joint positions API.
 		self.environment.reset()
-		if float(robosuite.__version__[:3])<1.:
+		if self.new_robosuite==0:
 			self.environment.set_robot_joint_positions(joint_angles[:7])
 		else:
 			self.environment.robots[0].set_robot_joint_positions(joint_angles[:7])
@@ -106,6 +107,7 @@ class FrankaVisualizer(SawyerVisualizer):
 
 		super(FrankaVisualizer, self).__init__(has_display=has_display)
 
+
 		import robosuite, threading
 
 		# Create kinematics object. 
@@ -117,7 +119,7 @@ class FrankaVisualizer(SawyerVisualizer):
 
 		# Set usual joint angles through set joint positions API.
 		self.environment.reset()
-		if float(robosuite.__version__[:3])<1.:
+		if self.new_robosuite==0:
 			self.environment.set_robot_joint_positions(joint_angles[:7])
 		else:
 			self.environment.robots[0].set_robot_joint_positions(joint_angles[:7])
