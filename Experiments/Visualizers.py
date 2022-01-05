@@ -107,7 +107,6 @@ class FrankaVisualizer(SawyerVisualizer):
 
 		super(FrankaVisualizer, self).__init__(has_display=has_display)
 
-
 		import robosuite, threading
 
 		# Create kinematics object. 

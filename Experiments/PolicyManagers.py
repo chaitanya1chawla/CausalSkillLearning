@@ -1108,7 +1108,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				stat_dir_name = "Roboturk"
 			elif self.args.data in ['RoboMimic','OrigRoboMimic']:
 				stat_dir_name = "Robomimic"
-			
+				self.test_set_size = 50
+
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
@@ -1958,6 +1959,9 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			
 			batch_trajectory = np.zeros((self.args.batch_size, self.current_traj_len, self.state_size))
 
+			# print("Embedding in batch pretrain manager get trajectory segment.")
+			# embed()
+
 			for x in range(self.args.batch_size):
 
 				# Select the trajectory for each instance in the batch. 
@@ -1991,6 +1995,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 						batch_trajectory[x] = data_element[x]['endeffector_trajectory'][start_timepoint:end_timepoint]
 					else:
 						batch_trajectory[x] = data_element[x]['demo'][start_timepoint:end_timepoint]
+					
 					if not(self.args.gripper):
 						if self.args.ee_trajectories:
 							batch_trajectory[x] = data_element['endeffector_trajectory'][start_timepoint:end_timepoint,:-1]
@@ -2090,7 +2095,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.number_layers = self.args.number_layers
 		self.traj_length = 5
 		self.conditional_info_size = 6
-		
+		self.test_set_size = 500
 
 		if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 			self.conditional_info_size = self.args.condition_size
@@ -2136,8 +2141,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			elif self.args.data in ['RoboMimic','OrigRoboMimic']:
 				stat_dir_name = "Robomimic"
 				self.conditional_viz_env = False
+				self.test_set_size = 50
 				self.visualizer = FrankaVisualizer()
-			
+
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
@@ -2169,7 +2175,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		self.training_phase_size = self.args.training_phase_size
 		self.number_epochs = self.args.epochs
-		self.test_set_size = 500
+		
 		self.baseline_value = 0.
 		self.beta_decay = 0.9
 		self.max_viz_trajs = self.args.max_viz_trajs
@@ -3415,10 +3421,10 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# Use the dataset to get reasonable trajectories (because without the information bottleneck / KL between N(0,1), cannot just randomly sample.)
 		for i in range(self.N//self.args.batch_size+1):
 
-			print("####################################")
-			print("Embedding in getting Z set")
-			print("####################################")
-			embed()
+			# print("####################################")
+			# print("Embedding in getting Z set")
+			# print("####################################")
+			# embed()
 
 			# (1) Encoder trajectory. 
 			with torch.no_grad():
@@ -5841,6 +5847,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Base logging. 
 		##################################################
 
+		# print("Running Transfer PM Plots")
+
 		log_dict = {'Domain': viz_dict['domain'], 
 					'Total VAE Loss': self.total_VAE_loss,
 					'Training Phase': self.training_phase}
@@ -5915,6 +5923,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Now visualizing spaces. 
 		##################################################
 
+
+		# print("About to get images in Transfer Plot")
+
 		# If we are displaying things: 
 		if counter%self.args.display_freq==0:
 
@@ -5947,7 +5958,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			# 		self.return_wandb_image(self.viz_dictionary['tsne_source_embedding']), self.return_wandb_image(self.viz_dictionary['tsne_target_embedding']), \
 			# 		self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p5']), self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p10']), \
 			# 		self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p30'])
-			
+
 			# Add the embeddings to logging dict.
 			log_dict['TSNE Combined Embedding Perplexity 5'], log_dict['TSNE Combined Embedding Perplexity 10'], log_dict['TSNE Combined Embedding Perplexity 30'] = \
 					self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p5']), self.return_wandb_image(self.viz_dictionary['tsne_combined_embeddings_p10']), \
@@ -5961,13 +5972,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			
 			# First run get embeddings. 
 			_, _, self.viz_dictionary['pca_combined_embeddings'], _ = self.get_embeddings(projection='pca', computed_sets=True)
-
 			# # Add embeddings to logging dict.			
 			# log_dict['PCA Source Embedding'], log_dict['PCA Target Embedding'], log_dict['PCA Combined Embedding'] = \
 			# 	self.return_wandb_image(self.viz_dictionary['pca_source_embedding']), self.return_wandb_image(self.viz_dictionary['pca_target_embedding']), \
 			# 	self.return_wandb_image(self.viz_dictionary['pca_combined_embeddings'])
 	
 			# Add embeddings to logging dict.			
+			
 			log_dict['PCA Combined Embedding'] = self.return_wandb_image(self.viz_dictionary['pca_combined_embeddings'])
 
 			# # If toy domain, add to log dict.
@@ -5994,7 +6005,6 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			log_dict['DENSNE Combined Embedding Perplexity 5'], log_dict['DENSNE Combined Embedding Perplexity 10'], log_dict['DENSNE Combined Embedding Perplexity 30'] = \
 				self.return_wandb_image(self.viz_dictionary['densne_combined_embeddings_p5']), self.return_wandb_image(self.viz_dictionary['densne_combined_embeddings_p10']), \
 					self.return_wandb_image(self.viz_dictionary['densne_combined_embeddings_p30'])
-			
 			##################################################
 			# We are also going to log Ground Truth trajectories and their reconstructions in each of the domains, to make sure our networks are learning. 		
 			##################################################
@@ -6004,19 +6014,19 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 			if 'source_trajectory' in self.viz_dictionary and not(self.args.no_mujoco):
 				# Now actually plot the images.
-
 				if self.args.source_domain in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 					log_dict['Source Trajectory'], log_dict['Source Reconstruction'] = \
 						self.return_wandb_image(self.viz_dictionary['source_trajectory']), self.return_wandb_image(self.viz_dictionary['source_reconstruction'])
 				else:
 					log_dict['Source Trajectory'], log_dict['Source Reconstruction'] = \
 						self.return_wandb_gif(self.viz_dictionary['source_trajectory']), self.return_wandb_gif(self.viz_dictionary['source_reconstruction'])
+
 				if self.args.target_domain in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 					log_dict['Target Trajectory'], log_dict['Target Reconstruction'] = \
 						self.return_wandb_image(self.viz_dictionary['target_trajectory']), self.return_wandb_image(self.viz_dictionary['target_reconstruction'])
 				else:
 					log_dict['Target Trajectory'], log_dict['Target Reconstruction'] = \
-						self.return_wandb_gif(self.viz_dictionary['target_trajectory']), self.return_wandb_gif(self.viz_dictionary['target_reconstruction'])
+						self.return_wandb_gif(self.viz_dictionary['target_trajectory']), self.return_wandb_gif(self.viz_dictionary['target_reconstruction'])	
 
 			##################################################			
 			# Evaluate metrics and plot them. 
@@ -6087,6 +6097,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			log_dict['Source Z Trajectory Joint DENSNE Embedding Visualizations'] = self.return_wandb_image(self.source_z_traj_densne_image)
 			log_dict['Target Z Trajectory Joint DENSNE Embedding Visualizations'] = self.return_wandb_image(self.target_z_traj_densne_image)
 
+			
 			##################################################
 			# Visualize z tuple embeddings
 			##################################################
@@ -7002,12 +7013,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# 	# 5) Visualize original target trajectory, and the translated target to source trajectory. 
 
 		number_of_batches = 1
-		self.number_of_datapoints_per_batch = 30	
+		self.number_of_datapoints_per_batch = 2	
 
 		with torch.no_grad():
 
 			for i in range(number_of_batches):
-
+				
 				# 0) Get source trajectory.				
 				source_input_dict, _, _ = self.encode_decode_trajectory(self.source_manager, i)
 
@@ -7029,14 +7040,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 					if not(os.path.isdir(self.traj_viz_dir_name)):
 						os.mkdir(self.traj_viz_dir_name)
-									
+
 					# First unnormalize the trajectories.
 					unnormalized_original_target_traj = (target_input_dict['sample_traj']*self.target_manager.norm_denom_value)+self.target_manager.norm_sub_value														
 					# unnormalized_target_traj = (cross_domain_decoding_dict['differentiable_trajectory'].detach().cpu().numpy()*self.target_manager.norm_denom_value)+self.target_manager.norm_sub_value
 					# Remember, the cross domain trajectory needs to be unnormalized with the source normalization values.. 					
 
 					unnormalized_translated_target_traj = (cross_domain_decoding_dict['differentiable_trajectory'].detach().cpu().numpy()*self.source_manager.norm_denom_value)+self.source_manager.norm_sub_value
-
+					
 					# Smoothen trajectories as needed... 
 					if self.args.target_domain in ['Roboturk']:
 						unnormalized_original_target_traj = self.smoothen_sawyer_trajectories(unnormalized_original_target_traj)
@@ -7046,6 +7057,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 					self.gif_logs = {}
 
+					print("### RUN VIZ TRANS TRAJ")
 					# Now for these many trajectories:
 					for k in range(self.number_of_datapoints_per_batch):
 						# Now visualize the original .. target trajectory. 
@@ -7905,6 +7917,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 	def evaluate_semantic_accuracy(self):
 		pass
+
 class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 
 	# Inherit from transfer. 
@@ -8963,7 +8976,6 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 	def update_plots(self, counter, viz_dict, log=False):
 
 		# Call super update plots for the majority of the work. Call this with log==false to make sure that wandb only logs things we add in this function. 
-		# print("Run Super Plots")
 		log_dict = super().update_plots(counter, viz_dict, log=False)
 
 		# # Also log identity loss..
@@ -8976,7 +8988,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		############################################################
 		# Now implement visualization of original latent set and translated z space in both directions. 
 		############################################################	
-
+		
 		if counter%self.args.display_freq==0:
 			
 			##################################################
@@ -9654,9 +9666,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		return gradient_penalty
 
 	def visualize_low_likelihood_skills(self, domain, update_dictionary, input_dict): 
-	
-
-		
+			
 		self.global_traj_counter_max = 10
 
 		if domain==0 and self.global_traj_counter<self.global_traj_counter_max:
@@ -11180,11 +11190,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 			cross_domain_input_dict, cross_domain_var_dict, cross_domain_eval_dict = self.encode_decode_trajectory(self.source_manager, i)
 			update_dictionary['cross_domain_latent_z'] = cross_domain_var_dict['latent_z_indices']
-
-			# # 
-			# print("Embed in run iteration to debug supervision")
-			# embed()
-			
+	
 			detached_original_latent_z = update_dictionary['latent_z'].detach()
 			update_dictionary['translated_latent_z'] = self.translate_latent_z(detached_original_latent_z, source_var_dict['latent_b'].detach())
 
@@ -11195,7 +11201,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			################################################
 			# 5a1) Compute likelihood of target z encoding under the source domain GMM. 
 			################################################
-
+			
 			# update_dictionary['cross_domain_density_loss'] = self.compute_density_based_loss(update_dictionary)
 			# print("RUNNING QGMMD Forward Z Den")
 			update_dictionary['forward_density_loss'] = self.query_GMM_density(evaluation_domain=0, point_set=update_dictionary['translated_latent_z'], differentiable_points=True)
@@ -11243,7 +11249,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 				# Step 3: Actually query GMM for likelihood. 
 				# print("RUNNING QGMMD Backward Z Tup Den")
 				update_dictionary['backward_z_tuple_density_loss'] = self.query_GMM_density(evaluation_domain=domain, point_set=update_dictionary['source_z_transformations'], differentiable_points=True, GMM=self.Z_Tuple_GMM_list[1])
-
+				
 			################################################
 			# 5c) Compute supervised loss.
 			################################################
@@ -11259,7 +11265,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			################################################
 			# 6) Compute gradients of objective and then update networks / policies.
 			################################################
-
+			
 			self.update_networks(1, self.target_manager, update_dictionary)					
 
 			################################################
@@ -11274,7 +11280,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 			if self.args.z_gmm:
 				viz_dict['forward_density_loss'], viz_dict['backward_density_loss'] = update_dictionary['forward_density_loss'].mean().detach().cpu().numpy(), update_dictionary['backward_density_loss'].mean().detach().cpu().numpy()
 				viz_dict['weighted_forward_density_loss'], viz_dict['weighted_backward_density_loss'] = self.weighted_forward_loss.mean().detach().cpu().numpy(), self.weighted_backward_loss.mean().detach().cpu().numpy()
-		
+
 			self.update_plots(counter, viz_dict, log=True)
 
 			# print("Embed in RUn ITer")
@@ -11354,8 +11360,6 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 
 
 		# make sure same number of labels across domains, otherwise measuring accuracy across different sets...
-
-		
 
 class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):
 

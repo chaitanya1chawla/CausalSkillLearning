@@ -167,8 +167,6 @@ class OrigRobomimic_Dataset(Dataset):
 		
 	def preprocess_dataset(self):
 
-
-
 		min_lengths = np.ones((4))*1000
 		max_lengths = np.zeros((4))
 
@@ -260,7 +258,6 @@ class OrigRobomimic_Dataset(Dataset):
 		for j in range(4):
 			print("Lengths:", j, min_lengths[j], max_lengths[j])
 
-
 class Robomimic_Dataset(OrigRobomimic_Dataset):
 	
 	def __init__(self, args):
@@ -280,6 +277,64 @@ class Robomimic_Dataset(OrigRobomimic_Dataset):
 
 			self.dataset_trajectory_lengths[index] = len(data_element['demo'])
 
+		# Now implementing the dataset trajectory length limits. 
+		######################################################
+		# Now implementing dataset_trajectory_length_limits. 
+		######################################################
+		
+		if self.args.dataset_traj_length_limit>0:
+			# Essentially will need new self.cummulative_num_demos and new .. file index map list things. 
+			# Also will need to set total_length. 
+
+			self.full_max_length = self.dataset_trajectory_lengths.max()
+			self.full_length = copy.deepcopy(self.total_length)
+			self.full_cummulative_num_demos = copy.deepcopy(self.cummulative_num_demos)
+			self.full_num_demos = copy.deepcopy(self.num_demos)
+			self.full_files = copy.deepcopy(self.files)
+			self.files = [[] for i in range(len(self.task_list))]
+			self.full_dataset_trajectory_lengths = copy.deepcopy(self.dataset_trajectory_lengths)
+			self.dataset_trajectory_lengths = []
+			self.num_demos = np.zeros(len(self.task_list),dtype=int)
+
+			for index in range(self.full_length):
+				# Get bucket that index falls into based on num_demos array. 
+				task_index = np.searchsorted(self.full_cummulative_num_demos, index, side='right')-1
+				# Get the demo index in this task list. 
+				new_index = index-self.full_cummulative_num_demos[max(task_index,0)]
+
+				# Check the length of this particular trajectory and its validity. 
+				if (self.full_dataset_trajectory_lengths[index] < self.args.dataset_traj_length_limit) and (index not in self.bad_original_index_list):
+					# Add from old list to new. 
+					self.files[task_index].append(self.full_files[task_index][new_index])
+					self.dataset_trajectory_lengths.append(self.full_dataset_trajectory_lengths[index])
+					self.num_demos[task_index] += 1
+				else:
+					pass
+
+					# Reduce count. 
+					# self.num_demos[task_index] -= 1
+					
+					# # Pop item from files. It's still saved in full_files. 					
+					# # self.files[task_index].pop(new_index)
+					# self.files[task_index] = np.delete(self.files[task_index],new_index)
+					# Approach with opposite pattern.. instead of deleting invalid files, add valid ones.
+					
+					# # Pop item from dataset_trajectory_lengths. 
+					# self.dataset_trajectory_lengths = np.delete(self.dataset_trajectory_lengths, index)
+
+			# Set new cummulative num demos. 
+			self.cummulative_num_demos = self.num_demos.cumsum()
+			self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
+			# Set new total length.
+			self.total_length = self.cummulative_num_demos[-1]
+			# Make array.
+			self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)
+
+			for t in range(len(self.task_list)):
+				self.files[t] = np.array(self.files[t])
+
+			# By popping element from files / dataset_traj_lengths, we now don't need to change indexing.
+		
 
 	def setup(self):
 		self.files = []
