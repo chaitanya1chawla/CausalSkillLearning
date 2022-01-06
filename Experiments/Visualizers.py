@@ -141,20 +141,33 @@ class BaxterVisualizer(object):
 		print("Do I have a display?", has_display)
 		
 		import robosuite, threading
-		from robosuite.wrappers import IKWrapper
-		
-		# self.base_env = robosuite.make('BaxterLift', has_renderer=has_display)
-		self.base_env = robosuite.make("BaxterViz",has_renderer=has_display)
+		# from robosuite.wrappers import IKWrapper		
 
-		# Create kinematics object. 
-		self.baxter_IK_object = IKWrapper(self.base_env)
-		self.environment = self.baxter_IK_object.env  
-		self.args = args 
+		if float(robosuite.__version__[:3])<1.:
+			self.new_robosuite = 0
+			self.base_env = robosuite.make("BaxterViz",has_renderer=has_display)
+			from robosuite.wrappers import IKWrapper					
+			self.baxter_IK_object = IKWrapper(self.base_env)
+			self.environment = self.baxter_IK_object.env
 
-		if IK_network_path is not None:
-			self.load_IK_network(IK_network_path)
+			if IK_network_path is not None:
+				self.load_IK_network(IK_network_path)
+			else:
+				self.IK_network = None
+
 		else:
-			self.IK_network = None
+			self.new_robosuite = 1
+			self.base_env = robosuite.make("TwoArmViz",robots=['Baxter'],has_renderer=has_display)
+			self.baxter_IK_object = None
+			self.environment = self.base_env
+
+		# # self.base_env = robosuite.make('BaxterLift', has_renderer=has_display)
+		# self.base_env = robosuite.make("BaxterViz",has_renderer=has_display)
+
+		# # Create kinematics object. 
+		# self.baxter_IK_object = IKWrapper(self.base_env)
+		# self.environment = self.baxter_IK_object.env  
+		# self.args = args 
 
 	def load_IK_network(self, path):
 		

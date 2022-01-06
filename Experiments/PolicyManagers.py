@@ -7061,10 +7061,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					# Now for these many trajectories:
 					for k in range(self.number_of_datapoints_per_batch):
 						# Now visualize the original .. target trajectory. 
-						self.gif_logs['Traj{0}_OriginalTarget_Traj'.format(k)] = np.array(self.target_manager.visualizer.visualize_joint_trajectory(unnormalized_original_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_OriginalTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
+						# self.gif_logs['Traj{0}_OriginalTarget_Traj'.format(k)] = np.array(self.target_manager.visualizer.visualize_joint_trajectory(unnormalized_original_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_OriginalTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
+						self.gif_logs['Traj{0}_OriginalTarget_Traj'.format(k)] = np.array(self.target_manager.visualizer.visualize_joint_trajectory(unnormalized_original_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="Traj{0}_OriginalTargetTraj.gif".format(k), return_and_save=True, end_effector=self.args.ee_trajectories))
 
 						# Now visualize the translated target trajectory. 
-						self.gif_logs['Traj{0}_TranslatedTarget_Traj'.format(k)] = np.array(self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_translated_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TranslatedTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
+						# self.gif_logs['Traj{0}_TranslatedTarget_Traj'.format(k)] = np.array(self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_translated_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TranslatedTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
+						self.gif_logs['Traj{0}_TranslatedTarget_Traj'.format(k)] = np.array(self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_translated_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="Traj{0}_TranslatedTargetTraj.gif".format(k), return_and_save=True, end_effector=self.args.ee_trajectories))
 
 		# Segment these GIFs and save them.
 		self.segment_source_target_gifs(target_var_dict['latent_b'], latent_zs=translated_latent_z.detach().cpu().numpy())
@@ -7193,12 +7195,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					# Now for these many trajectories:
 					for k in range(2):
 						# Now visualize the source trajectory. 
-						source_gif = self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_source_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_SourceTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories)
+						# source_gif = self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_source_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="Traj{0}_SourceTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories)
+						source_gif = self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_source_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="Traj{0}_SourceTraj.gif".format(k), return_and_save=True, end_effector=self.args.ee_trajectories)
 						self.gif_logs['Traj{0}_Source_Traj'.format(k)] = np.array(source_gif)
 
 						# Now visualize the target trajectory. 
 						# THIS IS ACTUALLY IN SOURCE DOMAIN... USE SOURCE VISUALIZER.
-						target_gif = self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_translatedtarget_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TargetTranslatedTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories)
+						# target_gif = self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_translatedtarget_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="Traj{0}_TargetTranslatedTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories)
+						target_gif = self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_translatedtarget_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="Traj{0}_TargetTranslatedTraj.gif".format(k), return_and_save=True, end_effector=self.args.ee_trajectories)
 						self.gif_logs['Traj{0}_Target_Traj'.format(k)] = np.array(target_gif)
 
 						# Segment up gifs..

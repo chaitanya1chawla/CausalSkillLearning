@@ -37,3 +37,10 @@ CUDA_VISIBLE_DEVICES=0 python Master.py --train=1 --setting=learntsub --name=RM_
 
 # 
 CUDA_VISIBLE_DEVICES=0 python Master.py --train=1 --setting=learntsub --name=RM_006 --normalization=meanvar --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=RoboMimic  --subpolicy_model=ExpWandbLogs/RMP_011/saved_models/Model_epoch5000 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=2 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=200 --epochs=5000 --normalization=meanvar --save_freq=100
+
+# Running joint training with new skill segmentation lengths
+#
+CUDA_VISIBLE_DEVICES=2 python Master.py --train=1 --setting=learntsub --name=RM_007 --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=RoboMimic  --subpolicy_model=ExpWandbLogs/RMP_010/saved_models/Model_epoch5000 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=2 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=200 --epochs=5000 --normalization=minmax --save_freq=500
+
+# 
+CUDA_VISIBLE_DEVICES=2 python Master.py --train=1 --setting=learntsub --name=RM_008 --kl_weight=0.001 --subpolicy_ratio=1. --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --data=RoboMimic  --subpolicy_model=ExpWandbLogs/RMP_011/saved_models/Model_epoch5000 --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --number_layers=4 --hidden_size=48 --var_number_layers=5 --var_hidden_size=48 --batch_size=32 --seed=2 --short_trajectories=1 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=200 --epochs=5000 --normalization=meanvar --save_freq=500
