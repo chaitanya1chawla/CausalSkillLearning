@@ -281,7 +281,15 @@ class BaxterVisualizer(object):
 		# FOR FULL 16 DOF STATE: ASSUMES JOINT_POSE IS <LEFT_JA, RIGHT_JA, LEFT_GRIPPER, RIGHT_GRIPPER>.
 
 		self.update_state()
-		self.state = copy.deepcopy(self.full_state['joint_pos'])
+
+		if self.new_robosuite:
+			# self.state = copy.deepcopy(self.full_state['robot0_joint_pos'])
+
+			# Since the environment observation function doesn't return raw joint poses, we are going to index into the sim state instead.
+			indices = [0,1,2,3,4,5,6,9,10,11,12,13,14,15]
+			self.state = self.environment.sim.get_state()[1][indices]
+		else:
+			self.state = copy.deepcopy(self.full_state['joint_pos'])
 		# THE FIRST 7 JOINT ANGLES IN MUJOCO ARE THE RIGHT HAND. 
 		# THE LAST 7 JOINT ANGLES IN MUJOCO ARE THE LEFT HAND. 
 		
