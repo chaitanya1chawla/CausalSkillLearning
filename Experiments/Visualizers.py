@@ -184,7 +184,10 @@ class BaxterVisualizer(object):
 	
 	def update_state(self):
 		# Updates all joint states
-		self.full_state = self.environment._get_observation()
+		if self.new_robosuite:
+			self.full_state = self.environment._get_observations()
+		else:
+			self.full_state = self.environment._get_observation()
 
 	def set_ee_pose(self, ee_pose, arm='both', seed=None):
 
