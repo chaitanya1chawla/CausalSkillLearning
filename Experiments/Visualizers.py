@@ -300,7 +300,12 @@ class BaxterVisualizer(object):
 			self.state[7:] = joint_pose[:7]
 			
 		# Set the joint angles magically. 
-		self.environment.set_robot_joint_positions(self.state)
+		# self.environment.set_robot_joint_positions(self.state)
+
+		if self.new_robosuite==0:
+			self.environment.set_robot_joint_positions(self.state)
+		else:
+			self.environment.robots[0].set_robot_joint_positions(self.state)
 
 		action = np.zeros((16))
 		if gripper:
