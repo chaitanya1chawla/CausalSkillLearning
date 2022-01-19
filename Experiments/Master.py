@@ -50,12 +50,9 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	elif args.data=='RoboMimic':
 		dataset = Robomimic_DataLoaders.Robomimic_Dataset(args)
 	elif args.data=='GRABPreproc':
-		dataset = GRAB_DataLoaders.GRAB_PreDataset(args)
+		dataset = GRAB_DataLoader.GRAB_PreDataset(args)
 	elif args.data=='GRAB':
-		dataset = GRAB_DataLoaders.GRAB_Dataset(args)
-
-	print("Embedding in return dataset to figure out dataset..")
-	embed()
+		dataset = GRAB_DataLoader.GRAB_Dataset(args)
 
 	return dataset
 
@@ -68,8 +65,8 @@ class Master():
 		if self.args.setting not in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 			print("Creating Datasets")			
 			self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)			
-			print("Embed after create dataset")
-			embed()
+			# print("Embed after create dataset")
+			# embed()
 			
 		# Now define policy manager.
 		if self.args.setting=='learntsub' or self.args.setting=='joint':

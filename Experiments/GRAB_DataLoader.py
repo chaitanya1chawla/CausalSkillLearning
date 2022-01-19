@@ -25,7 +25,7 @@ class GRAB_PreDataset(Dataset):
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
 			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
-			self.dataset_directory = '/data/tanmayshankar/Datasets/GRAB/GRAB_Joints/'
+			self.dataset_directory = '/data/tanmayshankar/Datasets/GRAB_Joints/'
 		else:
 			self.dataset_directory = self.args.datadir
 		   
@@ -242,11 +242,11 @@ class GRAB_PreDataset(Dataset):
 		self.arm_joint_indices = np.zeros(len(self.arm_joint_names))
 		self.arm_and_hand_joint_indices = np.zeros(len(self.arm_and_hand_joint_names))
 
-		for k, v in enumerate(self.arm_joint_names):
+		for k, v in enumerate(self.arm_joint_names):			
 			self.arm_joint_indices[k] = np.where(self.joint_names==v)[0][0]
-
-		for k, v in enumerate(self.arm_and_hand_joint_indices):
-			self.arm_and_hand_joint_indices[k] = np.where(self.joint_names==v)[0][0]
+		
+		# for k, v in enumerate(self.arm_and_hand_joint_indices):
+		# 	self.arm_and_hand_joint_indices[k] = np.where(self.joint_names==v)[0][0]
 		
 	def subsample_relevant_joints(self, datapoint):
 
@@ -258,7 +258,7 @@ class GRAB_PreDataset(Dataset):
 		# Consider unsupervised translation to robots without articulated grippers. 
 		# For now use arm joint indices. 
 		# We can later consider adding other robots / hands.
-		self.relevant_joint_indices = self.arm_joint_indices
+		self.relevant_joint_indices = self.arm_joint_indices.astype(int)
 
 		return datapoint[:, self.relevant_joint_indices]
 		
@@ -268,6 +268,9 @@ class GRAB_PreDataset(Dataset):
 		self.files = []
 		self.dataset_trajectory_lengths = np.zeros(self.total_length)
 		
+		# set joints
+		self.set_relevant_joints()
+
 		# For all files. 
 		for k, v in enumerate(self.filelist):
 						
@@ -275,14 +278,21 @@ class GRAB_PreDataset(Dataset):
 				print("Loading file: ",k)
 
 			# Now actually load file. 
-			datapoint = np.load(v, allow_pickle=True)['body_joints']
+			datapoint = np.load(v, allow_pickle=True)['body_joints']			
 
 			# Subsample relevant joints. 
 			relevant_joints_datapoint = self.subsample_relevant_joints(datapoint)
 
+			# Normalize using the pelvis joint (i.e. the first joint).
+			normalized_relevant_joint_datapoint = relevant_joints_datapoint[:,1:] - relevant_joints_datapoint[:,0].reshape(relevant_joints_datapoint.shape[0],1,3)
+
+			# Reshape. 
+			reshaped_normalized_datapoint = normalized_relevant_joint_datapoint.reshape(normalized_relevant_joint_datapoint.shape[0],-1)
+
 			# Subsample in time. 
 			number_of_timesteps = datapoint.shape[0]//self.ds_freq
-			subsampled_data = resample(relevant_joints_datapoint, number_of_timesteps)            
+			# subsampled_data = resample(relevant_joints_datapoint, number_of_timesteps)
+			subsampled_data = resample(reshaped_normalized_datapoint, number_of_timesteps)
 			
 			# Add subsampled datapoint to file. 
 			self.files.append(subsampled_data)            
@@ -291,7 +301,8 @@ class GRAB_PreDataset(Dataset):
 		self.file_array = np.array(self.files)
 
 		# Now save this file.
-		np.save(os.path.join(self.dataset_directory,"GRAB_DataFile.npy"), self.file_array)                
+		# np.save(os.path.join(self.dataset_directory,"GRAB_DataFile.npy"), self.file_array)
+		np.save(os.path.join(self.dataset_directory,"GRAB_DataFile_BaseNormalize.npy"), self.file_array)
 
 	def __len__(self):
 		return self.total_length
@@ -318,7 +329,7 @@ class GRAB_Dataset(Dataset):
 			self.dataset_directory = self.args.datadir
 		   
 		# Load file.
-		self.data_list = np.load(os.path.join(self.dataset_directory,"GRAB_DataFile.npy"))
+		self.data_list = np.load(os.path.join(self.dataset_directory,"GRAB_DataFile_BaseNormalize.npy"), allow_pickle=True)
 		self.dataset_length = len(self.data_list)
 
 		if short_traj:
@@ -344,7 +355,83 @@ class GRAB_Dataset(Dataset):
 		# Return n'th item of dataset.
 		# This has already processed everything.
 
-		if isinstance(index,np.ndarray):			
-			return list(self.data_list_array[index])
-		else:
-			return self.data_list[index]
+		# if isinstance(index,np.ndarray):			
+		# 	return list(self.data_list_array[index])
+		# else:
+		# 	return self.data_list[index]
+
+		data_element = {}
+		data_element['is_valid'] = True
+		data_element['demo'] = self.data_list[index]
+
+		return data_element
+
+
+	def compute_statistics(self):
+
+		self.state_size = 24
+		self.total_length = self.__len__()
+		mean = np.zeros((self.state_size))
+		variance = np.zeros((self.state_size))
+		mins = np.zeros((self.total_length, self.state_size))
+		maxs = np.zeros((self.total_length, self.state_size))
+		lens = np.zeros((self.total_length))
+
+		# And velocity statistics. 
+		vel_mean = np.zeros((self.state_size))
+		vel_variance = np.zeros((self.state_size))
+		vel_mins = np.zeros((self.total_length, self.state_size))
+		vel_maxs = np.zeros((self.total_length, self.state_size))
+		
+		for i in range(self.total_length):
+
+			print("Phase 1: DP: ",i)
+			data_element = self.__getitem__(i)
+
+			if data_element['is_valid']:
+				demo = data_element['demo']
+				vel = np.diff(demo,axis=0)
+				mins[i] = demo.min(axis=0)
+				maxs[i] = demo.max(axis=0)
+				mean += demo.sum(axis=0)
+				lens[i] = demo.shape[0]
+
+				vel_mins[i] = abs(vel).min(axis=0)
+				vel_maxs[i] = abs(vel).max(axis=0)
+				vel_mean += vel.sum(axis=0)			
+
+		mean /= lens.sum()
+		vel_mean /= lens.sum()
+
+		for i in range(self.total_length):
+
+			print("Phase 2: DP: ",i)
+			data_element = self.__getitem__(i)
+			
+			# Just need to normalize the demonstration. Not the rest. 
+			if data_element['is_valid']:
+				demo = data_element['demo']
+				vel = np.diff(demo,axis=0)
+				variance += ((demo-mean)**2).sum(axis=0)
+				vel_variance += ((vel-vel_mean)**2).sum(axis=0)
+
+		variance /= lens.sum()
+		variance = np.sqrt(variance)
+
+		vel_variance /= lens.sum()
+		vel_variance = np.sqrt(vel_variance)
+
+		max_value = maxs.max(axis=0)
+		min_value = mins.min(axis=0)
+
+		vel_max_value = vel_maxs.max(axis=0)
+		vel_min_value = vel_mins.min(axis=0)
+
+		np.save("GRAB_Mean.npy", mean)
+		np.save("GRAB_Var.npy", variance)
+		np.save("GRAB_Min.npy", min_value)
+		np.save("GRAB_Max.npy", max_value)
+		np.save("GRAB_Vel_Mean.npy", vel_mean)
+		np.save("GRAB_Vel_Var.npy", vel_variance)
+		np.save("GRAB_Vel_Min.npy", vel_min_value)
+		np.save("GRAB_Vel_Max.npy", vel_max_value)
