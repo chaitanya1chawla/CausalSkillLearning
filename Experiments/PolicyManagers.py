@@ -300,8 +300,6 @@ class PolicyManager_BaseClass():
 			if e%self.args.eval_freq==0:
 				self.automatic_evaluation(e)
 
-		# self.write_and_close()
-
 	def automatic_evaluation(self, e):
 
 		# Writing new automatic evaluation that parses arguments and creates an identical command loading the appropriate model. 
@@ -320,8 +318,7 @@ class PolicyManager_BaseClass():
 				pass
 			# Add the rest
 			else:				
-				base_command = base_command + ' --{0}={1}'.format(ar[0],ar[1])
-		
+				base_command = base_command + ' --{0}={1}'.format(ar[0],ar[1])		
 		#  cluster_command = 'python cluster_run.py --partition=learnfair --name={0}_Eval --cmd=\'{1}\''.format(self.args.name, base_command)				
 
 		# NOT RUNNING AUTO EVAL FOR NOW.
@@ -995,7 +992,8 @@ class PolicyManager_BaseClass():
 		# 	print("########### Running shuffle from Transfer PM")
 
 		# If we're in a dataset that will have variable sized data.
-		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic']:
+		# if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic','GRAB']:
 	
 
 			if self.args.task_discriminability or self.args.task_based_supervision:

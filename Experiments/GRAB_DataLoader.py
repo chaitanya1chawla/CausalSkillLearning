@@ -316,7 +316,7 @@ class GRAB_PreDataset(Dataset):
 
 class GRAB_Dataset(Dataset):
 
-	def __init__(self, args, split='train', short_traj=False, traj_length_threshold=500):
+	def __init__(self, args):
 
 		# Some book-keeping first. 
 		self.args = args
@@ -324,7 +324,7 @@ class GRAB_Dataset(Dataset):
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
 			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
-			self.dataset_directory = '/data/tanmayshankar/Datasets/GRAB/GRAB_Joints/'
+			self.dataset_directory = '/data/tanmayshankar/Datasets/GRAB_Joints/'
 		else:
 			self.dataset_directory = self.args.datadir
 		   
@@ -332,12 +332,11 @@ class GRAB_Dataset(Dataset):
 		self.data_list = np.load(os.path.join(self.dataset_directory,"GRAB_DataFile_BaseNormalize.npy"), allow_pickle=True)
 		self.dataset_length = len(self.data_list)
 
-		if short_traj:
-			length_threshold = traj_length_threshold
+		if self.args.dataset_traj_length_limit>0:			
 			self.short_data_list = []
 			self.dataset_trajectory_lengths = []
 			for i in range(self.dataset_length):
-				if self.data_list[i].shape[0]<length_threshold:
+				if self.data_list[i].shape[0]<self.args.dataset_traj_length_limit:
 					self.short_data_list.append(self.data_list[i])
 					self.dataset_trajectory_lengths.append(self.data_list[i].shape[0])
 
