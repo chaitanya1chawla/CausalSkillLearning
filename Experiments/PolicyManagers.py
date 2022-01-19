@@ -157,7 +157,8 @@ class PolicyManager_BaseClass():
 				return sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj
 	
 		# elif self.args.data in ['MIME','OldMIME'] or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB']:
 
 			# If we're imitating... select demonstrations from the particular task.
 			if self.args.setting=='imitation' and (self.args.data in ['Roboturk','RoboMimic']):
@@ -178,7 +179,7 @@ class PolicyManager_BaseClass():
 
 			self.current_traj_len = len(trajectory)
 
-			if self.args.data in ['MIME','OldMIME']:
+			if self.args.data in ['MIME','OldMIME','GRAB']:
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
 			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
@@ -1132,6 +1133,25 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 
+		elif self.args.data=='GRAB':
+			
+			self.state_size = 24
+			self.state_dim = 24
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 50
+			stat_dir_name = 'GRAB'
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+
 		# Training parameters. 		
 		self.baseline_value = 0.
 		self.beta_decay = 0.9
@@ -1445,7 +1465,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 			return concatenated_traj, sample_action_seq, sample_traj
 		
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB']:
 			data_element = self.dataset[i]
 
 			# If Invalid.
@@ -1498,17 +1519,19 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				# CONDITIONAL INFORMATION for the encoder... 
 
-				if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
+				if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB']:
 					pass
-				elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
-					# robot_states = data_element['robot-state'][start_timepoint:end_timepoint]
-					# object_states = data_element['object-state'][start_timepoint:end_timepoint]
-					pass
+				# if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
+				# 	pass
+				# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
+				# 	# robot_states = data_element['robot-state'][start_timepoint:end_timepoint]
+				# 	# object_states = data_element['object-state'][start_timepoint:end_timepoint]
+				# 	pass
 
-					# self.conditional_information = np.zeros((len(trajectory),self.conditional_info_size))
-					# self.conditional_information[:,:self.cond_robot_state_size] = robot_states
-					# self.conditional_information[:,self.cond_robot_state_size:object_states.shape[-1]] = object_states								
-					# conditional_info = np.concatenate([robot_states,object_states],axis=1)	
+				# 	# self.conditional_information = np.zeros((len(trajectory),self.conditional_info_size))
+				# 	# self.conditional_information[:,:self.cond_robot_state_size] = robot_states
+				# 	# self.conditional_information[:,self.cond_robot_state_size:object_states.shape[-1]] = object_states								
+				# 	# conditional_info = np.concatenate([robot_states,object_states],axis=1)	
 			else:					
 				return None, None, None
 
@@ -1573,8 +1596,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		elif self.args.data in ['MIME','OldMIME']:
 			self.state_dim = 16
 			self.rollout_timesteps = self.traj_length
-		if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
+		elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
 			self.state_dim = 8
+			self.rollout_timesteps = self.traj_length
+		elif self.args.data in ['GRAB']:
+			self.state_dim = 24
 			self.rollout_timesteps = self.traj_length
 
 		if rollout_length is not None:
@@ -1737,7 +1763,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.visualize_embedding_space(suffix=suffix)
 
 		# if self.args.data=="MIME" or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB']:			
 			print("Running Evaluation of State Distances on small test set.")
 			# self.evaluate_metrics()		
 
@@ -1789,7 +1816,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
 				self.state_dim = 8
-				self.rollout_timesteps = self.traj_length		
+				self.rollout_timesteps = self.traj_length
+			if self.args.data in ['GRAB']:
+				self.state_dim = 24
+				self.rollout_timesteps = self.traj_length
 
 			self.trajectory_set = np.zeros((self.N, self.rollout_timesteps, self.state_dim))
 
@@ -1941,7 +1971,9 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 			return concatenated_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), sample_traj.transpose((1,0,2))
 				
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB']:			
+
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 				data_element = self.dataset[i:i+self.args.batch_size]
 			else:
@@ -2173,6 +2205,28 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			# Create visualizer object
 			self.visualizer = MocapVisualizer(args=self.args)
 
+		elif self.args.data=='GRAB':
+			
+			self.state_size = 24
+			self.state_dim = 24
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 50
+			stat_dir_name = 'GRAB'
+			self.conditional_information = None
+			self.conditional_viz_env = False			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+			
+
 		self.training_phase_size = self.args.training_phase_size
 		self.number_epochs = self.args.epochs
 		
@@ -2329,7 +2383,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 	def visualize_trajectory(self, trajectory, segmentations=None, i=0, suffix='_Img'):
 
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB']:			
+
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 				unnorm_trajectory = (trajectory*self.norm_denom_value)+self.norm_sub_value
 			else:
@@ -2450,7 +2506,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			variational_rollout_image = np.array(variational_rollout_image)
 			latent_rollout_image = np.array(latent_rollout_image)
 			
-			if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+			# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+			if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB']:
 				# Feeding as list of image because gif_summary.				
 				log_dict['GT Trajectory'] = self.return_wandb_gif(gt_trajectory_image)
 				log_dict['Variational Rollout'] = self.return_wandb_gif(variational_rollout_image)
@@ -3330,6 +3387,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# Visualize space if the subpolicy has been trained...
 		# Running even with the fix_subpolicy, so that we can evaluate joint reconstruction.
 		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:			
+					
 			print("Running Visualization on Robot Data.")	
 
 			########################################
@@ -4041,7 +4099,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
 
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB']:
 					   
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 
@@ -4096,7 +4155,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				batch_trajectory = (batch_trajectory-self.norm_sub_value)/self.norm_denom_value
 
 			# Set condiitonal information. 
-			if self.args.data in ['MIME','OldMIME']:
+			if self.args.data in ['MIME','OldMIME','GRAB']:
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
@@ -5221,7 +5280,9 @@ class PolicyManager_DMPBaselines(PolicyManager_Joint):
 					self.state_size = 14
 				elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
 					sample_traj = sample_traj[:,:-1]
-					self.state_size = 7					
+					self.state_size = 7	
+
+					
 					# sample_traj = gaussian_filter1d(sample_traj,3.5,axis=0,mode='nearest')
 				# elif self.args.data=='Mocap':
 				# 	sample_traj = sample_traj
