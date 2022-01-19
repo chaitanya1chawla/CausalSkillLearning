@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 from headers import *
-import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders
+import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders, GRAB_DataLoaders
 from PolicyManagers import *
 import TestClass
 import faulthandler
@@ -49,9 +49,13 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = Robomimic_DataLoaders.OrigRobomimic_Dataset(args)
 	elif args.data=='RoboMimic':
 		dataset = Robomimic_DataLoaders.Robomimic_Dataset(args)
+	elif args.data=='GRABPreproc':
+		dataset = GRAB_DataLoaders.GRAB_PreDataset(args)
+	elif args.data=='GRAB':
+		dataset = GRAB_DataLoaders.GRAB_Dataset(args)
 
-	# print("Embedding in return dataset to optimize dataset..")
-	# embed()
+	print("Embedding in return dataset to figure out dataset..")
+	embed()
 
 	return dataset
 

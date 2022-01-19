@@ -134,8 +134,9 @@ class FrankaVisualizer(SawyerVisualizer):
 class BaxterVisualizer(object):
 
 	# def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_010/saved_models/Model_epoch500"):
-	def __init__(self, has_display=False, args=None, IK_network_path=None):		
 	# def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_050/saved_models/Model_epoch2000"):
+	def __init__(self, has_display=False, args=None, IK_network_path=None):		
+
 
 		# Create environment.
 		print("Do I have a display?", has_display)

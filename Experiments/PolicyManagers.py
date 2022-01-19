@@ -7196,7 +7196,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					for k in range(2):
 						# Now visualize the source trajectory. 
 						# source_gif = self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_source_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="Traj{0}_SourceTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories)
-						source_gif = self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_source_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="Traj{0}_SourceTraj.gif".format(k), return_and_save=True, end_effector=self.args.ee_trajectories)
+						source_gif = self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_source_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="Traj{0}_SourceTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories)
 						self.gif_logs['Traj{0}_Source_Traj'.format(k)] = np.array(source_gif)
 
 						# Now visualize the target trajectory. 
