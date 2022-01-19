@@ -21,8 +21,16 @@ class Roboturk_Dataset(Dataset):
 
 	# Class implementing instance of Roboturk dataset. 
 	def __init__(self, args):
-		self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'
+		# self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'		
+		
 		self.args = args
+		if self.args.datadir is None:
+			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
+			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
+			self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/Roboturk/'
+		else:
+			self.dataset_directory = self.args.datadir			
+		
 		# Require a task list. 
 
 		# The task name is needed for setting the environment, rendering. 
@@ -135,7 +143,7 @@ class Roboturk_Dataset(Dataset):
 		data_element['is_valid'] = True
 
 		return data_element
-
+	
 	def close(self):
 		for file in self.files:
 			file.close()
@@ -159,6 +167,7 @@ class Roboturk_Dataset(Dataset):
 			obs = self.env._get_observation()
 			robot_state_size = obs['robot-state'].shape[0]
 			object_state_size = obs['object-state'].shape[0]	
+
 
 			# Create list of files for this task. 
 			task_demo_list = []
@@ -233,9 +242,82 @@ class Roboturk_Dataset(Dataset):
 			# Now save this file_demo_list. 
 			np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array.npy"),task_demo_array)
 
+	def compute_statistics(self):
+
+		self.state_size = 8
+		self.total_length = self.__len__()
+		mean = np.zeros((self.state_size))
+		variance = np.zeros((self.state_size))
+		mins = np.zeros((self.total_length, self.state_size))
+		maxs = np.zeros((self.total_length, self.state_size))
+		lens = np.zeros((self.total_length))
+
+		# And velocity statistics. 
+		vel_mean = np.zeros((self.state_size))
+		vel_variance = np.zeros((self.state_size))
+		vel_mins = np.zeros((self.total_length, self.state_size))
+		vel_maxs = np.zeros((self.total_length, self.state_size))
+
+		
+		for i in range(self.total_length):
+
+			print("Phase 1: DP: ",i)
+			data_element = self.__getitem__(i)
+
+			if data_element['is_valid']:
+				demo = data_element['demo']
+				vel = np.diff(demo,axis=0)
+				mins[i] = demo.min(axis=0)
+				maxs[i] = demo.max(axis=0)
+				mean += demo.sum(axis=0)
+				lens[i] = demo.shape[0]
+
+				vel_mins[i] = abs(vel).min(axis=0)
+				vel_maxs[i] = abs(vel).max(axis=0)
+				vel_mean += vel.sum(axis=0)			
+
+		mean /= lens.sum()
+		vel_mean /= lens.sum()
+
+		for i in range(self.total_length):
+
+			print("Phase 2: DP: ",i)
+			data_element = self.__getitem__(i)
+			
+			# Just need to normalize the demonstration. Not the rest. 
+			if data_element['is_valid']:
+				demo = data_element['demo']
+				vel = np.diff(demo,axis=0)
+				variance += ((demo-mean)**2).sum(axis=0)
+				vel_variance += ((vel-vel_mean)**2).sum(axis=0)
+
+		variance /= lens.sum()
+		variance = np.sqrt(variance)
+
+		vel_variance /= lens.sum()
+		vel_variance = np.sqrt(vel_variance)
+
+		max_value = maxs.max(axis=0)
+		min_value = mins.min(axis=0)
+
+		vel_max_value = vel_maxs.max(axis=0)
+		vel_min_value = vel_mins.min(axis=0)
+
+		np.save("Roboturk_Mean.npy", mean)
+		np.save("Roboturk_Var.npy", variance)
+		np.save("Roboturk_Min.npy", min_value)
+		np.save("Roboturk_Max.npy", max_value)
+		np.save("Roboturk_Vel_Mean.npy", vel_mean)
+		np.save("Roboturk_Vel_Var.npy", vel_variance)
+		np.save("Roboturk_Vel_Min.npy", vel_min_value)
+		np.save("Roboturk_Vel_Max.npy", vel_max_value)
+
 class Roboturk_FullDataset(Roboturk_Dataset):
+	
 	def __init__(self, args):
+		
 		super(Roboturk_FullDataset, self).__init__(args)
+		
 		self.environment_names = ["SawyerPickPlaceBread","SawyerPickPlaceCan","SawyerPickPlaceCereal","SawyerPickPlace","SawyerPickPlaceMilk","SawyerNutAssembly", "SawyerNutAssemblyRound","SawyerNutAssemblySquare"]
 
 	def setup(self):
@@ -264,6 +346,9 @@ class Roboturk_FullDataset(Roboturk_Dataset):
 		# print("Orig:", len(data_element['demo']),"New length:",resample_length)
 
 		self.kernel_bandwidth = self.args.smoothing_kernel_bandwidth
+		
+		# Trivially adding task ID to data element.
+		data_element['task_id'] = task_index
 
 		if resample_length<=1 or data_element['robot-state'].shape[0]<=1:
 			data_element['is_valid'] = False			
@@ -292,8 +377,16 @@ class Roboturk_SegmentedDataset(Roboturk_Dataset):
 
 		super(Roboturk_SegmentedDataset, self).__init__()
 		
-		self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'
 
+		self.args = args
+		# self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'
+		if self.args.datadir is None:
+			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
+			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
+			self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/Roboturk/'
+		else:
+			self.dataset_directory = self.args.datadir	
+		
 		# Require a task list. 
 		# The task name is needed for setting the environment, rendering. 
 		# We shouldn't need the environment for .. training though, should we? 
@@ -338,7 +431,16 @@ class Roboturk_NewSegmentedDataset(Dataset):
 
 		super(Roboturk_NewSegmentedDataset, self).__init__()
 		
-		self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'
+		# self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'
+		# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/Roboturk/'
+		self.args = args
+		if self.args.datadir is None:
+			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
+			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
+			self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/Roboturk/'
+		else:
+			self.dataset_directory = self.args.datadir	
+		
 		self.args = args
 		# Require a task list. 
 		# The task name is needed for setting the environment, rendering. 
@@ -349,6 +451,9 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		self.num_demos = np.array([1069, 1069, 1069, 1069, 1144, 1145])
 		self.cummulative_num_demos = self.num_demos.cumsum()
 		self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
+
+		self.bad_original_index_list = [4900,537]
+		
 		# Append -1 to the start of cummulative_num_demos. This has two purposes. 
 		# The first is that when we are at index 0 of the dataset, if we appended 0, np.searchsorted returns 0, rather than 1. 
 		# For index 1, it returns 1. This was becoming inconsistent behavior for demonstrations in the same task. 
@@ -365,7 +470,7 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		self.files = []
 		# for i in range(len(self.task_list)):
 		for i in range(len(self.task_list)):
-			self.files.append( np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
+			self.files.append(np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
 
 		# # Seems to follow joint angles order:
 		# # ('time','right_j0', 'head_pan', 'right_j1', 'right_j2', 'right_j3', 'right_j4', 'right_j5', 'right_j6', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'Milk0', 'Bread0', 'Cereal0', 'Can0').
@@ -380,6 +485,77 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		# # gripper_open = [0.0115, -0.0115]
 		# # gripper_closed = [-0.020833, 0.020833]
 
+		# Get dataset trajectory lengths for smart batching
+		self.dataset_trajectory_lengths = np.zeros(self.total_length)
+		for index in range(self.total_length):
+			# Get bucket that index falls into based on num_demos array. 
+			task_index = np.searchsorted(self.cummulative_num_demos, index, side='right')-1
+			
+			# Decide task ID, and new index modulo num_demos.
+			# Subtract number of demonstrations in cumsum until then, and then 				
+			new_index = index-self.cummulative_num_demos[max(task_index,0)]		
+			data_element = self.files[task_index][new_index]
+
+			self.dataset_trajectory_lengths[index] = len(data_element['demo'])
+
+		######################################################
+		# Now implementing dataset_trajectory_length_limits. 
+		######################################################
+		
+		if self.args.dataset_traj_length_limit>0:
+			# Essentially will need new self.cummulative_num_demos and new .. file index map list things. 
+			# Also will need to set total_length. 
+
+			self.full_max_length = self.dataset_trajectory_lengths.max()
+			self.full_length = copy.deepcopy(self.total_length)
+			self.full_cummulative_num_demos = copy.deepcopy(self.cummulative_num_demos)
+			self.full_num_demos = copy.deepcopy(self.num_demos)
+			self.full_files = copy.deepcopy(self.files)
+			self.files = [[] for i in range(len(self.task_list))]
+			self.full_dataset_trajectory_lengths = copy.deepcopy(self.dataset_trajectory_lengths)
+			self.dataset_trajectory_lengths = []
+			self.num_demos = np.zeros(len(self.task_list),dtype=int)
+
+			for index in range(self.full_length):
+				# Get bucket that index falls into based on num_demos array. 
+				task_index = np.searchsorted(self.full_cummulative_num_demos, index, side='right')-1
+				# Get the demo index in this task list. 
+				new_index = index-self.full_cummulative_num_demos[max(task_index,0)]
+
+				# Check the length of this particular trajectory and its validity. 
+				if (self.full_dataset_trajectory_lengths[index] < self.args.dataset_traj_length_limit) and (index not in self.bad_original_index_list):
+					# Add from old list to new. 
+					self.files[task_index].append(self.full_files[task_index][new_index])
+					self.dataset_trajectory_lengths.append(self.full_dataset_trajectory_lengths[index])
+					self.num_demos[task_index] += 1
+				else:
+					pass
+
+					# Reduce count. 
+					# self.num_demos[task_index] -= 1
+					
+					# # Pop item from files. It's still saved in full_files. 					
+					# # self.files[task_index].pop(new_index)
+					# self.files[task_index] = np.delete(self.files[task_index],new_index)
+					# Approach with opposite pattern.. instead of deleting invalid files, add valid ones.
+					
+					# # Pop item from dataset_trajectory_lengths. 
+					# self.dataset_trajectory_lengths = np.delete(self.dataset_trajectory_lengths, index)
+
+			# Set new cummulative num demos. 
+			self.cummulative_num_demos = self.num_demos.cumsum()
+			self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
+			# Set new total length.
+			self.total_length = self.cummulative_num_demos[-1]
+			# Make array.
+			self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)
+
+			for t in range(len(self.task_list)):
+				self.files[t] = np.array(self.files[t])
+
+			# By popping element from files / dataset_traj_lengths, we now don't need to change indexing.
+		
+
 	def __len__(self):
 		return self.total_length
 
@@ -392,6 +568,8 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		# Get bucket that index falls into based on num_demos array. 
 		task_index = np.searchsorted(self.cummulative_num_demos, index, side='right')-1
 		
+		
+
 		# Decide task ID, and new index modulo num_demos.
 		# Subtract number of demonstrations in cumsum until then, and then 				
 		new_index = index-self.cummulative_num_demos[max(task_index,0)]		
@@ -402,11 +580,12 @@ class Roboturk_NewSegmentedDataset(Dataset):
 
 		self.kernel_bandwidth = self.args.smoothing_kernel_bandwidth
 
-		if resample_length<=1 or index==4900 or index==537:
+		if resample_length<=1 or ((index in self.bad_original_index_list) and ((self.args.dataset_traj_length_limit==-1) or (self.args.dataset_traj_length_limit>self.full_max_length))):
+			# Only skip elements here if we didn't artificially shorten trajs
 			data_element['is_valid'] = False			
 		else:
 			data_element['is_valid'] = True
-
+			
 			if self.args.smoothen:
 				data_element['demo'] = gaussian_filter1d(data_element['demo'],self.kernel_bandwidth,axis=0,mode='nearest')
 				data_element['robot-state'] = gaussian_filter1d(data_element['robot-state'],self.kernel_bandwidth,axis=0,mode='nearest')
@@ -415,6 +594,8 @@ class Roboturk_NewSegmentedDataset(Dataset):
 
 			data_element['environment-name'] = self.environment_names[task_index]
 			data_element['task-id'] = task_index
+			# Trivially adding task ID to data element.
+			data_element['task_id'] = task_index
 
 			if self.args.ds_freq>1:
 				data_element['demo'] = resample(data_element['demo'], resample_length)
@@ -475,6 +656,18 @@ class Roboturk_Dataloader_Tester(unittest.TestCase):
 		check_demo_data = (data_element['demo']==np.load("Test_Data/Roboturk_Dataloader_DE.npy")).all()
 
 		self.assertTrue(validity and check_demo_data)
+
+class RealRoboturk_Dataset(Dataset):
+	
+	def __init__(self, args):
+
+		self.dataset_directory = '/data1/tanmayshankar/RealRoboturk'
+		self.args = args
+
+
+		
+		embed()
+		pass 
 
 if __name__ == '__main__':
 	# Run all tests defined for the dataloader.

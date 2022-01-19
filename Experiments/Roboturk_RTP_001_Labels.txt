@@ -1,0 +1,50 @@
+0 - Place to robot's left
+1 - Place to robot's right
+2 - Noisy move
+3 - Place to robot left
+4 - Grasp and place from robot right to mid
+5 - Noisy move
+6 - Noisy move
+7 - Small push / to robot left
+8 - Noisy move
+9 - Place from robot robot right to mid
+10 - Noisy move then place to robot left
+11 - Reach from robot left
+12 - Reach from robot mid left to right
+13 - Noisy move
+14 - Noisy move
+15 - Pick and place
+16 - Noisy move
+17 - Move to robot left nad then back right
+18 - Grasp
+19 - Reach from left mid to right
+20 - Place from robot mid to robot left 
+21 - Place from robot right to robot mid left
+22 - Place from robot right to robot mid left
+23 - Noisy move
+24 - Noisy move
+25 - Reach from robot left to robot right
+26 - Place from robot mid to left
+27 - Place from robot right to left
+28 - Place from robot right to left
+29 - Place from robot mid to left
+30 - Place from robot mid to left
+31 - Noisy move
+32 - MOve to robot left then back to mid
+33 - Place from robot left to robot right
+34 - Noisy Move
+35 - Place from robot right to robot left
+36 - Place from robot left to robot right
+37 - Lift
+38 - Place from robot left to robot right
+39 - Place from robot right to robot left
+40 - Reach from robot left mid
+41 - Lift / Grasp
+42 - Place from robot right to robot left
+43 - Noisy move
+44 - Place from robot mid to left
+45 - Lift / Grasp
+46 - Lift / Grasp
+47 - Place from robot mid to left
+48 - Place from robot right mid to robot left
+49 - Lift / Grasp

@@ -11,27 +11,42 @@ from __future__ import print_function
 from absl import flags, app
 import copy, os, imageio, scipy.misc, pdb, math, time, numpy as np
 
-import robosuite, threading
-from robosuite.wrappers import IKWrapper
 import matplotlib.pyplot as plt
 from IPython import embed
+from memory_profiler import profile
+from PolicyNetworks import *
+import torch
+
+# Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
+use_cuda = torch.cuda.is_available()
+device = torch.device("cuda" if use_cuda else "cpu")
+torch.set_printoptions(sci_mode=False, precision=2)
 
 # # Mocap viz.
 # import MocapVisualizationUtils
 # from mocap_processing.motion.pfnn import Animation, BVH
 
-class SawyerVisualizer():
+class SawyerVisualizer(object):
 
 	def __init__(self, has_display=False):
-
+	
 		# Create environment.
 		print("Do I have a display?", has_display)
-		# self.base_env = robosuite.make('BaxterLift', has_renderer=has_display)
-		self.base_env = robosuite.make("SawyerViz",has_renderer=has_display)
-
+		
+		import robosuite, threading
 		# Create kinematics object. 
-		self.sawyer_IK_object = IKWrapper(self.base_env)
-		self.environment = self.sawyer_IK_object.env        
+		if float(robosuite.__version__[:3])<1.:
+			self.new_robosuite = 0
+			self.base_env = robosuite.make("SawyerViz",has_renderer=has_display)
+			from robosuite.wrappers import IKWrapper					
+			self.sawyer_IK_object = IKWrapper(self.base_env)
+			self.environment = self.sawyer_IK_object.env
+		else:
+			self.new_robosuite = 1
+			self.base_env = robosuite.make("Viz",robots=['Sawyer'],has_renderer=has_display)
+			self.sawyer_IK_object = None
+			self.environment = self.base_env
+		
 
 	def update_state(self):
 		# Updates all joint states
@@ -44,7 +59,10 @@ class SawyerVisualizer():
 
 		# Set usual joint angles through set joint positions API.
 		self.environment.reset()
-		self.environment.set_robot_joint_positions(joint_angles[:7])
+		if self.new_robosuite==0:
+			self.environment.set_robot_joint_positions(joint_angles[:7])
+		else:
+			self.environment.robots[0].set_robot_joint_positions(joint_angles[:7])
 
 		# For gripper, use "step". 
 		# Mujoco requires actions that are -1 for Open and 1 for Close.
@@ -63,7 +81,7 @@ class SawyerVisualizer():
 		image = np.flipud(self.environment.sim.render(600, 600, camera_name='vizview1'))
 		return image
 
-	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None):
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False):
 
 		image_list = []
 		for t in range(trajectory.shape[0]):
@@ -83,31 +101,142 @@ class SawyerVisualizer():
 		else:
 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)            
 
-class BaxterVisualizer():
+class FrankaVisualizer(SawyerVisualizer):
 
 	def __init__(self, has_display=False):
 
-		# Create environment.
-		print("Do I have a display?", has_display)
-		# self.base_env = robosuite.make('BaxterLift', has_renderer=has_display)
-		self.base_env = robosuite.make("BaxterViz",has_renderer=has_display)
+		super(FrankaVisualizer, self).__init__(has_display=has_display)
+
+		import robosuite, threading
 
 		# Create kinematics object. 
-		self.baxter_IK_object = IKWrapper(self.base_env)
-		self.environment = self.baxter_IK_object.env        
+		self.base_env = robosuite.make("Viz",robots=['Panda'],has_renderer=has_display)
+		self.sawyer_IK_object = None
+		self.environment = self.base_env
+
+	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False):
+
+		# Set usual joint angles through set joint positions API.
+		self.environment.reset()
+		if self.new_robosuite==0:
+			self.environment.set_robot_joint_positions(joint_angles[:7])
+		else:
+			self.environment.robots[0].set_robot_joint_positions(joint_angles[:7])
+		actions = np.zeros((8))
+		actions[-1] = joint_angles[-1]
+
+		# Move gripper positions.
+		self.environment.step(actions)
+
+		image = np.flipud(self.environment.sim.render(600, 600, camera_name='vizview2'))
+		return image
+
+class BaxterVisualizer(object):
+
+	# def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_010/saved_models/Model_epoch500"):
+	# def __init__(self, has_display=False, args=None, IK_network_path="ExpWandbLogs/IK_050/saved_models/Model_epoch2000"):
+	def __init__(self, has_display=False, args=None, IK_network_path=None):		
+
+
+		# Create environment.
+		print("Do I have a display?", has_display)
+		
+		import robosuite, threading
+		# from robosuite.wrappers import IKWrapper		
+
+		if float(robosuite.__version__[:3])<1.:
+			self.new_robosuite = 0
+			self.base_env = robosuite.make("BaxterViz",has_renderer=has_display)
+			from robosuite.wrappers import IKWrapper					
+			self.baxter_IK_object = IKWrapper(self.base_env)
+			self.environment = self.baxter_IK_object.env
+
+			if IK_network_path is not None:
+				self.load_IK_network(IK_network_path)
+			else:
+				self.IK_network = None
+
+		else:
+			self.new_robosuite = 1
+			self.base_env = robosuite.make("TwoArmViz",robots=['Baxter'],has_renderer=has_display)
+			self.baxter_IK_object = None
+			self.environment = self.base_env
+
+		# # self.base_env = robosuite.make('BaxterLift', has_renderer=has_display)
+		# self.base_env = robosuite.make("BaxterViz",has_renderer=has_display)
+
+		# # Create kinematics object. 
+		# self.baxter_IK_object = IKWrapper(self.base_env)
+		# self.environment = self.baxter_IK_object.env  
+		# self.args = args 
+
+	def load_IK_network(self, path):
+		
+		# Now load the IK network! 
+		self.IK_state_size = 14
+		self.hidden_size = 48
+		self.number_layers = 4
+		self.IK_network = ContinuousMLP(self.IK_state_size, self.hidden_size, self.IK_state_size, args=self.args, number_layers=self.number_layers).to(device)
+
+		load_object = torch.load(path)
+		self.IK_network.load_state_dict(load_object['IK_Network'])
+
+		print("Loaded IK Network from: ", path)
 	
 	def update_state(self):
 		# Updates all joint states
-		self.full_state = self.environment._get_observation()
+		if self.new_robosuite:
+			self.full_state = self.environment._get_observations()
+		else:
+			self.full_state = self.environment._get_observation()
 
-	def set_ee_pose_return_image(self, ee_pose, arm='right', seed=None):
+	def set_ee_pose(self, ee_pose, arm='both', seed=None):
 
 		# Assumes EE pose is Position in the first three elements, and quaternion in last 4 elements. 
+
+		self.environment.reset()		
 		self.update_state()
 
+		#################################################
+		# Normalize EE pose Quaternions
+		#################################################
+
+		if arm=='both':
+			ee_pose[3:7] = ee_pose[3:7]/np.linalg.norm(ee_pose[3:7])
+			ee_pose[10:14] = ee_pose[10:14]/np.linalg.norm(ee_pose[10:14])
+		else:
+			ee_pose[3:] = ee_pose[3:]/np.linalg.norm(ee_pose[3:])
+
 		if seed is None:
-			# Set seed to current state.
-			seed = self.full_state['joint_pos']
+			if self.IK_network is None:
+				# Set seed to current state.
+				seed = self.full_state['joint_pos']
+			else:
+				# Feed to IK network			
+				# Nice thing about doing this inside the visualizer is that the trajectories will always be correctly unnormalized w.r.t mean / variance / min max. 
+				# HEre, just normalize the L and R ee quaternions.. important when feeding in ee poses that are predicted, because otherwise domain shift. 			
+
+				# Should do this before feeding to IK Network.
+			
+				# print("Embed in IK Viz")
+				# embed()
+
+				seed = self.IK_network.forward(torch.tensor(ee_pose[:14]).to(device).float()).detach().cpu().numpy()
+				# ditch network and see what happens...
+				# seed = self.full_state['joint_pos']
+				# seed = np.zeros(14)
+				# seed = np.random.random(14)
+				# seed = np.ones(14)*0.5
+
+				# Mean position
+				# mean_position = np.array([ 0.43,  0.48, -1.87,  0.94, -2.01, -1.44,  1.54, -0.41,  0.41, 1.57,  1.29, -1.15,  1.08,  1.69])
+				# mean_position = np.array([ 0.21,  0.2 , -1.26,  1.28, -0.96,  0.13,  0.  , -0.3 ,  0.06, 1.33,  1.29,  0.01,  0.26, -0.01])
+				# seed = mean_position
+
+			# The rest poses / seed only makes a difference when you make the IK_object's controller state get set to this seed....
+
+			# Maybe try not syncing? 
+			self.baxter_IK_object.controller.sync_ik_robot(seed, simulate=False, sync_last=True)
 
 		if arm == 'right':
 			joint_positions = self.baxter_IK_object.controller.inverse_kinematics(
@@ -132,18 +261,36 @@ class BaxterVisualizer():
 				target_position_right=ee_pose[:3],
 				target_orientation_right=ee_pose[3:7],
 				target_position_left=ee_pose[7:10],
-				target_orientation_left=ee_pose[10:],
+				target_orientation_left=ee_pose[10:14],
 				rest_poses=seed
 			)
-		image = self.set_joint_pose_return_image(joint_positions, arm=arm, gripper=False)
-		return image
 
-	def set_joint_pose_return_image(self, joint_pose, arm='both', gripper=False):
+		# self.set_joint_pose(joint_positions, arm=arm, gripper=False)
+
+		return joint_positions
+
+	def set_ee_pose_return_image(self, ee_pose, arm='both', seed=None):
+		
+		joint_positions = self.set_ee_pose(ee_pose, arm=arm, seed=seed)
+
+		image = self.set_joint_pose_return_image(joint_positions, arm=arm, gripper=False)
+
+		return image, joint_positions
+
+	def set_joint_pose(self, joint_pose, arm='both', gripper=False):
 
 		# FOR FULL 16 DOF STATE: ASSUMES JOINT_POSE IS <LEFT_JA, RIGHT_JA, LEFT_GRIPPER, RIGHT_GRIPPER>.
 
 		self.update_state()
-		self.state = copy.deepcopy(self.full_state['joint_pos'])
+
+		if self.new_robosuite:
+			# self.state = copy.deepcopy(self.full_state['robot0_joint_pos'])
+
+			# Since the environment observation function doesn't return raw joint poses, we are going to index into the sim state instead.
+			indices = [0,1,2,3,4,5,6,9,10,11,12,13,14,15]
+			self.state = self.environment.sim.get_state()[1][indices]
+		else:
+			self.state = copy.deepcopy(self.full_state['joint_pos'])
 		# THE FIRST 7 JOINT ANGLES IN MUJOCO ARE THE RIGHT HAND. 
 		# THE LAST 7 JOINT ANGLES IN MUJOCO ARE THE LEFT HAND. 
 		
@@ -160,8 +307,14 @@ class BaxterVisualizer():
 			self.state[:7] = joint_pose[7:14]
 			# Now left hand. 
 			self.state[7:] = joint_pose[:7]
+			
 		# Set the joint angles magically. 
-		self.environment.set_robot_joint_positions(self.state)
+		# self.environment.set_robot_joint_positions(self.state)
+
+		if self.new_robosuite==0:
+			self.environment.set_robot_joint_positions(self.state)
+		else:
+			self.environment.robots[0].set_robot_joint_positions(self.state)
 
 		action = np.zeros((16))
 		if gripper:
@@ -177,14 +330,27 @@ class BaxterVisualizer():
 			# Move gripper positions.
 			self.environment.step(action)
 
+	def set_joint_pose_return_image(self, joint_pose, arm='both', gripper=False):
+
+		# Just use the set pose function..
+		self.set_joint_pose(joint_pose=joint_pose, arm=arm, gripper=gripper)
+
 		image = np.flipud(self.environment.sim.render(600, 600, camera_name='vizview1'))
 		return image
 
-	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None):
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False):
 
 		image_list = []
+		previous_joint_positions = None
+
 		for t in range(trajectory.shape[0]):
-			new_image = self.set_joint_pose_return_image(trajectory[t])
+
+			# Check whether it's end effector or joint trajectory. 
+			if end_effector: 
+				new_image, previous_joint_positions = self.set_ee_pose_return_image(trajectory[t], seed=previous_joint_positions)
+			else:
+				new_image = self.set_joint_pose_return_image(trajectory[t])
+
 			image_list.append(new_image)
 
 			# Insert white 
@@ -323,7 +489,8 @@ class ToyDataVisualizer():
 
 		pass
 
-	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None):
+	# @profile
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False):
 
 		fig = plt.figure()		
 		ax = fig.gca()
@@ -337,6 +504,10 @@ class ToyDataVisualizer():
 		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)
 		image = np.transpose(image, axes=[2,0,1])
 
+		ax.clear()
+		fig.clear()
+		plt.close(fig)
+
 		return image
 
 
@@ -347,3 +518,4 @@ if __name__ == '__main__':
 	visualizer = MujocoVisualizer()
 	# img = visualizer.set_ee_pose_return_image(end_eff_pose, arm='right')
 	# scipy.misc.imsave('mj_vis.png', img)
+

@@ -119,14 +119,55 @@ class MIME_Dataset(Dataset):
 
 class MIME_NewDataset(Dataset):
 
-	def __init__(self, split='all'):
-		self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
+	def __init__(self, args, split='all', short_traj=False, traj_length_threshold=500):
+
+		# 
+		self.args = args		
+
+		if self.args.datadir is None:
+			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
+			self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
+		else:
+			self.dataset_directory = self.args.datadir
 
 		# Load the entire set of trajectories. 
-		self.data_list = np.load(os.path.join(self.dataset_directory, "Data_List.npy"),allow_pickle=True)
+		
+		self.file = "Data_List.npy"
+		self.key = 'demo'
+		
+		if isinstance(self, MIME_NewMetaDataset):
+			# This is not an elif condition, because the first always evaluates to true...		
+			# self.file = "MIMEDataArray.npy"
+			# Just load the EE augmented version anyway.. just 80Mb bigger
+			self.file = "MIMEDataArray_EEAugmented.npy"
+		
+		self.original_data_list = np.load(os.path.join(self.dataset_directory, self.file),allow_pickle=True)			
+		self.original_dataset_length = len(self.original_data_list)
+
+		# Now only selecting valid datapoints.
+		self.data_list = []
+		for i in range(self.original_dataset_length):
+			if self.original_data_list[i]['is_valid']:
+				self.data_list.append(self.original_data_list[i])
 
 		self.dataset_length = len(self.data_list)
-	
+
+		if short_traj:
+			
+			length_threshold = traj_length_threshold
+			self.short_data_list = []
+			self.dataset_trajectory_lengths = []
+			for i in range(self.dataset_length):
+				if self.data_list[i][self.key].shape[0]<length_threshold:
+					self.short_data_list.append(self.data_list[i])
+					self.dataset_trajectory_lengths.append(self.data_list[i][self.key].shape[0])
+
+			self.data_list = self.short_data_list
+			self.dataset_length = len(self.data_list)
+			self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)		
+		
+		self.data_list_array = np.array(self.data_list)
+
 	def __len__(self):
 		# Return length of file list. 
 		return self.dataset_length
@@ -135,7 +176,10 @@ class MIME_NewDataset(Dataset):
 		# Return n'th item of dataset.
 		# This has already processed everything.
 
-		return self.data_list[index]
+		if isinstance(index,np.ndarray):			
+			return list(self.data_list_array[index])
+		else:
+			return self.data_list[index]
 
 	def compute_statistics(self):
 
@@ -206,6 +250,59 @@ class MIME_NewDataset(Dataset):
 		np.save("MIME_Orig_Vel_Var.npy", vel_variance)
 		np.save("MIME_Orig_Vel_Min.npy", vel_min_value)
 		np.save("MIME_Orig_Vel_Max.npy", vel_max_value)
+
+class MIME_NewMetaDataset(MIME_NewDataset):
+
+	def __init__(self, args, split='all', short_traj=False, traj_length_threshold=500):
+
+		super(MIME_NewMetaDataset, self).__init__(args, split=split, short_traj=short_traj, traj_length_threshold=traj_length_threshold)
+
+class MIME_OneHandedDataset(MIME_NewMetaDataset):
+
+	def __init__(self, args, split='all', short_traj=False, traj_length_threshold=500):
+
+		super(MIME_OneHandedDataset, self).__init__(args, split=split, short_traj=short_traj, traj_length_threshold=traj_length_threshold)
+
+		# Things that need to be updated based on the one handed nature of this.. 
+		# self.data_list = self.short_data_list
+		# self.dataset_length = len(self.data_list)
+		# self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)		
+		# self.data_list_array = np.array(self.data_list)
+
+		# Create onehanded lists to add selected trajecotries to.
+		self.onehanded_data_list = []		
+		self.onehanded_dataset_length = 0
+		self.onehanded_dataset_trajectory_lengths = []
+
+		# For every element in the data list, add it to the one handed list if the particular hand is active in this trajcetory? 
+		# If the other hand is inactive? Hmm...
+		# Difference is about bimanual skills - do we want these? Probably not... 	
+		for k, v in enumerate(self.data_list):			
+
+			# Add to left handed data list if the right hand is inactive..
+			if self.args.single_hand=='left':						
+				# Right hand indexing is [:,:7] for all timesteps..
+				joint_traj = v['demo'][:,:7]
+			# Add to right handed data list if the left hand is inactive..
+			elif self.args.single_hand=='right':
+				# Left hand indexing is [:,7:14] for all timesteps..
+				joint_traj = v['demo'][:,7:14]
+
+			# Now check if the off hand is active
+			# Recycling older version of the validity / movement definition.. 
+			offhand_inactive = (np.linalg.norm(np.diff(joint_traj,axis=0),axis=1).max() < 0.02)
+
+			if offhand_inactive:
+				self.onehanded_data_list.append(v)
+				self.onehanded_dataset_trajectory_lengths.append(v['demo'].shape[0])
+				# self.onehanded_dataset_trajectory_lengths.append(self.dataset_trajectory_lengths[k])
+				self.onehanded_dataset_length += 1
+								
+		# Rename these elements, so other classes can access them, and the inherited length and get_item functions work.
+		self.dataset_length = self.onehanded_dataset_length
+		self.dataset_trajectory_lengths = np.array(self.onehanded_dataset_trajectory_lengths)		
+		self.data_list = self.onehanded_data_list
+		self.data_list_array = np.array(self.data_list)
 
 class MIME_Dataloader_Tester(unittest.TestCase):
 	
