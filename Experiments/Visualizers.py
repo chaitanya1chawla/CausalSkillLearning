@@ -392,10 +392,10 @@ class GRABVisualizer(object):
 		self.setup()
 
 	def setup(self):
-		# 
-
-		self.grab_path = self.cfg_object.grab_path
 		
+
+		self.model_path = '/home/tshankar/Research/Code/GRAB/smplx-models/models/'
+		# Don't really need the grab_path, if we aren't going to load the object and table meshes.
 
 		self.meshviewer = self.grab_tools.meshviewer.MeshViewer(width=600,height=600,offscreen=True)
 		self.camera_pose = np.eye(4)
@@ -417,7 +417,7 @@ class GRABVisualizer(object):
 		sbj_mesh = os.path.join(grab_path, '..', seq_data.body.vtemp)
 		sbj_vtemp = np.array(self.grab_tools.meshviewer.Mesh(filename=sbj_mesh).vertices)
 
-		sbj_m = smplx.create(model_path=self.cfg_object.model_path,
+		sbj_m = self.smplx.create(model_path=self.cfg_object.model_path,
 								model_type='smplx',
 								gender=gender,
 								num_pca_comps=n_comps,
@@ -459,11 +459,14 @@ class GRABVisualizer(object):
 			self.meshviewer.set_static_meshes([o_mesh, s_mesh, s_mesh_wf, t_mesh])
 			self.meshviewer.save_snapshot(seq_render_path+'/%04d.png'%frame)
 
-	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, end_effector=False)
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, end_effector=False):
 
-		pass
-		
-	
+		image_list = []
+		image_list.append(255*np.ones((600,600,3)))
+		image_list.append(255*np.ones((600,600,3)))
+		# imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+
+		return image_list		
 
 # class MocapVisualizer():
 
@@ -588,26 +591,36 @@ class ToyDataVisualizer():
 
 		pass
 
+	# CREATING DUPLICATE
 	# @profile
-	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False):
+	# def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False):
 
-		fig = plt.figure()		
-		ax = fig.gca()
-		ax.scatter(trajectory[:,0],trajectory[:,1],c=range(len(trajectory)),cmap='jet')
-		plt.xlim(-10,10)
-		plt.ylim(-10,10)
+	# 	fig = plt.figure()		
+	# 	ax = fig.gca()
+	# 	ax.scatter(trajectory[:,0],trajectory[:,1],c=range(len(trajectory)),cmap='jet')
+	# 	plt.xlim(-10,10)
+	# 	plt.ylim(-10,10)
 
-		fig.canvas.draw()
+	# 	fig.canvas.draw()
 
-		width, height = fig.get_size_inches() * fig.get_dpi()
-		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)
-		image = np.transpose(image, axes=[2,0,1])
+	# 	width, height = fig.get_size_inches() * fig.get_dpi()
+	# 	image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)
+	# 	image = np.transpose(image, axes=[2,0,1])
 
-		ax.clear()
-		fig.clear()
-		plt.close(fig)
+	# 	ax.clear()
+	# 	fig.clear()
+	# 	plt.close(fig)
 
-		return image
+	# 	return image
+
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, end_effector=False):
+
+		image_list = []
+		image_list.append(255*np.ones((600,600,3)))
+		image_list.append(255*np.ones((600,600,3)))
+		# imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+
+		return image_list
 
 
 if __name__ == '__main__':

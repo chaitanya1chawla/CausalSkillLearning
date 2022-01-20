@@ -7180,10 +7180,13 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Now save this z set. 
 		np.save(os.path.join(self.traj_viz_dir_name,"Translated_Zs.npy"),self.translated_latent_zs_for_downstream)
 
-		# Now save all the gifs we created.
-		for key in self.segmented_gif_logs.keys():			
-			# Save. 
-			imageio.mimsave(os.path.join(self.traj_viz_dir_name,"{0}.gif".format(key)), list(self.segmented_gif_logs[key]))
+		# if self.args.data not in ['GRAB'] and self.args.target_domain not in ['']:
+		if self.args.target_domain not in ['GRAB']:
+			
+			# Now save all the gifs we created.
+			for key in self.segmented_gif_logs.keys():			
+				# Save. 
+				imageio.mimsave(os.path.join(self.traj_viz_dir_name,"{0}.gif".format(key)), list(self.segmented_gif_logs[key]))
 
 		# print("embedding in segment source target gifs")
 		# embed()
