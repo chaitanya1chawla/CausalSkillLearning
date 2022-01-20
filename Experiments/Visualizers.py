@@ -366,6 +366,105 @@ class BaxterVisualizer(object):
 		else:
 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
 
+class GRABVisualizer(object):
+
+	def __init__(self, has_display=False):
+
+		# Import files from GRAB repo here? 
+		# How do we import it in such a way that it is in scope for other functions of this class? 
+		# Can we create instances of the modules as class variables?  Yes!
+		
+		# Strategy - 
+		# 1) Add path to GRAB repository here. 
+		# 2) Import GRAB repository tools. 
+		# 3) Create local instances of modules.
+		# 4) Create persistent variables.
+		# 5) Create function that gets called by visualize_joint_trajectory function; put per-iteration code here.
+
+		import sys
+		sys.path.insert(0,'../../GRAB')
+
+		import tools
+		import smplx
+		self.grab_tools = tools
+		self.smplx = smplx
+
+		self.setup()
+
+	def setup(self):
+		# 
+
+		self.grab_path = self.cfg_object.grab_path
+		
+
+		self.meshviewer = self.grab_tools.meshviewer.MeshViewer(width=600,height=600,offscreen=True)
+		self.camera_pose = np.eye(4)
+		self.camera_pose[:3, :3] = self.grab_tools.utils.euler([80, -15, 0], 'xzx')
+		self.camera_pose[:3, 3] = np.array([-.5, -1.4, 1.5])
+		self.meshviewer.update_camera_pose(self.camera_pose)
+
+	def visualize_sequence(self, sequence):
+		
+		# This function mimics the function vis_sequence https://github.com/tanmayshankar/GRAB/blob/master/examples/render_grab.py . 		
+		# We probably need to add functionality to get mean person pose.. 
+
+		seq_data = self.grab_tools.utils.parse_npz(sequence)
+		n_comps = seq_data['n_comps']
+		gender = seq_data['gender']
+
+		T = seq_data.n_frames
+		
+		sbj_mesh = os.path.join(grab_path, '..', seq_data.body.vtemp)
+		sbj_vtemp = np.array(self.grab_tools.meshviewer.Mesh(filename=sbj_mesh).vertices)
+
+		sbj_m = smplx.create(model_path=self.cfg_object.model_path,
+								model_type='smplx',
+								gender=gender,
+								num_pca_comps=n_comps,
+								v_template=sbj_vtemp,
+								batch_size=T)
+
+		sbj_parms = self.grab_tools.utils.params2torch(seq_data.body.params)
+		verts_sbj = self.grab_tools.utils.to_cpu(sbj_m(**sbj_parms).vertices)
+
+		obj_mesh = os.path.join(self.grab_path, '..', seq_data.object.object_mesh)
+		obj_mesh = self.grab_tools.meshviewer.Mesh(filename=obj_mesh)
+		obj_vtemp = np.array(obj_mesh.vertices)
+		obj_m = self.grab_tools.objectmodel.ObjectModel(v_template=obj_vtemp, batch_size=T)
+
+		obj_parms = self.grab_tools.utils.params2torch(seq_data.object.params)
+		verts_obj = self.grab_tools.utils.to_cpu(obj_m(**obj_parms).vertices)
+
+		table_mesh = os.path.join(grab_path, '..', seq_data.table.table_mesh)
+		table_mesh = self.grab_tools.meshviewer.Mesh(filename=table_mesh)
+		table_vtemp = np.array(table_mesh.vertices)
+		table_m = self.grab_tools.objectmodel.ObjectModel(v_template=table_vtemp, batch_size=T)
+
+		table_parms = self.grab_tools.utils.params2torch(seq_data.table.params)
+		verts_table = self.grab_tools.utils.to_cpu(table_m(**table_parms).vertices)
+
+		seq_render_path = self.grab_tools.utils.makepath(sequence.replace('.npz','').replace(cfg.grab_path, cfg.render_path))
+
+		skip_frame = 4
+		for frame in range(0,T, skip_frame):
+			o_mesh = self.grab_tools.meshviewer.Mesh(vertices=verts_obj[frame], faces=obj_mesh.faces, vc=colors['yellow'])
+			o_mesh.set_vertex_colors(vc=colors['red'], vertex_ids=seq_data['contact']['object'][frame] > 0)
+
+			s_mesh = self.grab_tools.meshviewer.Mesh(vertices=verts_sbj[frame], faces=sbj_m.faces, vc=colors['pink'], smooth=True)
+			s_mesh.set_vertex_colors(vc=colors['red'], vertex_ids=seq_data['contact']['body'][frame] > 0)
+
+			s_mesh_wf = self.grab_tools.meshviewer.Mesh(vertices=verts_sbj[frame], faces=sbj_m.faces, vc=colors['grey'], wireframe=True)
+			t_mesh = self.grab_tools.meshviewer.Mesh(vertices=verts_table[frame], faces=table_mesh.faces, vc=colors['white'])
+
+			self.meshviewer.set_static_meshes([o_mesh, s_mesh, s_mesh_wf, t_mesh])
+			self.meshviewer.save_snapshot(seq_render_path+'/%04d.png'%frame)
+
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, end_effector=False)
+
+		pass
+		
+	
+
 # class MocapVisualizer():
 
 # 	def __init__(self, has_display=False, args=None):
