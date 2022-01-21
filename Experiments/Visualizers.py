@@ -11,11 +11,16 @@ from __future__ import print_function
 from absl import flags, app
 import copy, os, imageio, scipy.misc, pdb, math, time, numpy as np
 
+
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from IPython import embed
 from memory_profiler import profile
 from PolicyNetworks import *
 import torch
+from moviepy.video.io.bindings import mplfig_to_npimage
 
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
 use_cuda = torch.cuda.is_available()
@@ -392,7 +397,7 @@ class GRABVisualizer(object):
 		# Set index pairs for links to be drawn. 
 		# 9 links, for 2 x Pelvis --> Collar --> Shoulder --> Elbow --> Wrist
 		# Also adding Collar <-> Collar links. 
-		self.link_indices = np.zeros(9,2,dtype=int)
+		self.link_indices = np.zeros((9,2),dtype=int)
 		self.link_indices = np.array([[0,1],[0,2],[1,2],[1,3],[2,4],[3,5],[4,6],[5,7],[6,8]])
 		self.link_colors = ['k','k','k','b','r','b','r','b','r']
 		
@@ -406,13 +411,21 @@ class GRABVisualizer(object):
 		# First create figure object. 
 		fig = plt.figure()
 		ax = fig.add_subplot(111, projection='3d')
+		ax.set_xlim(-0.5,0.5)
+		ax.set_ylim(-0.5,0.5)
+		ax.set_zlim(-0.5,0.5)
 		
 		# Add pelvis joint. 
 		# Assumes joint_angles are dimensions N joints x 3 dimensions. 
-		joints = np.insert(joint_angles, 0, self.default_pelvis_pose, axis=0)
+		joints = copy.deepcopy(joint_angles)
+		joints = joints.reshape((8,3))
+		joints = np.insert(joints, 0, self.default_pelvis_pose, axis=0)
 		# Unnormalization w.r.t pelvis doesn't need to happen, because default pelvis pose 0. 
 		
 		# Now plot all joints, with left hand blue and right hand red to differentiate, and pelvis in black. 
+
+		# print("Embedding in set joint pose")
+		# embed()
 		ax.scatter(joints[:, 0], joints[:, 1], joints[:, 2], color=self.colors, s=20, depthshade=False)
 		
 		# Now plot links. 
@@ -420,8 +433,9 @@ class GRABVisualizer(object):
 			ax.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
 				
 		# Now get image from figure object to return .
-		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)		
-		image = np.transpose(image, axes=[2,0,1])
+		# image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)
+		image = mplfig_to_npimage(fig)
+		# image = np.transpose(image, axes=[2,0,1])
 
 		# Clear figure from memory.
 		ax.clear()
@@ -431,6 +445,7 @@ class GRABVisualizer(object):
 		return image
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False):
+
 
 		image_list = []
 		for t in range(trajectory.shape[0]):
@@ -783,4 +798,5 @@ if __name__ == '__main__':
 	visualizer = MujocoVisualizer()
 	# img = visualizer.set_ee_pose_return_image(end_eff_pose, arm='right')
 	# scipy.misc.imsave('mj_vis.png', img)
+
 
