@@ -37,7 +37,7 @@ class GRAB_PreDataset(Dataset):
 	
 		# Logging all the files we need. 
 		self.file_path = os.path.join(self.dataset_directory, '*/*_body_joints.npz')
-		self.filelist = glob.glob(self.file_path)
+		self.filelist = sorted(glob.glob(self.file_path))
 
 		# Get number of files. 
 		self.total_length = len(self.filelist)
@@ -303,6 +303,7 @@ class GRAB_PreDataset(Dataset):
 		# Now save this file.
 		# np.save(os.path.join(self.dataset_directory,"GRAB_DataFile.npy"), self.file_array)
 		np.save(os.path.join(self.dataset_directory,"GRAB_DataFile_BaseNormalize.npy"), self.file_array)
+		np.save(os.path.join(self.dataset_directory,"GRAB_OrderedFileList.npy"), self.filelist)
 
 	def __len__(self):
 		return self.total_length
@@ -330,6 +331,8 @@ class GRAB_Dataset(Dataset):
 		   
 		# Load file.
 		self.data_list = np.load(os.path.join(self.dataset_directory,"GRAB_DataFile_BaseNormalize.npy"), allow_pickle=True)
+		self.filelist = np.load(os.path.join(self.dataset_directory,"GRAB_OrderedFileList.npy"), allow_pickle=True)
+
 		self.dataset_length = len(self.data_list)
 
 		if self.args.dataset_traj_length_limit>0:			
@@ -362,9 +365,9 @@ class GRAB_Dataset(Dataset):
 		data_element = {}
 		data_element['is_valid'] = True
 		data_element['demo'] = self.data_list[index]
+		data_element['file'] = self.filelist[index]
 
 		return data_element
-
 
 	def compute_statistics(self):
 

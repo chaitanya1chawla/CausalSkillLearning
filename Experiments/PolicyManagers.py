@@ -9,7 +9,7 @@ from headers import *
 from PolicyNetworks import *
 from RL_headers import *
 from PPO_Utilities import PPOBuffer
-from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer #, MocapVisualizer
+from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, GRABVisualizer #, MocapVisualizer
 import TFLogger, DMP, RLUtils
 
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
@@ -91,6 +91,8 @@ class PolicyManager_BaseClass():
 
 		elif self.args.data=='Mocap':
 			self.visualizer = MocapVisualizer(args=self.args)
+		elif self.args.data=='GRAB':
+			self.visualizer = GRABVisualizer()
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
@@ -1150,6 +1152,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 
+			# self.visualizer = GRABVisualizer()	
+
 		# Training parameters. 		
 		self.baseline_value = 0.
 		self.beta_decay = 0.9
@@ -1761,8 +1765,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.visualize_embedding_space(suffix=suffix)
 
 		# if self.args.data=="MIME" or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB']:			
+		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB']:			
 			print("Running Evaluation of State Distances on small test set.")
 			# self.evaluate_metrics()		
 
@@ -2215,7 +2219,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.test_set_size = 50
 			stat_dir_name = 'GRAB'
 			self.conditional_information = None
-			self.conditional_viz_env = False			
+			self.conditional_viz_env = False	
+
+			self.visualizer = GRABVisualizer()		
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
@@ -2381,8 +2387,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 	def visualize_trajectory(self, trajectory, segmentations=None, i=0, suffix='_Img'):
 
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB']:			
+		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB']:			
 
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 				unnorm_trajectory = (trajectory*self.norm_denom_value)+self.norm_sub_value
@@ -2504,8 +2510,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			variational_rollout_image = np.array(variational_rollout_image)
 			latent_rollout_image = np.array(latent_rollout_image)
 			
-			if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-			# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB']:
+			# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+			if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB']:
 				# Feeding as list of image because gif_summary.				
 
 				# print("Embedding in joint update plots, L2511 ")
@@ -7180,10 +7186,14 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Now save this z set. 
 		np.save(os.path.join(self.traj_viz_dir_name,"Translated_Zs.npy"),self.translated_latent_zs_for_downstream)
 
-		# Now save all the gifs we created.
-		for key in self.segmented_gif_logs.keys():			
-			# Save. 
-			imageio.mimsave(os.path.join(self.traj_viz_dir_name,"{0}.gif".format(key)), list(self.segmented_gif_logs[key]))
+		# if self.args.data not in ['GRAB'] and self.args.target_domain not in ['']:
+		# if self.args.target_domain not in ['GRAB']:
+		if True:
+			
+			# Now save all the gifs we created.
+			for key in self.segmented_gif_logs.keys():			
+				# Save. 
+				imageio.mimsave(os.path.join(self.traj_viz_dir_name,"{0}.gif".format(key)), list(self.segmented_gif_logs[key]))
 
 		# print("embedding in segment source target gifs")
 		# embed()
