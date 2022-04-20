@@ -337,17 +337,20 @@ class GRAB_Dataset(Dataset):
 
 		if self.args.dataset_traj_length_limit>0:			
 			self.short_data_list = []
+			self.short_file_list = []
 			self.dataset_trajectory_lengths = []
 			for i in range(self.dataset_length):
 				if self.data_list[i].shape[0]<self.args.dataset_traj_length_limit:
 					self.short_data_list.append(self.data_list[i])
+					self.short_file_list.append(self.filelist[i])
 					self.dataset_trajectory_lengths.append(self.data_list[i].shape[0])
 
 			self.data_list = self.short_data_list
+			self.filelist = self.short_file_list
 			self.dataset_length = len(self.data_list)
-			self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)		
+			self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)
 				
-		self.data_list_array = np.array(self.data_list)
+		self.data_list_array = np.array(self.data_list)		
 
 	def __len__(self):
 		# Return length of file list. 

@@ -1089,6 +1089,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# Max of robot_state + object_state sizes across all Baxter environments. 			
 			self.cond_robot_state_size = 60
 			self.cond_object_state_size = 25
+			self.test_set_size = 50
 			self.conditional_info_size = self.cond_robot_state_size+self.cond_object_state_size
 
 		# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
@@ -1142,7 +1143,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.output_size = self.state_size
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
-			self.test_set_size = 50
+			self.test_set_size = 40
 			stat_dir_name = 'GRAB'
 
 			if self.args.normalization=='meanvar':
@@ -2129,7 +2130,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.number_layers = self.args.number_layers
 		self.traj_length = 5
 		self.conditional_info_size = 6
-		self.test_set_size = 500
+		self.test_set_size = 50
 
 		if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 			self.conditional_info_size = self.args.condition_size
@@ -2138,6 +2139,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		if self.args.data in ['MIME','OldMIME']:
 			self.state_size = 16	
 			self.state_dim = 16
+			self.test_set_size = 50
 			self.input_size = 2*self.state_size
 			self.output_size = self.state_size			
 			self.traj_length = self.args.traj_length
@@ -2216,7 +2218,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.output_size = self.state_size
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
-			self.test_set_size = 50
+			self.test_set_size = 40
 			stat_dir_name = 'GRAB'
 			self.conditional_information = None
 			self.conditional_viz_env = False	
@@ -4136,12 +4138,16 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			self.batch_trajectory_lengths = np.zeros((self.args.batch_size), dtype=int)
 			minl = 10000
 			maxl = 0
+
+			# print("Debugging dataset extent")
+			# embed()
 			
 			for x in range(self.args.batch_size):
 
 				if self.args.ee_trajectories:
 					self.batch_trajectory_lengths[x] = data_element[x]['endeffector_trajectory'].shape[0]
 				else:
+
 					self.batch_trajectory_lengths[x] = data_element[x]['demo'].shape[0]
 				maxl = max(maxl,self.batch_trajectory_lengths[x])
 				minl = min(minl,self.batch_trajectory_lengths[x])
@@ -5582,6 +5588,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.source_dataset_size = len(self.source_manager.dataset) - self.source_manager.test_set_size
 			self.target_dataset_size = len(self.target_manager.dataset) - self.target_manager.test_set_size
 
+
 			# Now setup networks for these PolicyManagers. 		
 			self.source_manager.setup()
 			self.target_manager.setup()
@@ -6288,6 +6295,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 			self.source_latent_zs = (self.source_latent_zs-self.source_z_mean.detach().cpu().numpy())/self.source_z_std.detach().cpu().numpy()
 			self.target_latent_zs = (self.target_latent_zs-self.target_z_mean.detach().cpu().numpy())/self.target_z_std.detach().cpu().numpy()
 
+
+
 		# Try something
 		self.source_latent_zs = self.source_latent_zs[:min(500,len(self.source_latent_zs))]
 		self.target_latent_zs = self.target_latent_zs[:min(500,len(self.target_latent_zs))]
@@ -6358,6 +6367,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		# First construct tuples from self.source_z_trajectory_set and self.target_z_trajectory_set		
 		self.source_z_tuples = self.construct_tuples_from_z_traj_set(self.source_z_trajectory_set)
+
+		
 		if translated_target: 
 			self.target_z_tuples = self.construct_tuples_from_z_traj_set(self.translated_target_z_trajectory_set)
 		else:
@@ -6377,6 +6388,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		z_tuple_list = []
 
 		for k, v in enumerate(z_trajectory_set):
+
+			if v.shape[0] == 0:
+				print("Running into empty translated target z set issue.")
+				embed()
 
 			# First add (0,z_1) tuple. 
 			z_tuple_list.append(np.concatenate([np.zeros(self.args.z_dimensions),v[0]]).reshape(1,-1))
@@ -7082,7 +7097,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# 	# 5) Visualize original target trajectory, and the translated target to source trajectory. 
 
 		number_of_batches = 1
-		self.number_of_datapoints_per_batch = 2	
+		self.number_of_datapoints_per_batch = self.args.number_of_visualized_translations
+		self.start_index = 10
 
 		with torch.no_grad():
 
@@ -7128,11 +7144,16 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 					print("### RUN VIZ TRANS TRAJ")
 					# Now for these many trajectories:
-					for k in range(self.number_of_datapoints_per_batch):
-						# Now visualize the original .. target trajectory. 
-						# self.gif_logs['Traj{0}_OriginalTarget_Traj'.format(k)] = np.array(self.target_manager.visualizer.visualize_joint_trajectory(unnormalized_original_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_OriginalTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
-						self.gif_logs['Traj{0}_OriginalTarget_Traj'.format(k)] = np.array(self.target_manager.visualizer.visualize_joint_trajectory(unnormalized_original_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="Traj{0}_OriginalTargetTraj.gif".format(k), return_and_save=True, end_effector=self.args.ee_trajectories))
+					for k in range(self.start_index,self.start_index+self.number_of_datapoints_per_batch):
+						# Now visualize the original .. target trajectory. 			
 
+						if self.args.target_domain in ['GRAB']:
+							GRAB_gif_name = self.GRAB_trajectory_ID[k].lstrip(self.args.target_datadir+'/')
+						else:
+							GRAB_gif_name = None
+						
+						# self.gif_logs['Traj{0}_OriginalTarget_Traj'.format(k)] = np.array(self.target_manager.visualizer.visualize_joint_trajectory(unnormalized_original_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_OriginalTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
+						self.gif_logs['Traj{0}_OriginalTarget_Traj'.format(k)] = np.array(self.target_manager.visualizer.visualize_joint_trajectory(unnormalized_original_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="Traj{0}_OriginalTargetTraj.gif".format(k), return_and_save=True, end_effector=self.args.ee_trajectories, additional_info=GRAB_gif_name))
 						# Now visualize the translated target trajectory. 
 						# self.gif_logs['Traj{0}_TranslatedTarget_Traj'.format(k)] = np.array(self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_translated_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="E{0}_C{1}_Traj{2}_TranslatedTargetTraj.gif".format(self.current_epoch_running, self.counter, k), return_and_save=True, end_effector=self.args.ee_trajectories))
 						self.gif_logs['Traj{0}_TranslatedTarget_Traj'.format(k)] = np.array(self.source_manager.visualizer.visualize_joint_trajectory(unnormalized_translated_target_traj[:,k], gif_path=self.traj_viz_dir_name, gif_name="Traj{0}_TranslatedTargetTraj.gif".format(k), return_and_save=True, end_effector=self.args.ee_trajectories))
@@ -7153,7 +7174,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		self.translated_latent_zs_for_downstream = []
 
 		# Remember, we're doing this for 2 batch elements. 
-		for k in range(self.number_of_datapoints_per_batch):
+		# for k in range(self.number_of_datapoints_per_batch):
+		for k in range(self.start_index,self.start_index+self.number_of_datapoints_per_batch):			
 			# Set source and target gif from gif_logs object.
 			target_gif = self.gif_logs['Traj{0}_OriginalTarget_Traj'.format(k)]
 			translatedtarget_gif = self.gif_logs['Traj{0}_TranslatedTarget_Traj'.format(k)]
@@ -8875,7 +8897,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		# Now create variables that we need. 
 		self.number_epochs = self.args.epochs
-		self.extent = min(self.source_dataset_size, self.target_dataset_size)		
+		self.extent = min(self.source_dataset_size, self.target_dataset_size)
 
 		# Now setup networks for these PolicyManagers. 		
 		self.source_manager.setup()
@@ -9296,7 +9318,15 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 
 		# Since the joint training manager nicely lets us get dictionaries, just use it, but remember not to train. 
 		# This does all the steps we need.
-		source_input_dict, source_var_dict, source_eval_dict = policy_manager.run_iteration(self.counter, i, return_dicts=True, train=False, bucket_index=bucket_index)
+		source_input_dict, source_var_dict, source_eval_dict = policy_manager.run_iteration(self.counter, i, return_dicts=True, train=False, bucket_index=bucket_index)		
+
+		# If we're using GRAB data, also remember the trajectory information. to visualize. 
+		if policy_manager.args.data in ['GRAB']:
+			
+			# Use the get batch eleemnt function. 
+			batched_data_element = policy_manager.get_batch_element(i)
+			# Now log the trajctory ID. 			
+			self.GRAB_trajectory_ID = np.array([batched_data_element[b]['file'] for b in range(self.args.batch_size)])			
 
 		if self.args.z_normalization and not(initialize_run):
 			if domain==0:
@@ -11432,10 +11462,7 @@ class PolicyManager_DensityJointFixEmbedTransfer(PolicyManager_JointFixEmbedTran
 		# 4c) Nearest neighbor indices indexes into .. self.source_domain_z_set, which is... length 50. 
 		# Use self.source_domain_labelled_z_indices to get indices for the label set.. 
 		original_index_nearest_neighbors = self.source_domain_labelled_z_indices[nearest_neighbor_indices]
-
-		
-
-
+	
 		# make sure same number of labels across domains, otherwise measuring accuracy across different sets...
 
 class PolicyManager_JointCycleTransfer(PolicyManager_CycleConsistencyTransfer):

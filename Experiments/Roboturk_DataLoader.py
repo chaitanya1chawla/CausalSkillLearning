@@ -161,6 +161,7 @@ class Roboturk_Dataset(Dataset):
 			# Get the name of environment.
 			environment_name = self.files[task_index]['data'].attrs['env']
 			# Create an actual robo-suite environment. 
+			import robosuite
 			self.env = robosuite.make(environment_name)
 
 			# Get sizes. 
@@ -213,8 +214,12 @@ class Roboturk_Dataset(Dataset):
 					for t in range(flattened_state_sequence.shape[0]):
 
 						self.env.sim.set_state_from_flattened(flattened_state_sequence[t])
+						# Seems like we necessarily need to call this, because otherwise states are wrong
+						# This was the difference?
+						# Also seems to be 
+						self.env.sim.forward()
 
-						# Now get observation. 
+						# Now get observation.
 						observation = self.env._get_observation()
 
 						# Robot and Object state appended to datapoint dictionary. 
@@ -240,7 +245,8 @@ class Roboturk_Dataset(Dataset):
 			task_demo_array = np.array(task_demo_list)
 
 			# Now save this file_demo_list. 
-			np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array.npy"),task_demo_array)
+			# np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array.npy"),task_demo_array)
+			np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array_with_Objects.npy"),task_demo_array)
 
 	def compute_statistics(self):
 
@@ -326,7 +332,8 @@ class Roboturk_FullDataset(Roboturk_Dataset):
 			if i==3 or i==5:
 				self.files.append(np.load("{0}/{1}/FullDataset_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
 			else:
-				self.files.append(np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
+				# self.files.append(np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
+				self.files.append(np.load("{0}/{1}/New_Task_Demo_Array_with_Objects.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
 
 	def __getitem__(self, index):
 
@@ -418,12 +425,7 @@ class Roboturk_SegmentedDataset(Roboturk_Dataset):
 		self.joint_angle_indices = [1,3,4,5,6,7,8]
 		self.gripper_indices = [9,10]	
 		self.ds_freq = 20
-		# self.r_gripper_r_finger_joint = np.array([-0.0116,   0.020833])
-		# self.r_gripper_l_finger_joint = np.array([-0.020833, 0.0135])
 
-		# [l,r]
-		# gripper_open = [0.0115, -0.0115]
-		# gripper_closed = [-0.020833, 0.020833]
 
 class Roboturk_NewSegmentedDataset(Dataset):
 
@@ -470,7 +472,8 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		self.files = []
 		# for i in range(len(self.task_list)):
 		for i in range(len(self.task_list)):
-			self.files.append(np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
+			# self.files.append(np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
+			self.files.append(np.load("{0}/{1}/New_Task_Demo_Array_with_Objects.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
 
 		# # Seems to follow joint angles order:
 		# # ('time','right_j0', 'head_pan', 'right_j1', 'right_j2', 'right_j3', 'right_j4', 'right_j5', 'right_j6', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'Milk0', 'Bread0', 'Cereal0', 'Can0').
@@ -568,9 +571,7 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		# Get bucket that index falls into based on num_demos array. 
 		task_index = np.searchsorted(self.cummulative_num_demos, index, side='right')-1
 		
-		
-
-		# Decide task ID, and new index modulo num_demos.
+				# Decide task ID, and new index modulo num_demos.
 		# Subtract number of demonstrations in cumsum until then, and then 				
 		new_index = index-self.cummulative_num_demos[max(task_index,0)]		
 		data_element = self.files[task_index][new_index]
@@ -643,6 +644,23 @@ class Roboturk_NewSegmentedDataset(Dataset):
 
 		return data_element
 
+class Roboturk_ObjectDataset(Roboturk_NewSegmentedDataset):
+
+	def __init__(self, args):
+
+		super(Roboturk_ObjectDataset, self).__init__()
+
+	def __getitem__(self, index):
+		
+		data_element = super().__getitem__(index)
+
+		# Copy over the demo to the robot-demo key.
+		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
+		# Set demo to object-state trajectory. 
+		data_element['demo'] = data_element['object-state']
+
+		return data_element
+		
 class Roboturk_Dataloader_Tester(unittest.TestCase):
 	
 	def test_Roboturkdataloader(self):
@@ -663,8 +681,6 @@ class RealRoboturk_Dataset(Dataset):
 
 		self.dataset_directory = '/data1/tanmayshankar/RealRoboturk'
 		self.args = args
-
-
 		
 		embed()
 		pass 

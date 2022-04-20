@@ -193,3 +193,20 @@ python Master.py --train=0 --setting=pretrain_sub --name=RTP_001_viz2 --data=Ful
 
 # trial
 python Master.py --train=1 --setting=pretrain_sub --name=RTP_trial --data=FullRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=2 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/Roboturk/ --model=ExpWandbLogs/RTP_053/saved_models/Model_epoch340 --smoothen=1
+
+
+######################
+python Master.py --train=0 --setting=pretrain_sub --name=OrigRoboturk_Repreprocess --data=OrigRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=1 --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000
+
+python Master.py --train=0 --setting=pretrain_sub --name=OrigRoboturk_Repreprocess --datadir=/data/tanmayshankar/RoboturkHDF5/Roboturk/ --data=OrigRoboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=1 --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000
+
+
+
+
+#######################################################
+#######################################################
+
+# RUNNING WITH NEW FILES>>>>>
+python Master.py --train=0 --setting=pretrain_sub --name=RTO_withobjs_001 --data=Roboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=1 --seed=0 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --display_freq=2000
+
+

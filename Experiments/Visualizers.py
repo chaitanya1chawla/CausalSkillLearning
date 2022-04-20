@@ -404,7 +404,7 @@ class GRABVisualizer(object):
 		# Now set pelvis pose.
 		self.default_pelvis_pose = np.zeros((3))
 				
-	def set_joint_pose_return_image(self, joint_angles):
+	def set_joint_pose_return_image(self, joint_angles, additional_info=None):
 
 		# This code just plots skeleton. 			
 
@@ -431,7 +431,9 @@ class GRABVisualizer(object):
 		# Now plot links. 
 		for k, v in enumerate(self.link_indices):
 			ax.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
-				
+
+		if additional_info is not None:
+			ax.set_title(additional_info)
 		# Now get image from figure object to return .
 		# image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)
 		image = mplfig_to_npimage(fig)
@@ -446,10 +448,9 @@ class GRABVisualizer(object):
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False):
 
-
 		image_list = []
 		for t in range(trajectory.shape[0]):
-			new_image = self.set_joint_pose_return_image(trajectory[t])
+			new_image = self.set_joint_pose_return_image(trajectory[t], additional_info=additional_info)
 			image_list.append(new_image)
 
 			# Insert white 

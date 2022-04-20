@@ -65,8 +65,9 @@ class Master():
 		if self.args.setting not in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 			print("Creating Datasets")			
 			self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)			
-			# print("Embed after create dataset")
-			# embed()
+			
+			print("Embed after create dataset")
+			embed()
 			
 		# Now define policy manager.
 		if self.args.setting=='learntsub' or self.args.setting=='joint':
@@ -327,6 +328,7 @@ def parse_arguments():
 	parser.add_argument('--max_viz_trajs',dest='max_viz_trajs',type=int,default=5,help='How many trajectories to visualize.')
 	parser.add_argument('--z_transform_or_tuple',dest='z_transform_or_tuple',type=int,default=0,help='Whether to use the z transform or z tuples.')	
 	parser.add_argument('--ignore_last_z_transform',dest='ignore_last_z_transform',type=int,default=0,help='Whether to ignore or last z transform.')
+	parser.add_argument('--number_of_visualized_translations',dest='number_of_visualized_translations',type=int,default=2, help='How many pairs of translations to visualize.')
 
 	# Exploration and learning rate parameters. 
 	parser.add_argument('--epsilon_from',dest='epsilon_from',type=float,default=0.3)
