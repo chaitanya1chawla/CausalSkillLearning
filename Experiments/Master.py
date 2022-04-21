@@ -43,6 +43,8 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = Roboturk_DataLoader.Roboturk_Dataset(args)
 	elif args.data=='FullRoboturk':
 		dataset = Roboturk_DataLoader.Roboturk_FullDataset(args)
+	elif args.data=='RoboturkObjects':
+		dataset = Roboturk_DataLoader.Roboturk_ObjectDataset(args)
 	elif args.data=='Mocap':
 		dataset = Mocap_DataLoader.Mocap_Dataset(args)
 	elif args.data=='OrigRoboMimic':
@@ -53,14 +55,13 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = GRAB_DataLoader.GRAB_PreDataset(args)
 	elif args.data=='GRAB':
 		dataset = GRAB_DataLoader.GRAB_Dataset(args)
-
+	
 	return dataset
 
 class Master():
 
 	def __init__(self, arguments):
 		self.args = arguments 
-
 
 		if self.args.setting not in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 			print("Creating Datasets")			
