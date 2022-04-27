@@ -648,7 +648,7 @@ class Roboturk_ObjectDataset(Roboturk_NewSegmentedDataset):
 
 	def __init__(self, args):
 
-		super(Roboturk_ObjectDataset, self).__init__()
+		super(Roboturk_ObjectDataset, self).__init__(args)
 
 	def __getitem__(self, index):
 		
