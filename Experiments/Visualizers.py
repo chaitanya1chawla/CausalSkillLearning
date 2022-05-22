@@ -83,6 +83,9 @@ class SawyerVisualizer(object):
 		# Move gripper positions.
 		self.environment.step(actions)
 
+		# Should set positions correctly.. Only really relevant for OBJECTS
+		self.environment.sim.forward()
+
 		image = np.flipud(self.environment.sim.render(600, 600, camera_name='vizview1'))
 		return image
 
@@ -332,8 +335,14 @@ class BaxterVisualizer(object):
 			elif arm=='both':
 				action[14] = -joint_pose[15]*2+1
 				action[15] = -joint_pose[14]*2+1
+			
 			# Move gripper positions.
 			self.environment.step(action)
+
+		# Apparently this needs to be called to set the positions correctly IN GENERAL
+		self.environment.sim.forward()
+
+		
 
 	def set_joint_pose_return_image(self, joint_pose, arm='both', gripper=False):
 
@@ -500,13 +509,16 @@ class RoboturkObjectVisualizer(object):
 		self.environment.sim.data.qpos[13:16] = orientation[:-1]
 		self.environment.sim.data.qpos[12] = orientation[-1]
 
+		# Sets posiitons correctly. Quaternions slightly off - trend is sstill correct.
+		self.environment.sim.forward()
+
 	def set_joint_pose(self, pose, arm='both', gripper=False):
 
 		# Is wrapper for set object pose.		
 		position = pose[:3]
 		orientation = pose[3:]
 		
-		self.set_joint_pose(position, orientation)		
+		self.set_joint_pose(position, orientation)
 
 	def set_joint_pose_return_image(self, pose, arm='both', gripper=False):
 
