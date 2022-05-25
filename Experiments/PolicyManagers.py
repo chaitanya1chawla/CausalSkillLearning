@@ -9,7 +9,7 @@ from headers import *
 from PolicyNetworks import *
 from RL_headers import *
 from PPO_Utilities import PPOBuffer
-from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, GRABVisualizer, RoboturkObjectsVisualizer #, MocapVisualizer
+from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, GRABVisualizer, RoboturkObjectVisualizer #, MocapVisualizer
 # from Visualizers import *
 import TFLogger, DMP, RLUtils
 
@@ -95,7 +95,7 @@ class PolicyManager_BaseClass():
 		elif self.args.data=='GRAB':
 			self.visualizer = GRABVisualizer()
 		elif self.args.data in ['RoboturkObjects']:
-			self.visualizer = RoboturkObjectsVisualizer(args=self.args)
+			self.visualizer = RoboturkObjectVisualizer(args=self.args)
 		else:
 			self.visualizer = ToyDataVisualizer()
 		
@@ -353,7 +353,7 @@ class PolicyManager_BaseClass():
 			# Because there are just more invalid DP's in Mocap.
 			self.N = 100
 		elif self.args.data in ['RoboturkObjects']:
-			self.visualizer = RoboturkObjectsVisualizer(args=self.args)
+			self.visualizer = RoboturkObjectVisualizer(args=self.args)
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
@@ -2267,7 +2267,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length
 			
 			# self.args.data in ['RoboturkObjects']:
-			self.visualizer = RoboturkObjectsVisualizer(args=self.args)
+			self.visualizer = RoboturkObjectVisualizer(args=self.args)
 
 
 		self.training_phase_size = self.args.training_phase_size
