@@ -9,7 +9,8 @@ from headers import *
 from PolicyNetworks import *
 from RL_headers import *
 from PPO_Utilities import PPOBuffer
-from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, GRABVisualizer #, MocapVisualizer
+from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, GRABVisualizer, RoboturkObjectVisualizer #, MocapVisualizer
+# from Visualizers import *
 import TFLogger, DMP, RLUtils
 
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
@@ -93,8 +94,11 @@ class PolicyManager_BaseClass():
 			self.visualizer = MocapVisualizer(args=self.args)
 		elif self.args.data=='GRAB':
 			self.visualizer = GRABVisualizer()
-		else: 
+		elif self.args.data in ['RoboturkObjects']:
+			self.visualizer = RoboturkObjectVisualizer(args=self.args)
+		else:
 			self.visualizer = ToyDataVisualizer()
+		
 
 		self.rollout_gif_list = []
 		self.gt_gif_list = []
@@ -348,6 +352,8 @@ class PolicyManager_BaseClass():
 			self.visualizer = MocapVisualizer(args=self.args)
 			# Because there are just more invalid DP's in Mocap.
 			self.N = 100
+		elif self.args.data in ['RoboturkObjects']:
+			self.visualizer = RoboturkObjectVisualizer(args=self.args)
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
@@ -2259,6 +2265,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.input_size = 2*self.state_size	
 			self.output_size = self.state_size
 			self.traj_length = self.args.traj_length
+			
+			# self.args.data in ['RoboturkObjects']:
+			self.visualizer = RoboturkObjectVisualizer(args=self.args)
 
 
 		self.training_phase_size = self.args.training_phase_size

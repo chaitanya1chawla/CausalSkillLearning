@@ -83,6 +83,9 @@ class SawyerVisualizer(object):
 		# Move gripper positions.
 		self.environment.step(actions)
 
+		# Should set positions correctly.. Only really relevant for OBJECTS
+		self.environment.sim.forward()
+
 		image = np.flipud(self.environment.sim.render(600, 600, camera_name='vizview1'))
 		return image
 
@@ -332,8 +335,14 @@ class BaxterVisualizer(object):
 			elif arm=='both':
 				action[14] = -joint_pose[15]*2+1
 				action[15] = -joint_pose[14]*2+1
+			
 			# Move gripper positions.
 			self.environment.step(action)
+
+		# Apparently this needs to be called to set the positions correctly IN GENERAL
+		self.environment.sim.forward()
+
+		
 
 	def set_joint_pose_return_image(self, joint_pose, arm='both', gripper=False):
 
@@ -466,293 +475,83 @@ class GRABVisualizer(object):
 		else:
 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)            
 
+class RoboturkObjectVisualizer(object):
 
-# class GRABVisualizer(object):
-
-# 	def __init__(self, has_display=False):
-
-# 		# Import files from GRAB repo here? 
-# 		# How do we import it in such a way that it is in scope for other functions of this class? 
-# 		# Can we create instances of the modules as class variables?  Yes!
+	def __init__(self, has_display=False, args=None):
 		
-# 		# Strategy - 
-# 		# 1) Add path to GRAB repository here. 
-# 		# 2) Import GRAB repository tools. 
-# 		# 3) Create local instances of modules.
-# 		# 4) Create persistent variables.
-# 		# 5) Create function that gets called by visualize_joint_trajectory function; put per-iteration code here.
-
-# 		import sys
-# 		sys.path.insert(0,'../../GRAB')
-
-# 		import tools
-# 		import smplx
-# 		self.grab_tools = tools
-# 		self.smplx = smplx
-
-# 		self.setup()
-
-# 	def setup(self):		
-
-# 		self.model_path = '/home/tshankar/Research/Code/GRAB/smplx-models/models/'
-# 		# Don't really need the grab_path, if we aren't going to load the object and table meshes.
-
-# 		self.meshviewer = self.grab_tools.meshviewer.MeshViewer(width=600,height=600,offscreen=True)
-# 		self.camera_pose = np.eye(4)
-# 		self.camera_pose[:3, :3] = self.grab_tools.utils.euler([80, -15, 0], 'xzx')
-# 		self.camera_pose[:3, 3] = np.array([-.5, -1.4, 1.5])
-# 		self.meshviewer.update_camera_pose(self.camera_pose)
-
-# 	def visualize_sequence(self, sequence):
+		self.args = args
 		
-# 		# This function mimics the function vis_sequence https://github.com/tanmayshankar/GRAB/blob/master/examples/render_grab.py . 		
-# 		# We probably need to add functionality to get mean person pose.. 
-
-# 		seq_data = self.grab_tools.utils.parse_npz(sequence)
-
-# 		T = seq_data.n_frames
+		# Create environment.
+		print("Do I have a display?", has_display)
 		
-# 		sbj_mesh = os.path.join(grab_path, '..', seq_data.body.vtemp)
-# 		sbj_vtemp = np.array(self.grab_tools.meshviewer.Mesh(filename=sbj_mesh).vertices)
+		import robosuite, threading
+		# Create kinematics object. 
+		if float(robosuite.__version__[:3])<1.:
+			self.new_robosuite = 0
+			self.base_env = robosuite.make("SawyerViz",has_renderer=has_display)
+			from robosuite.wrappers import IKWrapper					
+			self.sawyer_IK_object = IKWrapper(self.base_env)
+			self.environment = self.sawyer_IK_object.env
+		else:
+			self.new_robosuite = 1
+			self.base_env = robosuite.make("Viz",robots=['Sawyer'],has_renderer=has_display)
+			self.sawyer_IK_object = None
+			self.environment = self.base_env
+	
+	def set_object_pose(self, position, orientation):
 
-# 		sbj_m = self.smplx.create(model_path=self.model_path,
-# 								model_type='smplx',
-# 								gender='neutral',								
-# 								# v_template=sbj_vtemp,
-# 								batch_size=T)
+		# Sets object position for environment with one object. 
+		# Indices of object position are 9-12. 
+		self.environment.sim.data.qpos[9:12] = position
+		# Orientation is indexed from 12-16., but is ordered differently. 
+		# Orientation argument is ordered as x,y,z,w / This is what Mujoco observation gives us.
+		# This qpos argument is ordered as w,x,y,z. 
+		self.environment.sim.data.qpos[13:16] = orientation[:-1]
+		self.environment.sim.data.qpos[12] = orientation[-1]
 
-# 		sbj_parms = self.grab_tools.utils.params2torch(seq_data.body.params)
-# 		verts_sbj = self.grab_tools.utils.to_cpu(sbj_m(**sbj_parms).vertices)
+		# Sets posiitons correctly. Quaternions slightly off - trend is sstill correct.
+		self.environment.sim.forward()
 
-# 		obj_mesh = os.path.join(self.grab_path, '..', seq_data.object.object_mesh)
-# 		obj_mesh = self.grab_tools.meshviewer.Mesh(filename=obj_mesh)
-# 		obj_vtemp = np.array(obj_mesh.vertices)
-# 		obj_m = self.grab_tools.objectmodel.ObjectModel(v_template=obj_vtemp, batch_size=T)
+	def set_joint_pose(self, pose, arm='both', gripper=False):
 
-# 		obj_parms = self.grab_tools.utils.params2torch(seq_data.object.params)
-# 		verts_obj = self.grab_tools.utils.to_cpu(obj_m(**obj_parms).vertices)
-
-# 		table_mesh = os.path.join(grab_path, '..', seq_data.table.table_mesh)
-# 		table_mesh = self.grab_tools.meshviewer.Mesh(filename=table_mesh)
-# 		table_vtemp = np.array(table_mesh.vertices)
-# 		table_m = self.grab_tools.objectmodel.ObjectModel(v_template=table_vtemp, batch_size=T)
-
-# 		table_parms = self.grab_tools.utils.params2torch(seq_data.table.params)
-# 		verts_table = self.grab_tools.utils.to_cpu(table_m(**table_parms).vertices)
-
-# 		seq_render_path = self.grab_tools.utils.makepath(sequence.replace('.npz','').replace(cfg.grab_path, cfg.render_path))
-
-# 		skip_frame = 4
-# 		for frame in range(0,T, skip_frame):
-# 			o_mesh = self.grab_tools.meshviewer.Mesh(vertices=verts_obj[frame], faces=obj_mesh.faces, vc=colors['yellow'])
-# 			o_mesh.set_vertex_colors(vc=colors['red'], vertex_ids=seq_data['contact']['object'][frame] > 0)
-
-# 			s_mesh = self.grab_tools.meshviewer.Mesh(vertices=verts_sbj[frame], faces=sbj_m.faces, vc=colors['pink'], smooth=True)
-# 			s_mesh.set_vertex_colors(vc=colors['red'], vertex_ids=seq_data['contact']['body'][frame] > 0)
-
-# 			s_mesh_wf = self.grab_tools.meshviewer.Mesh(vertices=verts_sbj[frame], faces=sbj_m.faces, vc=colors['grey'], wireframe=True)
-# 			t_mesh = self.grab_tools.meshviewer.Mesh(vertices=verts_table[frame], faces=table_mesh.faces, vc=colors['white'])
-
-# 			self.meshviewer.set_static_meshes([o_mesh, s_mesh, s_mesh_wf, t_mesh])
-# 			self.meshviewer.save_snapshot(seq_render_path+'/%04d.png'%frame)
-
-# 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, end_effector=False):
-
-# 		image_list = []
-# 		image_list.append(255*np.ones((600,600,3)))
-# 		image_list.append(255*np.ones((600,600,3)))
-# 		# imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
-
-# 		return image_list		
-
-# class SMPLXVisualizer(object):
-
-# 	def __init__(self, has_display=False):
-
-# 		# This class implements visualizing a SMPLX model, adapted from here https://github.com/vchoutas/smplx/blob/master/examples/demo.py#L85
-# 		import smplx
-# 		# Now import necessary matplotlib tools. 
-# 		# from mpl_toolkits.mplot3d import Axes3D
-# 		from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-
-# 		self.smplx = smplx
-# 		# self.axes3d = Axes3D
-# 		self.poly3dcollection = Poly3DCollection
-
-# 		self.model_path = '/home/tshankar/Research/Code/GRAB/smplx-models/models/'
-
-# 	def visualize_smplx_from_body_pose(self, body_pose):
+		# Is wrapper for set object pose.		
+		position = pose[:3]
+		orientation = pose[3:]
 		
-# 		# This function takes a complete body pose and returns an image visualization of this body pose as a SMPLX model.
+		self.set_joint_pose(position, orientation)
 
-# 		self.model = self.smplx.create(self.model_path, 
-# 								model_type = 'smplx',
-# 								gender = 'neutral',
-# 								body_pose = body_pose)
+	def set_joint_pose_return_image(self, pose, arm='both', gripper=False):
 
-# 		output = self.model(betas=None, expression=None, return_verts=True)
-# 		vertices = output.vertices.detach().cpu().numpy().squeeze()
-# 		joints = output.joints.detach().cpu().numpy().squeeze()
-		
-# 		# Now plot these vertices / joints using matplotlib.
-# 		fig = plt.figure()
-# 		ax = fig.add_subplot(111, projection='3d')
-		
-# 		# Create model.
-# 		mesh = self.poly3dcollection(vertices[model.faces], alpha=0.1)
-# 		face_color = (1.0, 1.0, 0.9)
-# 		edge_color = (0, 0, 0)
-# 		mesh.set_edgecolor(edge_color)
-# 		mesh.set_facecolor(face_color)
-# 		ax.add_collection3d(mesh)
-# 		ax.scatter(joints[:, 0], joints[:, 1], joints[:, 2], color='r')		
-# 		# Actually plot joints.
-# 		ax.scatter(joints[:, 0], joints[:, 1], joints[:, 2], alpha=0.1)
-		
-# 		# Now get image from figure object to return .
-# 		image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)		
-# 		image = np.transpose(image, axes=[2,0,1])
+		self.set_joint_pose(pose)
 
-# 		# Clear figure from memory.
-# 		ax.clear()
-# 		fig.clear()
-# 		plt.close(fig)
+		image = np.flipud(self.environment.sim.render(600, 600, camera_name='vizview1'))
+		return image
 
-# 		return image
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False):
 
-# 	def construct_body_pose(self, joints):
-		
-# 		# This function takes a joint pose at a single timestep, and fills it out into a full body pose using the mean poses for other joints. 		
-# 		# It also handles things like unnormalizing the pelvis. 
+		image_list = []
+		previous_joint_positions = None
 
-# 		# Things this function needs to do - 
-# 		# 1) Get mean body pose.  
-# 		# 2) Use mean pelvis pose to unnormalize joint positions. 
-# 		# 3) Use unnormalized joint positions to construct full body pose. 
-# 		# 4) Return body pose for other functions to use, such as visualize_smplx_from_body_pose.
+		for t in range(trajectory.shape[0]):
 
-# 		# 1) First, get mean body pose. 
-# 		pass
+			# Check whether it's end effector or joint trajectory. 
+			# Calls joint pose function, but is really setting the object position
+			new_image = self.set_joint_pose_return_image(trajectory[t])
 
+			image_list.append(new_image)
 
+			# Insert white 
+			if segmentations is not None:
+				if t>0 and segmentations[t]==1:
+					image_list.append(255*np.ones_like(new_image)+new_image)
 
-
-# class MocapVisualizer():
-
-# 	def __init__(self, has_display=False, args=None):
-
-# 		# Load some things from the MocapVisualizationUtils and set things up so that they're ready to go. 
-# 		# self.cam_cur = MocapVisualizationUtils.camera.Camera(pos=np.array([6.0, 0.0, 2.0]),
-# 		# 						origin=np.array([0.0, 0.0, 0.0]), 
-# 		# 						vup=np.array([0.0, 0.0, 1.0]), 
-# 		# 						fov=45.0)
-
-# 		self.args = args
-
-# 		# Default is local data. 
-# 		self.global_data = False
-
-# 		self.cam_cur = MocapVisualizationUtils.camera.Camera(pos=np.array([4.5, 0.0, 2.0]),
-# 								origin=np.array([0.0, 0.0, 0.0]), 
-# 								vup=np.array([0.0, 0.0, 1.0]), 
-# 								fov=45.0)
-
-# 		# Path to dummy file that is going to populate joint_parents, initial global positions, etc. 
-# 		bvh_filename = "/private/home/tanmayshankar/Research/Code/CausalSkillLearning/Experiments/01_01_poses.bvh"  
-
-# 		# Run init before loading animation.
-# 		MocapVisualizationUtils.init()
-# 		MocapVisualizationUtils.global_positions, MocapVisualizationUtils.joint_parents, MocapVisualizationUtils.time_per_frame = MocapVisualizationUtils.load_animation(bvh_filename)
-
-# 		# State sizes. 
-# 		self.number_joints = 22
-# 		self.number_dimensions = 3
-# 		self.total_dimensions = self.number_joints*self.number_dimensions
-
-# 		# Run thread of viewer, so that callbacks start running. 
-# 		thread = threading.Thread(target=self.run_thread)
-# 		thread.start()
-
-# 		# Also create dummy animation object. 
-# 		self.animation_object, _, _ = BVH.load(bvh_filename)
-
-# 	def run_thread(self):
-# 		MocapVisualizationUtils.viewer.run(
-# 			title='BVH viewer',
-# 			cam=self.cam_cur,
-# 			size=(1280, 720),
-# 			keyboard_callback=None,
-# 			render_callback=MocapVisualizationUtils.render_callback_time_independent,
-# 			idle_callback=MocapVisualizationUtils.idle_callback_return,
-# 		) 
-
-# 	def get_global_positions(self, positions, animation_object=None):
-# 		# Function to get global positions corresponding to predicted or actual local positions.
-
-# 		traj_len = positions.shape[0]
-
-# 		def resample(original_trajectory, desired_number_timepoints):
-# 			original_traj_len = len(original_trajectory)
-# 			new_timepoints = np.linspace(0, original_traj_len-1, desired_number_timepoints, dtype=int)
-# 			return original_trajectory[new_timepoints]
-
-# 		if animation_object is not None:
-# 			# Now copy over from animation_object instead of just dummy animation object.
-# 			new_animation_object = Animation.Animation(resample(animation_object.rotations, traj_len), positions, animation_object.orients, animation_object.offsets, animation_object.parents)
-# 		else:	
-# 			# Create a dummy animation object. 
-# 			new_animation_object = Animation.Animation(self.animation_object.rotations[:traj_len], positions, self.animation_object.orients, self.animation_object.offsets, self.animation_object.parents)
-
-# 		# Then transform them.
-# 		transformed_global_positions = Animation.positions_global(new_animation_object)
-
-# 		# Now return coordinates. 
-# 		return transformed_global_positions
-
-# 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None):
-
-# 		image_list = []
-
-# 		if self.global_data:
-# 			# If we predicted in the global setting, just reshape.
-# 			predicted_global_positions = np.reshape(trajectory, (-1,self.number_joints,self.number_dimensions)) 
-# 		else:
-# 			# If it's local data, then transform to global. 
-# 			# Assume trajectory is number of timesteps x number_dimensions. 
-# 			# Convert to number_of_timesteps x number_of_joints x 3.
-# 			predicted_local_positions = np.reshape(trajectory, (-1,self.number_joints,self.number_dimensions))
-
-# 			# Assume trajectory was predicted in local coordinates. Transform to global for visualization.
-# 			predicted_global_positions = self.get_global_positions(predicted_local_positions, animation_object=additional_info)
-
-# 		# Copy into the global variable.
-# 		MocapVisualizationUtils.global_positions = predicted_global_positions
-
-# 		# Reset Image List. 
-# 		MocapVisualizationUtils.image_list = []
-# 		# Set save_path and prefix.
-# 		MocapVisualizationUtils.save_path = gif_path
-# 		MocapVisualizationUtils.name_prefix = gif_name.rstrip('.gif')
-# 		# Now set the whether_to_render as true. 
-# 		MocapVisualizationUtils.whether_to_render = True
-
-# 		# Wait till rendering is complete. 
-# 		x_count = 0
-# 		while MocapVisualizationUtils.done_with_render==False and MocapVisualizationUtils.whether_to_render==True:
-# 			x_count += 1
-# 			time.sleep(1)
-			
-# 		# Now that rendering is complete, load images.
-# 		image_list = MocapVisualizationUtils.image_list
-
-# 		# Now actually save the GIF or return.
-# 		if return_and_save:
-# 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
-# 			return image_list
-# 		elif return_gif:
-# 			return image_list
-# 		else:
-# 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+		if return_and_save:
+			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			return image_list
+		elif return_gif:
+			return image_list
+		else:
+			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
 
 class ToyDataVisualizer():
 
