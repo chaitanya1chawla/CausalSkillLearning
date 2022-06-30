@@ -10,6 +10,7 @@ Experiments/Experimental_Logs/*
 Experiments/ExpWandbLogs/*
 Experiments/Code_Runs/*
 Logs/*
+CSLenv/*
 .vscode/settings.json
 Experiments/.vscode/settings.json
 Experiments/Statistics/*
