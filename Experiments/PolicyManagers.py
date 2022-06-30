@@ -7134,7 +7134,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		number_of_batches = 1
 		self.number_of_datapoints_per_batch = self.args.number_of_visualized_translations
-		self.start_index = 10
+		self.start_index = 0  # Changed here
 
 		with torch.no_grad():
 
