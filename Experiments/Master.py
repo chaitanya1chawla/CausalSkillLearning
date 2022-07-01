@@ -55,6 +55,10 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = GRAB_DataLoader.GRAB_PreDataset(args)
 	elif args.data=='GRAB':
 		dataset = GRAB_DataLoader.GRAB_Dataset(args)
+	elif args.data=='GRABArmHand':
+		dataset = GRAB_DataLoader.GRAB_ArmHandDataset(args)
+	elif args.data=='GRABHand':
+		dataset = GRAB_DataLoader.GRAB_HandDataset(args)
 	
 	return dataset
 
