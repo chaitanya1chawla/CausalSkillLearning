@@ -92,7 +92,7 @@ class PolicyManager_BaseClass():
 
 		elif self.args.data=='Mocap':
 			self.visualizer = MocapVisualizer(args=self.args)
-		elif self.args.data=='GRAB','GRABHand','GRABArmHand':
+		elif self.args.data in ['GRAB','GRABHand','GRABArmHand']:
 			self.visualizer = GRABVisualizer()
 		elif self.args.data in ['RoboturkObjects']:
 			self.visualizer = RoboturkObjectVisualizer(args=self.args)
@@ -1140,7 +1140,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 
-		elif self.args.data=='GRAB','GRABHand','GRABArmHand':
+		elif self.args.data in ['GRAB','GRABHand','GRABArmHand']:
 			
 			self.state_size = 24
 			self.state_dim = 24
@@ -1150,7 +1150,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 			self.test_set_size = 40
-			stat_dir_name = 'GRAB','GRABHand','GRABArmHand'
+			stat_dir_name = self.args.data
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
@@ -2236,7 +2236,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			# Create visualizer object
 			self.visualizer = MocapVisualizer(args=self.args)
 
-		elif self.args.data=='GRAB','GRABHand','GRABArmHand':
+		elif self.args.data in ['GRAB','GRABHand','GRABArmHand']:
 			
 			self.state_size = 24
 			self.state_dim = 24
@@ -2246,7 +2246,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 			self.test_set_size = 40
-			stat_dir_name = 'GRAB','GRABHand','GRABArmHand'
+			stat_dir_name = self.args.data
 			self.conditional_information = None
 			self.conditional_viz_env = False	
 
