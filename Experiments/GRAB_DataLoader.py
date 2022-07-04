@@ -441,7 +441,7 @@ class GRAB_Dataset(Dataset):
 		np.save("GRAB_Vel_Min.npy", vel_min_value)
 		np.save("GRAB_Vel_Max.npy", vel_max_value)
 
-class GRAB_ArmHandDataset(GRAB_Dataset):
+class GRAB_ArmHandDataset(GRAB_PreDataset):
 
 	def set_relevant_joints(self):
 		self.joint_names = np.array(['pelvis',
@@ -634,7 +634,23 @@ class GRAB_ArmHandDataset(GRAB_Dataset):
 
 		return datapoint[:, self.relevant_joint_indices]
 
-class GRAB_HandDataset(GRAB_Dataset):
+	def __getitem__(self, index):
+		# Return n'th item of dataset.
+		# This has already processed everything.
+
+		# if isinstance(index,np.ndarray):
+		# 	return list(self.data_list_array[index])
+		# else:
+		# 	return self.data_list[index]
+
+		data_element = {}
+		data_element['is_valid'] = True
+		data_element['demo'] = self.data_list[index]
+		data_element['file'] = self.filelist[index]
+
+		return data_element
+
+class GRAB_HandDataset(GRAB_PreDataset):
 
 	def set_relevant_joints(self):
 		self.joint_names = np.array(['pelvis',
@@ -817,3 +833,19 @@ class GRAB_HandDataset(GRAB_Dataset):
 		self.relevant_joint_indices = self.hand_joint_indices.astype(int)
 
 		return datapoint[:, self.relevant_joint_indices]
+
+	def __getitem__(self, index):
+		# Return n'th item of dataset.
+		# This has already processed everything.
+
+		# if isinstance(index,np.ndarray):
+		# 	return list(self.data_list_array[index])
+		# else:
+		# 	return self.data_list[index]
+
+		data_element = {}
+		data_element['is_valid'] = True
+		data_element['demo'] = self.data_list[index]
+		data_element['file'] = self.filelist[index]
+
+		return data_element
