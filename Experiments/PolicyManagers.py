@@ -2030,10 +2030,6 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 				if self.args.ee_trajectories:
 					traj = data_element[x]['endeffector_trajectory']
 				else:
-
-					from IPython import embed
-					embed()
-
 					traj = data_element[x]['demo']
 
 				# Pick start and end.               

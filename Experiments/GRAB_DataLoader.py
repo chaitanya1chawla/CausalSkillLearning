@@ -441,7 +441,7 @@ class GRAB_Dataset(Dataset):
 		np.save("GRAB_Vel_Min.npy", vel_min_value)
 		np.save("GRAB_Vel_Max.npy", vel_max_value)
 
-class GRAB_ArmHandDataset(GRAB_PreDataset):
+class GRAB_ArmHandDataset(GRAB_Dataset):
 
 	def set_relevant_joints(self):
 		self.joint_names = np.array(['pelvis',
@@ -634,7 +634,7 @@ class GRAB_ArmHandDataset(GRAB_PreDataset):
 
 		return datapoint[:, self.relevant_joint_indices]
 
-class GRAB_HandDataset(GRAB_PreDataset):
+class GRAB_HandDataset(GRAB_Dataset):
 
 	def set_relevant_joints(self):
 		self.joint_names = np.array(['pelvis',
