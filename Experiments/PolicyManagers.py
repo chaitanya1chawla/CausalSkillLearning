@@ -1142,8 +1142,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		elif self.args.data in ['GRAB','GRABHand','GRABArmHand']:
 			
-			self.state_size = 24
-			self.state_dim = 24
+			self.state_size = 117 # 24
+			self.state_dim = 117 # 24
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
@@ -2056,10 +2056,6 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 					if self.args.ee_trajectories:
 						batch_trajectory[x] = data_element[x]['endeffector_trajectory'][start_timepoint:end_timepoint]
 					else:
-
-						from IPython import embed
-						embed()
-
 						batch_trajectory[x] = data_element[x]['demo'][start_timepoint:end_timepoint]
 					
 					if not(self.args.gripper):
