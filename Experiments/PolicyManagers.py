@@ -2056,6 +2056,10 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 					if self.args.ee_trajectories:
 						batch_trajectory[x] = data_element[x]['endeffector_trajectory'][start_timepoint:end_timepoint]
 					else:
+
+						from IPython import embed
+						embed()
+
 						batch_trajectory[x] = data_element[x]['demo'][start_timepoint:end_timepoint]
 					
 					if not(self.args.gripper):
