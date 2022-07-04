@@ -1142,8 +1142,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		elif self.args.data in ['GRAB','GRABHand','GRABArmHand']:
 			
-			self.state_size = 117 # 24
-			self.state_dim = 117 # 24
+			self.state_size = 123 # 24
+			self.state_dim = 123 # 24
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
@@ -1627,7 +1627,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.state_dim = 8
 			self.rollout_timesteps = self.traj_length
 		elif self.args.data in ['GRAB','GRABHand','GRABArmHand']:
-			self.state_dim = 117 # 24
+			self.state_dim = 123 # 24
 			self.rollout_timesteps = self.traj_length
 
 		if rollout_length is not None:
@@ -1845,7 +1845,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.state_dim = 8
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['GRAB','GRABHand','GRABArmHand']:
-				self.state_dim = 117 # 24
+				self.state_dim = 123 # 24
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['RoboturkObjects']:
 				self.state_dim = 14
@@ -2238,8 +2238,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		elif self.args.data in ['GRAB','GRABHand','GRABArmHand']:
 			
-			self.state_size = 117 # 24
-			self.state_dim = 117 # 24
+			self.state_size = 123 # 24
+			self.state_dim = 123 # 24
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
