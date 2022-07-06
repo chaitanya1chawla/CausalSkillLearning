@@ -830,7 +830,7 @@ class GRABArmHand_PreDataset(GRAB_PreDataset):
 		# Create index arrays
 		self.arm_and_hand_joint_indices = np.zeros(len(self.arm_and_hand_joint_names))
 
-		for k, v in enumerate(self.arm_and_hand_joint_indices):
+		for k, v in enumerate(self.arm_and_hand_joint_names):
 			self.arm_and_hand_joint_indices[k] = np.where(self.joint_names==v)[0][0]
 
 	def subsample_relevant_joints(self, datapoint):
