@@ -1140,10 +1140,48 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 
-		elif self.args.data in ['GRAB','GRABHand','GRABArmHand']:
+		elif self.args.data in ['GRAB']:
 			
-			self.state_size = 123 # 24
-			self.state_dim = 123 # 24
+			self.state_size = 24
+			self.state_dim = 24
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 40
+			stat_dir_name = self.args.data
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+		
+		elif self.args.data in ['GRABHand']:
+			
+			self.state_size = 123
+			self.state_dim = 123
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 40
+			stat_dir_name = self.args.data
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+		
+		elif self.args.data in ['GRABArmHand']:
+			
+			self.state_size = 147
+			self.state_dim = 147
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
@@ -1626,8 +1664,14 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
 			self.state_dim = 8
 			self.rollout_timesteps = self.traj_length
-		elif self.args.data in ['GRAB','GRABHand','GRABArmHand']:
-			self.state_dim = 123 # 24
+		elif self.args.data in ['GRAB']:
+			self.state_dim = 24
+			self.rollout_timesteps = self.traj_length
+		elif self.args.data in ['GRABArmHand']:
+			self.state_dim = 147
+			self.rollout_timesteps = self.traj_length
+		elif self.args.data in ['GRABHand']:
+			self.state_dim = 123
 			self.rollout_timesteps = self.traj_length
 
 		if rollout_length is not None:
@@ -1844,8 +1888,14 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic']:
 				self.state_dim = 8
 				self.rollout_timesteps = self.traj_length
-			if self.args.data in ['GRAB','GRABHand','GRABArmHand']:
-				self.state_dim = 123 # 24
+			if self.args.data in ['GRAB']:
+				self.state_dim = 24
+				self.rollout_timesteps = self.traj_length
+			if self.args.data in ['GRABArmHand']:
+				self.state_dim = 147
+				self.rollout_timesteps = self.traj_length
+			if self.args.data in ['GRABHand']:
+				self.state_dim = 123
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['RoboturkObjects']:
 				self.state_dim = 14
@@ -2236,10 +2286,56 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			# Create visualizer object
 			self.visualizer = MocapVisualizer(args=self.args)
 
-		elif self.args.data in ['GRAB','GRABHand','GRABArmHand']:
+		elif self.args.data in ['GRAB']:
 			
-			self.state_size = 123 # 24
-			self.state_dim = 123 # 24
+			self.state_size = 24
+			self.state_dim = 24
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 40
+			stat_dir_name = self.args.data
+			self.conditional_information = None
+			self.conditional_viz_env = False	
+
+			self.visualizer = GRABVisualizer()		
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+		
+		elif self.args.data in ['GRABHand']:
+			
+			self.state_size = 123
+			self.state_dim = 123
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 40
+			stat_dir_name = self.args.data
+			self.conditional_information = None
+			self.conditional_viz_env = False	
+
+			self.visualizer = GRABVisualizer()		
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+		
+		elif self.args.data in ['GRABArmHand']:
+			
+			self.state_size = 147
+			self.state_dim = 147
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
