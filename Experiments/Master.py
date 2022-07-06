@@ -64,6 +64,7 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	elif args.data=='GRABHand':
 		dataset = GRAB_DataLoader.GRABHand_Dataset(args)
 	
+	print("DATASET LENGTH", len(dataset))
 	return dataset
 
 class Master():
