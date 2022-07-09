@@ -9,7 +9,7 @@ from headers import *
 from PolicyNetworks import *
 from RL_headers import *
 from PPO_Utilities import PPOBuffer
-from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, GRABVisualizer, RoboturkObjectVisualizer #, MocapVisualizer
+from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, GRABVisualizer, GRABHandVisualizer, RoboturkObjectVisualizer #, MocapVisualizer
 # from Visualizers import *
 import TFLogger, DMP, RLUtils
 
@@ -92,8 +92,10 @@ class PolicyManager_BaseClass():
 
 		elif self.args.data=='Mocap':
 			self.visualizer = MocapVisualizer(args=self.args)
-		elif self.args.data in ['GRAB','GRABHand','GRABArmHand']:
+		elif self.args.data in ['GRAB']:
 			self.visualizer = GRABVisualizer()
+		elif self.args.data in ['GRABHand']:
+			self.visualizer = GRABHandVisualizer()
 		elif self.args.data in ['RoboturkObjects']:
 			self.visualizer = RoboturkObjectVisualizer(args=self.args)
 		else:
@@ -2323,7 +2325,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.conditional_information = None
 			self.conditional_viz_env = False	
 
-			self.visualizer = GRABVisualizer()		
+			self.visualizer = GRABHandVisualizer()		
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))

@@ -473,7 +473,142 @@ class GRABVisualizer(object):
 		elif return_gif:
 			return image_list
 		else:
-			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)            
+			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+
+
+class GRABHandVisualizer(GRABVisualizer):
+	
+	def __init__(self, has_display=False):
+
+		# THis class implements skeleton based visualization of the joints predicted by our model, rather than trying to visualize meshes. 
+
+		# Remember, the relevant joints - 
+		self.hand_joint_names = np.array(['left_wrist', 
+										  'left_index1',
+										  'left_index2',
+										  'left_index3',
+										  'left_middle1',
+										  'left_middle2',
+										  'left_middle3',
+										  'left_pinky1',
+										  'left_pinky2',
+										  'left_pinky3',
+										  'left_ring1',
+										  'left_ring2',
+										  'left_ring3',
+										  'left_thumb1',
+										  'left_thumb2',
+										  'left_thumb3',
+										  'left_thumb',
+										  'left_index', # 17
+										  'left_middle',
+										  'left_ring',
+										  'left_pinky',
+										  'right_wrist',  # index 21
+										  'right_index1',
+										  'right_index2',
+										  'right_index3',
+										  'right_middle1',
+										  'right_middle2',
+										  'right_middle3',
+										  'right_pinky1',
+										  'right_pinky2',
+										  'right_pinky3',
+										  'right_ring1',
+										  'right_ring2',
+										  'right_ring3',
+										  'right_thumb1',
+										  'right_thumb2',
+										  'right_thumb3',
+										  'right_thumb',
+										  'right_index',
+										  'right_middle',
+										  'right_ring',
+										  'right_pinky'])
+		
+		# Skeleton - Pelvis --> Collar --> Shoulder --> Elbow --> Wrist (for each hand)
+		# Add zeros as pelvis pose. 
+
+		# Set colors of joints. 
+		self.colors = ['r' for i in range(21)].extend(['b' for j in range(21)])
+		
+		# Set index pairs for links to be drawn. 
+		# 9 links, for 2 x Pelvis --> Collar --> Shoulder --> Elbow --> Wrist
+		# Also adding Collar <-> Collar links. 
+		self.link_indices = np.zeros((40,2),dtype=int)
+		self.link_indices = np.array([[0,1],[1,2],[2,3],[3,17], # left index finger
+									  [0,4], [4,5], [5,6], [6,18], # left middle finger
+									  [0,7], [7,8], [8,9], [9,20], # left pinky
+									  [0,10], [10,11], [11,12], [12,19], # left ring finger
+									  [0,13], [13,14], [14,15], [15,16], # left thumb
+									  [21,22],[22,23],[23,24],[24,38], # right index finger
+									  [21,25], [25,26], [26,27], [27,39], # right middle finger
+									  [21,28], [28,29], [29,30], [30,41], # right pinky
+									  [21,31], [31,32], [32,33], [33,40], # right ring finger
+									  [21,34], [34,35], [35,36], [36,37]]) # right thumb
+									  
+		self.link_colors = ['k' for i in range(40)]
+		
+		# Now set pelvis pose.
+		self.default_pelvis_pose = np.zeros((3))
+	
+	def set_joint_pose_return_image(self, joint_angles, additional_info=None):
+
+		# This code just plots skeleton. 			
+
+		# First create figure object. 
+		# One plot for each hand
+		fig = plt.figure()
+		ax_left = fig.add_subplot(111, projection='3d')
+		ax_left.set_xlim(-0.5,0.5)
+		ax_left.set_ylim(-0.5,0.5)
+		ax_left.set_zlim(-0.5,0.5)
+		ax_right = fig.add_subplot(211, projection='3d')
+		ax_right.set_xlim(-0.5,0.5)
+		ax_right.set_ylim(-0.5,0.5)
+		ax_right.set_zlim(-0.5,0.5)
+		
+		# Add pelvis joint. 
+		# Assumes joint_angles are dimensions N joints x 3 dimensions. 
+		joints = copy.deepcopy(joint_angles)
+		joints = joints.reshape((42,3))
+		# joints = np.insert(joints, 0, self.default_pelvis_pose, axis=0)
+		# Unnormalization w.r.t pelvis doesn't need to happen, because default pelvis pose 0. 
+		leftjoints = joints[:20]
+		rightjoints = joints[21:]
+		leftjoints[0] = [0, 0, 0]
+		rightjoints[0] = [0, 0, 0]
+
+		# Now plot all joints, with left hand blue and right hand red to differentiate, and pelvis in black. 
+
+		# print("Embedding in set joint pose")
+		# embed()
+		ax_left.scatter(leftjoints[:, 0], leftjoints[:, 1], leftjoints[:, 2], color=self.colors, s=20, depthshade=False)
+		ax_right.scatter(rightjoints[:, 0], rightjoints[:, 1], rightjoints[:, 2], color=self.colors, s=20, depthshade=False)
+
+		# Now plot links. 
+		for k, v in enumerate(self.link_indices):
+			ax_left.plot([leftjoints[v[0],0],leftjoints[v[1],0]],[leftjoints[v[0],1],leftjoints[v[1],1]],[leftjoints[v[0],2],leftjoints[v[1],2]],c=self.link_colors[k])
+			ax_right.plot([rightjoints[v[0],0],rightjoints[v[1],0]],[rightjoints[v[0],1],rightjoints[v[1],1]],[rightjoints[v[0],2],rightjoints[v[1],2]],c=self.link_colors[k])
+
+
+		if additional_info is not None:
+			ax_left.set_title(additional_info)
+			ax_right.set_title(additional_info)
+
+		# Now get image from figure object to return .
+		# image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)
+		image = mplfig_to_npimage(fig)
+		# image = np.transpose(image, axes=[2,0,1])
+
+		# Clear figure from memory.
+		ax_left.clear()
+		ax_right.clear()
+		fig.clear()
+		plt.close(fig)
+
+		return image
+
 
 class RoboturkObjectVisualizer(object):
 
