@@ -448,6 +448,8 @@ class GRABVisualizer(object):
 		image = mplfig_to_npimage(fig)
 		# image = np.transpose(image, axes=[2,0,1])
 
+		embed()
+
 		# Clear figure from memory.
 		ax.clear()
 		fig.clear()
