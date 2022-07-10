@@ -361,8 +361,6 @@ class PolicyManager_BaseClass():
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
-		embed()
-
 		#####################################################
 		# Get latent z sets.
 		#####################################################
