@@ -535,8 +535,7 @@ class GRABHandVisualizer(GRABVisualizer):
 		self.colors = ['r' for i in range(21)].extend(['b' for j in range(21)])
 		
 		# Set index pairs for links to be drawn. 
-		# 9 links, for 2 x Pelvis --> Collar --> Shoulder --> Elbow --> Wrist
-		# Also adding Collar <-> Collar links. 
+
 		self.link_indices = np.zeros((40,2),dtype=int)
 		self.link_indices = np.array([[0,1],[1,2],[2,3],[3,17], # left index finger
 									  [0,4], [4,5], [5,6], [6,18], # left middle finger

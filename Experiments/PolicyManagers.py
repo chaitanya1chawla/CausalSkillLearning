@@ -1167,8 +1167,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		
 		elif self.args.data in ['GRABHand']:
 			
-			self.state_size = 123
-			self.state_dim = 123
+			self.state_size = 126
+			self.state_dim = 126
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
@@ -1677,7 +1677,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.state_dim = 144
 			self.rollout_timesteps = self.traj_length
 		elif self.args.data in ['GRABHand']:
-			self.state_dim = 123
+			self.state_dim = 126
 			self.rollout_timesteps = self.traj_length
 
 		if rollout_length is not None:
@@ -1901,7 +1901,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.state_dim = 144
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['GRABHand']:
-				self.state_dim = 123
+				self.state_dim = 126
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['RoboturkObjects']:
 				self.state_dim = 14
@@ -2317,8 +2317,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		
 		elif self.args.data in ['GRABHand']:
 			
-			self.state_size = 123
-			self.state_dim = 123
+			self.state_size = 126
+			self.state_dim = 126
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
@@ -3535,7 +3535,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# Visualize space if the subpolicy has been trained...
 		# Running even with the fix_subpolicy, so that we can evaluate joint reconstruction.
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:			
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic', 'GRABHand', 'GRABArmHand']:			
 					
 			print("Running Visualization on Robot Data.")	
 
