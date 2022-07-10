@@ -467,13 +467,16 @@ class GRABVisualizer(object):
 				if t>0 and segmentations[t]==1:
 					image_list.append(255*np.ones_like(new_image)+new_image)
 
+			print(new_image)
+			print("image list", len(image_list))
+			
+
 		if return_and_save:
 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
 			return image_list
 		elif return_gif:
 			return image_list
 		else:
-			print("##", gif_path, gif_name)
 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
 
 
