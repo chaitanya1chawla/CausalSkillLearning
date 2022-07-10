@@ -448,8 +448,6 @@ class GRABVisualizer(object):
 		image = mplfig_to_npimage(fig)
 		# image = np.transpose(image, axes=[2,0,1])
 
-		embed()
-
 		# Clear figure from memory.
 		ax.clear()
 		fig.clear()
@@ -475,6 +473,7 @@ class GRABVisualizer(object):
 		elif return_gif:
 			return image_list
 		else:
+			print("##", gif_path, gif_name)
 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
 
 
@@ -549,9 +548,6 @@ class GRABHandVisualizer(GRABVisualizer):
 									  [21,34], [34,35], [35,36], [36,37]]) # right thumb
 									  
 		self.link_colors = ['k' for i in range(40)]
-		
-		# Now set pelvis pose.
-		self.default_pelvis_pose = np.zeros((3))
 	
 	def set_joint_pose_return_image(self, joint_angles, additional_info=None):
 
@@ -560,11 +556,11 @@ class GRABHandVisualizer(GRABVisualizer):
 		# First create figure object. 
 		# One plot for each hand
 		fig = plt.figure()
-		ax_left = fig.add_subplot(111, projection='3d')
+		ax_left = fig.add_subplot(211, projection='3d')
 		ax_left.set_xlim(-0.5,0.5)
 		ax_left.set_ylim(-0.5,0.5)
 		ax_left.set_zlim(-0.5,0.5)
-		ax_right = fig.add_subplot(211, projection='3d')
+		ax_right = fig.add_subplot(212, projection='3d')
 		ax_right.set_xlim(-0.5,0.5)
 		ax_right.set_ylim(-0.5,0.5)
 		ax_right.set_zlim(-0.5,0.5)
