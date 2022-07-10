@@ -321,9 +321,9 @@ class GRAB_PreDataset(Dataset):
 	def normalize(self, relevant_joints_datapoint):
 		if self.args.position_normalization == 'waist':
 			return waist_norm(relevant_joints_datapoint)
-		elif self.position_normalization == 'shoulder':
+		elif self.args.position_normalization == 'shoulder':
 			return shoulder_norm(relevant_joints_datapoint)
-		elif self.position_normalization == 'wrist':
+		elif self.args.position_normalization == 'wrist':
 			return wrist_norm(relevant_joints_datapoint)
 		else:
 			print("Invalid or no position normalization set")
