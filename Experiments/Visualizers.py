@@ -588,8 +588,10 @@ class GRABHandVisualizer(GRABVisualizer):
 		ax_right.scatter(rightjoints[:, 0], rightjoints[:, 1], rightjoints[:, 2], color=self.colors, s=20, depthshade=False)
 
 		# Now plot links. 
-		for k, v in enumerate(self.link_indices):
+		for k, v in enumerate(self.link_indices[:20]):
 			ax_left.plot([leftjoints[v[0],0],leftjoints[v[1],0]],[leftjoints[v[0],1],leftjoints[v[1],1]],[leftjoints[v[0],2],leftjoints[v[1],2]],c=self.link_colors[k])
+			
+		for k, v in enumerate(self.link_indices[20:]):
 			ax_right.plot([rightjoints[v[0],0],rightjoints[v[1],0]],[rightjoints[v[0],1],rightjoints[v[1],1]],[rightjoints[v[0],2],rightjoints[v[1],2]],c=self.link_colors[k])
 
 
