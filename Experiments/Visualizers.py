@@ -574,8 +574,8 @@ class GRABHandVisualizer(GRABVisualizer):
 		# Unnormalization w.r.t pelvis doesn't need to happen, because default pelvis pose 0. 
 		leftjoints = joints[:21]
 		rightjoints = joints[21:]
-		leftjoints[0] = [0, 0, 0]
-		rightjoints[0] = [0, 0, 0]
+		# leftjoints[0] = [0, 0, 0]
+		# rightjoints[0] = [0, 0, 0]
 
 		# Now plot all joints, with left hand blue and right hand red to differentiate, and pelvis in black. 
 
