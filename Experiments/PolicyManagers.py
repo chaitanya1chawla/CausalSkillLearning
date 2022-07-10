@@ -356,6 +356,8 @@ class PolicyManager_BaseClass():
 			self.N = 100
 		elif self.args.data in ['RoboturkObjects']:
 			self.visualizer = RoboturkObjectVisualizer(args=self.args)
+		elif self.args.data in ['GRABHand']:
+			self.visualizer = GRABHandVisualizer()
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
