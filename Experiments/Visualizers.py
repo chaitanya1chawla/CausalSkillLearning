@@ -558,13 +558,13 @@ class GRABHandVisualizer(GRABVisualizer):
 		# One plot for each hand
 		fig = plt.figure()
 		ax_left = fig.add_subplot(211, projection='3d')
-		ax_left.set_xlim(-1,1)
-		ax_left.set_ylim(-1,1)
-		ax_left.set_zlim(-1,1)
+		# ax_left.set_xlim(-1,1)
+		# ax_left.set_ylim(-1,1)
+		# ax_left.set_zlim(-1,1)
 		ax_right = fig.add_subplot(212, projection='3d')
-		ax_right.set_xlim(-1,1)
-		ax_right.set_ylim(-1,1)
-		ax_right.set_zlim(-1,1)
+		# ax_right.set_xlim(-1,1)
+		# ax_right.set_ylim(-1,1)
+		# ax_right.set_zlim(-1,1)
 		
 		# Add pelvis joint. 
 		# Assumes joint_angles are dimensions N joints x 3 dimensions. 
