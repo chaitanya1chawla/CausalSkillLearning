@@ -25,10 +25,8 @@ def shoulder_norm(relevant_joints_datapoint):
 	return relevant_joints_datapoint
 
 def wrist_norm(relevant_joints_datapoint):
-	temp = copy.deepcopy(relevant_joints_datapoint)
 	relevant_joints_datapoint[:, 1:20] -= relevant_joints_datapoint[:, 0].reshape(relevant_joints_datapoint.shape[0], 1, 3)
 	relevant_joints_datapoint[:, 22:] -= relevant_joints_datapoint[:, 21].reshape(relevant_joints_datapoint.shape[0], 1, 3)
-	embed()
 	return relevant_joints_datapoint
 
 class GRAB_PreDataset(Dataset):
