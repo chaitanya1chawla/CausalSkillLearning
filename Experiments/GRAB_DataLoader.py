@@ -61,6 +61,8 @@ class GRAB_PreDataset(Dataset):
 		# Setup. 
 		self.setup()
 
+		self.compute_statistics()
+
 	def set_relevant_joints(self):
 
 		self.joint_names = np.array(['pelvis',
@@ -254,6 +256,7 @@ class GRAB_PreDataset(Dataset):
 		# Create index arrays
 		self.arm_joint_indices = np.zeros(len(self.arm_joint_names))
 		self.arm_and_hand_joint_indices = np.zeros(len(self.arm_and_hand_joint_names))
+		self.state_size = len(self.arm_joint_names * 3)
 
 		for k, v in enumerate(self.arm_joint_names):			
 			self.arm_joint_indices[k] = np.where(self.joint_names==v)[0][0]
@@ -340,71 +343,10 @@ class GRAB_PreDataset(Dataset):
 		if isinstance(index, np.ndarray):
 			return list(self.file_array[index])
 		else:
-			return self.file_array[index]   
-
-class GRAB_Dataset(Dataset):
-
-	def __init__(self, args):
-
-		# Some book-keeping first. 
-		self.args = args
-
-		if self.args.datadir is None:
-			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
-			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
-			self.dataset_directory = '/data/tanmayshankar/Datasets/GRAB_Joints/'
-		else:
-			self.dataset_directory = self.args.datadir
-		   
-		# Load file.
-		self.data_list = np.load(os.path.join(self.dataset_directory, self.getname() + "_DataFile_BaseNormalize.npy"), allow_pickle=True)
-		self.filelist = np.load(os.path.join(self.dataset_directory, self.getname() + "_OrderedFileList.npy"), allow_pickle=True)
-
-		self.dataset_length = len(self.data_list)
-
-		if self.args.dataset_traj_length_limit>0:			
-			self.short_data_list = []
-			self.short_file_list = []
-			self.dataset_trajectory_lengths = []
-			for i in range(self.dataset_length):
-				if self.data_list[i].shape[0]<self.args.dataset_traj_length_limit:
-					self.short_data_list.append(self.data_list[i])
-					self.short_file_list.append(self.filelist[i])
-					self.dataset_trajectory_lengths.append(self.data_list[i].shape[0])
-
-			self.data_list = self.short_data_list
-			self.filelist = self.short_file_list
-			self.dataset_length = len(self.data_list)
-			self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)
-				
-		self.data_list_array = np.array(self.data_list)		
-
-	def getname(self):
-		return "GRAB"
-
-	def __len__(self):
-		# Return length of file list. 
-		return self.dataset_length
-
-	def __getitem__(self, index):
-		# Return n'th item of dataset.
-		# This has already processed everything.
-
-		# if isinstance(index,np.ndarray):			
-		# 	return list(self.data_list_array[index])
-		# else:
-		# 	return self.data_list[index]
-
-		data_element = {}
-		data_element['is_valid'] = True
-		data_element['demo'] = self.data_list[index]
-		data_element['file'] = self.filelist[index]
-
-		return data_element
+			return self.file_array[index]
 
 	def compute_statistics(self):
 
-		self.state_size = 24
 		self.total_length = self.__len__()
 		mean = np.zeros((self.state_size))
 		variance = np.zeros((self.state_size))
@@ -470,6 +412,66 @@ class GRAB_Dataset(Dataset):
 		np.save(self.getname() + "_Vel_Var.npy", vel_variance)
 		np.save(self.getname() + "_Vel_Min.npy", vel_min_value)
 		np.save(self.getname() + "_Vel_Max.npy", vel_max_value)
+
+class GRAB_Dataset(Dataset):
+
+	def __init__(self, args):
+
+		# Some book-keeping first. 
+		self.args = args
+
+		if self.args.datadir is None:
+			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
+			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
+			self.dataset_directory = '/data/tanmayshankar/Datasets/GRAB_Joints/'
+		else:
+			self.dataset_directory = self.args.datadir
+		   
+		# Load file.
+		self.data_list = np.load(os.path.join(self.dataset_directory, self.getname() + "_DataFile_BaseNormalize.npy"), allow_pickle=True)
+		self.filelist = np.load(os.path.join(self.dataset_directory, self.getname() + "_OrderedFileList.npy"), allow_pickle=True)
+
+		self.dataset_length = len(self.data_list)
+
+		if self.args.dataset_traj_length_limit>0:			
+			self.short_data_list = []
+			self.short_file_list = []
+			self.dataset_trajectory_lengths = []
+			for i in range(self.dataset_length):
+				if self.data_list[i].shape[0]<self.args.dataset_traj_length_limit:
+					self.short_data_list.append(self.data_list[i])
+					self.short_file_list.append(self.filelist[i])
+					self.dataset_trajectory_lengths.append(self.data_list[i].shape[0])
+
+			self.data_list = self.short_data_list
+			self.filelist = self.short_file_list
+			self.dataset_length = len(self.data_list)
+			self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)
+				
+		self.data_list_array = np.array(self.data_list)		
+
+	def getname(self):
+		return "GRAB"
+
+	def __len__(self):
+		# Return length of file list. 
+		return self.dataset_length
+
+	def __getitem__(self, index):
+		# Return n'th item of dataset.
+		# This has already processed everything.
+
+		# if isinstance(index,np.ndarray):			
+		# 	return list(self.data_list_array[index])
+		# else:
+		# 	return self.data_list[index]
+
+		data_element = {}
+		data_element['is_valid'] = True
+		data_element['demo'] = self.data_list[index]
+		data_element['file'] = self.filelist[index]
+
+		return data_element
 
 class GRABArmHand_Dataset(GRAB_Dataset):
 
@@ -665,6 +667,8 @@ class GRABArmHand_PreDataset(GRAB_PreDataset):
 
 		# Create index arrays
 		self.arm_and_hand_joint_indices = np.zeros(len(self.arm_and_hand_joint_names))
+
+		self.state_size = len(self.arm_and_hand_joint_names * 3)
 
 		for k, v in enumerate(self.arm_and_hand_joint_names):
 			self.arm_and_hand_joint_indices[k] = np.where(self.joint_names==v)[0][0]
@@ -909,6 +913,8 @@ class GRABHand_PreDataset(GRAB_PreDataset):
 
 		# Create index arrays
 		self.hand_joint_indices = np.zeros(len(self.hand_joint_names))
+
+		self.state_size = len(self.hand_joint_names * 3)
 
 		for k, v in enumerate(self.hand_joint_names):
 			self.hand_joint_indices[k] = np.where(self.joint_names==v)[0][0]
