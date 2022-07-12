@@ -542,13 +542,17 @@ class GRABHandVisualizer(GRABVisualizer):
 									  [0,7], [7,8], [8,9], [9,20], # left pinky
 									  [0,10], [10,11], [11,12], [12,19], # left ring finger
 									  [0,13], [13,14], [14,15], [15,16], # left thumb
+									  [1,4], [4,7], [7,10], # left hand outline
 									  [21,22],[22,23],[23,24],[24,38], # right index finger
 									  [21,25], [25,26], [26,27], [27,39], # right middle finger
 									  [21,28], [28,29], [29,30], [30,41], # right pinky
 									  [21,31], [31,32], [32,33], [33,40], # right ring finger
-									  [21,34], [34,35], [35,36], [36,37]]) # right thumb
+									  [21,34], [34,35], [35,36], [36,37], # right thumb
+									  [22,25], [25,28], [28,31]])  # right hand outline
 									  
-		self.link_colors = ['k' for i in range(40)]
+		self.link_colors = ['k' for i in range(23)]
+		self.link_colors[16:20] = 'r'
+		self.link_colors *= 2
 	
 	def set_joint_pose_return_image(self, joint_angles, additional_info=None):
 
@@ -557,14 +561,14 @@ class GRABHandVisualizer(GRABVisualizer):
 		# First create figure object. 
 		# One plot for each hand
 		fig = plt.figure()
-		ax_left = fig.add_subplot(211, projection='3d')
-		# ax_left.set_xlim(-1,1)
-		# ax_left.set_ylim(-1,1)
-		# ax_left.set_zlim(-1,1)
-		ax_right = fig.add_subplot(212, projection='3d')
-		# ax_right.set_xlim(-1,1)
-		# ax_right.set_ylim(-1,1)
-		# ax_right.set_zlim(-1,1)
+		ax_left = fig.add_subplot(121, projection='3d')
+		ax_left.set_xlim(-0.5,0.5)
+		ax_left.set_ylim(-0.5,0.5)
+		ax_left.set_zlim(-0.5,0.5)
+		ax_right = fig.add_subplot(122, projection='3d')
+		ax_right.set_xlim(-0.5,0.5)
+		ax_right.set_ylim(-0.5,0.5)
+		ax_right.set_zlim(-0.5,0.5)
 		
 		# Add pelvis joint. 
 		# Assumes joint_angles are dimensions N joints x 3 dimensions. 
@@ -585,11 +589,13 @@ class GRABHandVisualizer(GRABVisualizer):
 		ax_right.scatter(rightjoints[:, 0], rightjoints[:, 1], rightjoints[:, 2], color=self.colors, s=20, depthshade=False)
 
 		# Now plot links. 
-		for k, v in enumerate(self.link_indices[:20]):
+		for k, v in enumerate(self.link_indices[:23]):
 			ax_left.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
-			
-		for k, v in enumerate(self.link_indices[20:]):
-			ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
+		
+
+
+		for k, v in enumerate(self.link_indices[23:]):
+			ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k + 23])
 
 
 		if additional_info is not None:
