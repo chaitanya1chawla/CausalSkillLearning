@@ -550,8 +550,10 @@ class GRABHandVisualizer(GRABVisualizer):
 									  [21,34], [34,35], [35,36], [36,37], # right thumb
 									  [22,25], [25,28], [28,31]])  # right hand outline
 									  
-		self.link_colors = ['k' for i in range(23)]
+		self.link_colors = ['k' for i in range(46)]
 		self.link_colors[16:20] = 'r'
+		self.link_colors[39:43] = 'b'
+
 	
 	def set_joint_pose_return_image(self, joint_angles, additional_info=None):
 
@@ -590,8 +592,6 @@ class GRABHandVisualizer(GRABVisualizer):
 		# Now plot links. 
 		for k, v in enumerate(self.link_indices[:23]):
 			ax_left.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
-		
-
 
 		for k, v in enumerate(self.link_indices[23:]):
 			ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
