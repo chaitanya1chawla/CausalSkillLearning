@@ -339,7 +339,7 @@ class GRAB_PreDataset(Dataset):
 		return self.total_length
 
 	def __getitem__(self, index):
-
+		
 		if isinstance(index, np.ndarray):
 			return list(self.file_array[index])
 		else:
@@ -363,7 +363,10 @@ class GRAB_PreDataset(Dataset):
 		for i in range(self.total_length):
 
 			print("Phase 1: DP: ",i)
-			data_element = self.__getitem__(i)
+			data_element = {}
+			data_element['is_valid'] = True
+			data_element['demo'] = self.file_array[i]
+			data_element['file'] = self.filelist[i]
 
 			if data_element['is_valid']:
 				demo = data_element['demo']
