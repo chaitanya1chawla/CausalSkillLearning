@@ -256,7 +256,7 @@ class GRAB_PreDataset(Dataset):
 		# Create index arrays
 		self.arm_joint_indices = np.zeros(len(self.arm_joint_names))
 		self.arm_and_hand_joint_indices = np.zeros(len(self.arm_and_hand_joint_names))
-		self.state_size = len(self.arm_joint_names * 3)
+		self.state_size = len(self.arm_joint_names) * 3
 
 		for k, v in enumerate(self.arm_joint_names):			
 			self.arm_joint_indices[k] = np.where(self.joint_names==v)[0][0]
@@ -668,7 +668,7 @@ class GRABArmHand_PreDataset(GRAB_PreDataset):
 		# Create index arrays
 		self.arm_and_hand_joint_indices = np.zeros(len(self.arm_and_hand_joint_names))
 
-		self.state_size = len(self.arm_and_hand_joint_names * 3)
+		self.state_size = len(self.arm_and_hand_joint_names) * 3
 
 		for k, v in enumerate(self.arm_and_hand_joint_names):
 			self.arm_and_hand_joint_indices[k] = np.where(self.joint_names==v)[0][0]
@@ -914,7 +914,7 @@ class GRABHand_PreDataset(GRAB_PreDataset):
 		# Create index arrays
 		self.hand_joint_indices = np.zeros(len(self.hand_joint_names))
 
-		self.state_size = len(self.hand_joint_names * 3)
+		self.state_size = len(self.hand_joint_names) * 3
 
 		for k, v in enumerate(self.hand_joint_names):
 			self.hand_joint_indices[k] = np.where(self.joint_names==v)[0][0]
