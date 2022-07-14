@@ -693,7 +693,8 @@ class GRABArmHandVisualizer(GRABVisualizer):
 		# 9 links, for 2 x Pelvis --> Collar --> Shoulder --> Elbow --> Wrist
 		# Also adding Collar <-> Collar links. 
 		self.arm_link_indices = np.zeros((9,2),dtype=int)
-		self.arm_link_indices = np.array([[0,1],[0,2],[1,2],[1,3],[2,4],[3,5],[4,6],[5,7],[6,8]])
+		self.arm_link_indices = np.array([[3,1],[1,2],[2,4], # left collar -> shoulder -> elbow -> wrist
+										[28,26],[26,27],[27,29]]) # right collar -> shoulder -> elbow -> wrist
 		self.arm_link_colors = ['k','k','k','b','r','b','r','b','r']
 		
 		# Now set pelvis pose.
