@@ -16,8 +16,9 @@ def resample(original_trajectory, desired_number_timepoints):
 	new_timepoints = np.linspace(0, original_traj_len-1, desired_number_timepoints, dtype=int)
 	return original_trajectory[new_timepoints]
 
-def waist_norm(relevant_joints_datapoint):
-	return relevant_joints_datapoint[:, 1:] - relevant_joints_datapoint[:, 0].reshape(relevant_joints_datapoint.shape[0], 1, 3)
+def pelvis_norm(relevant_joints_datapoint):
+	relevant_joints_datapoint[:, 1:] -= relevant_joints_datapoint[:, 0].reshape(relevant_joints_datapoint.shape[0], 1, 3)
+	return relevant_joints_datapoint
 
 def shoulder_norm(relevant_joints_datapoint):
 	relevant_joints_datapoint[:, 2:25] -= relevant_joints_datapoint[:, 1].reshape(relevant_joints_datapoint.shape[0], 1, 3)
@@ -322,8 +323,8 @@ class GRAB_PreDataset(Dataset):
 		np.save(os.path.join(self.dataset_directory, self.getname() + "_OrderedFileList.npy"), self.filelist)
 
 	def normalize(self, relevant_joints_datapoint):
-		if self.args.position_normalization == 'waist':
-			return waist_norm(relevant_joints_datapoint)
+		if self.args.position_normalization == 'pelvis':
+			return pelvis_norm(relevant_joints_datapoint)
 		elif self.args.position_normalization == 'shoulder':
 			return shoulder_norm(relevant_joints_datapoint)
 		elif self.args.position_normalization == 'wrist':

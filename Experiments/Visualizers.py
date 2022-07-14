@@ -7,6 +7,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from cgitb import handler
 
 from absl import flags, app
 import copy, os, imageio, scipy.misc, pdb, math, time, numpy as np
@@ -647,7 +648,7 @@ class GRABArmHandVisualizer(GRABVisualizer):
 												'left_middle',
 												'left_ring',
 												'left_pinky',
-												'right_shoulder', # index 26
+												'right_shoulder', # index 25
 												'right_elbow',
 												'right_collar'
 												'right_wrist',
@@ -680,7 +681,7 @@ class GRABArmHandVisualizer(GRABVisualizer):
 		
 		# Set index pairs for links to be drawn. 
 
-		self.hand_link_indices = np.zeros((40,2),dtype=int)
+		self.hand_link_indices = np.zeros((46,2),dtype=int)
 		self.hand_link_indices = np.array([[0,1],[1,2],[2,3],[3,17], # left index finger
 									  [0,4], [4,5], [5,6], [6,18], # left middle finger
 									  [0,7], [7,8], [8,9], [9,20], # left pinky
@@ -693,13 +694,22 @@ class GRABArmHandVisualizer(GRABVisualizer):
 									  [21,31], [31,32], [32,33], [33,40], # right ring finger
 									  [21,34], [34,35], [35,36], [36,37], # right thumb
 									  [22,25], [25,28], [28,31]])  # right hand outline
+
+		# adjust indices
+		for i in range(23):
+			self.hand_link_indices[i][0] += 4
+			self.hand_link_indices[i][1] += 4
 		
+		for i in range(23):
+			self.hand_link_indices[23+i][0] += 3
+			self.hand_link_indices[23+i][1] += 3
+
 		self.arm_colors = ['k','b','r','b','r','b','r','b','r']
 		
 		# Set index pairs for links to be drawn. 
 		# 9 links, for 2 x Pelvis --> Collar --> Shoulder --> Elbow --> Wrist
 		# Also adding Collar <-> Collar links. 
-		self.arm_link_indices = np.zeros((9,2),dtype=int)
+		self.arm_link_indices = np.zeros((6,2),dtype=int)
 		self.arm_link_indices = np.array([[3,1],[1,2],[2,4], # left collar -> shoulder -> elbow -> wrist
 										[28,26],[26,27],[27,29]]) # right collar -> shoulder -> elbow -> wrist
 		self.arm_link_colors = ['k','k','k','b','r','b','r','b','r']
@@ -747,11 +757,17 @@ class GRABArmHandVisualizer(GRABVisualizer):
 		ax_right.scatter(rightjoints[:, 0], rightjoints[:, 1], rightjoints[:, 2], color=self.colors, s=20, depthshade=False)
 
 		# Now plot links. 
-		for k, v in enumerate(self.link_indices[:23]):
-			ax_left.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
+		for k, v in enumerate(self.hand_link_indices[:23]):
+			ax_left.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.hand_link_indices[k])
 
-		for k, v in enumerate(self.link_indices[23:]):
-			ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
+		for k, v in enumerate(self.hand_link_indices[23:]):
+			ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.hand_link_colors[k])
+
+		for k, v in enumerate(self.arm_link_indices[:3]):
+			ax_left.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.arm_link_colors[k])
+
+		for k, v in enumerate(self.arm_link_indices[3:]):
+			ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.arm_link_colors[k])
 
 
 		if additional_info is not None:
