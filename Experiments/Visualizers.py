@@ -500,6 +500,9 @@ class RoboturkObjectVisualizer(object):
 	
 	def set_object_pose(self, position, orientation):
 
+		print("Entering object pose")
+		embed()
+		
 		# Sets object position for environment with one object. 
 		# Indices of object position are 9-12. 
 		self.environment.sim.data.qpos[9:12] = position
@@ -512,13 +515,15 @@ class RoboturkObjectVisualizer(object):
 		# Sets posiitons correctly. Quaternions slightly off - trend is sstill correct.
 		self.environment.sim.forward()
 
+		print("Exiting object pose")
+
 	def set_joint_pose(self, pose, arm='both', gripper=False):
 
 		# Is wrapper for set object pose.		
 		position = pose[:3]
 		orientation = pose[3:]
 		
-		self.set_joint_pose(position, orientation)
+		self.set_object_pose(position, orientation)		
 
 	def set_joint_pose_return_image(self, pose, arm='both', gripper=False):
 
