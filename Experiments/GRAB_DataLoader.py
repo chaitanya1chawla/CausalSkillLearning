@@ -678,6 +678,8 @@ class GRABArmHand_PreDataset(GRAB_PreDataset):
 
 		self.state_size = len(self.arm_and_hand_joint_names) * 3
 
+		embed()
+
 		for k, v in enumerate(self.arm_and_hand_joint_names):
 			self.arm_and_hand_joint_indices[k] = np.where(self.joint_names==v)[0][0]
 
