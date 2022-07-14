@@ -650,7 +650,7 @@ class GRABArmHand_PreDataset(GRAB_PreDataset):
 												'left_pinky',
 												'right_shoulder', # index 26
 												'right_elbow',
-												'right_collar'
+												'right_collar',
 												'right_wrist',
 												'right_index1',
 												'right_index2',
