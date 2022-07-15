@@ -412,14 +412,14 @@ class GRAB_PreDataset(Dataset):
 
 		statdir = "Statistics/" + self.getname()
 
-		np.save(os.path.join(statdir, self.getname() + "_Mean.npy", mean))
-		np.save(os.path.join(statdir, self.getname() + "_Var.npy", variance))
-		np.save(os.path.join(statdir, self.getname() + "_Min.npy", min_value))
-		np.save(os.path.join(statdir, self.getname() + "_Max.npy", max_value))
-		np.save(os.path.join(statdir, self.getname() + "_Vel_Mean.npy", vel_mean))
-		np.save(os.path.join(statdir, self.getname() + "_Vel_Var.npy", vel_variance))
-		np.save(os.path.join(statdir, self.getname() + "_Vel_Min.npy", vel_min_value))
-		np.save(os.path.join(statdir, self.getname() + "_Vel_Max.npy", vel_max_value))
+		np.save(os.path.join(statdir, self.getname() + "_Mean.npy"), mean)
+		np.save(os.path.join(statdir, self.getname() + "_Var.npy"), variance)
+		np.save(os.path.join(statdir, self.getname() + "_Min.npy"), min_value)
+		np.save(os.path.join(statdir, self.getname() + "_Max.npy"), max_value)
+		np.save(os.path.join(statdir, self.getname() + "_Vel_Mean.npy"), vel_mean)
+		np.save(os.path.join(statdir, self.getname() + "_Vel_Var.npy"), vel_variance)
+		np.save(os.path.join(statdir, self.getname() + "_Vel_Min.npy"), vel_min_value
+		np.save(os.path.join(statdir, self.getname() + "_Vel_Max.npy"), vel_max_value))
 
 class GRAB_Dataset(Dataset):
 
