@@ -741,13 +741,12 @@ class GRABArmHandVisualizer(GRABVisualizer):
 		# Add pelvis joint. 
 		# Assumes joint_angles are dimensions N joints x 3 dimensions. 
 		joints = copy.deepcopy(joint_angles)
-		joints = joints.reshape((42,3))
+		joints = joints.reshape((48,3))
 		# joints = np.insert(joints, 0, self.default_pelvis_pose, axis=0)
 		# Unnormalization w.r.t pelvis doesn't need to happen, because default pelvis pose 0. 
 		leftjoints = joints[1:25]
 		rightjoints = joints[25:]
-		leftjoints[0] = [0, 0, 0]
-		rightjoints[0] = [0, 0, 0]
+		joints[0] = self.default_pelvis_pose
 
 		# Now plot all joints, with left hand blue and right hand red to differentiate, and pelvis in black. 
 
