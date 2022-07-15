@@ -757,16 +757,16 @@ class GRABArmHandVisualizer(GRABVisualizer):
 
 		# Now plot links. 
 		for k, v in enumerate(self.hand_link_indices[:23]):
-			ax_left.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.hand_link_indices[k])
+			ax_left.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]]) #,c=self.hand_link_indices[k])
 
 		for k, v in enumerate(self.hand_link_indices[23:]):
-			ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.hand_link_colors[k])
+			ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]]) #,c=self.hand_link_colors[k])
 
 		for k, v in enumerate(self.arm_link_indices[:3]):
-			ax_left.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.arm_link_colors[k])
+			ax_left.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]]) #,c=self.arm_link_colors[k])
 
 		for k, v in enumerate(self.arm_link_indices[3:]):
-			ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.arm_link_colors[k])
+			ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]]) #,c=self.arm_link_colors[k])
 
 
 		if additional_info is not None:
