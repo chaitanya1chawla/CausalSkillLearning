@@ -760,6 +760,7 @@ class GRABArmHandVisualizer(GRABVisualizer):
 			ax_left.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]]) #,c=self.hand_link_indices[k])
 
 		for k, v in enumerate(self.hand_link_indices[23:]):
+			print(k, v)
 			ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]]) #,c=self.hand_link_colors[k])
 
 		for k, v in enumerate(self.arm_link_indices[:3]):
