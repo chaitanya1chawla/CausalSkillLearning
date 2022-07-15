@@ -623,7 +623,7 @@ class GRABArmHandVisualizer(GRABVisualizer):
 		# THis class implements skeleton based visualization of the joints predicted by our model, rather than trying to visualize meshes. 
 
 		# Remember, the relevant joints - 
-		self.arm_and_hand_joint_names = np.array(['pelvis',
+		self.arm_and_hand_joint_names = np.array([ #'pelvis', # not counted
 												'left_shoulder', # index 1
 												'left_elbow',
 												'left_collar',
@@ -668,8 +668,8 @@ class GRABArmHandVisualizer(GRABVisualizer):
 												'right_thumb2',
 												'right_thumb3',
 												'right_thumb',
-												'right_index',
-												'right_middle', # index 46
+												'right_index', # index 45
+												'right_middle', 
 												'right_ring',
 												'right_pinky'])
 		
@@ -697,12 +697,12 @@ class GRABArmHandVisualizer(GRABVisualizer):
 
 		# adjust indices
 		for i in range(23):
-			self.hand_link_indices[i][0] += 4
-			self.hand_link_indices[i][1] += 4
+			self.hand_link_indices[i][0] += 3
+			self.hand_link_indices[i][1] += 3
 		
 		for i in range(23):
-			self.hand_link_indices[23+i][0] += 7
-			self.hand_link_indices[23+i][1] += 7
+			self.hand_link_indices[23+i][0] += 6
+			self.hand_link_indices[23+i][1] += 6
 
 		self.arm_colors = ['k','b','r','b','r','b','r','b','r']
 		
@@ -744,8 +744,8 @@ class GRABArmHandVisualizer(GRABVisualizer):
 		joints = joints.reshape((48,3))
 		# joints = np.insert(joints, 0, self.default_pelvis_pose, axis=0)
 		# Unnormalization w.r.t pelvis doesn't need to happen, because default pelvis pose 0. 
-		leftjoints = joints[1:25]
-		rightjoints = joints[25:]
+		leftjoints = joints[:24]
+		rightjoints = joints[24:]
 		joints[0] = self.default_pelvis_pose
 
 		# Now plot all joints, with left hand blue and right hand red to differentiate, and pelvis in black. 
@@ -760,8 +760,6 @@ class GRABArmHandVisualizer(GRABVisualizer):
 			ax_left.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]]) #,c=self.hand_link_indices[k])
 
 		for k, v in enumerate(self.hand_link_indices[23:]):
-			print(k, v)
-			print(self.arm_and_hand_joint_names[v[0]], self.arm_and_hand_joint_names[v[1]])
 			ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]]) #,c=self.hand_link_colors[k])
 
 		for k, v in enumerate(self.arm_link_indices[:3]):
