@@ -304,7 +304,7 @@ class GRAB_PreDataset(Dataset):
 			# Reshape. 
 			reshaped_normalized_datapoint = normalized_relevant_joint_datapoint.reshape(normalized_relevant_joint_datapoint.shape[0],-1)
 
-			self.state_size = len(reshaped_normalized_datapoint) * 3
+			self.state_size = len(reshaped_normalized_datapoint[0]) * 3
 
 			# Subsample in time. 
 			number_of_timesteps = datapoint.shape[0]//self.ds_freq
