@@ -696,13 +696,13 @@ class GRABArmHandVisualizer(GRABVisualizer):
 									  [22,25], [25,28], [28,31]])  # right hand outline
 
 		# adjust indices
-		for i in range(23):
+		for i in range(24):
 			self.hand_link_indices[i][0] += 3
 			self.hand_link_indices[i][1] += 3
 		
-		for i in range(23):
-			self.hand_link_indices[23+i][0] += 6
-			self.hand_link_indices[23+i][1] += 6
+		for i in range(24):
+			self.hand_link_indices[24+i][0] += 6
+			self.hand_link_indices[24+i][1] += 6
 
 		self.arm_colors = ['k','b','r','b','r','b','r','b','r']
 		
@@ -746,7 +746,7 @@ class GRABArmHandVisualizer(GRABVisualizer):
 		# Unnormalization w.r.t pelvis doesn't need to happen, because default pelvis pose 0. 
 		leftjoints = joints[:24]
 		rightjoints = joints[24:]
-		joints[0] = self.default_pelvis_pose
+		# joints[0] = self.default_pelvis_pose
 
 		# Now plot all joints, with left hand blue and right hand red to differentiate, and pelvis in black. 
 
