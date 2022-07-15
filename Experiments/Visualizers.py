@@ -701,8 +701,8 @@ class GRABArmHandVisualizer(GRABVisualizer):
 			self.hand_link_indices[i][1] += 4
 		
 		for i in range(23):
-			self.hand_link_indices[23+i][0] += 3
-			self.hand_link_indices[23+i][1] += 3
+			self.hand_link_indices[23+i][0] += 7
+			self.hand_link_indices[23+i][1] += 7
 
 		self.arm_colors = ['k','b','r','b','r','b','r','b','r']
 		
