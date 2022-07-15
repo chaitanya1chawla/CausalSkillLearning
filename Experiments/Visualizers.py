@@ -696,13 +696,13 @@ class GRABArmHandVisualizer(GRABVisualizer):
 									  [22,25], [25,28], [28,31]])  # right hand outline
 
 		# adjust indices
-		for i in range(24):
+		for i in range(23):
 			self.hand_link_indices[i][0] += 3
 			self.hand_link_indices[i][1] += 3
 		
-		for i in range(24):
-			self.hand_link_indices[24+i][0] += 6
-			self.hand_link_indices[24+i][1] += 6
+		for i in range(23):
+			self.hand_link_indices[23+i][0] += 6
+			self.hand_link_indices[23+i][1] += 6
 
 		self.arm_colors = ['k','b','r','b','r','b','r','b','r']
 		
