@@ -255,7 +255,7 @@ def parse_arguments():
 	parser.add_argument('--condition_size',dest='condition_size',type=int,default=4)
 	parser.add_argument('--smoothen', dest='smoothen',type=int,default=0) # Whether to smoothen the original dataset. 
 	parser.add_argument('--smoothing_kernel_bandwidth', dest='smoothing_kernel_bandwidth',type=float,default=3.5) # The smoothing bandwidth that is applied to data loader trajectories. 
-	parser.add_argument('--position_normalization', dest='position_normalization', type=str, default='waist') # The position normalization for GRAB dataloader
+	parser.add_argument('--position_normalization', dest='position_normalization', type=str, default='pelvis') # The position normalization for GRAB dataloader
 
 
 	# Training paradigm parameters. 

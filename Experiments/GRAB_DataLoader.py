@@ -17,8 +17,7 @@ def resample(original_trajectory, desired_number_timepoints):
 	return original_trajectory[new_timepoints]
 
 def pelvis_norm(relevant_joints_datapoint):
-	relevant_joints_datapoint[:, 1:] -= relevant_joints_datapoint[:, 0].reshape(relevant_joints_datapoint.shape[0], 1, 3)
-	return relevant_joints_datapoint
+	return relevant_joints_datapoint[:, 1:] - relevant_joints_datapoint[:, 0].reshape(relevant_joints_datapoint.shape[0], 1, 3)
 
 def shoulder_norm(relevant_joints_datapoint):
 	relevant_joints_datapoint[:, 2:25] -= relevant_joints_datapoint[:, 1].reshape(relevant_joints_datapoint.shape[0], 1, 3)
@@ -257,7 +256,6 @@ class GRAB_PreDataset(Dataset):
 		# Create index arrays
 		self.arm_joint_indices = np.zeros(len(self.arm_joint_names))
 		self.arm_and_hand_joint_indices = np.zeros(len(self.arm_and_hand_joint_names))
-		self.state_size = len(self.arm_joint_names) * 3
 
 		for k, v in enumerate(self.arm_joint_names):			
 			self.arm_joint_indices[k] = np.where(self.joint_names==v)[0][0]
@@ -305,6 +303,8 @@ class GRAB_PreDataset(Dataset):
 
 			# Reshape. 
 			reshaped_normalized_datapoint = normalized_relevant_joint_datapoint.reshape(normalized_relevant_joint_datapoint.shape[0],-1)
+
+			self.state_size = len(reshaped_normalized_datapoint) * 3
 
 			# Subsample in time. 
 			number_of_timesteps = datapoint.shape[0]//self.ds_freq
@@ -680,8 +680,6 @@ class GRABArmHand_PreDataset(GRAB_PreDataset):
 		# Create index arrays
 		self.arm_and_hand_joint_indices = np.zeros(len(self.arm_and_hand_joint_names))
 
-		self.state_size = len(self.arm_and_hand_joint_names) * 3
-
 		for k, v in enumerate(self.arm_and_hand_joint_names):
 			self.arm_and_hand_joint_indices[k] = np.where(self.joint_names==v)[0][0]
 
@@ -925,8 +923,6 @@ class GRABHand_PreDataset(GRAB_PreDataset):
 
 		# Create index arrays
 		self.hand_joint_indices = np.zeros(len(self.hand_joint_names))
-
-		self.state_size = len(self.hand_joint_names) * 3
 
 		for k, v in enumerate(self.hand_joint_names):
 			self.hand_joint_indices[k] = np.where(self.joint_names==v)[0][0]
