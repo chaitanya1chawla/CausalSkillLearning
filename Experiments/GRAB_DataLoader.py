@@ -304,9 +304,7 @@ class GRAB_PreDataset(Dataset):
 			# Reshape. 
 			reshaped_normalized_datapoint = normalized_relevant_joint_datapoint.reshape(normalized_relevant_joint_datapoint.shape[0],-1)
 
-
-			self.state_size = reshaped_normalized_datapoint.shape[1] * 3
-			embed()
+			self.state_size = reshaped_normalized_datapoint.shape[1]
 
 			# Subsample in time. 
 			number_of_timesteps = datapoint.shape[0]//self.ds_freq
@@ -332,7 +330,6 @@ class GRAB_PreDataset(Dataset):
 		elif self.args.position_normalization == 'wrist':
 			return wrist_norm(relevant_joints_datapoint)
 		else:
-			print("Invalid or no position normalization set")
 			return relevant_joints_datapoint
 
 	def getname(self):
