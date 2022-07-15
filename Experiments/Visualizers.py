@@ -624,7 +624,7 @@ class GRABArmHandVisualizer(GRABVisualizer):
 
 		# Remember, the relevant joints - 
 		self.arm_and_hand_joint_names = np.array([ #'pelvis', # not counted
-												'left_shoulder', # index 1
+												'left_shoulder', # index 0
 												'left_elbow',
 												'left_collar',
 												'left_wrist', 
@@ -648,7 +648,7 @@ class GRABArmHandVisualizer(GRABVisualizer):
 												'left_middle',
 												'left_ring',
 												'left_pinky',
-												'right_shoulder',
+												'right_shoulder', # 24
 												'right_elbow',
 												'right_collar',
 												'right_wrist',
@@ -711,7 +711,7 @@ class GRABArmHandVisualizer(GRABVisualizer):
 		# Also adding Collar <-> Collar links. 
 		self.arm_link_indices = np.zeros((6,2),dtype=int)
 		self.arm_link_indices = np.array([[2,0],[0,1],[1,3], # left collar -> shoulder -> elbow -> wrist
-										[27,25],[25,26],[26,28]]) # right collar -> shoulder -> elbow -> wrist
+										[26,24],[24,25],[25,27]]) # right collar -> shoulder -> elbow -> wrist
 		self.arm_link_colors = ['k','k','k','b','r','b','r','b','r']
 		
 		# Now set pelvis pose.
