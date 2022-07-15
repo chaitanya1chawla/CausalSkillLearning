@@ -648,9 +648,9 @@ class GRABArmHandVisualizer(GRABVisualizer):
 												'left_middle',
 												'left_ring',
 												'left_pinky',
-												'right_shoulder', # index 25
+												'right_shoulder',
 												'right_elbow',
-												'right_collar'
+												'right_collar',
 												'right_wrist',
 												'right_index1',
 												'right_index2',
@@ -669,7 +669,7 @@ class GRABArmHandVisualizer(GRABVisualizer):
 												'right_thumb3',
 												'right_thumb',
 												'right_index',
-												'right_middle',
+												'right_middle', # index 46
 												'right_ring',
 												'right_pinky'])
 		
