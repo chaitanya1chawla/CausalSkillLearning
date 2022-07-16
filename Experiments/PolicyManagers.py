@@ -3566,7 +3566,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			########################################
 
 			arg_copy = copy.deepcopy(self.args)
-			args_copy.name += "_Eval_Pretrain"
+			arg_copy.name += "_Eval_Pretrain"
 			if self.args.batch_size>1:
 				self.pretrain_policy_manager = PolicyManager_BatchPretrain(self.args.number_policies, self.dataset, arg_copy)
 			else:
