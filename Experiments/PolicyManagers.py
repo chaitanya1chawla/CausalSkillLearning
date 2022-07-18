@@ -95,9 +95,9 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['GRAB']:
 			self.visualizer = GRABVisualizer()
 		elif self.args.data in ['GRABHand']:
-			self.visualizer = GRABHandVisualizer()
+			self.visualizer = GRABHandVisualizer(args=self.args)
 		elif self.args.data in ['GRABArmHand']:
-			self.visualizer = GRABArmHandVisualizer()
+			self.visualizer = GRABArmHandVisualizer(args=self.args)
 		elif self.args.data in ['RoboturkObjects']:
 			self.visualizer = RoboturkObjectVisualizer(args=self.args)
 		else:
@@ -359,9 +359,9 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['RoboturkObjects']:
 			self.visualizer = RoboturkObjectVisualizer(args=self.args)
 		elif self.args.data in ['GRABHand']:
-			self.visualizer = GRABHandVisualizer()
+			self.visualizer = GRABHandVisualizer(args=self.args)
 		elif self.args.data in ['GRABArmHand']:
-			self.visualizer = GRABArmHandVisualizer()
+			self.visualizer = GRABArmHandVisualizer(args=self.args)
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
@@ -1171,6 +1171,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			
 			self.state_size = 126
 			self.state_dim = 126
+
+			if self.args.single_hand in ['left', 'right']:
+				self.state_dim /= 2
+				self.state_size /= 2
+
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
@@ -1191,6 +1196,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			if self.args.position_normalization == 'pelvis':
 				self.state_size = 144
 				self.state_dim = 144
+
+				if self.args.single_hand in ['left', 'right']:
+					self.state_dim /= 2
+					self.state_size /= 2
 			else:
 				self.state_size = 147
 				self.state_dim = 147
@@ -1682,11 +1691,15 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		elif self.args.data in ['GRABArmHand']:
 			if self.args.position_normalization == 'pelvis':
 				self.state_dim = 144
+				if self.args.single_hand in ['left', 'right']:
+					self.state_dim /= 2
 			else:
 				self.state_dim = 147
 			self.rollout_timesteps = self.traj_length
 		elif self.args.data in ['GRABHand']:
 			self.state_dim = 126
+			if self.args.single_hand in ['left', 'right']:
+				self.state_dim /= 2
 			self.rollout_timesteps = self.traj_length
 
 		if rollout_length is not None:
@@ -1909,11 +1922,15 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			if self.args.data in ['GRABArmHand']:
 				if self.args.position_normalization == 'pelvis':
 					self.state_dim = 144
+					if self.args.single_hand in ['left', 'right']:
+						self.state_dim /= 2
 				else:
 					self.state_dim = 147
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['GRABHand']:
 				self.state_dim = 126
+				if self.args.single_hand in ['left', 'right']:
+					self.state_dim /= 2
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['RoboturkObjects']:
 				self.state_dim = 14
@@ -2331,6 +2348,11 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			
 			self.state_size = 126
 			self.state_dim = 126
+
+			if self.args.single_hand in ['left', 'right']:
+				self.state_dim /= 2
+				self.state_size /= 2
+			
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
@@ -2341,7 +2363,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.conditional_information = None
 			self.conditional_viz_env = False	
 
-			self.visualizer = GRABHandVisualizer()		
+			self.visualizer = GRABHandVisualizer(args=self.args)		
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
@@ -2368,7 +2390,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.conditional_information = None
 			self.conditional_viz_env = False	
 
-			self.visualizer = GRABArmHandVisualizer()		
+			self.visualizer = GRABArmHandVisualizer(args=self.args)		
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))

@@ -481,8 +481,9 @@ class GRABVisualizer(object):
 
 class GRABHandVisualizer(GRABVisualizer):
 	
-	def __init__(self, has_display=False):
+	def __init__(self, args, has_display=False):
 
+		self.side = self.args.single_hand
 		# THis class implements skeleton based visualization of the joints predicted by our model, rather than trying to visualize meshes. 
 
 		# Remember, the relevant joints - 
@@ -563,14 +564,17 @@ class GRABHandVisualizer(GRABVisualizer):
 		# First create figure object. 
 		# One plot for each hand
 		fig = plt.figure()
-		ax_left = fig.add_subplot(121, projection='3d')
-		ax_left.set_xlim(-0.15,0.15)
-		ax_left.set_ylim(-0.15,0.15)
-		ax_left.set_zlim(-0.15,0.15)
-		ax_right = fig.add_subplot(122, projection='3d')
-		ax_right.set_xlim(-0.15,0.15)
-		ax_right.set_ylim(-0.15,0.15)
-		ax_right.set_zlim(-0.15,0.15)
+
+		if self.side != 'right':
+			ax_left = fig.add_subplot(121, projection='3d')
+			ax_left.set_xlim(-0.15,0.15)
+			ax_left.set_ylim(-0.15,0.15)
+			ax_left.set_zlim(-0.15,0.15)
+		if self.side != 'left':
+			ax_right = fig.add_subplot(122, projection='3d')
+			ax_right.set_xlim(-0.15,0.15)
+			ax_right.set_ylim(-0.15,0.15)
+			ax_right.set_zlim(-0.15,0.15)
 		
 		# Add pelvis joint. 
 		# Assumes joint_angles are dimensions N joints x 3 dimensions. 
@@ -579,7 +583,10 @@ class GRABHandVisualizer(GRABVisualizer):
 		# joints = np.insert(joints, 0, self.default_pelvis_pose, axis=0)
 		# Unnormalization w.r.t pelvis doesn't need to happen, because default pelvis pose 0. 
 		leftjoints = joints[:21]
-		rightjoints = joints[21:]
+		if self.side != 'right':
+			rightjoints = joints[21:]
+		else:
+			rightjoints = joints[:21]
 		leftjoints[0] = [0, 0, 0]
 		rightjoints[0] = [0, 0, 0]
 
@@ -594,13 +601,16 @@ class GRABHandVisualizer(GRABVisualizer):
 		for k, v in enumerate(self.link_indices[:23]):
 			ax_left.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
 
-		for k, v in enumerate(self.link_indices[23:]):
-			ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
+		if self.side not in ['left', 'right']:
+			for k, v in enumerate(self.link_indices[23:]):
+				ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
 
 
 		if additional_info is not None:
-			ax_left.set_title(additional_info)
-			ax_right.set_title(additional_info)
+			if self.side != 'right':
+				ax_left.set_title(additional_info)
+			if self.side != 'left':
+				ax_right.set_title(additional_info)
 
 		# Now get image from figure object to return .
 		# image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)
@@ -608,8 +618,10 @@ class GRABHandVisualizer(GRABVisualizer):
 		# image = np.transpose(image, axes=[2,0,1])
 
 		# Clear figure from memory.
-		ax_left.clear()
-		ax_right.clear()
+		if self.side != 'right':
+			ax_left.clear()
+		if self.side != 'left':
+			ax_right.clear()
 		fig.clear()
 		plt.close(fig)
 
@@ -618,7 +630,7 @@ class GRABHandVisualizer(GRABVisualizer):
 
 class GRABArmHandVisualizer(GRABVisualizer):
 	
-	def __init__(self, has_display=False):
+	def __init__(self, args, has_display=False):
 
 		# THis class implements skeleton based visualization of the joints predicted by our model, rather than trying to visualize meshes. 
 

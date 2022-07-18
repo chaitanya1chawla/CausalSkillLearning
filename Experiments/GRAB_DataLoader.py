@@ -623,8 +623,8 @@ class GRABArmHand_PreDataset(GRAB_PreDataset):
 									 'lip_bottom',
 									 'right_lip_3'])
 
-		self.arm_and_hand_joint_names = np.array(['pelvis',
-												'left_shoulder', # index 1
+		self.arm_and_hand_joint_names = np.array([ #'pelvis',
+												'left_shoulder', # index 0
 												'left_elbow',
 												'left_collar',
 												'left_wrist', 
@@ -648,7 +648,59 @@ class GRABArmHand_PreDataset(GRAB_PreDataset):
 												'left_middle',
 												'left_ring',
 												'left_pinky',
-												'right_shoulder', # index 26
+												'right_shoulder', # index 24
+												'right_elbow',
+												'right_collar',
+												'right_wrist',
+												'right_index1',
+												'right_index2',
+												'right_index3',
+												'right_middle1',
+												'right_middle2',
+												'right_middle3',
+												'right_pinky1',
+												'right_pinky2',
+												'right_pinky3',
+												'right_ring1',
+												'right_ring2',
+												'right_ring3',
+												'right_thumb1',
+												'right_thumb2',
+												'right_thumb3',
+												'right_thumb',
+												'right_index',
+												'right_middle',
+												'right_ring',
+												'right_pinky'])
+
+		self.left_arm_and_hand_joint_names = np.array([ #'pelvis',
+												'left_shoulder',
+												'left_elbow',
+												'left_collar',
+												'left_wrist', 
+												'left_index1',
+												'left_index2',
+												'left_index3',
+												'left_middle1',
+												'left_middle2',
+												'left_middle3',
+												'left_pinky1',
+												'left_pinky2',
+												'left_pinky3',
+												'left_ring1',
+												'left_ring2',
+												'left_ring3',
+												'left_thumb1',
+												'left_thumb2',
+												'left_thumb3',
+												'left_thumb',
+												'left_index',
+												'left_middle',
+												'left_ring',
+												'left_pinky'])
+
+		self.right_arm_and_hand_joint_names = np.array([ #'pelvis',
+												'right_shoulder',
 												'right_elbow',
 												'right_collar',
 												'right_wrist',
@@ -674,9 +726,16 @@ class GRABArmHand_PreDataset(GRAB_PreDataset):
 												'right_pinky'])
 
 		# Create index arrays
-		self.arm_and_hand_joint_indices = np.zeros(len(self.arm_and_hand_joint_names))
+		if self.args.single_hand == "left":
+			selection = self.left_arm_and_hand_joint_names
+		elif self.args.single_hand == "right":
+			selection = self.right_arm_and_hand_joint_names
+		else:
+			selection = self.arm_and_hand_joint_names
 
-		for k, v in enumerate(self.arm_and_hand_joint_names):
+		self.arm_and_hand_joint_indices = np.zeros(len(selection))
+
+		for k, v in enumerate(selection):
 			self.arm_and_hand_joint_indices[k] = np.where(self.joint_names==v)[0][0]
 
 	def subsample_relevant_joints(self, datapoint):
@@ -918,9 +977,16 @@ class GRABHand_PreDataset(GRAB_PreDataset):
 										  'right_pinky'])
 
 		# Create index arrays
-		self.hand_joint_indices = np.zeros(len(self.hand_joint_names))
+		if self.args.single_hand == "left":
+			selection = self.left_hand_joint_names
+		elif self.args.single_hand == "right":
+			selection = self.right_hand_joint_names
+		else:
+			selection = self.hand_joint_names
 
-		for k, v in enumerate(self.hand_joint_names):
+		self.hand_joint_indices = np.zeros(len(selection))
+
+		for k, v in enumerate(selection):
 			self.hand_joint_indices[k] = np.where(self.joint_names==v)[0][0]
 
 	def subsample_relevant_joints(self, datapoint):
