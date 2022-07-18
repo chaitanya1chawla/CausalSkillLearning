@@ -483,7 +483,7 @@ class GRABHandVisualizer(GRABVisualizer):
 	
 	def __init__(self, args, has_display=False):
 
-		self.side = self.args.single_hand
+		self.side = args.single_hand
 		# THis class implements skeleton based visualization of the joints predicted by our model, rather than trying to visualize meshes. 
 
 		# Remember, the relevant joints - 
