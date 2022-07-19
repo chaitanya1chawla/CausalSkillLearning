@@ -419,7 +419,6 @@ class PolicyManager_BaseClass():
 				else:
 					latent_z, sample_trajs, _ = self.run_iteration(0, i, return_z=True, and_train=False)
 
-				embed()
 				
 				if self.args.batch_size>1:
 

@@ -579,7 +579,10 @@ class GRABHandVisualizer(GRABVisualizer):
 		# Add pelvis joint. 
 		# Assumes joint_angles are dimensions N joints x 3 dimensions. 
 		joints = copy.deepcopy(joint_angles)
-		joints = joints.reshape((42,3))
+		if self.side in ['left', 'right']:
+			joints = joints.reshape((21,3))
+		else:
+			joints = joints.reshape((42,3))
 		# joints = np.insert(joints, 0, self.default_pelvis_pose, axis=0)
 		# Unnormalization w.r.t pelvis doesn't need to happen, because default pelvis pose 0. 
 		leftjoints = joints[:21]
