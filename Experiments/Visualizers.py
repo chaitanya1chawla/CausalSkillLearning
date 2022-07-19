@@ -590,35 +590,38 @@ class GRABHandVisualizer(GRABVisualizer):
 			leftjoints = joints[:21]
 			leftjoints[0] = [0, 0, 0]
 			ax_left.scatter(leftjoints[:, 0], leftjoints[:, 1], leftjoints[:, 2], color=self.colors, s=20, depthshade=False)
+			for k, v in enumerate(self.link_indices[:23]):
+				ax_left.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
+
 
 		elif self.side == 'right':
 			rightjoints = joints[:21]
 			rightjoints[0] = [0, 0, 0]
 			ax_right.scatter(rightjoints[:, 0], rightjoints[:, 1], rightjoints[:, 2], color=self.colors, s=20, depthshade=False)
-		
+			for k, v in enumerate(self.link_indices[:23]):
+				ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
+
 		else:
 			leftjoints = joints[:21]
 			leftjoints[0] = [0, 0, 0]
 			rightjoints = joints[21:]
 			rightjoints[0] = [0, 0, 0]
+			# Now plot all joints, with left hand blue and right hand red to differentiate, and pelvis in black. 
 			ax_left.scatter(leftjoints[:, 0], leftjoints[:, 1], leftjoints[:, 2], color=self.colors, s=20, depthshade=False)
 			ax_right.scatter(rightjoints[:, 0], rightjoints[:, 1], rightjoints[:, 2], color=self.colors, s=20, depthshade=False)
+			# Now plot links. 
+
+			for k, v in enumerate(self.link_indices[:23]):
+				ax_left.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
+			for k, v in enumerate(self.link_indices[23:]):
+				ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
+
 			
 
-		# Now plot all joints, with left hand blue and right hand red to differentiate, and pelvis in black. 
 
 		# print("Embedding in set joint pose")
 		# embed()
 		
-
-		# Now plot links. 
-		for k, v in enumerate(self.link_indices[:23]):
-			ax_left.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
-
-		if self.side not in ['left', 'right']:
-			for k, v in enumerate(self.link_indices[23:]):
-				ax_right.plot([joints[v[0],0],joints[v[1],0]],[joints[v[0],1],joints[v[1],1]],[joints[v[0],2],joints[v[1],2]],c=self.link_colors[k])
-
 
 		if additional_info is not None:
 			if self.side != 'right':
