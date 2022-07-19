@@ -419,6 +419,7 @@ class PolicyManager_BaseClass():
 				else:
 					latent_z, sample_trajs, _ = self.run_iteration(0, i, return_z=True, and_train=False)
 
+				embed()
 				
 				if self.args.batch_size>1:
 
@@ -585,7 +586,6 @@ class PolicyManager_BaseClass():
 			animation_object = self.dataset[i]['animation']
 
 		# 3) Run unnormalized ground truth trajectory in visualizer. 
-		embed()
 		self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories)
 		
 		# 4) Run unnormalized rollout trajectory in visualizer. 
