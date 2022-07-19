@@ -585,20 +585,31 @@ class GRABHandVisualizer(GRABVisualizer):
 			joints = joints.reshape((42,3))
 		# joints = np.insert(joints, 0, self.default_pelvis_pose, axis=0)
 		# Unnormalization w.r.t pelvis doesn't need to happen, because default pelvis pose 0. 
-		leftjoints = joints[:21]
-		if self.side != 'right':
+
+		if self.side == 'left':
+			leftjoints = joints[21:]
+			leftjoints[0] = [0, 0, 0]
+			ax_left.scatter(leftjoints[:, 0], leftjoints[:, 1], leftjoints[:, 2], color=self.colors, s=20, depthshade=False)
+
+		elif self.side == 'right':
 			rightjoints = joints[21:]
+			rightjoints[0] = [0, 0, 0]
+			ax_right.scatter(rightjoints[:, 0], rightjoints[:, 1], rightjoints[:, 2], color=self.colors, s=20, depthshade=False)
+		
 		else:
+			leftjoints = joints[21:]
+			leftjoints[0] = [0, 0, 0]
 			rightjoints = joints[:21]
-		leftjoints[0] = [0, 0, 0]
-		rightjoints[0] = [0, 0, 0]
+			rightjoints[0] = [0, 0, 0]
+			ax_left.scatter(leftjoints[:, 0], leftjoints[:, 1], leftjoints[:, 2], color=self.colors, s=20, depthshade=False)
+			ax_right.scatter(rightjoints[:, 0], rightjoints[:, 1], rightjoints[:, 2], color=self.colors, s=20, depthshade=False)
+			
 
 		# Now plot all joints, with left hand blue and right hand red to differentiate, and pelvis in black. 
 
 		# print("Embedding in set joint pose")
 		# embed()
-		ax_left.scatter(leftjoints[:, 0], leftjoints[:, 1], leftjoints[:, 2], color=self.colors, s=20, depthshade=False)
-		ax_right.scatter(rightjoints[:, 0], rightjoints[:, 1], rightjoints[:, 2], color=self.colors, s=20, depthshade=False)
+		
 
 		# Now plot links. 
 		for k, v in enumerate(self.link_indices[:23]):
