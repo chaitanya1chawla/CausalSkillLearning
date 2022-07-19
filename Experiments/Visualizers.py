@@ -587,19 +587,19 @@ class GRABHandVisualizer(GRABVisualizer):
 		# Unnormalization w.r.t pelvis doesn't need to happen, because default pelvis pose 0. 
 
 		if self.side == 'left':
-			leftjoints = joints[21:]
+			leftjoints = joints[:21]
 			leftjoints[0] = [0, 0, 0]
 			ax_left.scatter(leftjoints[:, 0], leftjoints[:, 1], leftjoints[:, 2], color=self.colors, s=20, depthshade=False)
 
 		elif self.side == 'right':
-			rightjoints = joints[21:]
+			rightjoints = joints[:21]
 			rightjoints[0] = [0, 0, 0]
 			ax_right.scatter(rightjoints[:, 0], rightjoints[:, 1], rightjoints[:, 2], color=self.colors, s=20, depthshade=False)
 		
 		else:
-			leftjoints = joints[21:]
+			leftjoints = joints[:21]
 			leftjoints[0] = [0, 0, 0]
-			rightjoints = joints[:21]
+			rightjoints = joints[21:]
 			rightjoints[0] = [0, 0, 0]
 			ax_left.scatter(leftjoints[:, 0], leftjoints[:, 1], leftjoints[:, 2], color=self.colors, s=20, depthshade=False)
 			ax_right.scatter(rightjoints[:, 0], rightjoints[:, 1], rightjoints[:, 2], color=self.colors, s=20, depthshade=False)
