@@ -998,3 +998,20 @@ class GRABHand_PreDataset(GRAB_PreDataset):
 	
 	def getname(self):
 		return "GRABHand"
+
+	def __getitem__(self, index):
+		# Return n'th item of dataset.
+		# This has already processed everything.
+
+		# if isinstance(index,np.ndarray):			
+		# 	return list(self.data_list_array[index])
+		# else:
+		# 	return self.data_list[index]
+
+		data_element = {}
+		data_element['is_valid'] = True
+		data_element['demo'] = self.data_list[index]
+		data_element['file'] = self.filelist[index]
+
+		embed()
+		return data_element
