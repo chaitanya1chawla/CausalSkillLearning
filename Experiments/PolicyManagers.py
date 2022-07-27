@@ -695,16 +695,16 @@ class PolicyManager_BaseClass():
 	def visualize_robot_embedding(self, scaled_embedded_zs, gt=False):
 
 		# Create figure and axis objects
-		matplotlib.rcParams['figure.figsize'] = [8, 8]
-		zoom_factor = 0.04
+		# matplotlib.rcParams['figure.figsize'] = [8, 8]
+		# zoom_factor = 0.04
 
 		# # # Good low res parameters: 
 		# matplotlib.rcParams['figure.figsize'] = [8, 8]
 		# zoom_factor = 0.04
 
 		# # # Good spaced out highres parameters: 
-		# matplotlib.rcParams['figure.figsize'] = [40, 40]
-		# zoom_factor = 0.3	
+		matplotlib.rcParams['figure.figsize'] = [40, 40]
+		zoom_factor = 0.3	
 		
 		fig, ax = plt.subplots()
 
