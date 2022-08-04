@@ -438,7 +438,7 @@ class PolicyManager_BaseClass():
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 			
 							# Rollout each individual trajectory in this batch.
-							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b])
+							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b], indexed_data_element=data_element[b])
 
 						# Now append this particular sample traj and the rollout into trajectroy and rollout sets.
 						self.trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
@@ -552,7 +552,7 @@ class PolicyManager_BaseClass():
 		trajectory = subpolicy_inputs[:,:self.state_dim].detach().cpu().numpy()
 		return trajectory
 
-	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False):		
+	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None):		
 
 		# 1) Feed Z into policy, rollout trajectory. 
 
@@ -575,11 +575,21 @@ class PolicyManager_BaseClass():
 			# Get animation object from dataset. 
 			animation_object = self.dataset[i]['animation']
 
+		# Set task ID if the visualizer needs it. 
+		if indexed_data_element is None:
+			task_id = None
+		else:
+			task_id = indexed_data_element['task_id']
+			env_name = self.dataset.environment_names[task_id]
+
+		print("Embedding in viusalizer in PM.")
+		embed()
+
 		# 3) Run unnormalized ground truth trajectory in visualizer. 
-		self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories)
-		
+		self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+
 		# 4) Run unnormalized rollout trajectory in visualizer. 
-		self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_Rollout.gif".eformat(i), return_and_save=True, end_effector=self.args.ee_trajectories)
+		self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_Rollout.gif".eformat(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 		
 		self.gt_gif_list.append(copy.deepcopy(self.ground_truth_gif))
 		self.rollout_gif_list.append(copy.deepcopy(self.rollout_gif))
