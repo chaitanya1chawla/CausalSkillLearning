@@ -582,14 +582,14 @@ class PolicyManager_BaseClass():
 			task_id = indexed_data_element['task_id']
 			env_name = self.dataset.environment_names[task_id]
 
-		print("Embedding in viusalizer in PM.")
-		embed()
+		# print("Embedding in viusalizer in PM.")
+		# embed()
 
 		# 3) Run unnormalized ground truth trajectory in visualizer. 
 		self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 
 		# 4) Run unnormalized rollout trajectory in visualizer. 
-		self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_Rollout.gif".eformat(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+		self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_Rollout.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 		
 		self.gt_gif_list.append(copy.deepcopy(self.ground_truth_gif))
 		self.rollout_gif_list.append(copy.deepcopy(self.rollout_gif))

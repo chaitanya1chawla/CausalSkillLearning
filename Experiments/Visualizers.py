@@ -500,8 +500,8 @@ class RoboturkObjectVisualizer(object):
 	
 	def set_object_pose(self, position, orientation):
 
-		print("Entering object pose")
-		embed()
+		# print("Entering object pose")
+		# embed()
 		
 		# Sets object position for environment with one object. 
 		# Indices of object position are 9-12. 
