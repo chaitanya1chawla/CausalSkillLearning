@@ -360,8 +360,10 @@ class PolicyManager_BaseClass():
 			self.visualizer = RoboturkObjectVisualizer(args=self.args)
 		elif self.args.data in ['GRABHand']:
 			self.visualizer = GRABHandVisualizer(args=self.args)
+			self.N = 200
 		elif self.args.data in ['GRABArmHand']:
 			self.visualizer = GRABArmHandVisualizer(args=self.args)
+			self.N = 200
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
