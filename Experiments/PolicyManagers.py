@@ -809,6 +809,9 @@ class PolicyManager_BaseClass():
 			self.max_batch_size = 'Full'
 		else:
 			self.max_batch_size = self.dataset.dataset_trajectory_lengths.max()
+		
+		## embed()
+		embed()
 								
 		print("About to run max batch size iteration.")
 		print("This batch size is: ", self.max_batch_size)
