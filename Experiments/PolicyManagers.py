@@ -1766,7 +1766,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		############# (0) #############
 		# Sample trajectory segment from dataset. 
-		embed()			
 		
 		if self.args.traj_segments:			
 			state_action_trajectory, sample_action_seq, sample_traj  = self.get_trajectory_segment(i)
