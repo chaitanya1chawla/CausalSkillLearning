@@ -399,6 +399,9 @@ class PolicyManager_BaseClass():
 
 			self.shuffle(len(self.dataset)-self.test_set_size, shuffle=True)
 
+			# print("Embedding before gte robot visuals loop.s")
+			# embed()
+
 			for j in range(self.N//self.args.batch_size):
 				i = self.index_list[j]
 
@@ -585,6 +588,9 @@ class PolicyManager_BaseClass():
 		# print("Embedding in viusalizer in PM.")
 		# embed()
 
+		print("We are in the PM visualizer function.")
+		print("Visualizing a trajectory of task:", env_name)
+
 		# 3) Run unnormalized ground truth trajectory in visualizer. 
 		self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 
@@ -696,16 +702,16 @@ class PolicyManager_BaseClass():
 	def visualize_robot_embedding(self, scaled_embedded_zs, gt=False):
 
 		# Create figure and axis objects
-		matplotlib.rcParams['figure.figsize'] = [8, 8]
-		zoom_factor = 0.04
+		# matplotlib.rcParams['figure.figsize'] = [8, 8]
+		# zoom_factor = 0.04
 
 		# # # Good low res parameters: 
 		# matplotlib.rcParams['figure.figsize'] = [8, 8]
 		# zoom_factor = 0.04
 
 		# # # Good spaced out highres parameters: 
-		# matplotlib.rcParams['figure.figsize'] = [40, 40]
-		# zoom_factor = 0.3	
+		matplotlib.rcParams['figure.figsize'] = [40, 40]
+		zoom_factor = 0.3	
 		
 		fig, ax = plt.subplots()
 
@@ -1010,10 +1016,12 @@ class PolicyManager_BaseClass():
 
 		# If we're in a dataset that will have variable sized data.
 		# if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic']:
-		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic','GRAB']:
-	
+		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic','GRAB','RoboturkObjects']:
+			
+			# print("Embedding in shuffle")
+			# embed()
 
-			if self.args.task_discriminability or self.args.task_based_supervision:
+			if self.args.task_discriminability or self.args.task_based_supervision or self.args.task_based_shuffling:
 
 				# If we're in the BatchJoint setting, actually run task_based_shuffling.
 				if isinstance(self, PolicyManager_BatchJoint):						
@@ -1022,16 +1030,12 @@ class PolicyManager_BaseClass():
 						self.already_shuffled = 1				
 				
 				# if isinstance(self, PolicyManager_Transfer):
-
 				# Also create an index list to shuffle the order of blocks that we observe...
-				self.index_list = np.arange(0,self.extent)				
+				self.index_list = np.arange(0,extent)				
 				np.random.shuffle(self.index_list)
-						
-			else:
-				self.trajectory_length_based_shuffling(extent=extent,shuffle=shuffle)		
-			
-				
 
+			else:
+				self.trajectory_length_based_shuffling(extent=extent,shuffle=shuffle)			
 
 		# If we're in Toy data, doesn't matter, just randomly shuffle. 
 		else:
@@ -1170,8 +1174,13 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		
 
 		elif self.args.data=='RoboturkObjects':
-			self.state_size = 14
-			self.state_dim = 14
+			# self.state_size = 14
+			# self.state_dim = 14
+
+			# Set state size to 7 for now; because we're not using the relative pose.
+			self.state_size = 7
+			self.state_dim = 7
+
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
@@ -1872,7 +1881,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.state_dim = 24
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['RoboturkObjects']:
-				self.state_dim = 14
+				# Now switching to using 7 dimensions instead of 14, so as to not use relative pose.
+				self.state_dim = 7
+				# self.state_dim = 14
 				self.rollout_timesteps = self.traj_length
 
 			self.trajectory_set = np.zeros((self.N, self.rollout_timesteps, self.state_dim))
@@ -1996,9 +2007,13 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 		# Make data_element a list of dictionaries. 
 		data_element = []
-		
-		for b in range(i,i+self.args.batch_size):	
-			data_element.append(self.dataset[b])
+						
+		# for b in range(i,i+self.args.batch_size):	
+
+		# Now trying version of get_batch_element that shuffles..
+		# for b in range(self.index_list[i],self.index_list[i]+self.args.batch_size):		
+		for b in range(self.args.batch_size):
+			data_element.append(self.dataset[self.index_list[i+b]])
 
 		# # Checking what task we're solving if such a thing exists..
 		# if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic','RoboturkObjects']:
@@ -2299,8 +2314,13 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 			
 		elif self.args.data=='RoboturkObjects':
-			self.state_size = 14
-			self.state_dim = 14
+			# self.state_size = 14
+			# self.state_dim = 14
+
+			# Set state size to 7 for now; because we're not using the relative pose.
+			self.state_size = 7
+			self.state_dim = 7
+
 			self.input_size = 2*self.state_size	
 			self.output_size = self.state_size
 			self.traj_length = self.args.traj_length
@@ -3624,7 +3644,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		if self.args.z_tuple_gmm:			
 			self.cummulative_number_zs = np.concatenate([np.zeros(1),np.cumsum(np.array(self.number_distinct_zs))]).astype(int)
 			
-
 		# # if self.args.setting=='jointtransfer':
 		# # 	self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
 		# # 	self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)

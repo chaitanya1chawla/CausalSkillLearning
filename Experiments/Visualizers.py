@@ -52,7 +52,6 @@ class SawyerVisualizer(object):
 			self.sawyer_IK_object = None
 			self.environment = self.base_env
 		
-
 	def update_state(self):
 		# Updates all joint states
 		self.full_state = self.environment._get_observation()
@@ -480,6 +479,7 @@ class RoboturkObjectVisualizer(object):
 	def __init__(self, has_display=False, args=None):
 		
 		self.args = args
+		self.has_display = has_display
 		
 		# Create environment.
 		print("Do I have a display?", has_display)
@@ -515,7 +515,7 @@ class RoboturkObjectVisualizer(object):
 		# Sets posiitons correctly. Quaternions slightly off - trend is sstill correct.
 		self.environment.sim.forward()
 
-		print("Exiting object pose")
+		# print("Exiting object pose")
 
 	def set_joint_pose(self, pose, arm='both', gripper=False):
 		
@@ -536,9 +536,12 @@ class RoboturkObjectVisualizer(object):
 
 	def create_environment(self, task_id=None):
 
+		print("Creating environment for task: ",task_id)
+
+		import robosuite, threading
 		if float(robosuite.__version__[:3])<1.:
 			self.new_robosuite = 0
-			self.base_env = robosuite.make(task_id,has_renderer=has_display)
+			self.base_env = robosuite.make(task_id,has_renderer=self.has_display)
 			from robosuite.wrappers import IKWrapper					
 			self.sawyer_IK_object = IKWrapper(self.base_env)
 			self.environment = self.sawyer_IK_object.env
@@ -554,6 +557,9 @@ class RoboturkObjectVisualizer(object):
 
 		image_list = []
 		previous_joint_positions = None
+
+		# Recreate environment with new task ID potentially.
+		self.create_environment(task_id=task_id)
 
 		for t in range(trajectory.shape[0]):
 

@@ -664,7 +664,10 @@ class Roboturk_ObjectDataset(Roboturk_NewSegmentedDataset):
 		# Copy over the demo to the robot-demo key.
 		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
 		# Set demo to object-state trajectory. 
-		data_element['demo'] = data_element['object-state']
+
+		# Also try ignoring the relative positions for now.
+		# print("Embedding in get el")		
+		data_element['demo'] = data_element['object-state'][:,:7]
 
 		return data_element
 		
