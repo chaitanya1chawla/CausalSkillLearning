@@ -257,7 +257,6 @@ def parse_arguments():
 	parser.add_argument('--smoothing_kernel_bandwidth', dest='smoothing_kernel_bandwidth',type=float,default=3.5) # The smoothing bandwidth that is applied to data loader trajectories. 
 	parser.add_argument('--human_pos_normalization', dest='position_normalization', type=str, default='none') # The position normalization for GRAB dataloader
 
-
 	# Training paradigm parameters. 
 	parser.add_argument('--new_gradient',dest='new_gradient',type=int,default=1)
 	parser.add_argument('--b_prior',dest='b_prior',type=int,default=1)
