@@ -580,7 +580,7 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		
 				# Decide task ID, and new index modulo num_demos.
 		# Subtract number of demonstrations in cumsum until then, and then 				
-		new_index = index-self.cummulative_num_demos[max(task_index,0)]		
+		new_index = index-self.cummulative_num_demos[max(task_index,0)]
 		data_element = self.files[task_index][new_index]
 
 		resample_length = len(data_element['demo'])//self.args.ds_freq
@@ -666,7 +666,8 @@ class Roboturk_ObjectDataset(Roboturk_NewSegmentedDataset):
 		# Set demo to object-state trajectory. 
 
 		# Also try ignoring the relative positions for now.
-		# print("Embedding in get el")		
+		# print("Embedding in get el")
+		# embed()
 		data_element['demo'] = data_element['object-state'][:,:7]
 
 		return data_element

@@ -225,21 +225,33 @@ class PolicyManager_BaseClass():
 	# @tprofile
 	def train(self, model=None):
 
-		if model:
-			print("Loading model in training.")
-			self.load_all_models(model)				
-		counter = self.args.initial_counter_value
-
 		print("Running MAIN Train function.")
 
+		########################################
+		# (1) Load Model If Necessary
+		########################################
+		if model:
+			print("Loading model in training.")
+			self.load_all_models(model)			
+		
+		########################################
+		# (2) Set initial values.
+		########################################
+
+		counter = self.args.initial_counter_value
 		epoch_time = 0.
 		cum_epoch_time = 0.
 
+		########################################
+		# (3) Outer loop over epochs. 
+		########################################
+		
 		# For number of training epochs. 
 		for e in range(self.number_epochs+1): 
-						
-			self.current_epoch_running = e
-			print("Starting Epoch: ",e)
+					
+			########################################
+			# (4a) Bookkeeping
+			########################################
 
 			if e%self.args.save_freq==0:
 				self.save_all_models("epoch{0}".format(e))
@@ -247,6 +259,13 @@ class PolicyManager_BaseClass():
 			if self.args.debug:
 				print("Embedding in Outer Train Function.")
 				embed()
+
+			self.current_epoch_running = e
+			print("Starting Epoch: ",e)
+
+			########################################
+			# (4b) Set extent of dataset. 
+			########################################
 
 			# Modifying to make training functions handle batches. 
 			# For every item in the epoch:
@@ -264,25 +283,32 @@ class PolicyManager_BaseClass():
 					extent = self.args.debugging_datapoints
 				else:
 					extent = len(self.dataset)-self.test_set_size
-			
-
-			# np.random.shuffle(self.index_list)
-			self.shuffle(extent)
-			self.batch_indices_sizes = []
 
 			if self.args.task_discriminability or self.args.task_based_supervision:
 				extent = self.extent
 
+			########################################
+			# (4c) Shuffle based on extent of dataset. 
+			########################################
+			
+			# np.random.shuffle(self.index_list)
+			self.shuffle(extent)
+			self.batch_indices_sizes = []
+
+			########################################
+			# (4d) Inner training loop
+			########################################
+
 			t1 = time.time()
 						
-			for i in range(0,extent,self.args.batch_size):
+			for i in range(0,extent-self.args.batch_size,self.args.batch_size):
 				
 				# Probably need to make run iteration handle batch of current index plus batch size.				
 				# with torch.autograd.set_detect_anomaly(True):
 				t2 = time.time()
 
 				##############################################
-				############### LINE PROFILING ###############
+				# (5) Run Iteration
 				##############################################
 
 				# print("Epoch:",e,"Trajectory:",str(i).zfill(5), "Datapoints:",str(self.index_list[i]).zfill(5),"Extent:",extent)
@@ -291,19 +317,27 @@ class PolicyManager_BaseClass():
 					self.lp = LineProfiler()
 					self.lp_wrapper = self.lp(self.run_iteration)
 					self.lp_wrapper(counter, self.index_list[i])
-					self.lp.print_stats()
-				else:
+					self.lp.print_stats()			
+				else:				
 					self.run_iteration(counter, self.index_list[i])
 
 				t3 = time.time()
 				print("Epoch:",e,"Trajectory:",str(i).zfill(5), "Datapoints:",str(self.index_list[i]).zfill(5), "Iter Time:",format(t3-t2,".4f"),"PerET:",format(cum_epoch_time/max(e,1),".4f"),"CumET:",format(cum_epoch_time,".4f"),"Extent:",extent)
 
 				counter = counter+1
-				# counter = counter+self.args.batch_size
+				
+			##############################################
+			# (6) Some more book keeping.
+			##############################################
+				
 			t4 = time.time()
 			epoch_time = t4-t1
 			cum_epoch_time += epoch_time
 
+			##############################################
+			# (7) Automatic evaluation if we need it. 
+			##############################################
+				
 			if e%self.args.eval_freq==0:
 				self.automatic_evaluation(e)
 
@@ -777,7 +811,7 @@ class PolicyManager_BaseClass():
 
 		print("Initializing batches to manage GPU memory.")
 		# Set some parameters that we need for the dry run. 
-		extent = len(self.dataset)-self.test_set_size
+		extent = len(self.dataset)-self.test_set_size # -self.args.batch_size
 		counter = 0
 		self.batch_indices_sizes = []
 		# self.trajectory_lengths = []
@@ -1186,6 +1220,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.output_size = self.state_size
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
+			self.test_set_size = 50
 
 			stat_dir_name = "RoboturkObjects"
 			
@@ -1989,6 +2024,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 	def __init__(self, number_policies=4, dataset=None, args=None):
 		super(PolicyManager_BatchPretrain, self).__init__(number_policies, dataset, args)
+		self.blah = 0
 
 	def concat_state_action(self, sample_traj, sample_action_seq):
 		# Add blank to start of action sequence and then concatenate. 
@@ -2012,8 +2048,15 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 		# Now trying version of get_batch_element that shuffles..
 		# for b in range(self.index_list[i],self.index_list[i]+self.args.batch_size):		
+
+		# if i==4224 or self.blah: 
+		# 	print("Embedding in get batch element")
+		# 	embed()
+		# 	self.blah=1
+
 		for b in range(self.args.batch_size):
-			data_element.append(self.dataset[self.index_list[i+b]])
+			# data_element.append(self.dataset[self.index_list[i+b]])
+			data_element.append(self.dataset[min(len(self.dataset)-1,self.index_list[min(i+b,len(self.index_list)-1)])])
 
 		# # Checking what task we're solving if such a thing exists..
 		# if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic','RoboturkObjects']:
