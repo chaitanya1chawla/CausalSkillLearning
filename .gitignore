@@ -9,6 +9,8 @@
 Experiments/Experimental_Logs/*
 Experiments/ExpWandbLogs/*
 Experiments/Code_Runs/*
+Logs/*
+CSLenv/*
 .vscode/settings.json
 Experiments/.vscode/settings.json
 Experiments/Statistics/*
@@ -24,3 +26,5 @@ DataGenerator/NewGoalDirectedTraj.py
 Toy_Batching.py
 Toy_Batching.txt
 Experiments/PolicyManagers.py
+.DS_Store
+.idea/*

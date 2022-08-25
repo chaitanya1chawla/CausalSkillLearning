@@ -55,7 +55,14 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = GRAB_DataLoader.GRAB_PreDataset(args)
 	elif args.data=='GRAB':
 		dataset = GRAB_DataLoader.GRAB_Dataset(args)
-	
+	elif args.data=='GRABArmHandPreproc':
+		dataset = GRAB_DataLoader.GRABArmHand_PreDataset(args)
+	elif args.data=='GRABArmHand':
+		dataset = GRAB_DataLoader.GRABArmHand_Dataset(args)
+	elif args.data=='GRABHandPreproc':
+		dataset = GRAB_DataLoader.GRABHand_PreDataset(args)
+	elif args.data=='GRABHand':
+		dataset = GRAB_DataLoader.GRABHand_Dataset(args)
 	return dataset
 
 class Master():
@@ -248,6 +255,8 @@ def parse_arguments():
 	parser.add_argument('--condition_size',dest='condition_size',type=int,default=4)
 	parser.add_argument('--smoothen', dest='smoothen',type=int,default=0) # Whether to smoothen the original dataset. 
 	parser.add_argument('--smoothing_kernel_bandwidth', dest='smoothing_kernel_bandwidth',type=float,default=3.5) # The smoothing bandwidth that is applied to data loader trajectories. 
+	parser.add_argument('--human_pos_normalization', dest='position_normalization', type=str, default='none') # The position normalization for GRAB dataloader
+
 
 	# Training paradigm parameters. 
 	parser.add_argument('--new_gradient',dest='new_gradient',type=int,default=1)

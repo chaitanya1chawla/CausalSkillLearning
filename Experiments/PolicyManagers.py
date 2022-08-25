@@ -9,7 +9,7 @@ from headers import *
 from PolicyNetworks import *
 from RL_headers import *
 from PPO_Utilities import PPOBuffer
-from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, GRABVisualizer, RoboturkObjectVisualizer #, MocapVisualizer
+from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, RoboturkObjectVisualizer #, MocapVisualizer
 # from Visualizers import *
 import TFLogger, DMP, RLUtils
 
@@ -92,8 +92,12 @@ class PolicyManager_BaseClass():
 
 		elif self.args.data=='Mocap':
 			self.visualizer = MocapVisualizer(args=self.args)
-		elif self.args.data=='GRAB':
+		elif self.args.data in ['GRAB']:
 			self.visualizer = GRABVisualizer()
+		elif self.args.data in ['GRABHand']:
+			self.visualizer = GRABHandVisualizer(args=self.args)
+		elif self.args.data in ['GRABArmHand']:
+			self.visualizer = GRABArmHandVisualizer(args=self.args)
 		elif self.args.data in ['RoboturkObjects']:
 			self.visualizer = RoboturkObjectVisualizer(args=self.args)
 		else:
@@ -164,7 +168,7 @@ class PolicyManager_BaseClass():
 	
 		# elif self.args.data in ['MIME','OldMIME'] or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','RoboturkObjects']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects']:
 
 			# If we're imitating... select demonstrations from the particular task.
 			if self.args.setting=='imitation' and (self.args.data in ['Roboturk','RoboMimic','RoboturkObjects']):
@@ -185,7 +189,7 @@ class PolicyManager_BaseClass():
 
 			self.current_traj_len = len(trajectory)
 
-			if self.args.data in ['MIME','OldMIME','GRAB']:
+			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand']:
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
 			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic','RoboturkObjects']:
@@ -355,6 +359,12 @@ class PolicyManager_BaseClass():
 			self.N = 100
 		elif self.args.data in ['RoboturkObjects']:
 			self.visualizer = RoboturkObjectVisualizer(args=self.args)
+		elif self.args.data in ['GRABHand']:
+			self.visualizer = GRABHandVisualizer(args=self.args)
+			self.N = 200
+		elif self.args.data in ['GRABArmHand']:
+			self.visualizer = GRABArmHandVisualizer(args=self.args)
+			self.N = 200
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
@@ -696,16 +706,16 @@ class PolicyManager_BaseClass():
 	def visualize_robot_embedding(self, scaled_embedded_zs, gt=False):
 
 		# Create figure and axis objects
-		matplotlib.rcParams['figure.figsize'] = [8, 8]
-		zoom_factor = 0.04
+		# matplotlib.rcParams['figure.figsize'] = [8, 8]
+		# zoom_factor = 0.04
 
 		# # # Good low res parameters: 
 		# matplotlib.rcParams['figure.figsize'] = [8, 8]
 		# zoom_factor = 0.04
 
 		# # # Good spaced out highres parameters: 
-		# matplotlib.rcParams['figure.figsize'] = [40, 40]
-		# zoom_factor = 0.3	
+		matplotlib.rcParams['figure.figsize'] = [40, 40]
+		zoom_factor = 0.3	
 		
 		fig, ax = plt.subplots()
 
@@ -1010,7 +1020,7 @@ class PolicyManager_BaseClass():
 
 		# If we're in a dataset that will have variable sized data.
 		# if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic']:
-		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic','GRAB']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic','GRAB','GRABHand','GRABArmHand']:
 	
 
 			if self.args.task_discriminability or self.args.task_based_supervision:
@@ -1149,7 +1159,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 
-		elif self.args.data=='GRAB':
+		elif self.args.data in ['GRAB']:
 			
 			self.state_size = 24
 			self.state_dim = 24
@@ -1159,7 +1169,58 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 			self.test_set_size = 40
-			stat_dir_name = 'GRAB'
+			stat_dir_name = self.args.data
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+		
+		elif self.args.data in ['GRABHand']:
+			
+			self.state_size = 126
+			self.state_dim = 126
+
+			if self.args.single_hand in ['left', 'right']:
+				self.state_dim //= 2
+				self.state_size //= 2
+
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 40
+			stat_dir_name = self.args.data
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+		
+		elif self.args.data in ['GRABArmHand']:
+			
+			if self.args.position_normalization == 'pelvis':
+				self.state_size = 144
+				self.state_dim = 144
+
+				if self.args.single_hand in ['left', 'right']:
+					self.state_dim //= 2
+					self.state_size //= 2
+			else:
+				self.state_size = 147
+				self.state_dim = 147
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 40
+			stat_dir_name = self.args.data
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
@@ -1502,7 +1563,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			return concatenated_traj, sample_action_seq, sample_traj
 		
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','RoboturkObjects']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects']:
 			data_element = self.dataset[i]
 
 			# If Invalid.
@@ -1555,7 +1616,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				# CONDITIONAL INFORMATION for the encoder... 
 
-				if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','RoboturkObjects']:
+				if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects']:
 					pass
 				# if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 				# 	pass
@@ -1638,6 +1699,19 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		elif self.args.data in ['GRAB']:
 			self.state_dim = 24
 			self.rollout_timesteps = self.traj_length
+		elif self.args.data in ['GRABArmHand']:
+			if self.args.position_normalization == 'pelvis':
+				self.state_dim = 144
+				if self.args.single_hand in ['left', 'right']:
+					self.state_dim //= 2
+			else:
+				self.state_dim = 147
+			self.rollout_timesteps = self.traj_length
+		elif self.args.data in ['GRABHand']:
+			self.state_dim = 126
+			if self.args.single_hand in ['left', 'right']:
+				self.state_dim //= 2
+			self.rollout_timesteps = self.traj_length
 
 		if rollout_length is not None:
 			self.rollout_timesteps = rollout_length
@@ -1703,9 +1777,14 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		####################################
 		############# (0) #############
+
+		# Sample trajectory segment from dataset. 
+		
+
 		####################################
 
 		# Sample trajectory segment from dataset. 			
+
 		if self.args.traj_segments:			
 			state_action_trajectory, sample_action_seq, sample_traj, data_element  = self.get_trajectory_segment(i)
 		else:
@@ -1815,7 +1894,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# if self.args.data=="MIME" or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','RoboturkObjects']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','RoboturkObjects','GRAB','GRABHand','GRABArmHand']:			
 			print("Running Evaluation of State Distances on small test set.")
 			# self.evaluate_metrics()		
 
@@ -1870,6 +1949,19 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['GRAB']:
 				self.state_dim = 24
+				self.rollout_timesteps = self.traj_length
+			if self.args.data in ['GRABArmHand']:
+				if self.args.position_normalization == 'pelvis':
+					self.state_dim = 144
+					if self.args.single_hand in ['left', 'right']:
+						self.state_dim //= 2
+				else:
+					self.state_dim = 147
+				self.rollout_timesteps = self.traj_length
+			if self.args.data in ['GRABHand']:
+				self.state_dim = 126
+				if self.args.single_hand in ['left', 'right']:
+					self.state_dim //= 2
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['RoboturkObjects']:
 				self.state_dim = 14
@@ -2031,7 +2123,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			return concatenated_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), sample_traj.transpose((1,0,2))
 				
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','RoboturkObjects']:			
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects']:			
 
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 				data_element = self.dataset[i:i+self.args.batch_size]
@@ -2275,7 +2367,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			# Create visualizer object
 			self.visualizer = MocapVisualizer(args=self.args)
 
-		elif self.args.data=='GRAB':
+		elif self.args.data in ['GRAB']:
 			
 			self.state_size = 24
 			self.state_dim = 24
@@ -2285,11 +2377,66 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 			self.test_set_size = 40
-			stat_dir_name = 'GRAB'
+			stat_dir_name = self.args.data
 			self.conditional_information = None
 			self.conditional_viz_env = False	
 
 			self.visualizer = GRABVisualizer()		
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+		
+		elif self.args.data in ['GRABHand']:
+			
+			self.state_size = 126
+			self.state_dim = 126
+
+			if self.args.single_hand in ['left', 'right']:
+				self.state_dim //= 2
+				self.state_size //= 2
+			
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 40
+			stat_dir_name = self.args.data
+			self.conditional_information = None
+			self.conditional_viz_env = False	
+
+			self.visualizer = GRABHandVisualizer(args=self.args)		
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+		
+		elif self.args.data in ['GRABArmHand']:
+			
+			if self.args.position_normalization == 'pelvis':
+				self.state_size = 144
+				self.state_dim = 144
+			else:
+				self.state_size = 147
+				self.state_dim = 147
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 40
+			stat_dir_name = self.args.data
+			self.conditional_information = None
+			self.conditional_viz_env = False	
+
+			self.visualizer = GRABArmHandVisualizer(args=self.args)		
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
@@ -2466,7 +2613,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 	def visualize_trajectory(self, trajectory, segmentations=None, i=0, suffix='_Img'):
 
 		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','RoboturkObjects']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects']:
 
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 				unnorm_trajectory = (trajectory*self.norm_denom_value)+self.norm_sub_value
@@ -2589,7 +2736,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			latent_rollout_image = np.array(latent_rollout_image)
 			
 			# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-			if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB']:
+			if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand']:
 				# Feeding as list of image because gif_summary.				
 
 				# print("Embedding in joint update plots, L2511 ")
@@ -3472,7 +3619,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# Visualize space if the subpolicy has been trained...
 		# Running even with the fix_subpolicy, so that we can evaluate joint reconstruction.
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:			
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic', 'GRABHand', 'GRABArmHand']:			
 					
 			print("Running Visualization on Robot Data.")	
 
@@ -3487,7 +3634,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			########################################
 
 			arg_copy = copy.deepcopy(self.args)
-			args_copy.name += "_Eval_Pretrain"
+			arg_copy.name += "_Eval_Pretrain"
 			if self.args.batch_size>1:
 				self.pretrain_policy_manager = PolicyManager_BatchPretrain(self.args.number_policies, self.dataset, arg_copy)
 			else:
@@ -4186,7 +4333,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
 
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','RoboturkObjects']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects']:
 					   
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 
@@ -4245,7 +4392,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				batch_trajectory = (batch_trajectory-self.norm_sub_value)/self.norm_denom_value
 
 			# Set condiitonal information. 
-			if self.args.data in ['MIME','OldMIME','GRAB']:
+			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand']:
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
@@ -7173,7 +7320,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		number_of_batches = 1
 		self.number_of_datapoints_per_batch = self.args.number_of_visualized_translations
-		self.start_index = 10
+		self.start_index = 0  # Changed here
 
 		with torch.no_grad():
 
@@ -7222,7 +7369,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					for k in range(self.start_index,self.start_index+self.number_of_datapoints_per_batch):
 						# Now visualize the original .. target trajectory. 			
 
-						if self.args.target_domain in ['GRAB']:
+						if self.args.target_domain in ['GRAB','GRABHand','GRABArmHand']:
 							GRAB_gif_name = self.GRAB_trajectory_ID[k].lstrip(self.args.target_datadir+'/')
 						else:
 							GRAB_gif_name = None
@@ -7283,8 +7430,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Now save this z set. 
 		np.save(os.path.join(self.traj_viz_dir_name,"Translated_Zs.npy"),self.translated_latent_zs_for_downstream)
 
-		# if self.args.data not in ['GRAB'] and self.args.target_domain not in ['']:
-		# if self.args.target_domain not in ['GRAB']:
+		# if self.args.data not in ['GRAB','GRABHand','GRABArmHand'] and self.args.target_domain not in ['']:
+		# if self.args.target_domain not in ['GRAB','GRABHand','GRABArmHand']:
 		if True:
 			
 			# Now save all the gifs we created.
@@ -9396,7 +9543,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		source_input_dict, source_var_dict, source_eval_dict = policy_manager.run_iteration(self.counter, i, return_dicts=True, train=False, bucket_index=bucket_index)		
 
 		# If we're using GRAB data, also remember the trajectory information. to visualize. 
-		if policy_manager.args.data in ['GRAB']:
+		if policy_manager.args.data in ['GRAB','GRABHand','GRABArmHand']:
 			
 			# Use the get batch eleemnt function. 
 			batched_data_element = policy_manager.get_batch_element(i)
