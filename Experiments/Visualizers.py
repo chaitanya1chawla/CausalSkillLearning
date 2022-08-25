@@ -90,7 +90,7 @@ class SawyerVisualizer(object):
 		image = np.flipud(self.environment.sim.render(600, 600, camera_name='vizview1'))
 		return image
 
-	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False):
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 
 		image_list = []
 		for t in range(trajectory.shape[0]):
@@ -353,7 +353,7 @@ class BaxterVisualizer(object):
 		image = np.flipud(self.environment.sim.render(600, 600, camera_name='vizview1'))
 		return image
 
-	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False):
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 
 		image_list = []
 		previous_joint_positions = None
@@ -456,7 +456,7 @@ class GRABVisualizer(object):
 
 		return image
 
-	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False):
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 
 		image_list = []
 		for t in range(trajectory.shape[0]):
@@ -852,6 +852,9 @@ class RoboturkObjectVisualizer(object):
 	
 	def set_object_pose(self, position, orientation):
 
+		# print("Entering object pose")
+		# embed()
+		
 		# Sets object position for environment with one object. 
 		# Indices of object position are 9-12. 
 		self.environment.sim.data.qpos[9:12] = position
@@ -864,13 +867,17 @@ class RoboturkObjectVisualizer(object):
 		# Sets posiitons correctly. Quaternions slightly off - trend is sstill correct.
 		self.environment.sim.forward()
 
-	def set_joint_pose(self, pose, arm='both', gripper=False):
+		print("Exiting object pose")
 
-		# Is wrapper for set object pose.		
-		position = pose[:3]
-		orientation = pose[3:]
+	def set_joint_pose(self, pose, arm='both', gripper=False):
 		
-		self.set_joint_pose(position, orientation)
+		# Is wrapper for set object pose.		
+		object_position = pose[:3]
+		object_orientation = pose[3:7]
+		object_to_eef_position = pose[7:10]
+		object_to_eef_quaternion = pose[10:]
+
+		self.set_object_pose(object_position, object_orientation)
 
 	def set_joint_pose_return_image(self, pose, arm='both', gripper=False):
 
@@ -879,7 +886,23 @@ class RoboturkObjectVisualizer(object):
 		image = np.flipud(self.environment.sim.render(600, 600, camera_name='vizview1'))
 		return image
 
-	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False):
+	def create_environment(self, task_id=None):
+
+		if float(robosuite.__version__[:3])<1.:
+			self.new_robosuite = 0
+			self.base_env = robosuite.make(task_id,has_renderer=has_display)
+			from robosuite.wrappers import IKWrapper					
+			self.sawyer_IK_object = IKWrapper(self.base_env)
+			self.environment = self.sawyer_IK_object.env
+		else:
+			self.new_robosuite = 1
+
+			task_id_wo_robot_name = task_id.lstrip("Sawyer")
+			self.base_env = robosuite.make(task_id_wo_robot_name,robots=['Sawyer'],has_renderer=has_display)
+			self.sawyer_IK_object = None
+			self.environment = self.base_env		
+
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 
 		image_list = []
 		previous_joint_positions = None

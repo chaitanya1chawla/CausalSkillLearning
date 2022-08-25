@@ -449,6 +449,13 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		# We shouldn't need the environment for .. training though, should we? 
 
 		self.task_list = ["bins-Bread", "bins-Can", "bins-Cereal", "bins-Milk", "pegs-RoundNut", "pegs-SquareNut"]
+		self.task_names = {	"bins-Bread": "SawyerPickPlaceBread",
+						 	"bins-Can": "SawyerPickPlaceCan",
+							"bins-Cereal": "SawyerPickPlaceCereal", 
+							"bins-Milk": "SawyerPickPlaceMilk", 
+							"pegs-RoundNut": "SawyerNutAssemblyRound", 
+							"pegs-SquareNut": "SawyerNutAssemblySquare"
+						}
 		self.environment_names = ["SawyerPickPlaceBread","SawyerPickPlaceCan","SawyerPickPlaceCereal","SawyerPickPlaceMilk","SawyerNutAssemblyRound","SawyerNutAssemblySquare"]
 		self.num_demos = np.array([1069, 1069, 1069, 1069, 1144, 1145])
 		self.cummulative_num_demos = self.num_demos.cumsum()
