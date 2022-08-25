@@ -458,9 +458,7 @@ class GRAB_Dataset(Dataset):
 			self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)
 				
 		self.data_list_array = np.array(self.data_list)		
-		 
-		embed() 
-		
+
 	def getname(self):
 		return "GRAB"
 
