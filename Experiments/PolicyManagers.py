@@ -739,17 +739,22 @@ class PolicyManager_BaseClass():
 		# matplotlib.rcParams['figure.figsize'] = [8, 8]
 		# zoom_factor = 0.04
 
-		# # # Good low res parameters: 
+		# # Good low res parameters: 
 		# matplotlib.rcParams['figure.figsize'] = [8, 8]
 		# zoom_factor = 0.04
 
-		# # # Good spaced out highres parameters: 
-		matplotlib.rcParams['figure.figsize'] = [40, 40]
+		# # # # Good spaced out highres parameters: 
+		matplotlib.rcParams['figure.figsize'] = [40, 40]			
+		# Set this parameter to make sure we don't drop frames.
+		matplotlib.rcParams['animation.embed_limit'] = 2**128
 		zoom_factor = 0.3	
+
 		
 		fig, ax = plt.subplots()
 
 		# number_samples = 400
+
+
 		number_samples = self.N		
 
 		# Create a scatter plot of the embedding itself. The plot does not seem to work without this. 
@@ -1653,7 +1658,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.likelihood_loss = -loglikelihood.mean()
 		self.encoder_KL = encoder_KL.mean()
 
-		self.total_loss = (self.likelihood_loss + self.kl_weight*self.encoder_KL)
+
+		# Adding a penalty for link lengths. 
+		self.link_length_loss = ... 
+
+		self.total_loss = (self.likelihood_loss + self.kl_weight*self.encoder_KL + self.link_length_loss) 
 
 		if self.args.debug:
 			print("Embedding in Update subpolicies.")

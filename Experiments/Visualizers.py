@@ -488,13 +488,13 @@ class RoboturkObjectVisualizer(object):
 		# Create kinematics object. 
 		if float(robosuite.__version__[:3])<1.:
 			self.new_robosuite = 0
-			self.base_env = robosuite.make("SawyerViz",has_renderer=has_display)
+			self.base_env = robosuite.make("SawyerViz",has_renderer=self.has_display)
 			from robosuite.wrappers import IKWrapper					
 			self.sawyer_IK_object = IKWrapper(self.base_env)
 			self.environment = self.sawyer_IK_object.env
 		else:
 			self.new_robosuite = 1
-			self.base_env = robosuite.make("Viz",robots=['Sawyer'],has_renderer=has_display)
+			self.base_env = robosuite.make("Viz",robots=['Sawyer'],has_renderer=self.has_display)
 			self.sawyer_IK_object = None
 			self.environment = self.base_env
 	
@@ -549,7 +549,7 @@ class RoboturkObjectVisualizer(object):
 			self.new_robosuite = 1
 
 			task_id_wo_robot_name = task_id.lstrip("Sawyer")
-			self.base_env = robosuite.make(task_id_wo_robot_name,robots=['Sawyer'],has_renderer=has_display)
+			self.base_env = robosuite.make(task_id_wo_robot_name,robots=['Sawyer'],has_renderer=self.has_display)
 			self.sawyer_IK_object = None
 			self.environment = self.base_env		
 
