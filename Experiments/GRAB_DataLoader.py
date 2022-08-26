@@ -484,6 +484,9 @@ class GRAB_Dataset(Dataset):
 
 class GRABArmHand_Dataset(GRAB_Dataset):
 
+	def __init__(self, args):
+		super(GRABArmHand_Dataset, self).__init__(args=args)
+
 	def subsample_relevant_joints(self, datapoint):
 
 		self.relevant_joint_indices = self.arm_and_hand_joint_indices.astype(int)
@@ -494,6 +497,9 @@ class GRABArmHand_Dataset(GRAB_Dataset):
 		return "GRABArmHand"
 
 class GRABArmHand_PreDataset(GRAB_PreDataset):
+
+	def __init__(self, args, split='train', short_traj=False, traj_length_threshold=500):
+		super(GRABArmHand_PreDataset, self).__init__(args, split=split, short_traj=short_traj, traj_length_threshold=traj_length_threshold)
 
 	def set_relevant_joints(self):
 		self.joint_names = np.array(['pelvis',
@@ -750,6 +756,9 @@ class GRABArmHand_PreDataset(GRAB_PreDataset):
 
 class GRABHand_Dataset(GRAB_Dataset):
 
+	def __init__(self, args):
+		super(GRABHand_Dataset, self).__init__(args=args)
+
 	def subsample_relevant_joints(self, datapoint):
 
 		self.relevant_joint_indices = self.hand_joint_indices.astype(int)
@@ -760,6 +769,9 @@ class GRABHand_Dataset(GRAB_Dataset):
 		return "GRABHand"
 
 class GRABHand_PreDataset(GRAB_PreDataset):
+
+	def __init__(self, ):		
+		super(GRABHand_PreDataset, self).__init__(args, split=split, short_traj=short_traj, traj_length_threshold=traj_length_threshold)
 
 	def set_relevant_joints(self):
 		self.joint_names = np.array(['pelvis',

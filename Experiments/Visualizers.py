@@ -660,7 +660,7 @@ class GRABArmHandVisualizer(GRABVisualizer):
 	
 	def __init__(self, args, has_display=False):
 
-		# INherit from super class.
+		# Inherit from super class.
 		super(GRABArmHandVisualizer, self).__init__(args=args, has_display=has_display)
 
 		# THis class implements skeleton based visualization of the joints predicted by our model, rather than trying to visualize meshes. 
