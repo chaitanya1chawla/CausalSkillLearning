@@ -482,6 +482,8 @@ class GRABHandVisualizer(GRABVisualizer):
 	
 	def __init__(self, args, has_display=False):
 
+		super(GRABHandVisualizer, self).__init__(args=args, has_display=has_display)
+
 		self.side = args.single_hand
 		# THis class implements skeleton based visualization of the joints predicted by our model, rather than trying to visualize meshes. 
 
@@ -658,6 +660,9 @@ class GRABArmHandVisualizer(GRABVisualizer):
 	
 	def __init__(self, args, has_display=False):
 
+		# INherit from super class.
+		super(GRABArmHandVisualizer, self).__init__(args=args, has_display=has_display)
+
 		# THis class implements skeleton based visualization of the joints predicted by our model, rather than trying to visualize meshes. 
 
 		# Remember, the relevant joints - 
@@ -823,8 +828,6 @@ class GRABArmHandVisualizer(GRABVisualizer):
 		plt.close(fig)
 
 		return image
-
-
 
 class RoboturkObjectVisualizer(object):
 
