@@ -477,12 +477,11 @@ class GRABVisualizer(object):
 		else:
 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
 
-
 class GRABHandVisualizer(GRABVisualizer):
 	
 	def __init__(self, args, has_display=False):
 
-		super(GRABHandVisualizer, self).__init__(args=args, has_display=has_display)
+		super(GRABHandVisualizer, self).__init__(has_display=has_display)
 
 		self.side = args.single_hand
 		# THis class implements skeleton based visualization of the joints predicted by our model, rather than trying to visualize meshes. 
@@ -655,13 +654,12 @@ class GRABHandVisualizer(GRABVisualizer):
 
 		return image
 
-
 class GRABArmHandVisualizer(GRABVisualizer):
 	
 	def __init__(self, args, has_display=False):
 
 		# Inherit from super class.
-		super(GRABArmHandVisualizer, self).__init__(args=args, has_display=has_display)
+		super(GRABArmHandVisualizer, self).__init__(has_display=has_display)
 
 		# THis class implements skeleton based visualization of the joints predicted by our model, rather than trying to visualize meshes. 
 
@@ -877,8 +875,8 @@ class RoboturkObjectVisualizer(object):
 		# Is wrapper for set object pose.		
 		object_position = pose[:3]
 		object_orientation = pose[3:7]
-		object_to_eef_position = pose[7:10]
-		object_to_eef_quaternion = pose[10:]
+		# object_to_eef_position = pose[7:10]
+		# object_to_eef_quaternion = pose[10:]
 
 		self.set_object_pose(object_position, object_orientation)
 
@@ -936,6 +934,30 @@ class RoboturkObjectVisualizer(object):
 			return image_list
 		else:
 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+
+
+class RoboturkRobotObjectVisualizer(RoboturkObjectVisualizer):
+
+	def __init__(self, has_display=False, args=None):
+
+		super(GRABArmHandVisualizer, self).__init__(has_display=has_display, args=args)
+
+	def set_joint_pose(self, pose, arm='both', gripper=False):
+
+		# Set object pose.
+		# Assume last seven elements of pose are the actual pose.
+		object_position = pose[-7:-4]
+		object_orientation = pose[-4:]
+
+		self.set_object_pose(object_position, object_orientation)
+		
+		# Set robot pose.
+		# Assumes the  first seven elements are the robot pose.
+		if self.new_robosuite==0:
+			self.environment.set_robot_joint_positions(pose[:7])
+		else:
+			self.environment.robots[0].set_robot_joint_positions(pose[:7])
+	
 
 class ToyDataVisualizer():
 
