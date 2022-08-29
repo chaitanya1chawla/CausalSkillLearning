@@ -940,7 +940,7 @@ class RoboturkRobotObjectVisualizer(RoboturkObjectVisualizer):
 
 	def __init__(self, has_display=False, args=None):
 
-		super(GRABArmHandVisualizer, self).__init__(has_display=has_display, args=args)
+		super(RoboturkRobotObjectVisualizer, self).__init__(has_display=has_display, args=args)
 
 	def set_joint_pose(self, pose, arm='both', gripper=False):
 
