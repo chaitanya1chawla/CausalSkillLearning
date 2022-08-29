@@ -671,7 +671,23 @@ class Roboturk_ObjectDataset(Roboturk_NewSegmentedDataset):
 		data_element['demo'] = data_element['object-state'][:,:7]
 
 		return data_element
-		
+
+class Roboturk_RobotObjectDataset(Roboturk_NewSegmentedDataset):
+
+	def __init__(self, args):
+
+		super(Roboturk_RobotObjectDataset, self).__init__(args)
+
+	def __getitem__(self, index):
+
+		data_element = super().__getitem__(index)
+
+		# Now concatenate the robot and object states. 
+		demo = np.concatenate([data_element['robot-demo'],data_element['object-state'][:,:7]],axis=-1)
+		data_element['demo'] = demo
+
+		return data_element
+
 class Roboturk_Dataloader_Tester(unittest.TestCase):
 	
 	def test_Roboturkdataloader(self):

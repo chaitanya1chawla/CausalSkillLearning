@@ -45,6 +45,8 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = Roboturk_DataLoader.Roboturk_FullDataset(args)
 	elif args.data=='RoboturkObjects':
 		dataset = Roboturk_DataLoader.Roboturk_ObjectDataset(args)
+	elif args.data=='RoboturkRobotObjects':
+		dataset = Roboturk_DataLoader.Roboturk_RobotObjectDataset(args)		
 	elif args.data=='Mocap':
 		dataset = Mocap_DataLoader.Mocap_Dataset(args)
 	elif args.data=='OrigRoboMimic':
@@ -344,7 +346,7 @@ def parse_arguments():
 	# Exploration and learning rate parameters. 
 	parser.add_argument('--epsilon_from',dest='epsilon_from',type=float,default=0.3)
 	parser.add_argument('--epsilon_to',dest='epsilon_to',type=float,default=0.05)
-	parser.add_argument('--epsilon_over',dest='epsilon_over',type=int,default=30)
+	parser.add_argument('--epsilon_over',dest='epsilon_over',type=int,default=200)
 	parser.add_argument('--learning_rate',dest='learning_rate',type=float,default=1e-4)
 	parser.add_argument('--transfer_learning_rate',dest='transfer_learning_rate',type=float,default=1e-4)
 
