@@ -1271,7 +1271,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 		
 
-		elif self.args.data=='RoboturkObjects':
+		elif self.args.data in ['RoboturkObjects']:
 			# self.state_size = 14
 			# self.state_dim = 14
 
@@ -1286,15 +1286,38 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.conditional_info_size = 0
 			self.test_set_size = 50
 
-			stat_dir_name = "RoboturkObjects"
-			
+			stat_dir_name = "RoboturkObjects"			
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
 			elif self.args.normalization=='minmax':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value		
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+
+		elif self.args.data in ['RoboturkRobotObjects']:
+			# self.state_size = 14
+			# self.state_dim = 14
+
+			# Set state size to 7 for now; because we're not using the relative pose.
+			self.state_size = 15
+			self.state_dim = 15
+
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 50
+
+			stat_dir_name = "RoboturkRobotObjects"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 
 		# Training parameters. 		
 		self.baseline_value = 0.
@@ -1613,29 +1636,36 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects']:
 			data_element = self.dataset[i]
 
+			####################################			
 			# If Invalid.
+			####################################
+						
 			if not(data_element['is_valid']):
 				return None, None, None
+			
+			####################################
+			# Check for gripper.
+			####################################
 				
-			# if self.args.data in ['MIME','OldMIME']:
-			# 	# Sample a trajectory length that's valid. 			
-			# 	trajectory = np.concatenate([data_element['la_trajectory'],data_element['ra_trajectory'],data_element['left_gripper'].reshape((-1,1)),data_element['right_gripper'].reshape((-1,1))],axis=-1)
-			# elif self.args.data=='Roboturk':
-			# 	trajectory = data_element['demo']
-
 			if self.args.gripper:
 				trajectory = data_element['demo']
 			else:
 				trajectory = data_element['demo'][:,:-1]
 
+			####################################
 			# If allowing variable skill length, set length for this sample.				
+			####################################
+
 			if self.args.var_skill_length:
 				# Choose length of 12-16 with certain probabilities. 
 				self.current_traj_len = np.random.choice([12,13,14,15,16],p=[0.1,0.2,0.4,0.2,0.1])
 			else:
 				self.current_traj_len = self.traj_length
 
+			####################################
 			# Sample random start point.
+			####################################
+			
 			if trajectory.shape[0]>self.current_traj_len:
 
 				bias_length = int(self.args.pretrain_bias_sampling*trajectory.shape[0])
@@ -2196,18 +2226,6 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			else:
 				data_element = self.get_batch_element(i)
 
-			# # Checking what task we're solving if such a thing exists..
-			# if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic','RoboturkObjects']:
-			# 	self.current_task_for_viz = []				
-			# 	self.current_task_for_viz = data_element['task-id']
-			
-			# If this is different from previous visualizer, recreate visualizer object.
-			# Shouldn't we only do this ... on demand, at frequency of visualizing? 	
-			
-
-			# Must select common trajectory segment length for batch.
-			# Must select different start / end points for items of batch?
-
 			# If allowing variable skill length, set length for this sample.				
 			if self.args.var_skill_length:
 				# Choose length of 12-16 with certain probabilities. 
@@ -2216,9 +2234,6 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 				self.current_traj_len = self.traj_length            
 			
 			batch_trajectory = np.zeros((self.args.batch_size, self.current_traj_len, self.state_size))
-
-			# print("Embedding in batch pretrain manager get trajectory segment.")
-			# embed()
 
 			for x in range(self.args.batch_size):
 
@@ -2248,6 +2263,10 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 						start_timepoint = np.random.randint(0,traj.shape[0]-self.current_traj_len)
 
 					end_timepoint = start_timepoint + self.current_traj_len
+
+					# if data_element[x]['demo'].shape[-1]>15:
+					# 	print("Embed in batch pretrain get traj")
+					# 	embed()
 
 					if self.args.ee_trajectories:
 						batch_trajectory[x] = data_element[x]['endeffector_trajectory'][start_timepoint:end_timepoint]
@@ -2529,8 +2548,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		elif self.args.data=='RoboturkRobotObjects':
 
 			# Set state size to 14 for now; because we're not using the relative pose.
-			self.state_size = 14
-			self.state_dim = 14
+			self.state_size = 15
+			self.state_dim = 15
 
 			self.input_size = 2*self.state_size	
 			self.output_size = self.state_size

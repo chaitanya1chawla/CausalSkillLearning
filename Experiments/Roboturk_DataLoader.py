@@ -659,7 +659,7 @@ class Roboturk_ObjectDataset(Roboturk_NewSegmentedDataset):
 
 	def __getitem__(self, index):
 		
-		data_element = super().__getitem__(index)
+		data_element = copy.deepcopy(super().__getitem__(index))
 
 		# Copy over the demo to the robot-demo key.
 		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
@@ -680,11 +680,21 @@ class Roboturk_RobotObjectDataset(Roboturk_NewSegmentedDataset):
 
 	def __getitem__(self, index):
 
-		data_element = super().__getitem__(index)
+		data_element = copy.deepcopy(super().__getitem__(index))
 
 		# Now concatenate the robot and object states. 
-		demo = np.concatenate([data_element['robot-demo'],data_element['object-state'][:,:7]],axis=-1)
-		data_element['demo'] = demo
+		# if data_element['demo'].shape[-1]==15:
+		# 	print("embedding in dataset getitem")
+		# 	embed()
+
+		# print("######################")
+		print(data_element['task-id'])
+		# print("SHAPE OF 1st DEMO",data_element['demo'].shape)
+		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
+		demo = np.concatenate([data_element['demo'],data_element['object-state'][:,:7]],axis=-1)
+		data_element['demo'] = copy.deepcopy(demo)
+
+		# print("SHAPE OF 2nd DEMO",data_element['demo'].shape)
 
 		return data_element
 
