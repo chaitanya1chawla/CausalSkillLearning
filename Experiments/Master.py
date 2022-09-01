@@ -45,6 +45,8 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = Roboturk_DataLoader.Roboturk_FullDataset(args)
 	elif args.data=='RoboturkObjects':
 		dataset = Roboturk_DataLoader.Roboturk_ObjectDataset(args)
+	elif args.data=='RoboturkRobotObjects':
+		dataset = Roboturk_DataLoader.Roboturk_RobotObjectDataset(args)		
 	elif args.data=='Mocap':
 		dataset = Mocap_DataLoader.Mocap_Dataset(args)
 	elif args.data=='OrigRoboMimic':
@@ -74,8 +76,8 @@ class Master():
 			print("Creating Datasets")			
 			self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)			
 			
-			print("Embed after create dataset")
-			embed()	
+			# print("Embed after create dataset")
+			# embed()	
 			
 		# Now define policy manager.
 		if self.args.setting=='learntsub' or self.args.setting=='joint':
@@ -265,6 +267,7 @@ def parse_arguments():
 	parser.add_argument('--reparam',dest='reparam',type=int,default=1)	
 	parser.add_argument('--number_policies',dest='number_policies',type=int,default=4)
 	parser.add_argument('--fix_subpolicy',dest='fix_subpolicy',type=int,default=1)
+	parser.add_argument('--task_based_shuffling',dest='task_based_shuffling',type=int,default=0,help='Whether to use task based shuffling.')
 	parser.add_argument('--reset_training',dest='reset_training',type=int,default=0,help='Whether to reset subpolicy training for joint training, used mostly to learn contextual representations.')
 	parser.add_argument('--train_only_policy',dest='train_only_policy',type=int,default=0) # Train only the policy network and use a pretrained encoder. This is weird but whatever. 
 	parser.add_argument('--load_latent',dest='load_latent',type=int,default=1) # Whether to load latent policy from model or not.
@@ -343,7 +346,7 @@ def parse_arguments():
 	# Exploration and learning rate parameters. 
 	parser.add_argument('--epsilon_from',dest='epsilon_from',type=float,default=0.3)
 	parser.add_argument('--epsilon_to',dest='epsilon_to',type=float,default=0.05)
-	parser.add_argument('--epsilon_over',dest='epsilon_over',type=int,default=30)
+	parser.add_argument('--epsilon_over',dest='epsilon_over',type=int,default=200)
 	parser.add_argument('--learning_rate',dest='learning_rate',type=float,default=1e-4)
 	parser.add_argument('--transfer_learning_rate',dest='transfer_learning_rate',type=float,default=1e-4)
 

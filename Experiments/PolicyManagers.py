@@ -9,7 +9,7 @@ from headers import *
 from PolicyNetworks import *
 from RL_headers import *
 from PPO_Utilities import PPOBuffer
-from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, RoboturkObjectVisualizer #, MocapVisualizer
+from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer #, MocapVisualizer
 # from Visualizers import *
 import TFLogger, DMP, RLUtils
 
@@ -98,8 +98,10 @@ class PolicyManager_BaseClass():
 			self.visualizer = GRABHandVisualizer(args=self.args)
 		elif self.args.data in ['GRABArmHand']:
 			self.visualizer = GRABArmHandVisualizer(args=self.args)
-		elif self.args.data in ['RoboturkObjects']:
+		elif self.args.data in ['RoboturkObjects']:		
 			self.visualizer = RoboturkObjectVisualizer(args=self.args)
+		elif self.args.data in ['RoboturkRobotObjects']:
+			self.visualizer = RoboturkRobotObjectVisualizer(args=self.args)
 		else:
 			self.visualizer = ToyDataVisualizer()
 		
@@ -166,12 +168,10 @@ class PolicyManager_BaseClass():
 			else:
 				return sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj
 	
-		# elif self.args.data in ['MIME','OldMIME'] or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
-		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects']:
 
 			# If we're imitating... select demonstrations from the particular task.
-			if self.args.setting=='imitation' and (self.args.data in ['Roboturk','RoboMimic','RoboturkObjects']):
+			if self.args.setting=='imitation' and (self.args.data in ['Roboturk','RoboMimic','RoboturkObjects','RoboturkRobotObjects']):
 				data_element = self.dataset.get_task_demo(self.demo_task_index, i)
 			else:
 				data_element = self.dataset[i]
@@ -192,7 +192,7 @@ class PolicyManager_BaseClass():
 			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand']:
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
-			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic','RoboturkObjects']:
+			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic','RoboturkObjects','RoboturkRobotObjects']:
 				robot_states = data_element['robot-state']
 				object_states = data_element['object-state']
 				self.current_task_for_viz = data_element['task-id']
@@ -229,21 +229,33 @@ class PolicyManager_BaseClass():
 	# @tprofile
 	def train(self, model=None):
 
-		if model:
-			print("Loading model in training.")
-			self.load_all_models(model)				
-		counter = self.args.initial_counter_value
-
 		print("Running MAIN Train function.")
 
+		########################################
+		# (1) Load Model If Necessary
+		########################################
+		if model:
+			print("Loading model in training.")
+			self.load_all_models(model)			
+		
+		########################################
+		# (2) Set initial values.
+		########################################
+
+		counter = self.args.initial_counter_value
 		epoch_time = 0.
 		cum_epoch_time = 0.
 
+		########################################
+		# (3) Outer loop over epochs. 
+		########################################
+		
 		# For number of training epochs. 
 		for e in range(self.number_epochs+1): 
-						
-			self.current_epoch_running = e
-			print("Starting Epoch: ",e)
+					
+			########################################
+			# (4a) Bookkeeping
+			########################################
 
 			if e%self.args.save_freq==0:
 				self.save_all_models("epoch{0}".format(e))
@@ -251,6 +263,13 @@ class PolicyManager_BaseClass():
 			if self.args.debug:
 				print("Embedding in Outer Train Function.")
 				embed()
+
+			self.current_epoch_running = e
+			print("Starting Epoch: ",e)
+
+			########################################
+			# (4b) Set extent of dataset. 
+			########################################
 
 			# Modifying to make training functions handle batches. 
 			# For every item in the epoch:
@@ -268,25 +287,32 @@ class PolicyManager_BaseClass():
 					extent = self.args.debugging_datapoints
 				else:
 					extent = len(self.dataset)-self.test_set_size
-			
-
-			# np.random.shuffle(self.index_list)
-			self.shuffle(extent)
-			self.batch_indices_sizes = []
 
 			if self.args.task_discriminability or self.args.task_based_supervision:
 				extent = self.extent
 
+			########################################
+			# (4c) Shuffle based on extent of dataset. 
+			########################################
+			
+			# np.random.shuffle(self.index_list)
+			self.shuffle(extent)
+			self.batch_indices_sizes = []
+
+			########################################
+			# (4d) Inner training loop
+			########################################
+
 			t1 = time.time()
 						
-			for i in range(0,extent,self.args.batch_size):
+			for i in range(0,extent-self.args.batch_size,self.args.batch_size):
 				
 				# Probably need to make run iteration handle batch of current index plus batch size.				
 				# with torch.autograd.set_detect_anomaly(True):
 				t2 = time.time()
 
 				##############################################
-				############### LINE PROFILING ###############
+				# (5) Run Iteration
 				##############################################
 
 				# print("Epoch:",e,"Trajectory:",str(i).zfill(5), "Datapoints:",str(self.index_list[i]).zfill(5),"Extent:",extent)
@@ -295,19 +321,27 @@ class PolicyManager_BaseClass():
 					self.lp = LineProfiler()
 					self.lp_wrapper = self.lp(self.run_iteration)
 					self.lp_wrapper(counter, self.index_list[i])
-					self.lp.print_stats()
-				else:
+					self.lp.print_stats()			
+				else:				
 					self.run_iteration(counter, self.index_list[i])
 
 				t3 = time.time()
 				print("Epoch:",e,"Trajectory:",str(i).zfill(5), "Datapoints:",str(self.index_list[i]).zfill(5), "Iter Time:",format(t3-t2,".4f"),"PerET:",format(cum_epoch_time/max(e,1),".4f"),"CumET:",format(cum_epoch_time,".4f"),"Extent:",extent)
 
 				counter = counter+1
-				# counter = counter+self.args.batch_size
+				
+			##############################################
+			# (6) Some more book keeping.
+			##############################################
+				
 			t4 = time.time()
 			epoch_time = t4-t1
 			cum_epoch_time += epoch_time
 
+			##############################################
+			# (7) Automatic evaluation if we need it. 
+			##############################################
+				
 			if e%self.args.eval_freq==0:
 				self.automatic_evaluation(e)
 
@@ -365,6 +399,8 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['GRABArmHand']:
 			self.visualizer = GRABArmHandVisualizer(args=self.args)
 			self.N = 200
+		elif self.args.data in ['RoboturkRobotObjects']:
+			self.visualizer = RoboturkRobotObjectVisualizer(args=self.args)
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
@@ -408,6 +444,9 @@ class PolicyManager_BaseClass():
 			#####################################################
 
 			self.shuffle(len(self.dataset)-self.test_set_size, shuffle=True)
+
+			# print("Embedding before gte robot visuals loop.s")
+			# embed()
 
 			for j in range(self.N//self.args.batch_size):
 				i = self.index_list[j]
@@ -564,9 +603,8 @@ class PolicyManager_BaseClass():
 
 	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None):		
 
-		# 1) Feed Z into policy, rollout trajectory. 
-
-		print("Rollout length:", trajectory.shape[0])	
+		# 1) Feed Z into policy, rollout trajectory.
+		print("Rollout length:", trajectory.shape[0])
 
 		trajectory_rollout = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq)
 		
@@ -585,12 +623,15 @@ class PolicyManager_BaseClass():
 			# Get animation object from dataset. 
 			animation_object = self.dataset[i]['animation']
 
+		print("We are in the PM visualizer function.")
 		# Set task ID if the visualizer needs it. 
-		if indexed_data_element is None:
+		if indexed_data_element is None or ('task_id' not in indexed_data_element.keys()):
 			task_id = None
+			env_name = None
 		else:
 			task_id = indexed_data_element['task_id']
 			env_name = self.dataset.environment_names[task_id]
+			print("Visualizing a trajectory of task:", env_name)
 
 		# print("Embedding in viusalizer in PM.")
 		# embed()
@@ -709,17 +750,21 @@ class PolicyManager_BaseClass():
 		# matplotlib.rcParams['figure.figsize'] = [8, 8]
 		# zoom_factor = 0.04
 
-		# # # Good low res parameters: 
+		# # Good low res parameters: 
 		# matplotlib.rcParams['figure.figsize'] = [8, 8]
 		# zoom_factor = 0.04
 
-		# # # Good spaced out highres parameters: 
-		matplotlib.rcParams['figure.figsize'] = [40, 40]
+		# # # # Good spaced out highres parameters: 
+		matplotlib.rcParams['figure.figsize'] = [40, 40]			
+		# Set this parameter to make sure we don't drop frames.
+		matplotlib.rcParams['animation.embed_limit'] = 2**128
 		zoom_factor = 0.3	
 		
 		fig, ax = plt.subplots()
 
 		# number_samples = 400
+
+
 		number_samples = self.N		
 
 		# Create a scatter plot of the embedding itself. The plot does not seem to work without this. 
@@ -781,7 +826,7 @@ class PolicyManager_BaseClass():
 
 		print("Initializing batches to manage GPU memory.")
 		# Set some parameters that we need for the dry run. 
-		extent = len(self.dataset)-self.test_set_size
+		extent = len(self.dataset)-self.test_set_size # -self.args.batch_size
 		counter = 0
 		self.batch_indices_sizes = []
 		# self.trajectory_lengths = []
@@ -1020,10 +1065,10 @@ class PolicyManager_BaseClass():
 
 		# If we're in a dataset that will have variable sized data.
 		# if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic']:
-		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic','GRAB','GRABHand','GRABArmHand']:
-	
+		
+		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic','RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand']:
 
-			if self.args.task_discriminability or self.args.task_based_supervision:
+			if self.args.task_discriminability or self.args.task_based_supervision or self.args.task_based_shuffling:
 
 				# If we're in the BatchJoint setting, actually run task_based_shuffling.
 				if isinstance(self, PolicyManager_BatchJoint):						
@@ -1032,16 +1077,12 @@ class PolicyManager_BaseClass():
 						self.already_shuffled = 1				
 				
 				# if isinstance(self, PolicyManager_Transfer):
-
 				# Also create an index list to shuffle the order of blocks that we observe...
-				self.index_list = np.arange(0,self.extent)				
+				self.index_list = np.arange(0,extent)				
 				np.random.shuffle(self.index_list)
-						
-			else:
-				self.trajectory_length_based_shuffling(extent=extent,shuffle=shuffle)		
-			
-				
 
+			else:
+				self.trajectory_length_based_shuffling(extent=extent,shuffle=shuffle)			
 
 		# If we're in Toy data, doesn't matter, just randomly shuffle. 
 		else:
@@ -1230,24 +1271,53 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 		
 
-		elif self.args.data=='RoboturkObjects':
-			self.state_size = 14
-			self.state_dim = 14
+		elif self.args.data in ['RoboturkObjects']:
+			# self.state_size = 14
+			# self.state_dim = 14
+
+			# Set state size to 7 for now; because we're not using the relative pose.
+			self.state_size = 7
+			self.state_dim = 7
+
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
+			self.test_set_size = 50
 
-			stat_dir_name = "RoboturkObjects"
-			
+			stat_dir_name = "RoboturkObjects"			
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
 			elif self.args.normalization=='minmax':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value		
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+
+		elif self.args.data in ['RoboturkRobotObjects']:
+			# self.state_size = 14
+			# self.state_dim = 14
+
+			# Set state size to 7 for now; because we're not using the relative pose.
+			self.state_size = 15
+			self.state_dim = 15
+
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 50
+
+			stat_dir_name = "RoboturkRobotObjects"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 
 		# Training parameters. 		
 		self.baseline_value = 0.
@@ -1563,32 +1633,39 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			return concatenated_traj, sample_action_seq, sample_traj
 		
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects']:
 			data_element = self.dataset[i]
 
+			####################################			
 			# If Invalid.
+			####################################
+						
 			if not(data_element['is_valid']):
 				return None, None, None
+			
+			####################################
+			# Check for gripper.
+			####################################
 				
-			# if self.args.data in ['MIME','OldMIME']:
-			# 	# Sample a trajectory length that's valid. 			
-			# 	trajectory = np.concatenate([data_element['la_trajectory'],data_element['ra_trajectory'],data_element['left_gripper'].reshape((-1,1)),data_element['right_gripper'].reshape((-1,1))],axis=-1)
-			# elif self.args.data=='Roboturk':
-			# 	trajectory = data_element['demo']
-
 			if self.args.gripper:
 				trajectory = data_element['demo']
 			else:
 				trajectory = data_element['demo'][:,:-1]
 
+			####################################
 			# If allowing variable skill length, set length for this sample.				
+			####################################
+
 			if self.args.var_skill_length:
 				# Choose length of 12-16 with certain probabilities. 
 				self.current_traj_len = np.random.choice([12,13,14,15,16],p=[0.1,0.2,0.4,0.2,0.1])
 			else:
 				self.current_traj_len = self.traj_length
 
+			####################################
 			# Sample random start point.
+			####################################
+			
 			if trajectory.shape[0]>self.current_traj_len:
 
 				bias_length = int(self.args.pretrain_bias_sampling*trajectory.shape[0])
@@ -1616,7 +1693,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				# CONDITIONAL INFORMATION for the encoder... 
 
-				if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects']:
+				if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects']:
 					pass
 				# if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 				# 	pass
@@ -1670,7 +1747,12 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.likelihood_loss = -loglikelihood.mean()
 		self.encoder_KL = encoder_KL.mean()
 
-		self.total_loss = (self.likelihood_loss + self.kl_weight*self.encoder_KL)
+
+		# Adding a penalty for link lengths. 
+		# self.link_length_loss = ... 
+
+		self.total_loss = (self.likelihood_loss + self.kl_weight*self.encoder_KL) 
+		# + self.link_length_loss) 
 
 		if self.args.debug:
 			print("Embedding in Update subpolicies.")
@@ -1894,7 +1976,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# if self.args.data=="MIME" or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','RoboturkObjects','GRAB','GRABHand','GRABArmHand']:			
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand']:			
 			print("Running Evaluation of State Distances on small test set.")
 			# self.evaluate_metrics()		
 
@@ -1964,7 +2046,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 					self.state_dim //= 2
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['RoboturkObjects']:
-				self.state_dim = 14
+				# Now switching to using 7 dimensions instead of 14, so as to not use relative pose.
+				self.state_dim = 7
+				# self.state_dim = 14
 				self.rollout_timesteps = self.traj_length
 
 			self.trajectory_set = np.zeros((self.N, self.rollout_timesteps, self.state_dim))
@@ -2070,6 +2154,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 	def __init__(self, number_policies=4, dataset=None, args=None):
 		super(PolicyManager_BatchPretrain, self).__init__(number_policies, dataset, args)
+		self.blah = 0
 
 	def concat_state_action(self, sample_traj, sample_action_seq):
 		# Add blank to start of action sequence and then concatenate. 
@@ -2088,9 +2173,20 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 		# Make data_element a list of dictionaries. 
 		data_element = []
-		
-		for b in range(i,i+self.args.batch_size):	
-			data_element.append(self.dataset[b])
+						
+		# for b in range(i,i+self.args.batch_size):	
+
+		# Now trying version of get_batch_element that shuffles..
+		# for b in range(self.index_list[i],self.index_list[i]+self.args.batch_size):		
+
+		# if i==4224 or self.blah: 
+		# 	print("Embedding in get batch element")
+		# 	embed()
+		# 	self.blah=1
+
+		for b in range(self.args.batch_size):
+			# data_element.append(self.dataset[self.index_list[i+b]])
+			data_element.append(self.dataset[min(len(self.dataset)-1,self.index_list[min(i+b,len(self.index_list)-1)])])
 
 		# # Checking what task we're solving if such a thing exists..
 		# if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic','RoboturkObjects']:
@@ -2123,24 +2219,12 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			return concatenated_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), sample_traj.transpose((1,0,2))
 				
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects']:			
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects']:			
 
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 				data_element = self.dataset[i:i+self.args.batch_size]
 			else:
 				data_element = self.get_batch_element(i)
-
-			# # Checking what task we're solving if such a thing exists..
-			# if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic','RoboturkObjects']:
-			# 	self.current_task_for_viz = []				
-			# 	self.current_task_for_viz = data_element['task-id']
-			
-			# If this is different from previous visualizer, recreate visualizer object.
-			# Shouldn't we only do this ... on demand, at frequency of visualizing? 	
-			
-
-			# Must select common trajectory segment length for batch.
-			# Must select different start / end points for items of batch?
 
 			# If allowing variable skill length, set length for this sample.				
 			if self.args.var_skill_length:
@@ -2150,9 +2234,6 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 				self.current_traj_len = self.traj_length            
 			
 			batch_trajectory = np.zeros((self.args.batch_size, self.current_traj_len, self.state_size))
-
-			# print("Embedding in batch pretrain manager get trajectory segment.")
-			# embed()
 
 			for x in range(self.args.batch_size):
 
@@ -2182,6 +2263,10 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 						start_timepoint = np.random.randint(0,traj.shape[0]-self.current_traj_len)
 
 					end_timepoint = start_timepoint + self.current_traj_len
+
+					# if data_element[x]['demo'].shape[-1]>15:
+					# 	print("Embed in batch pretrain get traj")
+					# 	embed()
 
 					if self.args.ee_trajectories:
 						batch_trajectory[x] = data_element[x]['endeffector_trajectory'][start_timepoint:end_timepoint]
@@ -2446,14 +2531,32 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 			
 		elif self.args.data=='RoboturkObjects':
-			self.state_size = 14
-			self.state_dim = 14
+			# self.state_size = 14
+			# self.state_dim = 14
+
+			# Set state size to 7 for now; because we're not using the relative pose.
+			self.state_size = 7
+			self.state_dim = 7
+
 			self.input_size = 2*self.state_size	
 			self.output_size = self.state_size
 			self.traj_length = self.args.traj_length
 			
 			# self.args.data in ['RoboturkObjects']:
 			self.visualizer = RoboturkObjectVisualizer(args=self.args)
+
+		elif self.args.data=='RoboturkRobotObjects':
+
+			# Set state size to 14 for now; because we're not using the relative pose.
+			self.state_size = 15
+			self.state_dim = 15
+
+			self.input_size = 2*self.state_size	
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length
+			
+			# self.args.data in ['RoboturkObjects']:
+			self.visualizer = RoboturkRobotObjectVisualizer(args=self.args)
 
 
 		self.training_phase_size = self.args.training_phase_size
@@ -2613,7 +2716,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 	def visualize_trajectory(self, trajectory, segmentations=None, i=0, suffix='_Img'):
 
 		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects']:
 
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 				unnorm_trajectory = (trajectory*self.norm_denom_value)+self.norm_sub_value
@@ -3771,7 +3874,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		if self.args.z_tuple_gmm:			
 			self.cummulative_number_zs = np.concatenate([np.zeros(1),np.cumsum(np.array(self.number_distinct_zs))]).astype(int)
 			
-
 		# # if self.args.setting=='jointtransfer':
 		# # 	self.source_latent_zs = np.concatenate(self.source_manager.latent_z_set)
 		# # 	self.target_latent_zs = np.concatenate(self.target_manager.latent_z_set)
@@ -4333,7 +4435,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
 
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects']:
 					   
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 
@@ -4396,7 +4498,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
-			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic','RoboturkObjects']:
+			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic','RoboturkObjects','RoboturkRobotObjects']:
 
 				if self.args.batch_size==1:
 

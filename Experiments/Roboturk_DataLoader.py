@@ -580,7 +580,7 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		
 				# Decide task ID, and new index modulo num_demos.
 		# Subtract number of demonstrations in cumsum until then, and then 				
-		new_index = index-self.cummulative_num_demos[max(task_index,0)]		
+		new_index = index-self.cummulative_num_demos[max(task_index,0)]
 		data_element = self.files[task_index][new_index]
 
 		resample_length = len(data_element['demo'])//self.args.ds_freq
@@ -659,15 +659,45 @@ class Roboturk_ObjectDataset(Roboturk_NewSegmentedDataset):
 
 	def __getitem__(self, index):
 		
-		data_element = super().__getitem__(index)
+		data_element = copy.deepcopy(super().__getitem__(index))
 
 		# Copy over the demo to the robot-demo key.
 		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
 		# Set demo to object-state trajectory. 
-		data_element['demo'] = data_element['object-state']
+
+		# Also try ignoring the relative positions for now.
+		# print("Embedding in get el")
+		# embed()
+		data_element['demo'] = data_element['object-state'][:,:7]
 
 		return data_element
-		
+
+class Roboturk_RobotObjectDataset(Roboturk_NewSegmentedDataset):
+
+	def __init__(self, args):
+
+		super(Roboturk_RobotObjectDataset, self).__init__(args)
+
+	def __getitem__(self, index):
+
+		data_element = copy.deepcopy(super().__getitem__(index))
+
+		# Now concatenate the robot and object states. 
+		# if data_element['demo'].shape[-1]==15:
+		# 	print("embedding in dataset getitem")
+		# 	embed()
+
+		# print("######################")
+		print(data_element['task-id'])
+		# print("SHAPE OF 1st DEMO",data_element['demo'].shape)
+		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
+		demo = np.concatenate([data_element['demo'],data_element['object-state'][:,:7]],axis=-1)
+		data_element['demo'] = copy.deepcopy(demo)
+
+		# print("SHAPE OF 2nd DEMO",data_element['demo'].shape)
+
+		return data_element
+
 class Roboturk_Dataloader_Tester(unittest.TestCase):
 	
 	def test_Roboturkdataloader(self):
