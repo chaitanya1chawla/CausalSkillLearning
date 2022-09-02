@@ -688,7 +688,7 @@ class Roboturk_RobotObjectDataset(Roboturk_NewSegmentedDataset):
 		# 	embed()
 
 		# print("######################")
-		print(data_element['task-id'])
+		# print(data_element['task-id'])
 		# print("SHAPE OF 1st DEMO",data_element['demo'].shape)
 		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
 		demo = np.concatenate([data_element['demo'],data_element['object-state'][:,:7]],axis=-1)
