@@ -1361,7 +1361,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# if self.args.transformer:
 			# 	self.encoder_network = TransformerEncoder(self.input_size, self.hidden_size, self.latent_z_dimensionality, self.args).to(device)
 			# else:
-			self.encoder_network = ContinuousEncoderNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args).to(device)		
+
+			if self.args.split_stream_encoder:
+				self.encoder_network = ContinuousFactoredEncoderNetwork(self.input_size, self.args.var_hidden_size, int(self.latent_z_dimensionality/2), self.args).to(device)
+			else:
+				self.encoder_network = ContinuousEncoderNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args).to(device)		
 
 	def create_training_ops(self):
 		# self.negative_log_likelihood_loss_function = torch.nn.NLLLoss()
@@ -1895,6 +1899,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			########## (2) & (3) ##########
 			####################################
 
+			# print("Embed in rut iter")
+			# embed()
+
 			# Feed latent z and trajectory segment into policy network and evaluate likelihood. 
 			latent_z_seq, latent_b = self.construct_dummy_latents(latent_z)
 
@@ -2308,8 +2315,8 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			# Now assemble inputs for subpolicy.
 			
 			# Create subpolicy inputs tensor. 
-			# subpolicy_inputs = torch.zeros((len(input_trajectory),self.input_size+self.latent_z_dimensionality)).to(device)
-			
+			# subpolicy_inputs = torch.zeros((len(input_trajectory),self.input_size+self.latent_z_dimensionality)).to(device)			
+
 			subpolicy_inputs = torch.zeros((input_trajectory.shape[0], self.args.batch_size, self.input_size+self.latent_z_dimensionality)).to(device)
 
 			# Now copy over trajectory. 
