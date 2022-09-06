@@ -1401,31 +1401,6 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		# Now return prior value. 
 		return prior_value
 
-		####################################
-		####################################
-		# Unbatched prior computation. 
-		# # If at or over hard limit.
-		# if elapsed_t>=max_limit:
-		# 	prior_value[0,1]=1.
-
-		# # If at or more than typical, less than hard limit:
-		# elif elapsed_t>=skill_time_limit:
-	
-		# 	if self.args.var_skill_length:
-		# 		prior_value[0] = torch.tensor(prob_biases[elapsed_t-skill_time_limit]).to(device).float()
-		# 	else:
-		# 		# Random
-		# 		prior_value[0,1]=0. 
-
-		# # If less than typical. 
-		# else:
-		# 	# Continue.
-		# 	prior_value[0,0]=1.
-
-		# return prior_value
-		####################################
-		####################################
-	
 	# @gpu_profile
 	# @tprofile(immediate=True)
 	def forward(self, input, epsilon, new_z_selection=True, batch_size=None, batch_trajectory_lengths=None, precomputed_b=None, evaluate_z_probability=None):
@@ -1610,6 +1585,11 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 
 	def get_probabilities(self, input, epsilon, precomputed_b=None, evaluate_value=None):
 		return self.forward(input, epsilon, precomputed_b=precomputed_b, evaluate_z_probability=evaluate_value)
+
+# class ContinuousVariationalPolicyNetwork_Factored(ContinuousVariationalPolicyNetwork_Batch):
+
+# 	def __init__(self):
+
 
 class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNetwork_Batch):
 
@@ -1932,102 +1912,105 @@ class EncoderNetwork(PolicyNetwork_BaseClass):
 		# Return latentz_encoding as output layer of last outputs. 
 		return logprobabilities, probabilities
 
-# class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
+class OldContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 
-# 	# Policy Network inherits from torch.nn.Module. 
-# 	# Now we overwrite the init, forward functions. And define anything else that we need. 
+	# Policy Network inherits from torch.nn.Module. 
+	# Now we overwrite the init, forward functions. And define anything else that we need. 
 
-# 	def __init__(self, input_size, hidden_size, output_size, args, batch_size=1):
+	def __init__(self, input_size, hidden_size, output_size, args, batch_size=1):
 
-# 		# Ensures inheriting from torch.nn.Module goes nicely and cleanly. 	
-# 		super(ContinuousEncoderNetwork, self).__init__()
+		# Ensures inheriting from torch.nn.Module goes nicely and cleanly. 	
+		super(OldContinuousEncoderNetwork, self).__init__()
 
-# 		self.args = args
-# 		self.input_size = input_size
-# 		self.hidden_size = hidden_size
-# 		self.output_size = output_size
-# 		self.num_layers = self.args.var_number_layers
-# 		self.batch_size = self.args.batch_size
+		self.args = args
+		self.input_size = input_size
+		self.hidden_size = hidden_size
+		self.output_size = output_size
+		self.num_layers = self.args.var_number_layers
+		self.batch_size = self.args.batch_size
 
-# 		# Define a bidirectional LSTM now.
-# 		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers, bidirectional=True)
+		# Define a bidirectional LSTM now.
+		self.lstm = torch.nn.LSTM(input_size=self.input_size,hidden_size=self.hidden_size,num_layers=self.num_layers, bidirectional=True)
 
-# 		# Define output layers for the LSTM, and activations for this output layer. 
+		# Define output layers for the LSTM, and activations for this output layer. 
 
-# 		# # Because it's bidrectional, once we compute <outputs, hidden = self.lstm(input)>, we must concatenate: 
-# 		# # From reverse LSTM: <outputs[0,:,hidden_size:]> and from the forward LSTM: <outputs[-1,:,:hidden_size]>.
-# 		# # (Refer - https://towardsdatascience.com/understanding-bidirectional-rnn-in-pytorch-5bd25a5dd66 )
-# 		# # Because of this, the output layer must take in size 2*hidden.
-# 		# self.hidden_layer = torch.nn.Linear(2*self.hidden_size, self.hidden_size)
-# 		# self.output_layer = torch.nn.Linear(2*self.hidden_size, self.output_size)		
+		# # Because it's bidrectional, once we compute <outputs, hidden = self.lstm(input)>, we must concatenate: 
+		# # From reverse LSTM: <outputs[0,:,hidden_size:]> and from the forward LSTM: <outputs[-1,:,:hidden_size]>.
+		# # (Refer - https://towardsdatascience.com/understanding-bidirectional-rnn-in-pytorch-5bd25a5dd66 )
+		# # Because of this, the output layer must take in size 2*hidden.
+		# self.hidden_layer = torch.nn.Linear(2*self.hidden_size, self.hidden_size)
+		# self.output_layer = torch.nn.Linear(2*self.hidden_size, self.output_size)		
 
-# 		# Sigmoid and Softmax activation functions for Bernoulli termination probability and latent z selection .
-# 		self.batch_softmax_layer = torch.nn.Softmax(dim=2)
-# 		self.batch_logsoftmax_layer = torch.nn.LogSoftmax(dim=2)
+		# Sigmoid and Softmax activation functions for Bernoulli termination probability and latent z selection .
+		self.batch_softmax_layer = torch.nn.Softmax(dim=2)
+		self.batch_logsoftmax_layer = torch.nn.LogSoftmax(dim=2)
 
-# 		# Define output layers for the LSTM, and activations for this output layer. 
-# 		self.mean_output_layer = torch.nn.Linear(2*self.hidden_size,self.output_size)
-# 		self.variances_output_layer = torch.nn.Linear(2*self.hidden_size, self.output_size)
+		# Define output layers for the LSTM, and activations for this output layer. 
+		self.mean_output_layer = torch.nn.Linear(2*self.hidden_size,self.output_size)
+		self.variances_output_layer = torch.nn.Linear(2*self.hidden_size, self.output_size)
 
-# 		self.activation_layer = torch.nn.Tanh()
-# 		self.variance_activation_layer = torch.nn.Softplus()
-# 		self.variance_activation_bias = 0.
+		self.activation_layer = torch.nn.Tanh()
+		self.variance_activation_layer = torch.nn.Softplus()
+		self.variance_activation_bias = 0.
 
-# 		self.variance_factor = 0.01
+		self.variance_factor = 0.01
 
-# 	def forward(self, input, epsilon=0.001, z_sample_to_evaluate=None):
-# 		# This epsilon passed as an argument is just so that the signature of this function is the same as what's provided to the discrete encoder network.
+	def forward(self, input, epsilon=0.001, z_sample_to_evaluate=None):
+		# This epsilon passed as an argument is just so that the signature of this function is the same as what's provided to the discrete encoder network.
 
-# 		# Input format must be: Sequence_Length x Batch_Size x Input_Size. 
-# 		# Assuming input is a numpy array.
-# 		format_input = input.view((input.shape[0], self.batch_size, self.input_size))
+		# Input format must be: Sequence_Length x Batch_Size x Input_Size. 
+		# Assuming input is a numpy array.
+		format_input = input.view((input.shape[0], self.batch_size, self.input_size))
 		
-# 		# Instead of iterating over time and passing each timestep's input to the LSTM, we can now just pass the entire input sequence.
-# 		outputs, hidden = self.lstm(format_input)
+		# Instead of iterating over time and passing each timestep's input to the LSTM, we can now just pass the entire input sequence.
+		outputs, hidden = self.lstm(format_input)
 
-# 		concatenated_outputs = torch.cat([outputs[0,:,self.hidden_size:],outputs[-1,:,:self.hidden_size]],dim=-1).view((1,self.batch_size,-1))
+		concatenated_outputs = torch.cat([outputs[0,:,self.hidden_size:],outputs[-1,:,:self.hidden_size]],dim=-1).view((1,self.batch_size,-1))
 
-# 		# Predict Gaussian means and variances. 
-# 		# if self.args.mean_nonlinearity:
-# 		# 	mean_outputs = self.activation_layer(self.mean_output_layer(concatenated_outputs))
-# 		# else:
-# 		mean_outputs = self.mean_output_layer(concatenated_outputs)
-# 		variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(concatenated_outputs))+self.variance_activation_bias) + epsilon
+		# Predict Gaussian means and variances. 
+		# if self.args.mean_nonlinearity:
+		# 	mean_outputs = self.activation_layer(self.mean_output_layer(concatenated_outputs))
+		# else:
+		mean_outputs = self.mean_output_layer(concatenated_outputs)
+		variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(concatenated_outputs))+self.variance_activation_bias) + epsilon
 
-# 		dist = torch.distributions.MultivariateNormal(mean_outputs, torch.diag_embed(variance_outputs))
+		dist = torch.distributions.MultivariateNormal(mean_outputs, torch.diag_embed(variance_outputs))
 
-# 		# Whether to use reparametrization trick to retrieve the 
-# 		if self.args.reparam:
-# 			noise = torch.randn_like(variance_outputs)
+		# Whether to use reparametrization trick to retrieve the 
+		if self.args.reparam:
+			noise = torch.randn_like(variance_outputs)
 
-# 			# Instead of *sampling* the latent z from a distribution, construct using mu + sig * eps (random noise).
-# 			latent_z = mean_outputs + variance_outputs * noise
-# 			# Ought to be able to pass gradients through this latent_z now.
+			# Instead of *sampling* the latent z from a distribution, construct using mu + sig * eps (random noise).
+			latent_z = mean_outputs + variance_outputs * noise
+			# Ought to be able to pass gradients through this latent_z now.
 
-# 		else:
-# 			# Retrieve sample from the distribution as the value of the latent variable.
-# 			latent_z = dist.sample()
-# 		# calculate entropy for training.
-# 		entropy = dist.entropy()
-# 		# Also retrieve log probability of the same.
-# 		logprobability = dist.log_prob(latent_z)
+		else:
+			# Retrieve sample from the distribution as the value of the latent variable.
+			latent_z = dist.sample()
+		# calculate entropy for training.
+		entropy = dist.entropy()
+		# Also retrieve log probability of the same.
+		logprobability = dist.log_prob(latent_z)
 
-# 		# Set standard distribution for KL. 
-# 		self.standard_distribution = torch.distributions.MultivariateNormal(torch.zeros((self.output_size)).to(device),torch.eye((self.output_size)).to(device))
-# 		# Compute KL.
-# 		kl_divergence = torch.distributions.kl_divergence(dist, self.standard_distribution)
+		# Set standard distribution for KL. 
+		self.standard_distribution = torch.distributions.MultivariateNormal(torch.zeros((self.output_size)).to(device),torch.eye((self.output_size)).to(device))
+		# Compute KL.
+		kl_divergence = torch.distributions.kl_divergence(dist, self.standard_distribution)
 
-# 		if self.args.debug:
-# 			print("###############################")
-# 			print("Embedding in Encoder Network.")
-# 			embed()
+		if self.args.debug:
+			print("###############################")
+			print("Embedding in Encoder Network.")
+			embed()
 
-# 		if z_sample_to_evaluate is None:
-# 			return latent_z, logprobability, entropy, kl_divergence
+		if z_sample_to_evaluate is None:
 
-# 		else:
-# 			logprobability = dist.log_prob(z_sample_to_evaluate)
-# 			return logprobability
+			print("Embedding in forward of Old continuous encoder")
+			embed()
+			return latent_z, logprobability, entropy, kl_divergence
+
+		else:
+			logprobability = dist.log_prob(z_sample_to_evaluate)
+			return logprobability
 
 class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 
@@ -2091,7 +2074,7 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 
 	def instantiate_networks(self):
 
-		self.network_dict = {}
+		self.network_dict = torch.nn.ModuleDict()
 		self.network_dict['lstm'], self.network_dict['mean_output_layer'], self.network_dict['variances_output_layer'] = self.define_networks(self.size_dict['input_size'], self.size_dict['output_size'])
 
 	def forward(self, input, epsilon=0.001, network_dict=None, size_dict=None, z_sample_to_evaluate=None):
@@ -2159,7 +2142,6 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 			logprobability = dist.log_prob(z_sample_to_evaluate)
 			return logprobability
 
-
 class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 
 	def __init__(self, input_size, hidden_size, output_size, args, batch_size=1):
@@ -2196,11 +2178,11 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 	def instantiate_networks(self):		
 
 		# Define networks for robot stream.
-		self.robot_network_dict = {}
+		self.robot_network_dict = torch.nn.ModuleDict()
 		self.robot_network_dict['lstm'], self.robot_network_dict['mean_output_layer'], self.robot_network_dict['variances_output_layer'] = self.define_networks(self.robot_size_dict['input_size'], self.robot_size_dict['output_size'])
 
 		# Define networks for environment stream.
-		self.env_network_dict = {}
+		self.env_network_dict = torch.nn.ModuleDict()
 		self.env_network_dict['lstm'], self.env_network_dict['mean_output_layer'], self.env_network_dict['variances_output_layer'] = self.define_networks(self.env_size_dict['input_size'], self.env_size_dict['output_size'])
 
 	def split_stream_inputs(self, input):
@@ -2248,9 +2230,13 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 			# (2b) Run forward on env stream.		
 			env_latent_z, env_logprob, env_entropy, env_kl_divergence = super().forward(env_input, epsilon, network_dict=self.env_network_dict, size_dict=self.env_size_dict, z_sample_to_evaluate=env_z_sample)
 
+			# print("Embedding in forward")
+			# embed()
+
 			##################################
 			# (3) Aggregate stream outputs. 
-			##################################		
+			##################################
+			
 			
 			# Remember, robot_z and env_z are both [1 x Batch_Size x (2 x Z_Dimensions)]. Concatenate across last dimension. 
 			concatenated_latent_z = torch.cat([robot_latent_z, env_latent_z],axis=-1)

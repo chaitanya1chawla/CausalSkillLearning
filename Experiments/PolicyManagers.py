@@ -399,7 +399,7 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['GRABArmHand']:
 			self.visualizer = GRABArmHandVisualizer(args=self.args)
 			self.N = 200
-		elif self.args.data in ['RoboturkRobotObjects']:
+		elif self.args.data in ['RoboturkRobotObjects']:		
 			self.visualizer = RoboturkRobotObjectVisualizer(args=self.args)
 		else: 
 			self.visualizer = ToyDataVisualizer()
@@ -407,14 +407,29 @@ class PolicyManager_BaseClass():
 		#####################################################
 		# Get latent z sets.
 		#####################################################
-
+		
 		if not(load_sets):
+
+			#####################################################
+			# Select Z indices if necessary.
+			#####################################################
+
+			if self.args.split_stream_encoder:
+				if self.args.embedding_visualization_stream == 'robot':
+					stream_z_indices = np.arange(0,int(self.args.z_dimensions/2))
+				elif self.args.embedding_visualization_stream == 'env':
+					stream_z_indices = np.arange(int(self.args.z_dimensions/2),self.args.z_dimensions)
+				else:
+					stream_z_indices = np.arange(0,self.args.z_dimensions)	
+			else:
+				stream_z_indices = np.arange(0,self.args.z_dimensions)
 
 			#####################################################
 			# Initialize variables.
 			#####################################################
 
-			self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
+			# self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
+			self.latent_z_set = np.zeros((self.N,len(stream_z_indices)))		
 			# These are lists because they're variable length individually.
 			self.indices = []
 			self.trajectory_set = []
@@ -461,6 +476,14 @@ class PolicyManager_BaseClass():
 				else:
 					latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
 
+					########################################
+					# If needed, select Z's. 
+					########################################
+
+					# latent_z = original_latent_z[...,stream_z_indices]
+
+					########################################
+					########################################
 				
 				if self.args.batch_size>1:
 
@@ -484,7 +507,8 @@ class PolicyManager_BaseClass():
 							# Rollout each individual trajectory in this batch.
 							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:,b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True)
 						else:
-							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+							# self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b,stream_z_indices].detach().cpu().numpy())
 			
 							# Rollout each individual trajectory in this batch.
 							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b], indexed_data_element=data_element[b])
@@ -1365,7 +1389,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			if self.args.split_stream_encoder:
 				self.encoder_network = ContinuousFactoredEncoderNetwork(self.input_size, self.args.var_hidden_size, int(self.latent_z_dimensionality/2), self.args).to(device)
 			else:
-				self.encoder_network = ContinuousEncoderNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args).to(device)		
+				self.encoder_network = ContinuousEncoderNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args).to(device)
+				# self.encoder_network = OldContinuousEncoderNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args).to(device)
+
+		# print("Embed in create networks")
+		# embed()
 
 	def create_training_ops(self):
 		# self.negative_log_likelihood_loss_function = torch.nn.NLLLoss()
@@ -2069,49 +2097,36 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Use the dataset to get reasonable trajectories (because without the information bottleneck / KL between N(0,1), cannot just randomly sample.)
 		for i in range(self.N//self.args.batch_size+1):
 
+			########################################
 			# (1) Encoder trajectory. 
+			########################################
+
 			latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
 
-			if self.args.batch_size>1:
+			########################################
+			# Iterate over items in the batch.
+			########################################
 
-				for b in range(self.args.batch_size):
-
-					if i*self.args.batch_size+b>=self.N:
-						break 
-					# Copy z. 
-
-					self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
-					self.gt_trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
-
-					if get_visuals:
-						# (2) Now rollout policy.	
-						if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
-							self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
-						elif self.args.setting=='pretrain_sub':							
-							self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True, rollout_length=sample_trajs.shape[0]))
-						else:
-							self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True))
+			for b in range(self.args.batch_size):
 
 				if i*self.args.batch_size+b>=self.N:
 					break 
-
-			else:
-				if i>=self.N:
-					break 
-
 				# Copy z. 
-				self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())
-				self.gt_trajectory_set.append(copy.deepcopy(sample_trajs))
+
+				self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+				self.gt_trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
 
 				if get_visuals:
-					# (2) Now rollout policy.			
+					# (2) Now rollout policy.	
 					if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
-						self.trajectory_set[i] = self.rollout_visuals(i, latent_z=latent_z, return_traj=True)
-					else: 
-						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z, return_traj=True))
+						self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
+					elif self.args.setting=='pretrain_sub':							
+						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True, rollout_length=sample_trajs.shape[0]))
+					else:
+						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True))
 
-				# # (3) Plot trajectory.
-				# traj_image = self.visualize_trajectory(rollout_traj)
+			if i*self.args.batch_size+b>=self.N:
+				break 
 
 		# Compute average reconstruction error.
 		if get_visuals:
