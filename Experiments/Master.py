@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 from headers import *
-import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders, GRAB_DataLoader
+import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders, GRAB_DataLoader, DAPG_DataLoader
 from PolicyManagers import *
 import TestClass
 import faulthandler
@@ -65,6 +65,10 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = GRAB_DataLoader.GRABHand_PreDataset(args)
 	elif args.data=='GRABHand':
 		dataset = GRAB_DataLoader.GRABHand_Dataset(args)
+	elif args.data=='DAPGPreproc':
+		dataset = DAPG_DataLoader.DAPG_PreDataset(args)
+	elif args.data=='DAPG':
+		dataset = DAPG_DataLoader.DAPG_Dataset(args)
 	return dataset
 
 class Master():
