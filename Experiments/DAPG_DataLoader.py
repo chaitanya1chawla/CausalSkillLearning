@@ -23,7 +23,7 @@ def wrist_norm(relevant_joints_datapoint):
 	return relevant_joints_datapoint
 
 
-class DAPGHand_PreDataset(Dataset):
+class DAPG_PreDataset(Dataset):
 
 	def __init__(self, args, split='train', short_traj=False, traj_length_threshold=500):
 
@@ -139,7 +139,7 @@ class DAPGHand_PreDataset(Dataset):
 			return relevant_joints_datapoint
 
 	def getname(self):
-		return "DAPGHand"
+		return "DAPG"
 
 	def __len__(self):
 		return self.total_length
@@ -227,7 +227,7 @@ class DAPGHand_PreDataset(Dataset):
 		np.save(os.path.join(statdir, self.getname() + "_Vel_Min.npy"), vel_min_value)
 		np.save(os.path.join(statdir, self.getname() + "_Vel_Max.npy"), vel_max_value)
 
-class DAPGHand_Dataset(Dataset):
+class DAPG_Dataset(Dataset):
 
 	def __init__(self, args):
 
@@ -266,7 +266,7 @@ class DAPGHand_Dataset(Dataset):
 		self.data_list_array = np.array(self.data_list)		
 
 	def getname(self):
-		return "DAPGHand"
+		return "DAPG"
 
 	def __len__(self):
 		# Return length of file list. 
