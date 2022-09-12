@@ -1223,8 +1223,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		
 		elif self.args.data in ['GRABHand']:
 			
-			self.state_size = 126
-			self.state_dim = 126
+			self.state_size = 120
+			self.state_dim = 120
 
 			if self.args.single_hand in ['left', 'right']:
 				self.state_dim //= 2
@@ -1803,7 +1803,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.state_dim = 147
 			self.rollout_timesteps = self.traj_length
 		elif self.args.data in ['GRABHand']:
-			self.state_dim = 126
+			self.state_dim = 120
 			if self.args.single_hand in ['left', 'right']:
 				self.state_dim //= 2
 			self.rollout_timesteps = self.traj_length
@@ -2496,8 +2496,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		
 		elif self.args.data in ['GRABHand']:
 			
-			self.state_size = 126
-			self.state_dim = 126
+			self.state_size = 120
+			self.state_dim = 120
 
 			if self.args.single_hand in ['left', 'right']:
 				self.state_dim //= 2
