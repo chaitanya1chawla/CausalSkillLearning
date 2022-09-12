@@ -62,7 +62,6 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	elif args.data=='GRABArmHand':
 		dataset = GRAB_DataLoader.GRABArmHand_Dataset(args)
 	elif args.data=='GRABHandPreproc':
-		embed()
 		dataset = GRAB_DataLoader.GRABHand_PreDataset(args)
 	elif args.data=='GRABHand':
 		dataset = GRAB_DataLoader.GRABHand_Dataset(args)

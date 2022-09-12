@@ -772,7 +772,7 @@ class GRABHand_Dataset(GRAB_Dataset):
 
 class GRABHand_PreDataset(GRAB_PreDataset):
 
-	def __init__(self, ):		
+	def __init__(self, args):		
 		super(GRABHand_PreDataset, self).__init__(args, split=split, short_traj=short_traj, traj_length_threshold=traj_length_threshold)
 
 	def set_relevant_joints(self):
