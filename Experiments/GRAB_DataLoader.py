@@ -25,12 +25,12 @@ def shoulder_norm(relevant_joints_datapoint):
 	return relevant_joints_datapoint
 
 def wrist_norm(relevant_joints_datapoint):
-	relevant_joints_datapoint[:, 1:21] -= relevant_joints_datapoint[:, 0]
+	relevant_joints_datapoint[:, 1:21] -= relevant_joints_datapoint[:, 0].reshape(relevant_joints_datapoint.shape[0], 1, 3)
 	if len(relevant_joints_datapoint[0]) > 22:
-		relevant_joints_datapoint[:, 22:] -= relevant_joints_datapoint[:, 21]
+		relevant_joints_datapoint[:, 22:] -= relevant_joints_datapoint[:, 21].reshape(relevant_joints_datapoint.shape[0], 1, 3)
 		wristless_joints = np.delete(relevant_joints_datapoint, [0, 22], axis=1)
-		return wristless_joints.reshape(relevant_joints_datapoint.shape[0], 1, 3)
-	return relevant_joints_datapoint[:, 1:].reshape(relevant_joints_datapoint.shape[0], 1, 3)
+		return wristless_joints
+	return relevant_joints_datapoint[:, 1:]
 
 class GRAB_PreDataset(Dataset):
 
