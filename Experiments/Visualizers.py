@@ -592,11 +592,14 @@ class GRABHandVisualizer(GRABVisualizer):
 
 
 		if self.side in ['left', 'right']:
-			joints = np.insert(joints, [0, 0, 0], slice(0, 3))
+			for _ in range(3):
+				joints = np.insert(joints, 0, 0)
 			joints = joints.reshape((21,3))
 		else:
-			joints = np.insert(joints, [0, 0, 0], slice(60, 63))
-			joints = np.insert(joints, [0, 0, 0], slice(0, 3))
+			for _ in range(3):
+				joints = np.insert(joints, 0, 60)
+			for _ in range(3):
+				joints = np.insert(joints, 0, 0)
 			joints = joints.reshape((42,3))
 		# joints = np.insert(joints, 0, self.default_pelvis_pose, axis=0)
 		# Unnormalization w.r.t pelvis doesn't need to happen, because default pelvis pose 0. 
