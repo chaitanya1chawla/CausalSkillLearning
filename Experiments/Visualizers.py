@@ -43,13 +43,13 @@ class SawyerVisualizer(object):
 		# Create kinematics object. 
 		if float(robosuite.__version__[:3])<1.:
 			self.new_robosuite = 0
-			self.base_env = robosuite.make("SawyerViz",has_renderer=has_display)
+			self.base_env = robosuite.make("SawyerViz",has_renderer=has_display,camera_name='vizview1')
 			from robosuite.wrappers import IKWrapper					
 			self.sawyer_IK_object = IKWrapper(self.base_env)
 			self.environment = self.sawyer_IK_object.env
 		else:
 			self.new_robosuite = 1
-			self.base_env = robosuite.make("Viz",robots=['Sawyer'],has_renderer=has_display)
+			self.base_env = robosuite.make("Viz",robots=['Sawyer'],has_renderer=has_display,camera_name='vizview1')
 			self.sawyer_IK_object = None
 			self.environment = self.base_env
 		
@@ -841,13 +841,13 @@ class RoboturkObjectVisualizer(object):
 		# Create kinematics object. 
 		if float(robosuite.__version__[:3])<1.:
 			self.new_robosuite = 0
-			self.base_env = robosuite.make("SawyerViz",has_renderer=self.has_display)
+			self.base_env = robosuite.make("SawyerViz",has_renderer=self.has_display,camera_name='vizview1')
 			from robosuite.wrappers import IKWrapper					
 			self.sawyer_IK_object = IKWrapper(self.base_env)
 			self.environment = self.sawyer_IK_object.env
 		else:
 			self.new_robosuite = 1
-			self.base_env = robosuite.make("Viz",robots=['Sawyer'],has_renderer=self.has_display)
+			self.base_env = robosuite.make("Viz",robots=['Sawyer'],has_renderer=self.has_display,camera_name='vizview1')
 			self.sawyer_IK_object = None
 			self.environment = self.base_env
 	
@@ -935,7 +935,6 @@ class RoboturkObjectVisualizer(object):
 		else:
 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
 
-
 class RoboturkRobotObjectVisualizer(RoboturkObjectVisualizer):
 
 	def __init__(self, has_display=False, args=None):
@@ -957,6 +956,63 @@ class RoboturkRobotObjectVisualizer(RoboturkObjectVisualizer):
 			self.environment.set_robot_joint_positions(pose[:7])
 		else:
 			self.environment.robots[0].set_robot_joint_positions(pose[:7])
+	
+# class RoboturkRobotObjectRolloutVisualizer(RoboturkObjectVisualizer):
+
+# 	def __init__(self, has_display=False, args=None):
+
+# 		super(RoboturkRobotObjectRolloutVisualizer, self).__init__(has_display=has_display, args=args)
+
+# 	def set_joint_pose(self, actions, arm='both', gripper=False):
+
+# 		# Writing new function that sets pose using steps and rollouts.. 
+# 		# Needs to take in joint velocities instead of pose, or use current pose and diff...
+		
+# 		pass
+
+# 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
+		
+
+# 		# Recreate environment with new task ID potentially.
+# 		self.create_environment(task_id=task_id)
+		
+# 		# Get joint velocities from trajectory. Remember, robot state is the first 8 elements of the trajectory. 
+# 		joint_velocities = np.diff(trajectory[:,:8], axis=0)
+
+# 		# Set initial state and image.
+# 		image_list = []
+# 		previous_joint_positions = None		
+# 		new_image = self.set_joint_pose_return_image(trajectory[t])
+# 		image_list.append(new_image)
+
+# 		# Iterate over time...
+# 		for t in range(joint_velocities.shape[0]):
+
+# 			# First take step. 
+# 			self.environment.step(joint_velocities) 
+
+# 			# 
+# 			new_image = self.set_joint_pose_return_image(trajectory[t])
+
+# 			image_list.append(new_image)
+
+# 			# Insert white 
+# 			if segmentations is not None:
+# 				if t>0 and segmentations[t]==1:
+# 					image_list.append(255*np.ones_like(new_image)+new_image)
+
+# 		if return_and_save:
+# 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+# 			return image_list
+# 		elif return_gif:
+# 			return image_list
+# 		else:
+# 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+
+
+
+	
+
 	
 
 class ToyDataVisualizer():

@@ -44,3 +44,15 @@ CUDA_VISIBLE_DEVICES=1 python Master.py --train=1 --setting=pretrain_sub --name=
 // CUDA_VISIBLE_DEVICES=2 python Master.py --train=1 --setting=pretrain_sub --name=GHP_005_Right_cont --data=GRABHand --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --epsilon_from=0.1 --epsilon_to=0.01 --epsilon_over=200 --datadir=/data/tanmayshankar/Datasets/GRAB_Joints/ --human_pos_normalization=wrist --normalization=minmax --epochs=4000 --single_hand=right --dataset_traj_length_limit=90 --input_corruption_noise=0.1
 
 
+##########
+# Retry
+// CUDA_VISIBLE_DEVICES=2 python Master.py --train=1 --setting=pretrain_sub --name=GHP_006_Right --data=GRABHand --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=200 --datadir=/data/tanmayshankar/Datasets/GRAB_Joints/ --human_pos_normalization=wrist --normalization=minmax --epochs=4000 --single_hand=right --dataset_traj_length_limit=90 --logdir=/data/tanmayshankar/TrainingLogs/
+
+# Zero out wrist joint 
+// CUDA_VISIBLE_DEVICES=1 python Master.py --train=1 --setting=pretrain_sub --name=GHP_007_Right_ZeroWrist --data=GRABHand --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=200 --datadir=/data/tanmayshankar/Datasets/GRAB_Joints/ --human_pos_normalization=wrist --normalization=minmax --epochs=4000 --single_hand=right --dataset_traj_length_limit=90 --logdir=/data/tanmayshankar/TrainingLogs/
+
+# 
+// CUDA_VISIBLE_DEVICES=1 python Master.py --train=1 --setting=pretrain_sub --name=GHP_008_Right_ZeroWrist --data=GRABHand --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=200 --datadir=/data/tanmayshankar/Datasets/GRAB_Joints/ --human_pos_normalization=wrist --normalization=minmax --epochs=4000 --single_hand=right --dataset_traj_length_limit=90 --logdir=/data/tanmayshankar/TrainingLogs/
+
+# Eval
+// CUDA_VISIBLE_DEVICES=1 python Master.py --train=1 --setting=pretrain_sub --name=GHP_007_Right_ZeroWrist --data=GRABHand --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --epsilon_from=0.3 --epsilon_to=0.01 --epsilon_over=200 --datadir=/data/tanmayshankar/Datasets/GRAB_Joints/ --human_pos_normalization=wrist --normalization=minmax --epochs=4000 --single_hand=right --dataset_traj_length_limit=90 --logdir=/data/tanmayshankar/TrainingLogs/ --model=/data/tanmayshankar/TrainingLogs/GHP_007_Right_ZeroWrist/saved_models/Model_epoch

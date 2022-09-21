@@ -25,10 +25,30 @@ def shoulder_norm(relevant_joints_datapoint):
 	return relevant_joints_datapoint
 
 def wrist_norm(relevant_joints_datapoint):
+	
+	# Normalize with one hand for now.
 	relevant_joints_datapoint[:, 1:21] -= relevant_joints_datapoint[:, 0].reshape(relevant_joints_datapoint.shape[0], 1, 3)
+
+	# If we're normalizing for both hands. 
 	if len(relevant_joints_datapoint[0]) > 22:
+		# Normalize with other hand's wrist. 
 		relevant_joints_datapoint[:, 22:] -= relevant_joints_datapoint[:, 21].reshape(relevant_joints_datapoint.shape[0], 1, 3)
+		
 	return relevant_joints_datapoint
+
+def alternate_wrist_norm(relevant_joints_datapoint):
+	
+	# In this, we are going to normalize the wrist position as well.... 
+	# Normalize with one hand for now.
+	relevant_joints_datapoint[:, :21] -= relevant_joints_datapoint[:, 0].reshape(relevant_joints_datapoint.shape[0], 1, 3)
+
+	# If we're normalizing for both hands. 
+	if len(relevant_joints_datapoint[0]) > 22:
+		# Normalize with other hand's wrist. 
+		relevant_joints_datapoint[:, 21:] -= relevant_joints_datapoint[:, 21].reshape(relevant_joints_datapoint.shape[0], 1, 3)
+		
+	return relevant_joints_datapoint
+
 
 class GRAB_PreDataset(Dataset):
 
@@ -767,6 +787,19 @@ class GRABHand_Dataset(GRAB_Dataset):
 
 	def getname(self):
 		return "GRABHand"
+
+	# FOR NOW:
+	def __getitem__(self, index):
+
+		data_element = super().__getitem__(index)
+
+		# print("Embedding in get item")
+		# embed()
+		# Zero out the wrist position for all timesteps..
+		if self.args.skip_wrist:
+			data_element['demo'][:, :3] = 0.
+
+		return data_element
 
 class GRABHand_PreDataset(GRAB_PreDataset):
 

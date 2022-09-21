@@ -580,7 +580,94 @@ class PolicyManager_BaseClass():
 		# Save webpage. 
 		self.write_results_HTML()
 
+	def compute_next_state(self, current_state=None, action=None):
+
+		####################################
+		# If we're stepping in the environment:
+		####################################
+		
+		if self.args.viz_sim_rollout:
+			
+			# Numpy-ify the action.
+			action_np = action.detach().cpu().numpy()
+
+			####################################
+			# Take environment step.
+			####################################
+
+			# Use environment to take step.
+			env_next_state_dict, _, _, _ = self.visualizer.environment.step(action_np)
+
+			####################################
+			# Assemble robot state.
+			####################################
+			
+			gripper_open = np.array([0.0115, -0.0115])
+			gripper_closed = np.array([-0.020833, 0.020833])
+
+			# The state that we want is ... joint state?
+			gripper_finger_values = env_next_state_dict['gripper_qpos']
+			gripper_values = (gripper_finger_values - gripper_open)/(gripper_closed - gripper_open)			
+
+			finger_diff = gripper_values[1]-gripper_values[0]
+			gripper_value = 2*finger_diff-1
+
+			# Concatenate joint and gripper state. 			
+			robot_state_np = np.concatenate([env_next_state_dict['joint_pos'], np.array(gripper_value).reshape((1,))])
+
+			####################################
+			# Assemble object state.
+			####################################
+
+			# Get just the object pose, object quaternion.
+			object_state_np = env_next_state_dict['object-state'][:7]
+
+			####################################
+			# Assemble next state.
+			####################################
+
+			# Parse next state from dictionary, depending on what dataset we're using.
+
+			# If we're using a dataset with both objects and the robot. 
+			if self.args.data in ['RoboturkRobotObjects']:
+				next_state_np = np.concatenate([robot_state_np,object_state_np],axis=0)
+
+			# If we're using an object only dataset. 
+			elif self.args.data in ['RoboturkObjects']: 
+				next_state_np = object_state_np
+			
+			# If we're using a robot only dataset.
+			else:
+				next_state_np = robot_state_np
+
+			# Return torchified version of next_state
+			next_state = torch.from_numpy(next_state_np).to(device)	
+			return next_state, env_next_state_dict['image']			
+
+		####################################
+		# If not using environment to rollout trajectories.
+		####################################
+
+		else:			
+			# Simply create next state as addition of current state and action.		
+			next_state = current_state+action
+			# Return - remember this is already a torch tensor now.
+			return next_state, None
+
 	def rollout_robot_trajectory(self, trajectory_start, latent_z, rollout_length=None, z_seq=False):
+
+		if self.args.viz_sim_rollout:
+			########################################
+			# 0) Reset visualizer environment state. 
+			########################################
+
+			self.visualizer.environment.reset()
+			self.visualizer.set_joint_pose(trajectory_start)		
+
+			rendered_rollout_trajectory = []
+		########################################
+		# 1a) Create placeholder policy input tensor. 
+		########################################
 
 		subpolicy_inputs = torch.zeros((1,2*self.state_dim+self.latent_z_dimensionality)).to(device).float()
 		subpolicy_inputs[0,:self.state_dim] = torch.tensor(trajectory_start).to(device).float()
@@ -590,12 +677,24 @@ class PolicyManager_BaseClass():
 		else:
 			subpolicy_inputs[:,2*self.state_dim:] = torch.tensor(latent_z).to(device).float()	
 
+		########################################
+		# 1b) Set parameters.
+		########################################
+
 		if rollout_length is not None: 
 			length = rollout_length-1
 		else:
 			length = self.rollout_timesteps-1
 
+		########################################
+		# 2) Iterate over rollout length:
+		########################################
+
 		for t in range(length):
+			
+			########################################
+			# 3) Get action from policy. 
+			########################################
 
 			# Assume we always query the policy for actions with batch_size 1 here. 
 			actions = self.policy_network.get_actions(subpolicy_inputs, greedy=True, batch_size=1)
@@ -606,8 +705,17 @@ class PolicyManager_BaseClass():
 			# Downscale the actions by action_scale_factor.
 			action_to_execute = action_to_execute/self.args.action_scale_factor
 
-			# Compute next state. 
-			new_state = subpolicy_inputs[t,:self.state_dim]+action_to_execute
+			########################################
+			# 4) Compute next state. 
+			########################################
+			
+			# new_state = subpolicy_inputs[t,:self.state_dim]+action_to_execute
+			new_state, image = self.compute_next_state(subpolicy_inputs[t,:self.state_dim], action_to_execute)
+			rendered_rollout_trajectory.append(image)
+
+			########################################
+			# 5) Construct new input row.
+			########################################
 
 			# New input row. 
 			input_row = torch.zeros((1,2*self.state_dim+self.latent_z_dimensionality)).to(device).float()
@@ -623,16 +731,26 @@ class PolicyManager_BaseClass():
 			subpolicy_inputs = torch.cat([subpolicy_inputs,input_row],dim=0)
 
 		trajectory = subpolicy_inputs[:,:self.state_dim].detach().cpu().numpy()
-		return trajectory
+		
+		if self.args.viz_sim_rollout:
+			return trajectory, rendered_rollout_trajectory
+		else:
+			return trajectory
 
 	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None):		
 
+		########################################
 		# 1) Feed Z into policy, rollout trajectory.
+		########################################
+
 		print("Rollout length:", trajectory.shape[0])
 
-		trajectory_rollout = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq)
-		
+		trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq)
+
+		########################################
 		# 2) Unnormalize data. 
+		########################################
+
 		if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 			unnorm_gt_trajectory = (trajectory*self.norm_denom_value)+self.norm_sub_value
 			unnorm_pred_trajectory = (trajectory_rollout*self.norm_denom_value) + self.norm_sub_value
@@ -640,14 +758,15 @@ class PolicyManager_BaseClass():
 			unnorm_gt_trajectory = trajectory
 			unnorm_pred_trajectory = trajectory_rollout
 
-		# print("Embedding in get robot visuals.")
-		# embed()
-
 		if self.args.data=='Mocap':
 			# Get animation object from dataset. 
 			animation_object = self.dataset[i]['animation']
 
 		print("We are in the PM visualizer function.")
+
+		########################################
+		# 3) Get task ID. 
+		########################################
 		# Set task ID if the visualizer needs it. 
 		if indexed_data_element is None or ('task_id' not in indexed_data_element.keys()):
 			task_id = None
@@ -657,18 +776,32 @@ class PolicyManager_BaseClass():
 			env_name = self.dataset.environment_names[task_id]
 			print("Visualizing a trajectory of task:", env_name)
 
-		# print("Embedding in viusalizer in PM.")
-		# embed()
+		########################################
+		# 4a) Run unnormalized ground truth trajectory in visualizer. 
+		########################################
 
-		# 3) Run unnormalized ground truth trajectory in visualizer. 
 		self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 
-		# 4) Run unnormalized rollout trajectory in visualizer. 
-		self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_Rollout.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
-		
+		########################################
+		# 4b) Run unnormalized rollout trajectory in visualizer. 
+		########################################
+
+		if self.args.viz_sim_rollout:
+			self.rollout_gif = rendered_rollout_trajectory
+		else:
+			self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_Rollout.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+
+		########################################
+		# 5) Add to GIF lists. 
+		########################################		
+
 		self.gt_gif_list.append(copy.deepcopy(self.ground_truth_gif))
 		self.rollout_gif_list.append(copy.deepcopy(self.rollout_gif))
 		
+		########################################
+		# 6) Return: 
+		########################################
+
 		if return_numpy:
 			self.ground_truth_gif = np.array(self.ground_truth_gif)
 			self.rollout_gif = np.array(self.rollout_gif)
@@ -1266,6 +1399,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			elif self.args.normalization=='minmax':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+
+				# Modify to zero out for now..
+				if self.args.skip_wrist:
+					self.norm_sub_value[:3] = 0.
+					self.norm_denom_value[:3] = 1.
 		
 		elif self.args.data in ['GRABArmHand']:
 			
@@ -1364,7 +1502,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.baseline = None
 
 		# Per step decay. 
-		self.decay_rate = (self.initial_epsilon-self.final_epsilon)/(self.decay_counter)
+		self.decay_rate = (self.initial_epsilon-self.final_epsilon)/(self.decay_counter)	
 
 	def create_networks(self):
 		# Create K Policy Networks. 
@@ -1993,7 +2131,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				# Feed latent z to the rollout.
 				# rollout_trajectory = self.rollout_visuals(index, latent_z=latent_z, return_traj=True)
-				rollout_trajectory = self.rollout_robot_trajectory(sample_traj[0], latent_z, rollout_length=len(sample_traj))
+				rollout_trajectory, rendered_rollout_trajectory = self.rollout_robot_trajectory(sample_traj[0], latent_z, rollout_length=len(sample_traj))
 
 				self.distances[i] = ((sample_traj-rollout_trajectory)**2).mean()	
 
