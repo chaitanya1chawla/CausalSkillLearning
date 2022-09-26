@@ -2574,6 +2574,15 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			self.visualizer = None
 
+			stat_dir_name = "DAPG"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+
 		elif self.args.data=='RoboturkObjects':
 			# self.state_size = 14
 			# self.state_dim = 14
