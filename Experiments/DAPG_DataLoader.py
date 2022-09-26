@@ -82,7 +82,7 @@ class DAPG_PreDataset(Dataset):
 		# Used a dictionary to hold different indices by file
 		self.relevant_joint_indices = self.hand_joint_indices[dataset_name]
 
-		return datapoint['observations'][:, self.relevant_joint_indices]
+		return datapoint[:, self.relevant_joint_indices]
 		
 	def setup(self):
 
@@ -102,7 +102,9 @@ class DAPG_PreDataset(Dataset):
 			# Now actually load file. 
 			set = np.load(v, allow_pickle=True)
 
-			for datapoint in set:
+			for item in set:
+
+				datapoint = item['observations']
 
 				# Subsample relevant joints. 
 				# Modified for different dimensions by file.
