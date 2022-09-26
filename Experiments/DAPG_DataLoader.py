@@ -255,7 +255,6 @@ class DAPG_Dataset(Dataset):
 			self.short_data_list = []
 			self.short_file_list = []
 			self.dataset_trajectory_lengths = []
-			embed()
 			for i in range(self.dataset_length):
 				if self.data_list[i].shape[0]<self.args.dataset_traj_length_limit:
 					self.short_data_list.append(self.data_list[i])
@@ -291,6 +290,9 @@ class DAPG_Dataset(Dataset):
 		data_element = {}
 		data_element['is_valid'] = True
 		data_element['demo'] = self.data_list[index]
-		data_element['file'] = self.filelist[index]
+
+		# temporary?
+		fileindex = int(len(self.filelist)*(index/self.dataset_length))
+		data_element['file'] = self.filelist[fileindex]
 
 		return data_element
