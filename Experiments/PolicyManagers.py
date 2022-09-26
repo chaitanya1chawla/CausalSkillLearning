@@ -1284,6 +1284,15 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.test_set_size = 40
 			stat_dir_name = self.args.data
 
+			stat_dir_name = "DAPG"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+
 		elif self.args.data in ['RoboturkObjects']:
 			# self.state_size = 14
 			# self.state_dim = 14
