@@ -259,8 +259,11 @@ class DAPG_Dataset(Dataset):
 			for i in range(self.dataset_length):
 				if self.data_list[i].shape[0]<self.args.dataset_traj_length_limit:
 					self.short_data_list.append(self.data_list[i])
-					self.short_file_list.append(self.filelist[i])
 					self.dataset_trajectory_lengths.append(self.data_list[i].shape[0])
+
+			for i in range(len(self.filelist)):
+				self.short_file_list.append(self.filelist[i])
+
 
 			self.data_list = self.short_data_list
 			self.filelist = self.short_file_list
