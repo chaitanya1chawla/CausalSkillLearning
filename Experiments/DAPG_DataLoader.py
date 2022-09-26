@@ -100,6 +100,7 @@ class DAPG_PreDataset(Dataset):
 				print("Loading file: ",k)
 
 			# Now actually load file. 
+			v = v.replace(self.dataset_directory, '')
 			set = np.load(v, allow_pickle=True)
 
 			for datapoint in set:
