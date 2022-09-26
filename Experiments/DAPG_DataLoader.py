@@ -106,7 +106,7 @@ class DAPG_PreDataset(Dataset):
 
 				# Subsample relevant joints. 
 				# Modified for different dimensions by file.
-			v = v.replace(self.dataset_directory, '')
+				v = v.replace(self.dataset_directory, '')
 
 				relevant_joints_datapoint = self.subsample_relevant_joints(datapoint, v)
 
