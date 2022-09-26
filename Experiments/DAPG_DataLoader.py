@@ -82,6 +82,7 @@ class DAPG_PreDataset(Dataset):
 		# Used a dictionary to hold different indices by file
 		self.relevant_joint_indices = self.hand_joint_indices[dataset_name]
 
+		embed()
 		return datapoint[:, self.relevant_joint_indices]
 		
 	def setup(self):
@@ -107,7 +108,7 @@ class DAPG_PreDataset(Dataset):
 				# Subsample relevant joints. 
 				# Modified for different dimensions by file.
 				v = v.replace(self.dataset_directory, '')
-
+				embed()
 				relevant_joints_datapoint = self.subsample_relevant_joints(datapoint, v)
 
 				# Normalize using the pelvis joint (i.e. the first joint).
