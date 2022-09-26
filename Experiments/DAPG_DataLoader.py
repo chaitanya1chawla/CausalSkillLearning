@@ -100,13 +100,14 @@ class DAPG_PreDataset(Dataset):
 				print("Loading file: ",k)
 
 			# Now actually load file. 
-			v = v.replace(self.dataset_directory, '')
 			set = np.load(v, allow_pickle=True)
 
 			for datapoint in set:
 
 				# Subsample relevant joints. 
 				# Modified for different dimensions by file.
+			v = v.replace(self.dataset_directory, '')
+
 				relevant_joints_datapoint = self.subsample_relevant_joints(datapoint, v)
 
 				# Normalize using the pelvis joint (i.e. the first joint).
