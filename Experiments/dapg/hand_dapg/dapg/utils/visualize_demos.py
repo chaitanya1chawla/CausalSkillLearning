@@ -27,6 +27,9 @@ def main(env_name):
 def demo_playback(env_name, demo_paths):
     e = GymEnv(env_name)
     e.reset()
+
+    from IPython import embed
+    embed()
     for path in demo_paths:
         e.set_env_state(path['init_state_dict'])
         actions = path['actions']
