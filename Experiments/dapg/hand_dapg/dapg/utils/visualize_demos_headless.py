@@ -1,4 +1,4 @@
-import mj_envs
+# import mj_envs
 import click 
 import os
 import gym
@@ -44,10 +44,11 @@ def demo_playback(env_name, demo_paths):
             print("Successfully got image from sim renderer.")
             image_object = Image.fromarray(img)
             # image_object.save("DextrousHand.jpg")
-            # image_list.append(img)
 
-            # return to add to imglist
-            return image_object
+            # add to imglist
+            image_list.append(image_object)
+        # return to visualizer
+        return image_list
             
     print("About to save image list.")
     # np.save("Trial_Image_List.npy", image_list)
