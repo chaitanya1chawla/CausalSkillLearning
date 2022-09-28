@@ -1,4 +1,4 @@
-# import mj_envs
+import mj_envs
 import click 
 import os
 import gym
