@@ -25,15 +25,13 @@ def main(env_name):
     # render demonstrations
     demo_playback(env_name, demos)
 
-def demo_playback(env_name, demo_paths):
+def demo_playback(env_name, demo_paths, return_image=True):
     e = GymEnv(env_name)
     e.reset()
     
     for path in demo_paths:
         e.set_env_state(path['init_state_dict'])
         actions = path['actions']
-        from IPython import embed
-        embed()
         image_list = []
         for t in range(actions.shape[0]):
             e.step(actions[t])
@@ -43,7 +41,8 @@ def demo_playback(env_name, demo_paths):
             img = np.flipud(e.env.sim.render(600, 600))
             print("Successfully got image from sim renderer.")
             image_object = Image.fromarray(img)
-            # image_object.save("DextrousHand.jpg")
+            if return_image:
+                image_object.save("DextrousHand.jpg")
 
             # add to imglist
             image_list.append(image_object)

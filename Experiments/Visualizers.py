@@ -9,6 +9,7 @@ from __future__ import division
 from __future__ import print_function
 from cgitb import handler
 
+
 from absl import flags, app
 import copy, os, imageio, scipy.misc, pdb, math, time, numpy as np
 
@@ -22,6 +23,10 @@ from memory_profiler import profile
 from PolicyNetworks import *
 import torch
 from moviepy.video.io.bindings import mplfig_to_npimage
+from PIL import Image
+import mjenvs
+from mjrl.utils.gym_env import GymEnv
+
 
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
 use_cuda = torch.cuda.is_available()
@@ -834,6 +839,35 @@ class GRABArmHandVisualizer(GRABVisualizer):
 		plt.close(fig)
 
 		return image
+
+class DAPG_Visualizer(SawyerVisualizer):
+		
+	def __init__():
+		super.__init__()
+
+	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False, save_image=False):
+		environment = GymEnv("relocate-v0")
+		environment.reset()
+		
+		state = environment.get_env_state()
+		hand_qpos = np.zeros(30)
+		hand_qpos[6:] = joint_angles
+		qvel = np.zeros(36)
+		obj_pos = 100*np.ones(3)
+		state['hand_qpos'] = hand_qpos
+		state['qvel'] = qvel
+		state['obj_pos'] = obj_pos
+		environment.set_env_state(state)
+
+			# e.env.mj_render() 
+			
+			# Trying to use the sim render instead of the display based rendering, so that we can grab images.. 
+		img = np.flipud(environment.env.sim.render(600, 600))
+		print("Successfully got image from sim renderer.")
+		image_object = Image.fromarray(img)
+		if save_image:
+			image_object.save("DextrousHand.jpg")
+		return image_object
 
 class RoboturkObjectVisualizer(object):
 

@@ -16,11 +16,11 @@ def resample(original_trajectory, desired_number_timepoints):
 	new_timepoints = np.linspace(0, original_traj_len-1, desired_number_timepoints, dtype=int)
 	return original_trajectory[new_timepoints]
 
-def wrist_norm(relevant_joints_datapoint):
-	relevant_joints_datapoint[:, 1:21] -= relevant_joints_datapoint[:, 0].reshape(relevant_joints_datapoint.shape[0], 1, 3)
-	if len(relevant_joints_datapoint[0]) > 22:
-		relevant_joints_datapoint[:, 22:] -= relevant_joints_datapoint[:, 21].reshape(relevant_joints_datapoint.shape[0], 1, 3)
-	return relevant_joints_datapoint
+# def wrist_norm(relevant_joints_datapoint):
+# 	relevant_joints_datapoint[:, 1:21] -= relevant_joints_datapoint[:, 0].reshape(relevant_joints_datapoint.shape[0], 1, 3)
+# 	if len(relevant_joints_datapoint[0]) > 22:
+# 		relevant_joints_datapoint[:, 22:] -= relevant_joints_datapoint[:, 21].reshape(relevant_joints_datapoint.shape[0], 1, 3)
+# 	return relevant_joints_datapoint
 
 
 class DAPG_PreDataset(Dataset):
@@ -50,7 +50,7 @@ class DAPG_PreDataset(Dataset):
 		self.total_length = len(self.filelist)
 
 		# Set downsampling frequency.
-		self.ds_freq = 16        
+		self.ds_freq = 5
 
 		# Setup. 
 		self.setup()
@@ -111,11 +111,10 @@ class DAPG_PreDataset(Dataset):
 				v = v.replace(self.dataset_directory, '')
 				relevant_joints_datapoint = self.subsample_relevant_joints(datapoint, v)
 
-				# Normalize using the pelvis joint (i.e. the first joint).
-				normalized_relevant_joint_datapoint = self.normalize(relevant_joints_datapoint)
+				# normalized_relevant_joint_datapoint = self.normalize(relevant_joints_datapoint)
 
 				# Reshape. 
-				reshaped_normalized_datapoint = normalized_relevant_joint_datapoint.reshape(normalized_relevant_joint_datapoint.shape[0],-1)
+				reshaped_normalized_datapoint = relevant_joints_datapoint.reshape(relevant_joints_datapoint.shape[0],-1)
 
 				self.state_size = reshaped_normalized_datapoint.shape[1]
 

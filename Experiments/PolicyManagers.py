@@ -9,7 +9,7 @@ from headers import *
 from PolicyNetworks import *
 from RL_headers import *
 from PPO_Utilities import PPOBuffer
-from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer #, MocapVisualizer
+from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer, DAPGVisualizer #, MocapVisualizer
 # from Visualizers import *
 import TFLogger, DMP, RLUtils
 
