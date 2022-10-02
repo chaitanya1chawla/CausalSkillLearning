@@ -99,7 +99,7 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['GRABArmHand']:
 			self.visualizer = GRABArmHandVisualizer(args=self.args)		
 		elif self.args.data in ['DAPG']:
-			self.visualizer = None
+			self.visualizer = DAPGVisualizer(args=self.args)
 		elif self.args.data in ['RoboturkObjects']:		
 			self.visualizer = RoboturkObjectVisualizer(args=self.args)
 		elif self.args.data in ['RoboturkRobotObjects']:
@@ -2572,7 +2572,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.conditional_information = None
 			self.conditional_viz_env = False	
 
-			self.visualizer = None
+			self.visualizer = DAPGVisualizer(args=self.args)
 
 			stat_dir_name = "DAPG"			
 
