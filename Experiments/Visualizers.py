@@ -842,7 +842,7 @@ class GRABArmHandVisualizer(GRABVisualizer):
 
 class DAPGVisualizer(SawyerVisualizer):
 		
-	def __init__(args=None):
+	def __init__(self, args=None):
 		super.__init__()
 
 	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False, save_image=False):
