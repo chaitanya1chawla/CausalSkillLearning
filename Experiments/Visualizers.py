@@ -840,7 +840,7 @@ class GRABArmHandVisualizer(GRABVisualizer):
 
 		return image
 
-class DAPG_Visualizer(SawyerVisualizer):
+class DAPGVisualizer(SawyerVisualizer):
 		
 	def __init__():
 		super.__init__()
