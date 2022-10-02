@@ -859,15 +859,15 @@ class DAPGVisualizer(SawyerVisualizer):
 		state['obj_pos'] = obj_pos
 		environment.set_env_state(state)
 
-			# e.env.mj_render() 
-			
-			# Trying to use the sim render instead of the display based rendering, so that we can grab images.. 
+		# e.env.mj_render() 
+		
+		# Trying to use the sim render instead of the display based rendering, so that we can grab images.. 
 		img = np.flipud(environment.env.sim.render(600, 600))
 		print("Successfully got image from sim renderer.")
-		image_object = Image.fromarray(img)
 		if save_image:
+			image_object = Image.fromarray(img)
 			image_object.save("DextrousHand.jpg")
-		return image_object
+		return img
 
 class RoboturkObjectVisualizer(object):
 
