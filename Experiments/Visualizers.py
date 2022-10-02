@@ -854,7 +854,7 @@ class DAPGVisualizer(SawyerVisualizer):
 		hand_qpos[6:] = joint_angles
 		qvel = np.zeros(36)
 		obj_pos = 100*np.ones(3)
-		state['qpos'] = hand_qpos
+		state['hand_qpos'] = hand_qpos
 		state['qvel'] = qvel
 		state['obj_pos'] = obj_pos
 		environment.set_env_state(state)
