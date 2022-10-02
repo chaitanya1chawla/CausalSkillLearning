@@ -24,7 +24,7 @@ from PolicyNetworks import *
 import torch
 from moviepy.video.io.bindings import mplfig_to_npimage
 from PIL import Image
-import mjenvs
+import mj_envs
 from mjrl.utils.gym_env import GymEnv
 
 
