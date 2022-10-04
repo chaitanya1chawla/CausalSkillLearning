@@ -858,7 +858,7 @@ class DAPGVisualizer(SawyerVisualizer):
 		state['qvel'] = qvel
 		state['obj_pos'] = obj_pos
 		environment.set_env_state(state)
-		environment.sim.forward()
+		environment.env.env.sim.forward()
 		
 		# Trying to use the sim render instead of the display based rendering, so that we can grab images.. 
 		img = np.flipud(environment.env.sim.render(600, 600))
