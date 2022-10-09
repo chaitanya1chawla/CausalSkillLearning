@@ -401,6 +401,8 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['GRABArmHand']:
 			self.visualizer = GRABArmHandVisualizer(args=self.args)
 			self.N = 200
+		elif self.args.data in ['DAPG']:
+			self.visualizer = DAPGVisualizer(args=self.args)
 		elif self.args.data in ['RoboturkRobotObjects']:
 			self.visualizer = RoboturkRobotObjectVisualizer(args=self.args)
 		else: 
