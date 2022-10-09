@@ -845,6 +845,9 @@ class DAPGVisualizer(SawyerVisualizer):
 	def __init__(self, args=None):
 		super().__init__()
 
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
+		return super().visualize_joint_trajectory(trajectory, return_gif, gif_path, gif_name, segmentations, return_and_save, additional_info, end_effector, task_id)
+
 	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False, save_image=False):
 		environment = GymEnv("relocate-v0")
 		environment.reset()
