@@ -4,6 +4,7 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
+from locale import normalize
 from os import environ
 from headers import *
 from PolicyNetworks import *
@@ -588,15 +589,76 @@ class PolicyManager_BaseClass():
 		
 		if self.args.viz_sim_rollout:
 			
-			# Numpy-ify the action.
-			action_np = action.detach().cpu().numpy()
-
 			####################################
 			# Take environment step.
 			####################################
 
-			# Use environment to take step.
-			env_next_state_dict, _, _, _ = self.visualizer.environment.step(action_np)
+			# if self.args.data in ['RoboturkRobotObjects']:
+			# 	action_np = action.detach().cpu().numpy()[:8]
+			# else:
+			# 	action_np = action.detach().cpu().numpy()
+
+			########################################
+			# Numpy-fy and subsample. (It's 1x|S|, that's why we need to index into first dimension.)
+			########################################
+
+			action_np = action.detach().cpu().numpy()[0,:8]
+
+			########################################
+			# Unnormalize action.
+			########################################
+
+			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
+				# Remember. actions are normalized just by multiplying denominator, no addition of mean.
+				unnormalized_action = (action_np*self.norm_denom_value)
+			else:
+				unnormalized_action = action_np
+			
+			########################################
+			# Scale action.
+			########################################
+
+			scaled_action = unnormalized_action*self.args.sim_viz_action_scale_factor
+			# Step repetition
+			number_of_step_repeats = self.args.sim_viz_step_repetition
+
+			########################################
+			# Second unnormalization to undo the visualizer environment normalization.... 
+			########################################
+
+			ctrl_range = self.visualizer.environment.sim.model.actuator_ctrlrange
+			bias = 0.5 * (ctrl_range[:, 1] + ctrl_range[:, 0])
+			weight = 0.5 * (ctrl_range[:, 1] - ctrl_range[:, 0])
+			# Modify gripper normalization, so that the env normalization actually happens.
+			bias = bias[:-1]
+			bias[-1] = 0.
+			weight = weight[:-1]
+			weight[-1] = 1.
+			
+			# Unnormalized_scaled_action_for_env_step
+			if self.visualizer.new_robosuite:
+				unnormalized_scaled_action_for_env_step = scaled_action
+			else:
+				unnormalized_scaled_action_for_env_step = (scaled_action - bias)/weight
+
+			# print("#####################")
+			# print("Vanilla A:", action_np)
+			# print("Stat Unnorm A: ", unnormalized_action)
+			# print("Scaled A: ", scaled_action)
+			# print("Env Unnorm A: ", unnormalized_scaled_action_for_env_step)
+
+			########################################
+			# Repeat steps for K times.
+			########################################
+			
+			for k in range(number_of_step_repeats):
+				# Use environment to take step.
+				env_next_state_dict, _, _, _ = self.visualizer.environment.step(unnormalized_scaled_action_for_env_step)
+				gripper_state = env_next_state_dict[self.visualizer.gripper_key]
+				if self.visualizer.new_robosuite:
+					joint_state = self.visualizer.environment.sim.get_state()[1][:7]
+				else:
+					joint_state = env_next_state_dict['joint_pos']
 
 			####################################
 			# Assemble robot state.
@@ -606,25 +668,28 @@ class PolicyManager_BaseClass():
 			gripper_closed = np.array([-0.020833, 0.020833])
 
 			# The state that we want is ... joint state?
-			gripper_finger_values = env_next_state_dict['gripper_qpos']
+			gripper_finger_values = gripper_state
 			gripper_values = (gripper_finger_values - gripper_open)/(gripper_closed - gripper_open)			
 
 			finger_diff = gripper_values[1]-gripper_values[0]
 			gripper_value = 2*finger_diff-1
 
-			# Concatenate joint and gripper state. 			
-			robot_state_np = np.concatenate([env_next_state_dict['joint_pos'], np.array(gripper_value).reshape((1,))])
+			########################################
+			# Concatenate joint and gripper state. 	
+			########################################
 
-			####################################
+			robot_state_np = np.concatenate([joint_state, np.array(gripper_value).reshape((1,))])
+
+			########################################
 			# Assemble object state.
-			####################################
+			########################################
 
 			# Get just the object pose, object quaternion.
 			object_state_np = env_next_state_dict['object-state'][:7]
 
-			####################################
+			########################################
 			# Assemble next state.
-			####################################
+			########################################
 
 			# Parse next state from dictionary, depending on what dataset we're using.
 
@@ -632,17 +697,25 @@ class PolicyManager_BaseClass():
 			if self.args.data in ['RoboturkRobotObjects']:
 				next_state_np = np.concatenate([robot_state_np,object_state_np],axis=0)
 
-			# If we're using an object only dataset. 
-			elif self.args.data in ['RoboturkObjects']: 
-				next_state_np = object_state_np
-			
+			# REMEMBER, We're never actually using an only object dataset here, because we can't actually actuate the objects..
+			# # If we're using an object only dataset. 
+			# elif self.args.data in ['RoboturkObjects']: 
+			# 	next_state_np = object_state_np			
+
 			# If we're using a robot only dataset.
 			else:
 				next_state_np = robot_state_np
 
+			if self.args.normalization in ['meanvar','minmax']:
+				next_state_np = (next_state_np - self.norm_sub_value)/self.norm_denom_value
+
 			# Return torchified version of next_state
 			next_state = torch.from_numpy(next_state_np).to(device)	
-			return next_state, env_next_state_dict['image']			
+
+
+			# print("embedding at gazoo")
+			# embed()
+			return next_state, env_next_state_dict[self.visualizer.image_key]
 
 		####################################
 		# If not using environment to rollout trajectories.
@@ -656,15 +729,24 @@ class PolicyManager_BaseClass():
 
 	def rollout_robot_trajectory(self, trajectory_start, latent_z, rollout_length=None, z_seq=False):
 
+		rendered_rollout_trajectory = []
+		
 		if self.args.viz_sim_rollout:
+
 			########################################
 			# 0) Reset visualizer environment state. 
 			########################################
 
 			self.visualizer.environment.reset()
-			self.visualizer.set_joint_pose(trajectory_start)		
 
-			rendered_rollout_trajectory = []
+			# Unnormalize the start state. 
+			if self.args.normalization in ['minmax','meanvar']:
+				unnormalized_trajectory_start = (trajectory_start * self.norm_denom_value ) + self.norm_sub_value
+			else:
+				unnormalized_trajectory_start = trajectory_start 
+			# Now use unnormalized state to set the trajectory state. 
+			self.visualizer.set_joint_pose(unnormalized_trajectory_start)		
+			
 		########################################
 		# 1a) Create placeholder policy input tensor. 
 		########################################
@@ -695,7 +777,6 @@ class PolicyManager_BaseClass():
 			########################################
 			# 3) Get action from policy. 
 			########################################
-
 			# Assume we always query the policy for actions with batch_size 1 here. 
 			actions = self.policy_network.get_actions(subpolicy_inputs, greedy=True, batch_size=1)
 
@@ -732,23 +813,35 @@ class PolicyManager_BaseClass():
 
 		trajectory = subpolicy_inputs[:,:self.state_dim].detach().cpu().numpy()
 		
-		if self.args.viz_sim_rollout:
-			return trajectory, rendered_rollout_trajectory
-		else:
-			return trajectory
-
+		return trajectory, rendered_rollout_trajectory
+		
 	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None):		
 
 		########################################
-		# 1) Feed Z into policy, rollout trajectory.
+		# 1) Get task ID. 
+		########################################
+		# Set task ID if the visualizer needs it. 
+		if indexed_data_element is None or ('task_id' not in indexed_data_element.keys()):
+			task_id = None
+			env_name = None
+		else:
+			task_id = indexed_data_element['task_id']
+			env_name = self.dataset.environment_names[task_id]
+			print("Visualizing a trajectory of task:", env_name)
+
+		# print('Embed in get robot visuals.')
+		# embed()
+
+		########################################
+		# 2) Feed Z into policy, rollout trajectory.
 		########################################
 
 		print("Rollout length:", trajectory.shape[0])
-
+		self.visualizer.create_environment(task_id=env_name)
 		trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq)
 
 		########################################
-		# 2) Unnormalize data. 
+		# 3) Unnormalize data. 
 		########################################
 
 		if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
@@ -762,34 +855,43 @@ class PolicyManager_BaseClass():
 			# Get animation object from dataset. 
 			animation_object = self.dataset[i]['animation']
 
-		print("We are in the PM visualizer function.")
-
-		########################################
-		# 3) Get task ID. 
-		########################################
-		# Set task ID if the visualizer needs it. 
-		if indexed_data_element is None or ('task_id' not in indexed_data_element.keys()):
-			task_id = None
-			env_name = None
-		else:
-			task_id = indexed_data_element['task_id']
-			env_name = self.dataset.environment_names[task_id]
-			print("Visualizing a trajectory of task:", env_name)
+		# print("We are in the PM visualizer function.")
+		# embed()
 
 		########################################
 		# 4a) Run unnormalized ground truth trajectory in visualizer. 
 		########################################
 
-		self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+		self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+
+		# Also plotting trajectory against time. 
+		plt.close()
+		plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,:7])
+		ax = plt.gca()
+		ax.set_ylim([-3, 3])
+		plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_GT.png".format(i)))
+		plt.close()
 
 		########################################
 		# 4b) Run unnormalized rollout trajectory in visualizer. 
 		########################################
 
+		# Also plotting trajectory against time. 
+		plt.close()
+		plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,:7])
+		ax = plt.gca()
+		ax.set_ylim([-3, 3])
+
 		if self.args.viz_sim_rollout:
+			# No call to visualizer here means we have to save things on our own. 
 			self.rollout_gif = rendered_rollout_trajectory
+			self.visualizer.visualize_prerendered_gif(self.rollout_gif, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_SimRollout.gif".format(i))
+			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_SimRollout.png".format(i)))		
 		else:
-			self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_Rollout.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+			self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_Rollout.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_Rollout.png".format(i)))
+
+		plt.close()
 
 		########################################
 		# 5) Add to GIF lists. 
@@ -806,18 +908,10 @@ class PolicyManager_BaseClass():
 			self.ground_truth_gif = np.array(self.ground_truth_gif)
 			self.rollout_gif = np.array(self.rollout_gif)
 
-		if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
-
-			if return_image:
-					return unnorm_pred_trajectory, self.ground_truth_gif, self.rollout_gif
-			else:
-				return unnorm_pred_trajectory
+		if return_image:
+				return unnorm_pred_trajectory, self.ground_truth_gif, self.rollout_gif
 		else:
-
-			if return_image:
-				return trajectory_rollout, self.ground_truth_gif, self.rollout_gif
-			else:
-				return trajectory_rollout
+			return unnorm_pred_trajectory
 
 	def write_results_HTML(self):
 		# Retrieve, append, and print images from datapoints across different models. 
@@ -853,8 +947,15 @@ class PolicyManager_BaseClass():
 		print("Writing Embedding File.")
 
 		t1 = time.time()
-		# Open Results HTML file. 	    
-		with open(os.path.join(self.dir_name,'Embedding_{0}_{1}.html'.format(prefix,self.args.name)),'w') as html_file:
+
+		# Adding prefix.
+		if self.args.viz_sim_rollout:
+			sim_or_not = 'Sim'
+		else:
+			sim_or_not = 'Viz'
+
+		# Open Results HTML file. 	    		
+		with open(os.path.join(self.dir_name,'Embedding_{0}_{2}_{1}.html'.format(prefix,self.args.name,sim_or_not)),'w') as html_file:
 			
 			# Start HTML doc. 
 			html_file.write('<html>')
@@ -3451,8 +3552,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			gripper_open = np.array([0.0115, -0.0115])
 			gripper_closed = np.array([-0.020833, 0.020833])
 
-			# The state that we want is ... joint state?
-			gripper_finger_values = step_res[0]['gripper_qpos']
+			# The state that we want is ... joint state?			
+			# gripper_finger_values = step_res[0]['gripper_qpos']
+			gripper_finger_values = step_res[0][self.visualizer.gripper_key]
 			gripper_values = (gripper_finger_values - gripper_open)/(gripper_closed - gripper_open)			
 
 			finger_diff = gripper_values[1]-gripper_values[0]
