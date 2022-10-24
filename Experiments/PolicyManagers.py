@@ -103,6 +103,10 @@ class PolicyManager_BaseClass():
 			self.visualizer = RoboturkObjectVisualizer(args=self.args)
 		elif self.args.data in ['RoboturkRobotObjects']:
 			self.visualizer = RoboturkRobotObjectVisualizer(args=self.args)
+		elif self.args.data in ['RoboMimicObjects']:
+			self.visualizer = RoboMimicObjectVisualizer(args=self.args)
+		elif self.args.data in ['RoboMimicRobotObjects']:
+			self.visualizer = RoboMimicRobotObjectVisualizer(args=self.args)
 		else:
 			self.visualizer = ToyDataVisualizer()
 		
@@ -169,10 +173,14 @@ class PolicyManager_BaseClass():
 			else:
 				return sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj
 	
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk',\ 
+			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand',\
+			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
 
 			# If we're imitating... select demonstrations from the particular task.
-			if self.args.setting=='imitation' and (self.args.data in ['Roboturk','RoboMimic','RoboturkObjects','RoboturkRobotObjects']):
+			if self.args.setting=='imitation' and \
+				 (self.args.data in ['Roboturk','RoboMimic','RoboturkObjects','RoboturkRobotObjects',\
+					'RoboMimicObjects','RoboMimicRobotObjects']):
 				data_element = self.dataset.get_task_demo(self.demo_task_index, i)
 			else:
 				data_element = self.dataset[i]
@@ -193,7 +201,8 @@ class PolicyManager_BaseClass():
 			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand']:
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
-			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic','RoboturkObjects','RoboturkRobotObjects']:
+			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic',\ 
+				'RoboMimic','RoboturkObjects','RoboturkRobotObjects', 'RoboMimicObjects', 'RoboMimicRobotObjects']:
 				robot_states = data_element['robot-state']
 				object_states = data_element['object-state']
 				self.current_task_for_viz = data_element['task-id']
@@ -402,6 +411,10 @@ class PolicyManager_BaseClass():
 			self.N = 200
 		elif self.args.data in ['RoboturkRobotObjects']:		
 			self.visualizer = RoboturkRobotObjectVisualizer(args=self.args)
+		elif self.args.data in ['RoboMimicObjects']:
+			self.visualizer = RoboMimicObjectVisualizer(args=self.args)
+		elif self.args.data in ['RoboMimicRobotObjects']:
+			self.visualizer = RoboMimicRobotObjectVisualizer(args=self.args)			
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
@@ -694,7 +707,7 @@ class PolicyManager_BaseClass():
 			# Parse next state from dictionary, depending on what dataset we're using.
 
 			# If we're using a dataset with both objects and the robot. 
-			if self.args.data in ['RoboturkRobotObjects']:
+			if self.args.data in ['RoboturkRobotObjects','RoboMimicRobotObjects']:
 				next_state_np = np.concatenate([robot_state_np,object_state_np],axis=0)
 
 			# REMEMBER, We're never actually using an only object dataset here, because we can't actually actuate the objects..
@@ -1324,7 +1337,9 @@ class PolicyManager_BaseClass():
 		# If we're in a dataset that will have variable sized data.
 		# if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic']:
 		
-		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic','RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\ 
+			'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand',\
+				'RoboMimicObjects','RoboMimicRobotObjects']:
 
 			if self.args.task_discriminability or self.args.task_based_supervision or self.args.task_based_shuffling:
 
@@ -1384,6 +1399,15 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.number_epochs = self.args.epochs
 		self.test_set_size = 500
 
+		stat_dir_name = self.dataset.stat_dir_name
+		if self.args.normalization=='meanvar':
+			self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+		elif self.args.normalization=='minmax':
+			self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+
+
 		if self.args.data in ['MIME','OldMIME']:
 			self.state_size = 16			
 			self.state_dim = 16
@@ -1436,12 +1460,12 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				stat_dir_name = "Robomimic"
 				self.test_set_size = 50
 
-			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
-			elif self.args.normalization=='minmax':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+			# if self.args.normalization=='meanvar':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			# elif self.args.normalization=='minmax':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 
 			# Max of robot_state + object_state sizes across all sawyer environments. 
 			# Robot size always 30. Max object state size is... 23. 
@@ -1468,14 +1492,14 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 			self.test_set_size = 40
-			stat_dir_name = self.args.data
+			# stat_dir_name = self.args.data
 
-			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
-			elif self.args.normalization=='minmax':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+			# if self.args.normalization=='meanvar':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			# elif self.args.normalization=='minmax':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 		
 		elif self.args.data in ['GRABHand']:
 			
@@ -1492,19 +1516,19 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 			self.test_set_size = 40
-			stat_dir_name = self.args.data
+			# stat_dir_name = self.args.data
 
-			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
-			elif self.args.normalization=='minmax':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+			# if self.args.normalization=='meanvar':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			# elif self.args.normalization=='minmax':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 
-				# Modify to zero out for now..
-				if self.args.skip_wrist:
-					self.norm_sub_value[:3] = 0.
-					self.norm_denom_value[:3] = 1.
+			# Modify to zero out for now..
+			if self.args.skip_wrist:
+				self.norm_sub_value[:3] = 0.
+				self.norm_denom_value[:3] = 1.
 		
 		elif self.args.data in ['GRABArmHand']:
 			
@@ -1524,17 +1548,17 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 			self.test_set_size = 40
-			stat_dir_name = self.args.data
+			# stat_dir_name = self.args.data
 
-			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
-			elif self.args.normalization=='minmax':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+			# if self.args.normalization=='meanvar':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			# elif self.args.normalization=='minmax':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 		
 
-		elif self.args.data in ['RoboturkObjects']:
+		elif self.args.data in ['RoboturkObjects','RoboMimicObjects']:
 			# self.state_size = 14
 			# self.state_dim = 14
 
@@ -1549,16 +1573,17 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.conditional_info_size = 0
 			self.test_set_size = 50
 
-			stat_dir_name = "RoboturkObjects"			
+			# stat_dir_name = "RoboturkObjects"
+			# stat_dir_name = self.args.data			
 
-			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
-			elif self.args.normalization=='minmax':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+			# if self.args.normalization=='meanvar':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			# elif self.args.normalization=='minmax':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 
-		elif self.args.data in ['RoboturkRobotObjects']:
+		elif self.args.data in ['RoboturkRobotObjects','RoboMimicRobotObjects']:
 			# self.state_size = 14
 			# self.state_dim = 14
 
@@ -1573,14 +1598,15 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.conditional_info_size = 0
 			self.test_set_size = 50
 
-			stat_dir_name = "RoboturkRobotObjects"			
+			# stat_dir_name = "RoboturkRobotObjects"			
+			# stat_dir_name = self.args.data
 
-			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
-			elif self.args.normalization=='minmax':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+			# if self.args.normalization=='meanvar':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			# elif self.args.normalization=='minmax':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 
 		# Training parameters. 		
 		self.baseline_value = 0.
@@ -1904,7 +1930,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			return concatenated_traj, sample_action_seq, sample_traj
 		
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap',\
+				'OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects',\
+				'RoboMimicObjects','RoboMimicRobotObjects']:
 			data_element = self.dataset[i]
 
 			####################################			
@@ -1964,7 +1992,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				# CONDITIONAL INFORMATION for the encoder... 
 
-				if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects']:
+				if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
+					'GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
 					pass
 				# if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 				# 	pass
@@ -2250,7 +2279,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# if self.args.data=="MIME" or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand']:			
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
+				'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand',\
+				'RoboMimicObjects','RoboMimicRobotObjects']:
 			print("Running Evaluation of State Distances on small test set.")
 			# self.evaluate_metrics()		
 
@@ -2480,7 +2511,9 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			return concatenated_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), sample_traj.transpose((1,0,2))
 				
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects']:			
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
+				'GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects',\
+				'RoboMimicObjects','RoboMimicRobotObjects']:
 
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 				data_element = self.dataset[i:i+self.args.batch_size]
@@ -2977,7 +3010,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 	def visualize_trajectory(self, trajectory, segmentations=None, i=0, suffix='_Img'):
 
 		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
+				'GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects',\
+				'RoboMimicObjects','RoboMimicRobotObjects']:
 
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 				unnorm_trajectory = (trajectory*self.norm_denom_value)+self.norm_sub_value
@@ -4697,7 +4732,9 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
 
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects']:
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
+				'GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects',\
+				'RoboMimicObjects','RoboMimicRobotObjects']:
 					   
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 
@@ -4760,7 +4797,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
-			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic','RoboturkObjects','RoboturkRobotObjects']:
+			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic',\
+				'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
 
 				if self.args.batch_size==1:
 

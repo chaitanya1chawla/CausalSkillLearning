@@ -63,7 +63,7 @@ class GRAB_PreDataset(Dataset):
 		else:
 			self.dataset_directory = self.args.datadir
 		   
-
+		self.stat_dir_name='GRAB'
 		# 1) Keep track of joints: 
 		#   a) Full joint name list from https://github.com/vchoutas/smplx/blob/master/smplx/joint_names.py. 
 		#   b) Relevant joint names. 
@@ -448,7 +448,7 @@ class GRAB_Dataset(Dataset):
 
 		# Some book-keeping first. 
 		self.args = args
-
+		self.stat_dir_name='GRAB'
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
 			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'

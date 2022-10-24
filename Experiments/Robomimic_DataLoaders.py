@@ -79,6 +79,8 @@ class OrigRobomimic_Dataset(Dataset):
 		# Set files. 
 		self.setup()
 
+		self.stat_dir_name='RoboMimic'
+
 	def setup(self):
 		# Load data from all tasks. 			
 		self.files = []
@@ -264,6 +266,8 @@ class Robomimic_Dataset(OrigRobomimic_Dataset):
 	def __init__(self, args):
 		
 		super(Robomimic_Dataset, self).__init__(args)
+
+		
 
 		# Now that we've run setup, compute dataset_trajectory_lengths for smart batching.
 		self.dataset_trajectory_lengths = np.zeros(self.total_length)
