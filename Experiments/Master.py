@@ -21,6 +21,7 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		args.data = data
 
 	# Define Data Loader.
+	############################
 	if args.data=='ContinuousNonZero':
 		dataset = DataLoaders.ContinuousNonZeroToyDataset(args.datadir, create_dataset_variation=create_dataset_variation)
 	elif args.data=='DeterGoal':
@@ -29,14 +30,15 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = DataLoaders.ContinuousDirectedNonZeroToyDataset(args.datadir)
 	elif args.data=='ToyContext':
 		dataset = DataLoaders.ToyContextDataset(args.datadir)
-	elif args.data=='OldMIME':
-		
+	############################
+	elif args.data=='OldMIME':		
 		dataset = MIME_DataLoader.MIME_NewDataset(args, short_traj=args.short_trajectories)
 	elif args.data=='MIME':
 		if args.single_hand is None:
 			dataset = MIME_DataLoader.MIME_NewMetaDataset(args, short_traj=args.short_trajectories, traj_length_threshold=args.dataset_traj_length_limit)
 		else:
 			dataset = MIME_DataLoader.MIME_OneHandedDataset(args, short_traj=args.short_trajectories, traj_length_threshold=args.dataset_traj_length_limit)
+	############################			
 	elif args.data=='Roboturk':		
 		dataset = Roboturk_DataLoader.Roboturk_NewSegmentedDataset(args)
 	elif args.data=='OrigRoboturk':
@@ -47,12 +49,19 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = Roboturk_DataLoader.Roboturk_ObjectDataset(args)
 	elif args.data=='RoboturkRobotObjects':
 		dataset = Roboturk_DataLoader.Roboturk_RobotObjectDataset(args)		
+	############################
 	elif args.data=='Mocap':
 		dataset = Mocap_DataLoader.Mocap_Dataset(args)
+	############################		
 	elif args.data=='OrigRoboMimic':
 		dataset = Robomimic_DataLoaders.OrigRobomimic_Dataset(args)
 	elif args.data=='RoboMimic':
 		dataset = Robomimic_DataLoaders.Robomimic_Dataset(args)
+	elif args.data=='RoboMimicObjects':
+		dataset = Robomimic_DataLoaders.Robomimic_ObjectDataset(args)
+	elif args.data=='RoboMimicRobotObjects':
+		dataset = Robomimic_DataLoaders.Robomimic_RobotObjectDataset(args)
+	############################
 	elif args.data=='GRABPreproc':
 		dataset = GRAB_DataLoader.GRAB_PreDataset(args)
 	elif args.data=='GRAB':
