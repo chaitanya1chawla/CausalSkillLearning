@@ -448,3 +448,50 @@ class Robomimic_Dataset(OrigRobomimic_Dataset):
 		np.save("Robomimic_Vel_Var.npy", vel_variance)
 		np.save("Robomimic_Vel_Min.npy", vel_min_value)
 		np.save("Robomimic_Vel_Max.npy", vel_max_value)
+
+class Robomimic_ObjectDataset(Robomimic_Dataset):
+
+	def __init__(self, args):
+
+		super(Robomimic_ObjectDataset, self).__init__(args)
+
+	def __getitem__(self, index):
+		
+		data_element = copy.deepcopy(super().__getitem__(index))
+
+		# Copy over the demo to the robot-demo key.
+		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
+		# Set demo to object-state trajectory. 
+
+		# Also try ignoring the relative positions for now.
+		# print("Embedding in get el")
+		# embed()
+		data_element['demo'] = data_element['object-state'][:,:7]
+
+		return data_element
+
+class Robomimic_RobotObjectDataset(Robomimic_Dataset):
+
+	def __init__(self, args):
+
+		super(Robomimic_RobotObjectDataset, self).__init__(args)
+
+	def __getitem__(self, index):
+
+		data_element = copy.deepcopy(super().__getitem__(index))
+
+		# Now concatenate the robot and object states. 
+		# if data_element['demo'].shape[-1]==15:
+		# 	print("embedding in dataset getitem")
+		# 	embed()
+
+		# print("######################")
+		# print(data_element['task-id'])
+		# print("SHAPE OF 1st DEMO",data_element['demo'].shape)
+		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
+		demo = np.concatenate([data_element['demo'],data_element['object-state'][:,:7]],axis=-1)
+		data_element['demo'] = copy.deepcopy(demo)
+
+		# print("SHAPE OF 2nd DEMO",data_element['demo'].shape)
+
+		return data_element

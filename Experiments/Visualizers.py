@@ -8,6 +8,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 from cgitb import handler
+from signal import default_int_handler
 
 from absl import flags, app
 import copy, os, imageio, scipy.misc, pdb, math, time, numpy as np
@@ -864,13 +865,11 @@ class RoboturkObjectVisualizer(object):
 		self.args = args
 		self.has_display = has_display
 		self.just_objects = just_objects
-		self.create_environment()
+		default_task_id = "SawyerViz"
+		self.create_environment(task_id=default_task_id)
 
 	def set_object_pose(self, position, orientation):
 
-		# print("Entering object pose")
-		# embed()
-		
 		# Sets object position for environment with one object. 
 		# Indices of object position are 9-12. 
 		self.environment.sim.data.qpos[9:12] = position
