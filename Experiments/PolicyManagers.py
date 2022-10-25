@@ -1276,8 +1276,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		
 		elif self.args.data in ['DAPG']:
 			
-			self.state_size = 24
-			self.state_dim = 24
+			self.state_size = 24 + 3
+			self.state_dim = 24 + 3
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
@@ -1819,7 +1819,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.state_dim //= 2
 			self.rollout_timesteps = self.traj_length
 		elif self.args.data in ['DAPG']:
-			self.state_dim = 24
+			self.state_dim = 24 + 3
 			self.rollout_timesteps = self.traj_length
 
 		if rollout_length is not None:
@@ -2073,7 +2073,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 					self.state_dim //= 2
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['DAPG']:
-				self.state_dim = 24
+				self.state_dim = 24 + 3
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['RoboturkObjects']:
 				# Now switching to using 7 dimensions instead of 14, so as to not use relative pose.
@@ -2562,8 +2562,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			
 		elif self.args.data in ['DAPG']:
 			
-			self.state_size = 24
-			self.state_dim = 24
+			self.state_size = 24 + 3
+			self.state_dim = 24 + 3
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size

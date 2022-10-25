@@ -864,7 +864,7 @@ class DAPGVisualizer(SawyerVisualizer):
 		target_pos = -1000*np.ones(3)
 		state['hand_qpos'] = hand_qpos
 		state['qpos'][:30] = hand_qpos
-		state['qpos'][30:33] = wrist_pos
+		state['qpos'][3:6] = wrist_pos
 		state['qvel'] = qvel
 		state['obj_pos'] = obj_pos
 		state['target_pos'] = target_pos
