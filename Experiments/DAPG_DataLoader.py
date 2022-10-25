@@ -61,10 +61,10 @@ class DAPG_PreDataset(Dataset):
 
 		# Create index arrays
 		self.hand_joint_indices = {}
-		self.hand_joint_indices['door-v0_demos.pickle'] = list(range(4, 28))
-		self.hand_joint_indices['pen-v0_demos.pickle'] = list(range(0, 24))
-		self.hand_joint_indices['hammer-v0_demos.pickle'] = list(range(2, 26))
-		self.hand_joint_indices['relocate-v0_demos.pickle'] = list(range(6, 30))
+		self.hand_joint_indices['door-v0_demos.pickle'] = list(range(4, 28 + 3))
+		self.hand_joint_indices['pen-v0_demos.pickle'] = list(range(0, 24 + 3))
+		self.hand_joint_indices['hammer-v0_demos.pickle'] = list(range(2, 26 + 3))
+		self.hand_joint_indices['relocate-v0_demos.pickle'] = list(range(6, 30 + 3))
 
 		
 
@@ -109,8 +109,6 @@ class DAPG_PreDataset(Dataset):
 				# Subsample relevant joints. 
 				# Modified for different dimensions by file.
 				v = v.replace(self.dataset_directory, '')
-
-				embed()
 
 				relevant_joints_datapoint = self.subsample_relevant_joints(datapoint, v)
 
