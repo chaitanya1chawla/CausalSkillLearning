@@ -144,7 +144,7 @@ class FrankaVisualizer(SawyerVisualizer):
 
 	def __init__(self, has_display=False):
 
-		super(FrankaVisualizer, self).__init__(has_display=has_display)
+		# super(FrankaVisualizer, self).__init__(has_display=has_display)
 
 		import robosuite, threading
 
@@ -923,8 +923,7 @@ class RoboturkObjectVisualizer(object):
 			self.sawyer_IK_object = None
 			self.environment = self.base_env	
 			self.gripper_key = 'robot0_gripper_qpos'
-			self.image_key = 'vizview1_image'
-						
+			self.image_key = 'vizview1_image'						
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 
@@ -989,6 +988,137 @@ class RoboturkRobotObjectVisualizer(RoboturkObjectVisualizer):
 		else:
 			self.environment.robots[0].set_robot_joint_positions(pose[:7])
 	
+class RoboMimicObjectVisualizer(object):
+
+	def __init__(self, has_display=False, args=None, just_objects=True):
+		
+		self.args = args
+		self.has_display = has_display
+		self.just_objects = just_objects
+		default_task_id = "Viz"
+		self.create_environment(task_id=default_task_id)
+
+	def set_object_pose(self, position, orientation):
+
+		# Sets object position for environment with one object. 
+		# Indices of object position are 9-12. 
+		self.environment.sim.data.qpos[9:12] = position
+		# Orientation is indexed from 12-16., but is ordered differently. 
+		# Orientation argument is ordered as x,y,z,w / This is what Mujoco observation gives us.
+		# This qpos argument is ordered as w,x,y,z. 
+		self.environment.sim.data.qpos[13:16] = orientation[:-1]
+		self.environment.sim.data.qpos[12] = orientation[-1]
+
+		# Sets posiitons correctly. Quaternions slightly off - trend is sstill correct.
+		self.environment.sim.forward()
+
+		# print("Exiting object pose")
+
+	def set_joint_pose(self, pose, arm='both', gripper=False):
+		
+		# Is wrapper for set object pose.		
+		object_position = pose[:3]
+		object_orientation = pose[3:7]
+		# object_to_eef_position = pose[7:10]
+		# object_to_eef_quaternion = pose[10:]
+
+		self.set_object_pose(object_position, object_orientation)
+
+	def set_joint_pose_return_image(self, pose, arm='both', gripper=False):
+
+		self.set_joint_pose(pose)
+
+		image = np.flipud(self.environment.sim.render(600, 600, camera_name='vizview1'))
+		return image
+
+	def create_environment(self, task_id=None):
+
+		print("Creating environment for task: ",task_id)
+
+		import robosuite, threading
+		if float(robosuite.__version__[:3])<1.:
+			self.new_robosuite = 0
+			self.base_env = robosuite.make(task_id,has_renderer=self.has_display,camera_height=600,camera_width=600,camera_name='vizview1',just_objects=self.just_objects)
+			from robosuite.wrappers import IKWrapper					
+			self.sawyer_IK_object = IKWrapper(self.base_env)
+			self.environment = self.sawyer_IK_object.env
+			self.gripper_key = 'gripper_qpos'
+			self.image_key = 'image'
+		else:
+			self.controller_config = robosuite.load_controller_config(default_controller='JOINT_POSITION')
+			self.controller_config['kp'] = 20000
+			self.new_robosuite = 1
+			# task_id_wo_robot_name = task_id.lstrip("Sawyer")
+			task_id_wo_robot_name = task_id			
+			self.base_env = robosuite.make(task_id_wo_robot_name,robots=['Panda'],has_renderer=self.has_display,camera_heights=600,camera_widths=600,camera_names='vizview1',controller_configs=self.controller_config)
+			self.sawyer_IK_object = None
+			self.environment = self.base_env	
+			self.gripper_key = 'robot0_gripper_qpos'
+			self.image_key = 'vizview1_image'						
+
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
+
+		image_list = []
+		previous_joint_positions = None
+
+		# Recreate environment with new task ID potentially.
+		self.create_environment(task_id=task_id)
+
+		for t in range(trajectory.shape[0]):
+
+			# Check whether it's end effector or joint trajectory. 
+			# Calls joint pose function, but is really setting the object position
+			new_image = self.set_joint_pose_return_image(trajectory[t])
+
+			image_list.append(new_image)
+
+			# Insert white 
+			if segmentations is not None:
+				if t>0 and segmentations[t]==1:
+					image_list.append(255*np.ones_like(new_image)+new_image)
+
+		if return_and_save:
+			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			return image_list
+		elif return_gif:
+			return image_list
+		else:
+			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+
+	def visualize_prerendered_gif(self, image_list=None, gif_path=None, gif_name="Traj.gif"):
+		
+		for k,v in enumerate(image_list):
+			image_list[k] = np.flipud(v)
+		imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+
+class RoboMimicRobotObjectVisualizer(RoboMimicObjectVisualizer):
+
+	def __init__(self, has_display=False, args=None):
+
+		super(RoboMimicRobotObjectVisualizer, self).__init__(has_display=has_display, args=args, just_objects=False)
+
+	def set_joint_pose(self, pose, arm='both', gripper=False):
+
+		############################
+		# Set object pose.
+		############################
+
+		# Assume last seven elements of pose are the actual pose.
+		object_position = pose[-7:-4]
+		object_orientation = pose[-4:]
+
+		self.set_object_pose(object_position, object_orientation)
+		
+		############################
+		# Set robot pose.
+		############################
+
+		# Assumes the  first seven elements are the robot pose.
+		if self.new_robosuite==0:
+			self.environment.set_robot_joint_positions(pose[:7])
+		else:
+			self.environment.robots[0].set_robot_joint_positions(pose[:7])
+
 
 class ToyDataVisualizer():
 

@@ -10,7 +10,10 @@ from headers import *
 from PolicyNetworks import *
 from RL_headers import *
 from PPO_Utilities import PPOBuffer
-from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer #, MocapVisualizer
+from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, \
+	GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, \
+	RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer,\
+	RoboMimicObjectVisualizer, RoboMimicRobotObjectVisualizer #, MocapVisualizer
 # from Visualizers import *
 import TFLogger, DMP, RLUtils
 
@@ -173,8 +176,8 @@ class PolicyManager_BaseClass():
 			else:
 				return sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj
 	
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk',\ 
-			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand',\
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk', \
+			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', \
 			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
 
 			# If we're imitating... select demonstrations from the particular task.
@@ -201,7 +204,7 @@ class PolicyManager_BaseClass():
 			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand']:
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
-			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic',\ 
+			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic',\
 				'RoboMimic','RoboturkObjects','RoboturkRobotObjects', 'RoboMimicObjects', 'RoboMimicRobotObjects']:
 				robot_states = data_element['robot-state']
 				object_states = data_element['object-state']
@@ -834,16 +837,16 @@ class PolicyManager_BaseClass():
 		# 1) Get task ID. 
 		########################################
 		# Set task ID if the visualizer needs it. 
-		if indexed_data_element is None or ('task_id' not in indexed_data_element.keys()):
+		if indexed_data_element is None or ('task-id' not in indexed_data_element.keys()):
 			task_id = None
 			env_name = None
-		else:
-			task_id = indexed_data_element['task_id']
+		else:			
+			task_id = indexed_data_element['task-id']
 			env_name = self.dataset.environment_names[task_id]
 			print("Visualizing a trajectory of task:", env_name)
 
-		# print('Embed in get robot visuals.')
-		# embed()
+		print('Embed in get robot visuals.')
+		embed()
 
 		########################################
 		# 2) Feed Z into policy, rollout trajectory.
@@ -1337,7 +1340,7 @@ class PolicyManager_BaseClass():
 		# If we're in a dataset that will have variable sized data.
 		# if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic']:
 		
-		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\ 
+		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\
 			'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand',\
 				'RoboMimicObjects','RoboMimicRobotObjects']:
 

@@ -79,7 +79,7 @@ class OrigRobomimic_Dataset(Dataset):
 		# Set files. 
 		self.setup()
 
-		self.stat_dir_name='RoboMimic'
+		self.stat_dir_name='Robomimic'
 
 	def setup(self):
 		# Load data from all tasks. 			

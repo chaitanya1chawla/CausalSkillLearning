@@ -356,6 +356,7 @@ class Roboturk_FullDataset(Roboturk_Dataset):
 		
 		# Trivially adding task ID to data element.
 		data_element['task_id'] = task_index
+		data_element['task-id'] = task_index
 
 		if resample_length<=1 or data_element['robot-state'].shape[0]<=1:
 			data_element['is_valid'] = False			
