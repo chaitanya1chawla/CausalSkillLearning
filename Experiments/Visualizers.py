@@ -844,6 +844,7 @@ class DAPGVisualizer(SawyerVisualizer):
 		
 	def __init__(self, args=None):
 		super().__init__()
+		self.environment = GymEnv("relocate-v0")
 
 	def create_environment(self, task_id=None):
 		pass
@@ -852,11 +853,10 @@ class DAPGVisualizer(SawyerVisualizer):
 		return super().visualize_joint_trajectory(trajectory, return_gif, gif_path, gif_name, segmentations, return_and_save, additional_info, end_effector, task_id)
 
 	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False, save_image=False):
-		self.environment = GymEnv("relocate-v0")
-		self.environment.reset()
+		# self.environment.reset()
 		
 		state = self.environment.get_env_state()
-		hand_qpos = np.zeros(30)
+		hand_qpos = state['hand_qpos']
 		hand_qpos[6:] = joint_angles
 		qvel = np.zeros(36)
 		obj_pos = 100*np.ones(3)
@@ -866,6 +866,7 @@ class DAPGVisualizer(SawyerVisualizer):
 		state['qvel'] = qvel
 		state['obj_pos'] = obj_pos
 		state['target_pos'] = target_pos
+		
 		self.environment.set_env_state(state)
 		self.environment.env.env.sim.forward()
 		

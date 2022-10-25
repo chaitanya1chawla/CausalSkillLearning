@@ -109,6 +109,9 @@ class DAPG_PreDataset(Dataset):
 				# Subsample relevant joints. 
 				# Modified for different dimensions by file.
 				v = v.replace(self.dataset_directory, '')
+
+				embed()
+
 				relevant_joints_datapoint = self.subsample_relevant_joints(datapoint, v)
 
 				# normalized_relevant_joint_datapoint = self.normalize(relevant_joints_datapoint)
@@ -135,10 +138,7 @@ class DAPG_PreDataset(Dataset):
 		np.save(os.path.join(self.dataset_directory, self.getname() + "_OrderedFileList.npy"), self.filelist)
 
 	def normalize(self, relevant_joints_datapoint):
-		if self.args.position_normalization == 'wrist':
-			return wrist_norm(relevant_joints_datapoint)
-		else:
-			return relevant_joints_datapoint
+		return relevant_joints_datapoint
 
 	def getname(self):
 		return "DAPG"
