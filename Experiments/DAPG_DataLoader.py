@@ -89,11 +89,11 @@ class DAPG_PreDataset(Dataset):
 		sampled_joints[:, 0:6] = [0, 0.1, 0.1, 0, 0, 0]
 
 		if dataset_name == 'door-v0_demos.pickle':
-			sampled_joints[: 2:6] = datapoint[:, 0:4]
+			sampled_joints[:, 2:6] = datapoint[:, 0:4]
 		if dataset_name == 'relocate-v0_demos.pickle':
-			sampled_joints[: 0:6] = datapoint[:, 0:6]
+			sampled_joints[:, 0:6] = datapoint[:, 0:6]
 		if dataset_name == 'hammer-v0_demos.pickle':
-			sampled_joints[: 3:4] = datapoint[:, 0:2]
+			sampled_joints[:, 3:4] = datapoint[:, 0:2]
 
 		return sampled_joints
 		
