@@ -81,11 +81,11 @@ class DAPG_PreDataset(Dataset):
 
 		# Used a dictionary to hold different indices by file
 
-		sampled_joints = np.zeros(30)
+		sampled_joints = np.zeros((datapoint.shape[0], 30))
 
 		self.relevant_joint_indices = self.hand_joint_indices[dataset_name]
 		sampled_joints[:, 6:30] = datapoint[:, self.relevant_joint_indices]
-		
+
 		sampled_joints[:, 0:6] = [0, 0.1, 0.1, 0, 0, 0]
 
 		if dataset_name == 'door-v0_demos.pickle':
