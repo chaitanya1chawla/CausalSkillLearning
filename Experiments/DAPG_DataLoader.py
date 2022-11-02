@@ -61,10 +61,10 @@ class DAPG_PreDataset(Dataset):
 
 		# Create index arrays
 		self.hand_joint_indices = {}
-		self.hand_joint_indices['door-v0_demos.pickle'] = list(range(4, 28 + 3))
-		self.hand_joint_indices['pen-v0_demos.pickle'] = list(range(0, 24 + 3))
-		self.hand_joint_indices['hammer-v0_demos.pickle'] = list(range(2, 26 + 3))
-		self.hand_joint_indices['relocate-v0_demos.pickle'] = list(range(6, 30 + 3))
+		self.hand_joint_indices['door-v0_demos.pickle'] = list(range(4, 28))
+		self.hand_joint_indices['pen-v0_demos.pickle'] = list(range(0, 24))
+		self.hand_joint_indices['hammer-v0_demos.pickle'] = list(range(2, 26))
+		self.hand_joint_indices['relocate-v0_demos.pickle'] = list(range(6, 30))
 
 		
 
@@ -80,9 +80,22 @@ class DAPG_PreDataset(Dataset):
 		# We can later consider adding other robots / hands.
 
 		# Used a dictionary to hold different indices by file
-		self.relevant_joint_indices = self.hand_joint_indices[dataset_name]
 
-		return datapoint[:, self.relevant_joint_indices]
+		sampled_joints = np.zeros(30)
+
+		self.relevant_joint_indices = self.hand_joint_indices[dataset_name]
+		sampled_joints[:, 6:30] = datapoint[:, self.relevant_joint_indices]
+		
+		sampled_joints[:, 0:6] = [0, 0.1, 0.1, 0, 0, 0]
+
+		if dataset_name == 'door-v0_demos.pickle':
+			sampled_joints[: 2:6] = datapoint[:, 0:4]
+		if dataset_name == 'relocate-v0_demos.pickle':
+			sampled_joints[: 0:6] = datapoint[:, 0:6]
+		if dataset_name == 'hammer-v0_demos.pickle':
+			sampled_joints[: 3:4] = datapoint[:, 0:2]
+
+		return sampled_joints
 		
 	def setup(self):
 
