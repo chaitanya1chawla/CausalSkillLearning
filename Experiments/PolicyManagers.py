@@ -2585,6 +2585,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			elif self.args.normalization=='minmax':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
 
 		elif self.args.data=='RoboturkObjects':
 			# self.state_size = 14
