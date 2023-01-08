@@ -290,6 +290,14 @@ class DAPG_Dataset(Dataset):
 				
 		self.data_list_array = np.array(self.data_list)		
 
+		self.environment_names = []
+		for i in range(self.filelist):
+			f = self.filelist[0][:-4] # remove .xml
+			for j in range(self.cumulative_num_demos[i]):
+				self.environment_names.append(f)
+		print("Env names:\n", np.unique(self.environment_names))
+
+
 	def getname(self):
 		return "DAPG"
 
@@ -311,6 +319,6 @@ class DAPG_Dataset(Dataset):
 		data_element['demo'] = self.data_list[index]
 
 		task_index = np.searchsorted(self.cumulative_num_demos, index, side='right')-1
-		data_element['file'] = self.filelist[task_index]
+		data_element['file'] = self.filelist[task_index][:-4]	# remove .xml
 
 		return data_element

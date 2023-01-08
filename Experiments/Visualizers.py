@@ -8,6 +8,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 from cgitb import handler
+from re import S
 
 
 from absl import flags, app
@@ -845,19 +846,44 @@ class DAPGVisualizer(SawyerVisualizer):
 	def __init__(self, args=None):
 		super().__init__()
 		self.use_one_env = args.use_one_env
+
+		# Whether to merge all envs into relocate
 		if self.use_one_env:
 			self.environment = GymEnv("relocate-v0")
+			self.env_name = "relocate-v0"
+		# else:
+		# 	self.environment = {}
+		# 	self.environment["relocate-v0"] = GymEnv("relocate-v0")
+		# 	self.environment["hammer-v0"] = GymEnv("hammer-v0")
+		# 	self.environment["pen-v0"] = GymEnv("pen-v0")
+		# 	self.environment["door-v0"] = GymEnv("door-v0")
+
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
+		
+		self.create_environment(task_id)
+		
+		image_list = []
+		for t in range(trajectory.shape[0]):
+			new_image = self.set_joint_pose_return_image(trajectory[t])
+			image_list.append(new_image)
+
+			# Insert white 
+			if segmentations is not None:
+				if t>0 and segmentations[t]==1:
+					image_list.append(255*np.ones_like(new_image)+new_image)
+
+		if return_and_save:
+			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			return image_list
+		elif return_gif:
+			return image_list
 		else:
-			self.environment = {}
-			self.environment["relocate-v0"] = GymEnv("relocate-v0")
-			self.environment["hammer-v0"] = GymEnv("hammer-v0")
-			self.environment["pen-v0"] = GymEnv("pen-v0")
-			self.environment["door-v0"] = GymEnv("door-v0")
-
-
+			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)    
 
 	def create_environment(self, task_id=None):
-		pass
+		if not self.use_one_env and task_id is not None:
+			self.environment = GymEnv(task_id)
+			self.env_name = task_id
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 		return super().visualize_joint_trajectory(trajectory, return_gif, gif_path, gif_name, segmentations, return_and_save, additional_info, end_effector, task_id)
