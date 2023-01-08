@@ -106,11 +106,13 @@ class DAPG_PreDataset(Dataset):
 		# set joints
 		self.set_relevant_joints()
 
+		# self.cumulative_num_demos = [0, cumulative_length1, c]
+		self.cumulative_num_demos = [0]
+
 		# For all files. 
 		for k, v in enumerate(self.filelist):
 						
-			if k%100==0:
-				print("Loading file: ",k)
+			print("Loading from file: ", v)
 
 			# Now actually load file. 
 			set = np.load(v, allow_pickle=True)
@@ -138,7 +140,9 @@ class DAPG_PreDataset(Dataset):
 				subsampled_data = resample(reshaped_normalized_datapoint, number_of_timesteps)
 				
 				# Add subsampled datapoint to file. 
-				self.files.append(subsampled_data)            
+				self.files.append(subsampled_data)      
+			self.cumulative_num_demos.append(len(self.files))
+			print("Cumulative length:", len(self.files))      
 
 		# Create array. 
 		self.file_array = np.array(self.files)
@@ -147,6 +151,9 @@ class DAPG_PreDataset(Dataset):
 		# np.save(os.path.join(self.dataset_directory,"GRAB_DataFile.npy"), self.file_array)
 		np.save(os.path.join(self.dataset_directory, self.getname() + "_DataFile_BaseNormalize.npy"), self.file_array)
 		np.save(os.path.join(self.dataset_directory, self.getname() + "_OrderedFileList.npy"), self.filelist)
+
+		# Save cumulative lengths
+		np.save(os.path.join(self.dataset_directory, self.getname() + "_Lengths.npy"), self.cumulative_num_demos)
 
 	def normalize(self, relevant_joints_datapoint):
 		return relevant_joints_datapoint
@@ -258,8 +265,10 @@ class DAPG_Dataset(Dataset):
 		# Load file.
 		self.data_list = np.load(os.path.join(self.dataset_directory, self.getname() + "_DataFile_BaseNormalize.npy"), allow_pickle=True)
 		self.filelist = np.load(os.path.join(self.dataset_directory, self.getname() + "_OrderedFileList.npy"), allow_pickle=True)
+		self.cumulative_num_demos = np.load(os.path.join(self.dataset_directory, self.getname() + "_Lengths.npy"), allow_pickle=True)
 
 		self.dataset_length = len(self.data_list)
+		
 
 		if self.args.dataset_traj_length_limit>0:			
 			self.short_data_list = []
@@ -301,8 +310,7 @@ class DAPG_Dataset(Dataset):
 		data_element['is_valid'] = True
 		data_element['demo'] = self.data_list[index]
 
-		# temporary?
-		fileindex = int(len(self.filelist)*(index/self.dataset_length))
-		data_element['file'] = self.filelist[fileindex]
+		task_index = np.searchsorted(self.cumulative_num_demos, index, side='right')-1
+		data_element['file'] = self.filelist[task_index]
 
 		return data_element

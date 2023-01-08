@@ -844,7 +844,17 @@ class DAPGVisualizer(SawyerVisualizer):
 		
 	def __init__(self, args=None):
 		super().__init__()
-		self.environment = GymEnv("relocate-v0")
+		self.use_one_env = args.use_one_env
+		if self.use_one_env:
+			self.environment = GymEnv("relocate-v0")
+		else:
+			self.environment = {}
+			self.environment["relocate-v0"] = GymEnv("relocate-v0")
+			self.environment["hammer-v0"] = GymEnv("hammer-v0")
+			self.environment["pen-v0"] = GymEnv("pen-v0")
+			self.environment["door-v0"] = GymEnv("door-v0")
+
+
 
 	def create_environment(self, task_id=None):
 		pass
