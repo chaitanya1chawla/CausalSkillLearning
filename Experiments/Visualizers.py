@@ -890,15 +890,26 @@ class DAPGVisualizer(SawyerVisualizer):
 
 	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False, save_image=False):
 		# self.environment.reset()
+		print("Visualizing in", self.env_name)
 		
 		state = self.environment.get_env_state()
 		hand_qpos = state['hand_qpos']
-		hand_qpos[:30] = joint_angles[:30]
+
+		if self.env_name == "relocate_v0" or self.use_one_env:
+			hand_qpos[:30] = joint_angles[:30]
+		elif self.env_name == "hammer_v0":
+			hand_qpos[:30] = joint_angles[:30]
+		elif self.env_name == "door_v0":
+			hand_qpos[:30] = joint_angles[:30]
+		elif self.env_name == "pen_v0":
+			hand_qpos[:30] = joint_angles[:30]
+
+
 		qvel = np.zeros(36)
 		obj_pos = 100*np.ones(3)
 		target_pos = -100*np.ones(3)
 		state['hand_qpos'] = hand_qpos
-		state['qpos'][:30] = hand_qpos
+		state['qpos'][:30] = state['hand_qpos']
 		state['qvel'] = qvel
 		state['obj_pos'] = obj_pos
 		state['target_pos'] = target_pos
