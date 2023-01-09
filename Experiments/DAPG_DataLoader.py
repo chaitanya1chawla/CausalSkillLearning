@@ -291,7 +291,7 @@ class DAPG_Dataset(Dataset):
 		self.data_list_array = np.array(self.data_list)		
 
 		self.environment_names = []
-		for i in range(self.filelist):
+		for i in range(len(self.filelist)):
 			f = self.filelist[0][:-4] # remove .xml
 			for j in range(self.cumulative_num_demos[i]):
 				self.environment_names.append(f)
