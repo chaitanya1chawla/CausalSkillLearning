@@ -107,7 +107,7 @@ class DAPG_PreDataset(Dataset):
 		self.set_relevant_joints()
 
 		# self.cumulative_num_demos = [0, cumulative_length1, c]
-		self.cumulative_num_demos = [0]
+		self.cumulative_num_demos = []
 
 		# For all files. 
 		for k, v in enumerate(self.filelist):
