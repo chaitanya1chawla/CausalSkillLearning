@@ -896,7 +896,7 @@ class DAPGVisualizer(SawyerVisualizer):
 		
 		state = self.environment.get_env_state()
 
-		if self.env_name == "relocate_v0" or self.use_one_env:
+		if self.env_name == "relocate_v0":
 			hand_qpos = state['hand_qpos']
 			hand_qpos[:30] = joint_angles[:30]
 			qvel = np.zeros(36)
