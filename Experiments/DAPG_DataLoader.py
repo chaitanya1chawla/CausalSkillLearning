@@ -107,7 +107,7 @@ class DAPG_PreDataset(Dataset):
 		self.set_relevant_joints()
 
 		# self.cumulative_num_demos = [0, cumulative_length1, c]
-		self.cumulative_num_demos = []
+		self.cumulative_num_demos = [0]
 
 		# For all files. 
 		for k, v in enumerate(self.filelist):
@@ -294,7 +294,7 @@ class DAPG_Dataset(Dataset):
 		self.environment_names = []
 		for i in range(len(self.filelist)):
 			f = self.filelist[i][81:-7] # remove path and .pickle
-			for j in range(self.cumulative_num_demos[i]):
+			for j in range(self.cumulative_num_demos[i], self.cumulative_num_demos[i+1]):
 				self.environment_names.append(f)
 		print("Env names:\n", np.unique(self.environment_names))
 
