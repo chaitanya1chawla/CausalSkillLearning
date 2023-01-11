@@ -1062,6 +1062,8 @@ class PolicyManager_BaseClass():
 
 	def shuffle(self, extent, shuffle=True):
 
+		embed()
+
 		# if isinstance(self, PolicyManager_BatchJoint):
 		# 	print("########### Running shuffle from Batch Joint")
 		# # if isinstance(self, PolicyManager_JointFixEmbedTransfer):
