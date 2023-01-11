@@ -849,8 +849,10 @@ class DAPGVisualizer(SawyerVisualizer):
 
 		# Whether to merge all envs into relocate
 		if self.use_one_env:
-			self.environment = GymEnv("relocate-v0")
-			self.env_name = "relocate-v0"
+			# self.environment = GymEnv("relocate-v0")
+			# self.env_name = "relocate-v0"
+			self.environment = GymEnv("pen-v0")
+			self.env_name = "pen-v0"
 		# else:
 		# 	self.environment = {}
 		# 	self.environment["relocate-v0"] = GymEnv("relocate-v0")

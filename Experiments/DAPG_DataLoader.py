@@ -126,6 +126,7 @@ class DAPG_PreDataset(Dataset):
 				v = v.replace(self.dataset_directory, '')
 
 				relevant_joints_datapoint = self.subsample_relevant_joints(datapoint, v)
+				print("Preloading from", v)
 
 				# normalized_relevant_joint_datapoint = self.normalize(relevant_joints_datapoint)
 
