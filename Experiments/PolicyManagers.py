@@ -185,6 +185,7 @@ class PolicyManager_BaseClass():
 
 			# If normalization is set to some value.
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
+				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
 				trajectory = (trajectory-self.norm_sub_value)/self.norm_denom_value
 
 			action_sequence = np.diff(trajectory,axis=0)
@@ -4548,7 +4549,9 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			
 			# If normalization is set to some value.
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
+				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
 				batch_trajectory = (batch_trajectory-self.norm_sub_value)/self.norm_denom_value
+				
 
 			# Set condiitonal information. 
 			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand', 'DAPG']:
