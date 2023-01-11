@@ -891,7 +891,7 @@ class DAPGVisualizer(SawyerVisualizer):
 		state = self.environment.get_env_state()
 		qvel = np.zeros(36)
 
-		if self.env_name == "relocate_v0":
+		if self.env_name == "relocate-v0":
 			hand_qpos = state['hand_qpos']
 			hand_qpos[:30] = joint_angles[:30]
 			obj_pos = 100*np.ones(3)
@@ -900,13 +900,13 @@ class DAPGVisualizer(SawyerVisualizer):
 			state['qpos'][:30] = state['hand_qpos']
 			state['obj_pos'] = obj_pos
 			state['target_pos'] = target_pos
-		elif self.env_name == "pen_v0":
+		elif self.env_name == "pen-v0":
 			hand_qpos = joint_angles[:26]
 			state['qpos'][:26] = hand_qpos
-		elif self.env_name == "door_v0":
+		elif self.env_name == "door-v0":
 			hand_qpos = state['hand_qpos']
 			hand_qpos[:30] = joint_angles[:30]
-		elif self.env_name == "hammer_v0":
+		elif self.env_name == "hammer-v0":
 			hand_qpos = state['qpos']
 			hand_qpos[0:2] = joint_angles[3:5]
 			hand_qpos[2:32] = joint_angles[6:30]
