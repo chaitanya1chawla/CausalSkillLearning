@@ -851,8 +851,8 @@ class DAPGVisualizer(SawyerVisualizer):
 		if self.use_one_env:
 			# self.environment = GymEnv("relocate-v0")
 			# self.env_name = "relocate-v0"
-			self.environment = GymEnv("pen-v0")
-			self.env_name = "pen-v0"
+			self.environment = GymEnv("hammer-v0")
+			self.env_name = "hammer-v0"
 		# else:
 		# 	self.environment = {}
 		# 	self.environment["relocate-v0"] = GymEnv("relocate-v0")
@@ -913,14 +913,15 @@ class DAPGVisualizer(SawyerVisualizer):
 			hand_qpos = state['hand_qpos']
 			hand_qpos[:30] = joint_angles[:30]
 		elif self.env_name == "hammer_v0":
-			hand_qpos = state['hand_qpos']
-			hand_qpos[:30] = joint_angles[:30]
+			hand_qpos = state['qpos']
+			hand_qpos[0:2] = joint_angles[3:5]
+			hand_qpos[2:32] = joint_angles[6:30]
+			state['qpos'] = hand_qpos
 		else:
 			print("Unknown environment", self.env_name)
 
 		state['qvel'] = qvel
 
-		
 		self.environment.set_env_state(state)
 		self.environment.env.env.sim.forward()
 		
