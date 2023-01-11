@@ -322,6 +322,6 @@ class DAPG_Dataset(Dataset):
 		# task_index = np.searchsorted(self.cumulative_num_demos, index, side='right')-1
 		# data_element['file'] = self.filelist[task_index][81:-7]
 		data_element['file'] = self.environment_names[index]
-		print(data_element['file'])
+		print(index, data_element['file'])
 
 		return data_element
