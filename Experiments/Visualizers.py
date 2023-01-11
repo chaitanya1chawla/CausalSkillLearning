@@ -903,6 +903,8 @@ class DAPGVisualizer(SawyerVisualizer):
 			hand_qpos[:30] = joint_angles[:30]
 		elif self.env_name == "pen_v0":
 			hand_qpos[:30] = joint_angles[:30]
+		else:
+			print("Unknown environment", self.env_name)
 
 
 		qvel = np.zeros(36)

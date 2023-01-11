@@ -292,7 +292,7 @@ class DAPG_Dataset(Dataset):
 
 		self.environment_names = []
 		for i in range(len(self.filelist)):
-			f = self.filelist[0][:-4] # remove .xml
+			f = self.filelist[i][81:-7] # remove path and .pickle
 			for j in range(self.cumulative_num_demos[i]):
 				self.environment_names.append(f)
 		print("Env names:\n", np.unique(self.environment_names))
@@ -318,7 +318,8 @@ class DAPG_Dataset(Dataset):
 		data_element['is_valid'] = True
 		data_element['demo'] = self.data_list[index]
 
-		task_index = np.searchsorted(self.cumulative_num_demos, index, side='right')-1
-		data_element['file'] = self.filelist[task_index][:-4]	# remove .xml
+		# task_index = np.searchsorted(self.cumulative_num_demos, index, side='right')-1
+		# data_element['file'] = self.filelist[task_index][81:-7]
+		data_element['file'] = self.environment_names[index]
 
 		return data_element
