@@ -895,28 +895,31 @@ class DAPGVisualizer(SawyerVisualizer):
 		print("Visualizing in", self.env_name)
 		
 		state = self.environment.get_env_state()
-		hand_qpos = state['hand_qpos']
 
 		if self.env_name == "relocate_v0" or self.use_one_env:
+			hand_qpos = state['hand_qpos']
+			hand_qpos[:30] = joint_angles[:30]
+			qvel = np.zeros(36)
+			obj_pos = 100*np.ones(3)
+			target_pos = -100*np.ones(3)
+			state['hand_qpos'] = hand_qpos
+			state['qpos'][:30] = state['hand_qpos']
+			state['obj_pos'] = obj_pos
+			state['target_pos'] = target_pos
+		elif self.env_name == "pen_v0":
+			hand_qpos = joint_angles[:26]
+			state['qpos'][:26] = hand_qpos
+		elif self.env_name == "door_v0":
+			hand_qpos = state['hand_qpos']
 			hand_qpos[:30] = joint_angles[:30]
 		elif self.env_name == "hammer_v0":
-			hand_qpos[:30] = joint_angles[:30]
-		elif self.env_name == "door_v0":
-			hand_qpos[:30] = joint_angles[:30]
-		elif self.env_name == "pen_v0":
+			hand_qpos = state['hand_qpos']
 			hand_qpos[:30] = joint_angles[:30]
 		else:
 			print("Unknown environment", self.env_name)
 
-
-		qvel = np.zeros(36)
-		obj_pos = 100*np.ones(3)
-		target_pos = -100*np.ones(3)
-		state['hand_qpos'] = hand_qpos
-		state['qpos'][:30] = state['hand_qpos']
 		state['qvel'] = qvel
-		state['obj_pos'] = obj_pos
-		state['target_pos'] = target_pos
+
 		
 		self.environment.set_env_state(state)
 		self.environment.env.env.sim.forward()
