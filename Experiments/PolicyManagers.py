@@ -1286,7 +1286,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.output_size = self.state_size
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
-			self.test_set_size = 40
+			self.test_set_size = 3
 			stat_dir_name = self.args.data
 
 			stat_dir_name = "DAPG"			
