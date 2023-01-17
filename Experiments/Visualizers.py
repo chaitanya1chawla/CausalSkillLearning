@@ -887,6 +887,7 @@ class DAPGVisualizer(SawyerVisualizer):
 	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False, save_image=False):
 		# self.environment.reset()
 		print("Visualizing in", self.env_name)
+		print("Use one env", self.use_one_env)
 		
 		state = self.environment.get_env_state()
 		qvel = np.zeros(36)
@@ -916,7 +917,7 @@ class DAPGVisualizer(SawyerVisualizer):
 
 		state['qvel'] = qvel
 
-		embed()
+		# embed()
 
 		self.environment.set_env_state(state)
 		self.environment.env.env.sim.forward()
