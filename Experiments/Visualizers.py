@@ -890,7 +890,7 @@ class DAPGVisualizer(SawyerVisualizer):
 		# print("Use one env", self.use_one_env)
 		
 		state = self.environment.get_env_state()
-		qvel = np.zeros(36)
+		qvel = np.zeros_like(state['qvel'])
 
 		if self.env_name == "relocate-v0":
 			hand_qpos = state['hand_qpos']
@@ -916,8 +916,6 @@ class DAPGVisualizer(SawyerVisualizer):
 			print("Unknown environment", self.env_name)
 
 		state['qvel'] = qvel
-
-		embed()
 
 		self.environment.set_env_state(state)
 		self.environment.env.env.sim.forward()
