@@ -917,7 +917,7 @@ class DAPGVisualizer(SawyerVisualizer):
 
 		state['qvel'] = qvel
 
-		# embed()
+		embed()
 
 		self.environment.set_env_state(state)
 		self.environment.env.env.sim.forward()
