@@ -905,8 +905,9 @@ class DAPGVisualizer(SawyerVisualizer):
 			hand_qpos = joint_angles[:24]
 			state['qpos'][:24] = hand_qpos
 		elif self.env_name == "door-v0":
-			hand_qpos = state['hand_qpos']
-			hand_qpos[:30] = joint_angles[:30]
+			hand_qpos = state['qpos']
+			hand_qpos[4:28] = joint_angles[6:30]
+			hand_qpos[0:4] = joint_angles[2:6]
 		elif self.env_name == "hammer-v0":
 			hand_qpos = state['qpos']
 			hand_qpos[0:2] = joint_angles[3:5]
