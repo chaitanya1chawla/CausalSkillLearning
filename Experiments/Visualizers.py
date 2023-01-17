@@ -849,10 +849,10 @@ class DAPGVisualizer(SawyerVisualizer):
 
 		# Whether to merge all envs into relocate
 		if self.use_one_env:
-			self.environment = GymEnv("relocate-v0")
-			self.env_name = "relocate-v0"
-			# self.environment = GymEnv("hammer-v0")
-			# self.env_name = "hammer-v0"
+			# self.environment = GymEnv("relocate-v0")
+			# self.env_name = "relocate-v0"
+			self.environment = GymEnv("hammer-v0")
+			self.env_name = "hammer-v0"
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 		
@@ -887,7 +887,7 @@ class DAPGVisualizer(SawyerVisualizer):
 	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False, save_image=False):
 		# self.environment.reset()
 		print("Visualizing in", self.env_name)
-		print("Use one env", self.use_one_env)
+		# print("Use one env", self.use_one_env)
 		
 		state = self.environment.get_env_state()
 		qvel = np.zeros(36)
