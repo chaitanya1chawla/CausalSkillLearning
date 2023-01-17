@@ -909,7 +909,7 @@ class DAPGVisualizer(SawyerVisualizer):
 		elif self.env_name == "hammer-v0":
 			hand_qpos = state['qpos']
 			hand_qpos[0:2] = joint_angles[3:5]
-			hand_qpos[2:32] = joint_angles[6:30]
+			hand_qpos[2:28] = joint_angles[6:30]
 			state['qpos'] = hand_qpos
 		else:
 			print("Unknown environment", self.env_name)
