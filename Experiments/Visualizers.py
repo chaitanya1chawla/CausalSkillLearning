@@ -845,10 +845,9 @@ class DAPGVisualizer(SawyerVisualizer):
 		
 	def __init__(self, args=None):
 		super().__init__()
-		self.use_one_env = args.use_one_env
-
+		self.args = args
 		# Whether to merge all envs into relocate
-		if self.use_one_env:
+		if self.args.use_one_env:
 			self.environment = GymEnv("relocate-v0")
 			self.env_name = "relocate-v0"
 			# self.environment = GymEnv("door-v0")
@@ -877,19 +876,15 @@ class DAPGVisualizer(SawyerVisualizer):
 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)    
 
 	def create_environment(self, task_id=None):
-		if not self.use_one_env and task_id is not None:
+		if not self.args.use_one_env and task_id is not None and task_id != self.env_name:
 			self.environment = GymEnv(task_id)
 			self.env_name = task_id
+			print("create_environment set to", self.env_name)
 		else:
-			print("use_one_env:", self.use_one_env, "task_id:", task_id)
-
-	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
-		return super().visualize_joint_trajectory(trajectory, return_gif, gif_path, gif_name, segmentations, return_and_save, additional_info, end_effector, task_id)
+			print("create_environment failed |", "use_one_env:", self.args.use_one_env, "task_id:", task_id)
 
 	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False, save_image=False):
-		# self.environment.reset()
 		print("Visualizing in", self.env_name)
-		# print("Use one env", self.use_one_env)
 		
 		state = self.environment.get_env_state()
 		qvel = np.zeros_like(state['qvel'])
