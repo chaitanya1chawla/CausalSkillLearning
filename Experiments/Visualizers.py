@@ -872,10 +872,12 @@ class DAPGVisualizer(SawyerVisualizer):
 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)    
 
 	def create_environment(self, task_id=None):
-		# [:-5] drops "_demos" suffix
-		if task_id is not None and task_id[:-5] != self.env_name and task_id[:-5] in ["relocate-v0", "door-v0", "hammer-v0", "pen-v0"]:
-			self.environment = GymEnv(task_id[:-5])
-			self.env_name = task_id[:-5]
+		# [:-6] drops "_demos" suffix
+		if task_id is not None:
+			task_id = task_id[:-6]
+		if task_id is not None and task_id != self.env_name and task_id in ["relocate-v0", "door-v0", "hammer-v0", "pen-v0"]:
+			self.environment = GymEnv(task_id)
+			self.env_name = task_id
 			print("create_environment set to", self.env_name)
 		else:
 			print("create_environment failed |", "task_id:", task_id)
