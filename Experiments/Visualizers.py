@@ -876,12 +876,12 @@ class DAPGVisualizer(SawyerVisualizer):
 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)    
 
 	def create_environment(self, task_id=None):
-		if not self.args.use_one_env and task_id is not None and task_id != self.env_name:
+		if task_id is not None and task_id != self.env_name and task_id in ["relocate-v0", "door-v0", "hammer-v0", "pen-v0"]:
 			self.environment = GymEnv(task_id)
 			self.env_name = task_id
 			print("create_environment set to", self.env_name)
 		else:
-			print("create_environment failed |", "use_one_env:", self.args.use_one_env, "task_id:", task_id)
+			print("create_environment failed |", "task_id:", task_id)
 
 	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False, save_image=False):
 		print("Visualizing in", self.env_name)
