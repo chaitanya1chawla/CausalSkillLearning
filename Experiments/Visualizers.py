@@ -880,6 +880,8 @@ class DAPGVisualizer(SawyerVisualizer):
 		if not self.use_one_env and task_id is not None:
 			self.environment = GymEnv(task_id)
 			self.env_name = task_id
+		else:
+			print("use_one_env:", self.use_one_env, "task_id:", task_id)
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 		return super().visualize_joint_trajectory(trajectory, return_gif, gif_path, gif_name, segmentations, return_and_save, additional_info, end_effector, task_id)
