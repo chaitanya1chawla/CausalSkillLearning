@@ -328,7 +328,7 @@ def parse_arguments():
 	parser.add_argument('--kl_increment_epochs',dest='kl_increment_epochs',type=int,default=100,help='Number of epochs to increment KL over.')
 	parser.add_argument('--kl_begin_increment_epochs',dest='kl_begin_increment_epochs',type=int,default=100,help='Number of epochs after which to increment KL.')
 
-	parser.add_argument('--use_one_env', dest='use_one_env', type=bool, default=True, help="Whether to merge all tasks to use one environment in DAPG visualization.")
+	parser.add_argument('--use_one_env', dest='use_one_env', type=bool, default=False, help="Whether to merge all tasks to use one environment in DAPG visualization.")
 	
 	# Cross Domain Skill Transfer parameters. 
 	parser.add_argument('--discriminability_weight',dest='discriminability_weight',type=float,default=1.,help='Weight of discriminability loss in cross domain skill transfer.') 
