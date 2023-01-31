@@ -873,17 +873,20 @@ class DAPGVisualizer(SawyerVisualizer):
 
 	def create_environment(self, task_id=None):
 		# [:-6] drops "_demos" suffix
-		if task_id is not None:
-			task_id = task_id[:-6]
-		if task_id is not None and task_id != self.env_name and task_id in ["relocate-v0", "door-v0", "hammer-v0", "pen-v0"]:
+		if task_id is None:
+			print("create_environment failed |", "task_id is None")
+		if task_id == self.env_name:
+			return
+		task_id = task_id[:-6]
+		if task_id in ["relocate-v0", "door-v0", "hammer-v0", "pen-v0"]:
 			self.environment = GymEnv(task_id)
 			self.env_name = task_id
 			print("create_environment set to", self.env_name)
 		else:
-			print("create_environment failed |", "task_id:", task_id)
+			print("create_environment failed |", "task_id:", task_id, "current env:", self.env_name)
 
 	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False, save_image=False):
-		print("Visualizing in", self.env_name)
+		# print("Visualizing in", self.env_name)
 		
 		state = self.environment.get_env_state()
 		qvel = np.zeros_like(state['qvel'])
