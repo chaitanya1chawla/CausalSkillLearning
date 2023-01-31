@@ -846,12 +846,8 @@ class DAPGVisualizer(SawyerVisualizer):
 	def __init__(self, args=None):
 		super().__init__()
 		self.args = args
-		# Whether to merge all envs into relocate
-		if self.args.use_one_env:
-			self.environment = GymEnv("relocate-v0")
-			self.env_name = "relocate-v0"
-			# self.environment = GymEnv("door-v0")
-			# self.env_name = "door-v0"
+		self.environment = GymEnv("relocate-v0")
+		self.env_name = "relocate-v0"
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 		
