@@ -631,7 +631,7 @@ class PolicyManager_BaseClass():
 		print("We are in the PM visualizer function.")
 
 		# Set task ID if the visualizer needs it. 
-		if self.args.data == 'DAPG':
+		if indexed_data_element is not None and self.args.data == 'DAPG':
 			env_name = indexed_data_element['file']
 			print("Visualizing trajectory in task environment:", env_name)
 		elif indexed_data_element is None or ('task_id' not in indexed_data_element.keys()):
