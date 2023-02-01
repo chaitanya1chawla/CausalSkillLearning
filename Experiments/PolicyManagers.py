@@ -629,16 +629,11 @@ class PolicyManager_BaseClass():
 			animation_object = self.dataset[i]['animation']
 
 		print("We are in the PM visualizer function.")
-		
-		embed()
 
 		# Set task ID if the visualizer needs it. 
-		# if self.args.data == 'DAPG':
-		# 	task_id = i
-		# 	env_name = self.dataset.environment_names[task_id]
-		# 	print("Visualizing trajectory", i, "in task environment:", env_name)
-
-
+		if self.args.data == 'DAPG':
+			env_name = indexed_data_element['file']
+			print("Visualizing trajectory in task environment:", env_name)
 		if indexed_data_element is None or ('task_id' not in indexed_data_element.keys()):
 			task_id = None
 			env_name = None
