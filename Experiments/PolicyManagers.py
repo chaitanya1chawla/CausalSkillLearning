@@ -634,7 +634,7 @@ class PolicyManager_BaseClass():
 		if self.args.data == 'DAPG':
 			env_name = indexed_data_element['file']
 			print("Visualizing trajectory in task environment:", env_name)
-		if indexed_data_element is None or ('task_id' not in indexed_data_element.keys()):
+		elif indexed_data_element is None or ('task_id' not in indexed_data_element.keys()):
 			task_id = None
 			env_name = None
 		else:
