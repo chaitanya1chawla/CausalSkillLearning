@@ -422,11 +422,8 @@ class PolicyManager_BaseClass():
 			self.visualizer = GRABArmHandVisualizer(args=self.args)
 			self.N = 200
 		elif self.args.data in ['DAPG']:
-			self.visualizer = DAPGVisualizer(args=self.args)
-		elif self.args.data in ['RoboturkRobotObjects']:
-
+			self.visualizer = DAPGVisualizer(args=self.args)		
 		elif self.args.data in ['RoboturkRobotObjects']:		
-
 			self.visualizer = RoboturkRobotObjectVisualizer(args=self.args)
 		elif self.args.data in ['RoboMimicObjects']:
 			self.visualizer = RoboMimicObjectVisualizer(args=self.args)
@@ -1979,10 +1976,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
 
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG','RoboturkObjects','RoboturkRobotObjects']:
-
 		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap',\
-				'OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects',\
+				'OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects',\
 				'RoboMimicObjects','RoboMimicRobotObjects']:
 
 			data_element = self.dataset[i]
@@ -2043,12 +2038,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 					trajectory = (trajectory-self.norm_sub_value)/self.norm_denom_value
 
 				# CONDITIONAL INFORMATION for the encoder... 
-
-
-				if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG', 'RoboturkObjects','RoboturkRobotObjects']:
-
 				if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-					'GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
+					'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
 
 					pass
 				# if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
@@ -2337,12 +2328,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.visualize_embedding_space(suffix=suffix)
 
 		# if self.args.data=="MIME" or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
-		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG']:			
+		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:	
 
 		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-				'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand',\
+				'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG', \
 				'RoboMimicObjects','RoboMimicRobotObjects']:
 
 			print("Running Evaluation of State Distances on small test set.")
@@ -2576,14 +2565,10 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 			return concatenated_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), sample_traj.transpose((1,0,2))
 				
-		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG', 'RoboturkObjects','RoboturkRobotObjects']:			
-
+		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:	
 		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-				'GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects',\
+				'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects',\
 				'RoboMimicObjects','RoboMimicRobotObjects']:
-
 
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 				data_element = self.dataset[i:i+self.args.batch_size]
@@ -3106,11 +3091,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 	def visualize_trajectory(self, trajectory, segmentations=None, i=0, suffix='_Img'):
 
 		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG', 'RoboturkObjects','RoboturkRobotObjects']:
-
 		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-				'GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects',\
+				'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects',\
 				'RoboMimicObjects','RoboMimicRobotObjects']:
 
 
@@ -4831,12 +4813,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
 
-		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','DAPG', 'RoboturkObjects','RoboturkRobotObjects']:
-
 		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-				'GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects',\
+				'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects',\
 				'RoboMimicObjects','RoboMimicRobotObjects']:
 
 					   
