@@ -179,14 +179,10 @@ class PolicyManager_BaseClass():
 				return sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj, latent_b_seq, latent_z_seq
 			else:
 				return sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj
-	
-
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG', 'RoboturkObjects','RoboturkRobotObjects']:
 
 		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk', \
-			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', \
+			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG', \
 			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
-
 
 			# If we're imitating... select demonstrations from the particular task.
 			if self.args.setting=='imitation' and \
