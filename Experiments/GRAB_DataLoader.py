@@ -33,6 +33,11 @@ def wrist_norm(relevant_joints_datapoint):
 	if len(relevant_joints_datapoint[0]) > 22:
 		# Normalize with other hand's wrist. 
 		relevant_joints_datapoint[:, 22:] -= relevant_joints_datapoint[:, 21].reshape(relevant_joints_datapoint.shape[0], 1, 3)
+
+		wristless_joints = np.delete(relevant_joints_datapoint, [0, 22], axis=1)
+		return wristless_joints
+	return relevant_joints_datapoint[:, 1:]
+
 		
 	return relevant_joints_datapoint
 
@@ -48,6 +53,7 @@ def alternate_wrist_norm(relevant_joints_datapoint):
 		relevant_joints_datapoint[:, 21:] -= relevant_joints_datapoint[:, 21].reshape(relevant_joints_datapoint.shape[0], 1, 3)
 		
 	return relevant_joints_datapoint
+
 
 
 class GRAB_PreDataset(Dataset):
@@ -803,8 +809,8 @@ class GRABHand_Dataset(GRAB_Dataset):
 
 class GRABHand_PreDataset(GRAB_PreDataset):
 
-	def __init__(self, ):		
-		super(GRABHand_PreDataset, self).__init__(args, split=split, short_traj=short_traj, traj_length_threshold=traj_length_threshold)
+	def __init__(self, args):		
+		super(GRABHand_PreDataset, self).__init__(args)
 
 	def set_relevant_joints(self):
 		self.joint_names = np.array(['pelvis',
