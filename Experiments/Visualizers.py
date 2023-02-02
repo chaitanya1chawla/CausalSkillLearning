@@ -8,6 +8,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 from cgitb import handler
+from re import S
+
 from signal import default_int_handler
 
 from absl import flags, app
@@ -23,6 +25,10 @@ from memory_profiler import profile
 from PolicyNetworks import *
 import torch
 from moviepy.video.io.bindings import mplfig_to_npimage
+from PIL import Image
+import mj_envs
+from mjrl.utils.gym_env import GymEnv
+
 
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
 use_cuda = torch.cuda.is_available()
@@ -620,9 +626,17 @@ class GRABHandVisualizer(GRABVisualizer):
 		# Add pelvis joint. 
 		# Assumes joint_angles are dimensions N joints x 3 dimensions. 
 		joints = copy.deepcopy(joint_angles)
+
+
 		if self.side in ['left', 'right']:
+			for _ in range(3):
+				joints = np.insert(joints, 0, 0)
 			joints = joints.reshape((21,3))
 		else:
+			for _ in range(3):
+				joints = np.insert(joints, 0, 60)
+			for _ in range(3):
+				joints = np.insert(joints, 0, 0)
 			joints = joints.reshape((42,3))
 		# joints = np.insert(joints, 0, self.default_pelvis_pose, axis=0)
 		# Unnormalization w.r.t pelvis doesn't need to happen, because default pelvis pose 0. 
@@ -857,6 +871,92 @@ class GRABArmHandVisualizer(GRABVisualizer):
 		plt.close(fig)
 
 		return image
+
+class DAPGVisualizer(SawyerVisualizer):
+		
+	def __init__(self, args=None):
+		super().__init__()
+		self.args = args
+		self.environment = GymEnv("relocate-v0")
+		self.env_name = "relocate-v0"
+
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
+		
+		self.create_environment(task_id)
+		
+		image_list = []
+		for t in range(trajectory.shape[0]):
+			new_image = self.set_joint_pose_return_image(trajectory[t])
+			image_list.append(new_image)
+
+			# Insert white 
+			if segmentations is not None:
+				if t>0 and segmentations[t]==1:
+					image_list.append(255*np.ones_like(new_image)+new_image)
+
+		if return_and_save:
+			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			return image_list
+		elif return_gif:
+			return image_list
+		else:
+			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)    
+
+	def create_environment(self, task_id=None):
+		# [:-6] drops "_demos" suffix
+		if task_id is None:
+			print("create_environment failed |", "task_id is None")
+		if task_id == self.env_name:
+			return
+		task_id = task_id[:-6]
+		if task_id in ["relocate-v0", "door-v0", "hammer-v0", "pen-v0"]:
+			self.environment = GymEnv(task_id)
+			self.env_name = task_id
+			print("create_environment set to", self.env_name)
+		else:
+			print("create_environment failed |", "task_id:", task_id, "current env:", self.env_name)
+
+	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False, save_image=False):
+		# print("Visualizing in", self.env_name)
+		
+		state = self.environment.get_env_state()
+		qvel = np.zeros_like(state['qvel'])
+
+		if self.env_name == "relocate-v0":
+			hand_qpos = state['hand_qpos']
+			hand_qpos[:30] = joint_angles[:30]
+			obj_pos = 100*np.ones(3)
+			target_pos = -100*np.ones(3)
+			state['hand_qpos'] = hand_qpos
+			state['qpos'][:30] = state['hand_qpos']
+			state['obj_pos'] = obj_pos
+			state['target_pos'] = target_pos
+		elif self.env_name == "pen-v0":
+			hand_qpos = joint_angles[:24]
+			state['qpos'][:24] = hand_qpos
+		elif self.env_name == "door-v0":
+			hand_qpos = state['qpos']
+			hand_qpos[4:28] = joint_angles[6:30]
+			hand_qpos[0:4] = joint_angles[2:6]
+		elif self.env_name == "hammer-v0":
+			hand_qpos = state['qpos']
+			hand_qpos[0:2] = joint_angles[3:5]
+			hand_qpos[2:26] = joint_angles[6:30]
+			state['qpos'] = hand_qpos
+		else:
+			print("Unknown environment", self.env_name)
+
+		state['qvel'] = qvel
+
+		self.environment.set_env_state(state)
+		self.environment.env.env.sim.forward()
+		
+		# Trying to use the sim render instead of the display based rendering, so that we can grab images.. 
+		img = np.flipud(self.environment.env.sim.render(600, 600))
+		if save_image:
+			image_object = Image.fromarray(img)
+			image_object.save("DextrousHand.jpg")
+		return img
 
 class RoboturkObjectVisualizer(object):
 
