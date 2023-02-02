@@ -477,8 +477,8 @@ class PolicyManager_BaseClass():
 
 			self.shuffle(len(self.dataset)-self.test_set_size, shuffle=True)
 
-			# print("Embedding before gte robot visuals loop.s")
-			# embed()
+			print("Embedding before the robot visuals loop.s")
+			embed()
 
 			for j in range(self.N//self.args.batch_size):
 				i = self.index_list[j]
@@ -493,15 +493,6 @@ class PolicyManager_BaseClass():
 				else:
 					latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
 
-					########################################
-					# If needed, select Z's. 
-					########################################
-
-					# latent_z = original_latent_z[...,stream_z_indices]
-
-					########################################
-					########################################
-				
 				if self.args.batch_size>1:
 
 					# Set the max length if it's less than this batch of trajectories. 
@@ -513,10 +504,6 @@ class PolicyManager_BaseClass():
 						self.indices.append(j*self.args.batch_size+b)
 						print("#########################################")	
 						print("Getting visuals for trajectory: ",i,j*self.args.batch_size+b)
-
-						# Copy z. 
-						# print("Embed in Visualize Robot Data from,",self.args.setting)
-						# embed()
 
 						if self.args.setting in ['learntsub','joint']:
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
@@ -845,8 +832,8 @@ class PolicyManager_BaseClass():
 			env_name = self.dataset.environment_names[task_id]
 			print("Visualizing a trajectory of task:", env_name)
 
-		print('Embed in get robot visuals.')
-		embed()
+		# print('Embed in get robot visuals.')
+		# embed()
 
 		########################################
 		# 2) Feed Z into policy, rollout trajectory.
@@ -978,8 +965,14 @@ class PolicyManager_BaseClass():
 			html_file.write('<body>')
 			html_file.write('<p> Model: {0}</p>'.format(self.args.name))
 
-			# html_file.write(animation_object.to_html5_video())
-			html_file.write(animation_object.to_jshtml())
+			print("TEMPORARILY EMBEDDING VIA VIDEO RATHER THAN ANIMATION")
+			html_file.write(animation_object.to_html5_video())
+
+			###############################
+			# Regular embedding as animation
+			###############################
+			
+			# html_file.write(animation_object.to_jshtml())
 			# print(animation_object.to_html5_video(), file=html_file)
 
 			html_file.write('</body>')
@@ -1037,8 +1030,6 @@ class PolicyManager_BaseClass():
 		fig, ax = plt.subplots()
 
 		# number_samples = 400
-
-
 		number_samples = self.N		
 
 		# Create a scatter plot of the embedding itself. The plot does not seem to work without this. 
@@ -1057,7 +1048,6 @@ class PolicyManager_BaseClass():
 				imagebox = OffsetImage(self.gt_gif_list[i][0],zoom=zoom_factor)
 			else:
 				imagebox = OffsetImage(self.rollout_gif_list[i][0],zoom=zoom_factor)			
-
 
 			# Create an annotation box to put the offset image into. specify offset image, position, and disable bounding frame. 
 			ab = AnnotationBbox(imagebox, (scaled_embedded_zs[self.indices[i],0], scaled_embedded_zs[self.indices[i],1]), frameon=False)
