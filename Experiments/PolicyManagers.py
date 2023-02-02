@@ -1355,10 +1355,8 @@ class PolicyManager_BaseClass():
 		# If we're in a dataset that will have variable sized data.
 		# if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic']:
 		
-
-		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic','RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG']:
 		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\
-			'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand',\
+			'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG', \
 				'RoboMimicObjects','RoboMimicRobotObjects']:
 
 			if self.args.task_discriminability or self.args.task_based_supervision or self.args.task_based_shuffling:
