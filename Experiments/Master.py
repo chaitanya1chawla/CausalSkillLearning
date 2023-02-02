@@ -21,6 +21,7 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		args.data = data
 
 	# Define Data Loader.
+	############################
 	if args.data=='ContinuousNonZero':
 		dataset = DataLoaders.ContinuousNonZeroToyDataset(args.datadir, create_dataset_variation=create_dataset_variation)
 	elif args.data=='DeterGoal':
@@ -29,14 +30,15 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = DataLoaders.ContinuousDirectedNonZeroToyDataset(args.datadir)
 	elif args.data=='ToyContext':
 		dataset = DataLoaders.ToyContextDataset(args.datadir)
-	elif args.data=='OldMIME':
-		
+	############################
+	elif args.data=='OldMIME':		
 		dataset = MIME_DataLoader.MIME_NewDataset(args, short_traj=args.short_trajectories)
 	elif args.data=='MIME':
 		if args.single_hand is None:
 			dataset = MIME_DataLoader.MIME_NewMetaDataset(args, short_traj=args.short_trajectories, traj_length_threshold=args.dataset_traj_length_limit)
 		else:
 			dataset = MIME_DataLoader.MIME_OneHandedDataset(args, short_traj=args.short_trajectories, traj_length_threshold=args.dataset_traj_length_limit)
+	############################			
 	elif args.data=='Roboturk':		
 		dataset = Roboturk_DataLoader.Roboturk_NewSegmentedDataset(args)
 	elif args.data=='OrigRoboturk':
@@ -47,12 +49,19 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = Roboturk_DataLoader.Roboturk_ObjectDataset(args)
 	elif args.data=='RoboturkRobotObjects':
 		dataset = Roboturk_DataLoader.Roboturk_RobotObjectDataset(args)		
+	############################
 	elif args.data=='Mocap':
 		dataset = Mocap_DataLoader.Mocap_Dataset(args)
+	############################		
 	elif args.data=='OrigRoboMimic':
 		dataset = Robomimic_DataLoaders.OrigRobomimic_Dataset(args)
 	elif args.data=='RoboMimic':
 		dataset = Robomimic_DataLoaders.Robomimic_Dataset(args)
+	elif args.data=='RoboMimicObjects':
+		dataset = Robomimic_DataLoaders.Robomimic_ObjectDataset(args)
+	elif args.data=='RoboMimicRobotObjects':
+		dataset = Robomimic_DataLoaders.Robomimic_RobotObjectDataset(args)
+	############################
 	elif args.data=='GRABPreproc':
 		dataset = GRAB_DataLoader.GRAB_PreDataset(args)
 	elif args.data=='GRAB':
@@ -263,7 +272,7 @@ def parse_arguments():
 	parser.add_argument('--smoothing_kernel_bandwidth', dest='smoothing_kernel_bandwidth',type=float,default=3.5) # The smoothing bandwidth that is applied to data loader trajectories. 
 	parser.add_argument('--human_pos_normalization', dest='position_normalization', type=str, default='none') # The position normalization for GRAB dataloader
 	parser.add_argument('--human_angular_data', dest='angular_data', type=bool, default=False) # Angular transformations for the GRABHand Dataset
-
+	parser.add_argument('--skip_wrist',dest='skip_wrist',type=int,default=0,help='Whether or not to skip the wrist joint.')
 
 	# Training paradigm parameters. 
 	parser.add_argument('--new_gradient',dest='new_gradient',type=int,default=1)
@@ -291,6 +300,9 @@ def parse_arguments():
 	parser.add_argument('--perplexity',dest='perplexity',type=float,default=30,help='Value of perplexity fed to TSNE.')
 	parser.add_argument('--latent_set_file_path',dest='latent_set_file_path',type=str,help='File path to pre-computed latent sets to visualize.')
 	parser.add_argument('--viz_latent_rollout',dest='viz_latent_rollout',type=int,default=0,help='Whether to visualize latent rollout or not.')
+	parser.add_argument('--viz_sim_rollout',dest='viz_sim_rollout',type=int,default=1,help='Whether to visualize rollout by magically setting state, or stepping in the environment.')
+	parser.add_argument('--sim_viz_action_scale_factor',dest='sim_viz_action_scale_factor',type=float,default=0.3,help='Factor by which to scale actions when visualizing in simulation env.')
+	parser.add_argument('--sim_viz_step_repetition',dest='sim_viz_step_repetition',type=int,default=20,help='Number of times to repeat simulation step of visualization of traj.')
 
 	parser.add_argument('--entropy',dest='entropy',type=int,default=0)
 	parser.add_argument('--var_entropy',dest='var_entropy',type=int,default=0)
@@ -326,7 +338,12 @@ def parse_arguments():
 	parser.add_argument('--initial_kl_weight',dest='initial_kl_weight',type=float,default=0.0,help='Initial KL weight.')
 	parser.add_argument('--final_kl_weight',dest='final_kl_weight',type=float,default=1.0,help='Initial KL weight.')
 	parser.add_argument('--kl_increment_epochs',dest='kl_increment_epochs',type=int,default=100,help='Number of epochs to increment KL over.')
-	parser.add_argument('--kl_begin_increment_epochs',dest='kl_begin_increment_epochs',type=int,default=100,help='Number of epochs after which to increment KL.')
+	parser.add_argument('--kl_begin_increment_epochs',dest='kl_begin_increment_epochs',type=int,default=100,help='Number of epochs after which to increment KL.')	
+	# architecture
+	parser.add_argument('--split_stream_encoder',dest='split_stream_encoder',type=int,default=0,help='Whether to use split stream encoder or not.')
+	parser.add_argument('--embedding_visualization_stream',dest='embedding_visualization_stream',type=str,default=None,help='Which stream to use to embed and visualize Z space.')
+	parser.add_argument('--robot_state_size',dest='robot_state_size',type=int,default=8,help='Default robot state size.')
+	parser.add_argument('--env_state_size',dest='env_state_size',type=int,default=7,help='Default environment state size.')
 	
 	# Cross Domain Skill Transfer parameters. 
 	parser.add_argument('--discriminability_weight',dest='discriminability_weight',type=float,default=1.,help='Weight of discriminability loss in cross domain skill transfer.') 

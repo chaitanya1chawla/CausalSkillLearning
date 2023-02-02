@@ -30,7 +30,7 @@ class Roboturk_Dataset(Dataset):
 			self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/Roboturk/'
 		else:
 			self.dataset_directory = self.args.datadir			
-		
+		self.stat_dir_name='Roboturk'
 		# Require a task list. 
 
 		# The task name is needed for setting the environment, rendering. 
@@ -356,6 +356,7 @@ class Roboturk_FullDataset(Roboturk_Dataset):
 		
 		# Trivially adding task ID to data element.
 		data_element['task_id'] = task_index
+		data_element['task-id'] = task_index
 
 		if resample_length<=1 or data_element['robot-state'].shape[0]<=1:
 			data_element['is_valid'] = False			
@@ -382,8 +383,7 @@ class Roboturk_SegmentedDataset(Roboturk_Dataset):
 
 	def __init__(self):
 
-		super(Roboturk_SegmentedDataset, self).__init__()
-		
+		super(Roboturk_SegmentedDataset, self).__init__()		
 
 		self.args = args
 		# self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'
@@ -432,7 +432,7 @@ class Roboturk_NewSegmentedDataset(Dataset):
 	def __init__(self, args):
 
 		super(Roboturk_NewSegmentedDataset, self).__init__()
-		
+		self.stat_dir_name='Roboturk'
 		# self.dataset_directory = '/checkpoint/tanmayshankar/Roboturk/RoboTurkPilot'
 		# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/Roboturk/'
 		self.args = args
@@ -688,7 +688,7 @@ class Roboturk_RobotObjectDataset(Roboturk_NewSegmentedDataset):
 		# 	embed()
 
 		# print("######################")
-		print(data_element['task-id'])
+		# print(data_element['task-id'])
 		# print("SHAPE OF 1st DEMO",data_element['demo'].shape)
 		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
 		demo = np.concatenate([data_element['demo'],data_element['object-state'][:,:7]],axis=-1)

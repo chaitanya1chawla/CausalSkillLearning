@@ -79,6 +79,8 @@ class OrigRobomimic_Dataset(Dataset):
 		# Set files. 
 		self.setup()
 
+		self.stat_dir_name='Robomimic'
+
 	def setup(self):
 		# Load data from all tasks. 			
 		self.files = []
@@ -265,6 +267,8 @@ class Robomimic_Dataset(OrigRobomimic_Dataset):
 		
 		super(Robomimic_Dataset, self).__init__(args)
 
+		
+
 		# Now that we've run setup, compute dataset_trajectory_lengths for smart batching.
 		self.dataset_trajectory_lengths = np.zeros(self.total_length)
 		for index in range(self.total_length):
@@ -448,3 +452,50 @@ class Robomimic_Dataset(OrigRobomimic_Dataset):
 		np.save("Robomimic_Vel_Var.npy", vel_variance)
 		np.save("Robomimic_Vel_Min.npy", vel_min_value)
 		np.save("Robomimic_Vel_Max.npy", vel_max_value)
+
+class Robomimic_ObjectDataset(Robomimic_Dataset):
+
+	def __init__(self, args):
+
+		super(Robomimic_ObjectDataset, self).__init__(args)
+
+	def __getitem__(self, index):
+		
+		data_element = copy.deepcopy(super().__getitem__(index))
+
+		# Copy over the demo to the robot-demo key.
+		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
+		# Set demo to object-state trajectory. 
+
+		# Also try ignoring the relative positions for now.
+		# print("Embedding in get el")
+		# embed()
+		data_element['demo'] = data_element['object-state'][:,:7]
+
+		return data_element
+
+class Robomimic_RobotObjectDataset(Robomimic_Dataset):
+
+	def __init__(self, args):
+
+		super(Robomimic_RobotObjectDataset, self).__init__(args)
+
+	def __getitem__(self, index):
+
+		data_element = copy.deepcopy(super().__getitem__(index))
+
+		# Now concatenate the robot and object states. 
+		# if data_element['demo'].shape[-1]==15:
+		# 	print("embedding in dataset getitem")
+		# 	embed()
+
+		# print("######################")
+		# print(data_element['task-id'])
+		# print("SHAPE OF 1st DEMO",data_element['demo'].shape)
+		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
+		demo = np.concatenate([data_element['demo'],data_element['object-state'][:,:7]],axis=-1)
+		data_element['demo'] = copy.deepcopy(demo)
+
+		# print("SHAPE OF 2nd DEMO",data_element['demo'].shape)
+
+		return data_element

@@ -4,12 +4,18 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
+from locale import normalize
 from os import environ
 from headers import *
 from PolicyNetworks import *
 from RL_headers import *
 from PPO_Utilities import PPOBuffer
 from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer, DAPGVisualizer #, MocapVisualizer
+from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, \
+	GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, \
+	RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer,\
+	RoboMimicObjectVisualizer, RoboMimicRobotObjectVisualizer #, MocapVisualizer
+
 # from Visualizers import *
 import TFLogger, DMP, RLUtils
 
@@ -104,6 +110,10 @@ class PolicyManager_BaseClass():
 			self.visualizer = RoboturkObjectVisualizer(args=self.args)
 		elif self.args.data in ['RoboturkRobotObjects']:
 			self.visualizer = RoboturkRobotObjectVisualizer(args=self.args)
+		elif self.args.data in ['RoboMimicObjects']:
+			self.visualizer = RoboMimicObjectVisualizer(args=self.args)
+		elif self.args.data in ['RoboMimicRobotObjects']:
+			self.visualizer = RoboMimicRobotObjectVisualizer(args=self.args)
 		else:
 			self.visualizer = ToyDataVisualizer()
 		
@@ -170,10 +180,18 @@ class PolicyManager_BaseClass():
 			else:
 				return sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj
 	
+
 		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG', 'RoboturkObjects','RoboturkRobotObjects']:
 
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk', \
+			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', \
+			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
+
+
 			# If we're imitating... select demonstrations from the particular task.
-			if self.args.setting=='imitation' and (self.args.data in ['Roboturk','RoboMimic','RoboturkObjects','RoboturkRobotObjects']):
+			if self.args.setting=='imitation' and \
+				 (self.args.data in ['Roboturk','RoboMimic','RoboturkObjects','RoboturkRobotObjects',\
+					'RoboMimicObjects','RoboMimicRobotObjects']):
 				data_element = self.dataset.get_task_demo(self.demo_task_index, i)
 			else:
 				data_element = self.dataset[i]
@@ -195,7 +213,8 @@ class PolicyManager_BaseClass():
 			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand', 'DAPG']:
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
-			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic','RoboturkObjects','RoboturkRobotObjects']:
+			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic',\
+				'RoboMimic','RoboturkObjects','RoboturkRobotObjects', 'RoboMimicObjects', 'RoboMimicRobotObjects']:
 				robot_states = data_element['robot-state']
 				object_states = data_element['object-state']
 				self.current_task_for_viz = data_element['task-id']
@@ -405,21 +424,43 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['DAPG']:
 			self.visualizer = DAPGVisualizer(args=self.args)
 		elif self.args.data in ['RoboturkRobotObjects']:
+
+		elif self.args.data in ['RoboturkRobotObjects']:		
+
 			self.visualizer = RoboturkRobotObjectVisualizer(args=self.args)
+		elif self.args.data in ['RoboMimicObjects']:
+			self.visualizer = RoboMimicObjectVisualizer(args=self.args)
+		elif self.args.data in ['RoboMimicRobotObjects']:
+			self.visualizer = RoboMimicRobotObjectVisualizer(args=self.args)			
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
 		#####################################################
 		# Get latent z sets.
 		#####################################################
-
+		
 		if not(load_sets):
+
+			#####################################################
+			# Select Z indices if necessary.
+			#####################################################
+
+			if self.args.split_stream_encoder:
+				if self.args.embedding_visualization_stream == 'robot':
+					stream_z_indices = np.arange(0,int(self.args.z_dimensions/2))
+				elif self.args.embedding_visualization_stream == 'env':
+					stream_z_indices = np.arange(int(self.args.z_dimensions/2),self.args.z_dimensions)
+				else:
+					stream_z_indices = np.arange(0,self.args.z_dimensions)	
+			else:
+				stream_z_indices = np.arange(0,self.args.z_dimensions)
 
 			#####################################################
 			# Initialize variables.
 			#####################################################
 
-			self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
+			# self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
+			self.latent_z_set = np.zeros((self.N,len(stream_z_indices)))		
 			# These are lists because they're variable length individually.
 			self.indices = []
 			self.trajectory_set = []
@@ -466,6 +507,14 @@ class PolicyManager_BaseClass():
 				else:
 					latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
 
+					########################################
+					# If needed, select Z's. 
+					########################################
+
+					# latent_z = original_latent_z[...,stream_z_indices]
+
+					########################################
+					########################################
 				
 				if self.args.batch_size>1:
 
@@ -489,7 +538,8 @@ class PolicyManager_BaseClass():
 							# Rollout each individual trajectory in this batch.
 							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:,b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True)
 						else:
-							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+							# self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b,stream_z_indices].detach().cpu().numpy())
 			
 							# Rollout each individual trajectory in this batch.
 							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b], indexed_data_element=data_element[b])
@@ -561,7 +611,175 @@ class PolicyManager_BaseClass():
 		# Save webpage. 
 		self.write_results_HTML()
 
+	def compute_next_state(self, current_state=None, action=None):
+
+		####################################
+		# If we're stepping in the environment:
+		####################################
+		
+		if self.args.viz_sim_rollout:
+			
+			####################################
+			# Take environment step.
+			####################################
+
+			# if self.args.data in ['RoboturkRobotObjects']:
+			# 	action_np = action.detach().cpu().numpy()[:8]
+			# else:
+			# 	action_np = action.detach().cpu().numpy()
+
+			########################################
+			# Numpy-fy and subsample. (It's 1x|S|, that's why we need to index into first dimension.)
+			########################################
+
+			action_np = action.detach().cpu().numpy()[0,:8]
+
+			########################################
+			# Unnormalize action.
+			########################################
+
+			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
+				# Remember. actions are normalized just by multiplying denominator, no addition of mean.
+				unnormalized_action = (action_np*self.norm_denom_value)
+			else:
+				unnormalized_action = action_np
+			
+			########################################
+			# Scale action.
+			########################################
+
+			scaled_action = unnormalized_action*self.args.sim_viz_action_scale_factor
+			# Step repetition
+			number_of_step_repeats = self.args.sim_viz_step_repetition
+
+			########################################
+			# Second unnormalization to undo the visualizer environment normalization.... 
+			########################################
+
+			ctrl_range = self.visualizer.environment.sim.model.actuator_ctrlrange
+			bias = 0.5 * (ctrl_range[:, 1] + ctrl_range[:, 0])
+			weight = 0.5 * (ctrl_range[:, 1] - ctrl_range[:, 0])
+			# Modify gripper normalization, so that the env normalization actually happens.
+			bias = bias[:-1]
+			bias[-1] = 0.
+			weight = weight[:-1]
+			weight[-1] = 1.
+			
+			# Unnormalized_scaled_action_for_env_step
+			if self.visualizer.new_robosuite:
+				unnormalized_scaled_action_for_env_step = scaled_action
+			else:
+				unnormalized_scaled_action_for_env_step = (scaled_action - bias)/weight
+
+			# print("#####################")
+			# print("Vanilla A:", action_np)
+			# print("Stat Unnorm A: ", unnormalized_action)
+			# print("Scaled A: ", scaled_action)
+			# print("Env Unnorm A: ", unnormalized_scaled_action_for_env_step)
+
+			########################################
+			# Repeat steps for K times.
+			########################################
+			
+			for k in range(number_of_step_repeats):
+				# Use environment to take step.
+				env_next_state_dict, _, _, _ = self.visualizer.environment.step(unnormalized_scaled_action_for_env_step)
+				gripper_state = env_next_state_dict[self.visualizer.gripper_key]
+				if self.visualizer.new_robosuite:
+					joint_state = self.visualizer.environment.sim.get_state()[1][:7]
+				else:
+					joint_state = env_next_state_dict['joint_pos']
+
+			####################################
+			# Assemble robot state.
+			####################################
+			
+			gripper_open = np.array([0.0115, -0.0115])
+			gripper_closed = np.array([-0.020833, 0.020833])
+
+			# The state that we want is ... joint state?
+			gripper_finger_values = gripper_state
+			gripper_values = (gripper_finger_values - gripper_open)/(gripper_closed - gripper_open)			
+
+			finger_diff = gripper_values[1]-gripper_values[0]
+			gripper_value = 2*finger_diff-1
+
+			########################################
+			# Concatenate joint and gripper state. 	
+			########################################
+
+			robot_state_np = np.concatenate([joint_state, np.array(gripper_value).reshape((1,))])
+
+			########################################
+			# Assemble object state.
+			########################################
+
+			# Get just the object pose, object quaternion.
+			object_state_np = env_next_state_dict['object-state'][:7]
+
+			########################################
+			# Assemble next state.
+			########################################
+
+			# Parse next state from dictionary, depending on what dataset we're using.
+
+			# If we're using a dataset with both objects and the robot. 
+			if self.args.data in ['RoboturkRobotObjects','RoboMimicRobotObjects']:
+				next_state_np = np.concatenate([robot_state_np,object_state_np],axis=0)
+
+			# REMEMBER, We're never actually using an only object dataset here, because we can't actually actuate the objects..
+			# # If we're using an object only dataset. 
+			# elif self.args.data in ['RoboturkObjects']: 
+			# 	next_state_np = object_state_np			
+
+			# If we're using a robot only dataset.
+			else:
+				next_state_np = robot_state_np
+
+			if self.args.normalization in ['meanvar','minmax']:
+				next_state_np = (next_state_np - self.norm_sub_value)/self.norm_denom_value
+
+			# Return torchified version of next_state
+			next_state = torch.from_numpy(next_state_np).to(device)	
+
+
+			# print("embedding at gazoo")
+			# embed()
+			return next_state, env_next_state_dict[self.visualizer.image_key]
+
+		####################################
+		# If not using environment to rollout trajectories.
+		####################################
+
+		else:			
+			# Simply create next state as addition of current state and action.		
+			next_state = current_state+action
+			# Return - remember this is already a torch tensor now.
+			return next_state, None
+
 	def rollout_robot_trajectory(self, trajectory_start, latent_z, rollout_length=None, z_seq=False):
+
+		rendered_rollout_trajectory = []
+		
+		if self.args.viz_sim_rollout:
+
+			########################################
+			# 0) Reset visualizer environment state. 
+			########################################
+
+			self.visualizer.environment.reset()
+
+			# Unnormalize the start state. 
+			if self.args.normalization in ['minmax','meanvar']:
+				unnormalized_trajectory_start = (trajectory_start * self.norm_denom_value ) + self.norm_sub_value
+			else:
+				unnormalized_trajectory_start = trajectory_start 
+			# Now use unnormalized state to set the trajectory state. 
+			self.visualizer.set_joint_pose(unnormalized_trajectory_start)		
+			
+		########################################
+		# 1a) Create placeholder policy input tensor. 
+		########################################
 
 		subpolicy_inputs = torch.zeros((1,2*self.state_dim+self.latent_z_dimensionality)).to(device).float()
 		subpolicy_inputs[0,:self.state_dim] = torch.tensor(trajectory_start).to(device).float()
@@ -571,13 +789,24 @@ class PolicyManager_BaseClass():
 		else:
 			subpolicy_inputs[:,2*self.state_dim:] = torch.tensor(latent_z).to(device).float()	
 
+		########################################
+		# 1b) Set parameters.
+		########################################
+
 		if rollout_length is not None: 
 			length = rollout_length-1
 		else:
 			length = self.rollout_timesteps-1
 
-		for t in range(length):
+		########################################
+		# 2) Iterate over rollout length:
+		########################################
 
+		for t in range(length):
+			
+			########################################
+			# 3) Get action from policy. 
+			########################################
 			# Assume we always query the policy for actions with batch_size 1 here. 
 			actions = self.policy_network.get_actions(subpolicy_inputs, greedy=True, batch_size=1)
 
@@ -587,8 +816,17 @@ class PolicyManager_BaseClass():
 			# Downscale the actions by action_scale_factor.
 			action_to_execute = action_to_execute/self.args.action_scale_factor
 
-			# Compute next state. 
-			new_state = subpolicy_inputs[t,:self.state_dim]+action_to_execute
+			########################################
+			# 4) Compute next state. 
+			########################################
+			
+			# new_state = subpolicy_inputs[t,:self.state_dim]+action_to_execute
+			new_state, image = self.compute_next_state(subpolicy_inputs[t,:self.state_dim], action_to_execute)
+			rendered_rollout_trajectory.append(image)
+
+			########################################
+			# 5) Construct new input row.
+			########################################
 
 			# New input row. 
 			input_row = torch.zeros((1,2*self.state_dim+self.latent_z_dimensionality)).to(device).float()
@@ -604,22 +842,45 @@ class PolicyManager_BaseClass():
 			subpolicy_inputs = torch.cat([subpolicy_inputs,input_row],dim=0)
 
 		trajectory = subpolicy_inputs[:,:self.state_dim].detach().cpu().numpy()
-		return trajectory
-
+		
+		return trajectory, rendered_rollout_trajectory
+		
 	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None):		
 
-		# 1) Feed Z into policy, rollout trajectory.
-		print("Rollout length:", trajectory.shape[0])
+		########################################
+		# 1) Get task ID. 
+		########################################
+		# Set task ID if the visualizer needs it. 
+		if indexed_data_element is None or ('task-id' not in indexed_data_element.keys()):
+			task_id = None
+			env_name = None
+		else:			
+			task_id = indexed_data_element['task-id']
+			env_name = self.dataset.environment_names[task_id]
+			print("Visualizing a trajectory of task:", env_name)
 
-		trajectory_rollout = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq)
-		
-		# 2) Unnormalize data. 
+		print('Embed in get robot visuals.')
+		embed()
+
+		########################################
+		# 2) Feed Z into policy, rollout trajectory.
+		########################################
+
+		print("Rollout length:", trajectory.shape[0])
+		self.visualizer.create_environment(task_id=env_name)
+		trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq)
+
+		########################################
+		# 3) Unnormalize data. 
+		########################################
+
 		if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 			unnorm_gt_trajectory = (trajectory*self.norm_denom_value)+self.norm_sub_value
 			unnorm_pred_trajectory = (trajectory_rollout*self.norm_denom_value) + self.norm_sub_value
 		else:
 			unnorm_gt_trajectory = trajectory
 			unnorm_pred_trajectory = trajectory_rollout
+
 
 		# print("Embedding in get robot visuals.")
 		# embed()
@@ -637,39 +898,68 @@ class PolicyManager_BaseClass():
 		elif indexed_data_element is None or ('task_id' not in indexed_data_element.keys()):
 			task_id = None
 			env_name = None
-		else:
-			task_id = indexed_data_element['task_id']
-			env_name = self.dataset.environment_names[task_id]
-			print("Visualizing a trajectory of task:", env_name)
 
-		# print("Embedding in viusalizer in PM.")
+		if self.args.data=='Mocap':
+			# Get animation object from dataset. 
+			animation_object = self.dataset[i]['animation']
+
+		# print("We are in the PM visualizer function.")
 		# embed()
 
-		# 3) Run unnormalized ground truth trajectory in visualizer. 
-		self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+		########################################
+		# 4a) Run unnormalized ground truth trajectory in visualizer. 
+		########################################
 
-		# 4) Run unnormalized rollout trajectory in visualizer. 
-		self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_Rollout.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
-		
+		self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+
+		# Also plotting trajectory against time. 
+		plt.close()
+		plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,:7])
+		ax = plt.gca()
+		ax.set_ylim([-3, 3])
+		plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_GT.png".format(i)))
+		plt.close()
+
+		########################################
+		# 4b) Run unnormalized rollout trajectory in visualizer. 
+		########################################
+
+		# Also plotting trajectory against time. 
+		plt.close()
+		plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,:7])
+		ax = plt.gca()
+		ax.set_ylim([-3, 3])
+
+		if self.args.viz_sim_rollout:
+			# No call to visualizer here means we have to save things on our own. 
+			self.rollout_gif = rendered_rollout_trajectory
+			self.visualizer.visualize_prerendered_gif(self.rollout_gif, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_SimRollout.gif".format(i))
+			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_SimRollout.png".format(i)))		
+		else:
+			self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_Rollout.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_Rollout.png".format(i)))
+
+		plt.close()
+
+		########################################
+		# 5) Add to GIF lists. 
+		########################################		
+
 		self.gt_gif_list.append(copy.deepcopy(self.ground_truth_gif))
 		self.rollout_gif_list.append(copy.deepcopy(self.rollout_gif))
 		
+		########################################
+		# 6) Return: 
+		########################################
+
 		if return_numpy:
 			self.ground_truth_gif = np.array(self.ground_truth_gif)
 			self.rollout_gif = np.array(self.rollout_gif)
 
-		if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
-
-			if return_image:
-					return unnorm_pred_trajectory, self.ground_truth_gif, self.rollout_gif
-			else:
-				return unnorm_pred_trajectory
+		if return_image:
+				return unnorm_pred_trajectory, self.ground_truth_gif, self.rollout_gif
 		else:
-
-			if return_image:
-				return trajectory_rollout, self.ground_truth_gif, self.rollout_gif
-			else:
-				return trajectory_rollout
+			return unnorm_pred_trajectory
 
 	def write_results_HTML(self):
 		# Retrieve, append, and print images from datapoints across different models. 
@@ -705,8 +995,15 @@ class PolicyManager_BaseClass():
 		print("Writing Embedding File.")
 
 		t1 = time.time()
-		# Open Results HTML file. 	    
-		with open(os.path.join(self.dir_name,'Embedding_{0}_{1}.html'.format(prefix,self.args.name)),'w') as html_file:
+
+		# Adding prefix.
+		if self.args.viz_sim_rollout:
+			sim_or_not = 'Sim'
+		else:
+			sim_or_not = 'Viz'
+
+		# Open Results HTML file. 	    		
+		with open(os.path.join(self.dir_name,'Embedding_{0}_{2}_{1}.html'.format(prefix,self.args.name,sim_or_not)),'w') as html_file:
 			
 			# Start HTML doc. 
 			html_file.write('<html>')
@@ -1075,7 +1372,11 @@ class PolicyManager_BaseClass():
 		# If we're in a dataset that will have variable sized data.
 		# if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic']:
 		
+
 		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic','RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG']:
+		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\
+			'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand',\
+				'RoboMimicObjects','RoboMimicRobotObjects']:
 
 			if self.args.task_discriminability or self.args.task_based_supervision or self.args.task_based_shuffling:
 
@@ -1135,6 +1436,15 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.number_epochs = self.args.epochs
 		self.test_set_size = 500
 
+		stat_dir_name = self.dataset.stat_dir_name
+		if self.args.normalization=='meanvar':
+			self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+		elif self.args.normalization=='minmax':
+			self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+
+
 		if self.args.data in ['MIME','OldMIME']:
 			self.state_size = 16			
 			self.state_dim = 16
@@ -1187,12 +1497,12 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				stat_dir_name = "Robomimic"
 				self.test_set_size = 50
 
-			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
-			elif self.args.normalization=='minmax':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+			# if self.args.normalization=='meanvar':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			# elif self.args.normalization=='minmax':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 
 			# Max of robot_state + object_state sizes across all sawyer environments. 
 			# Robot size always 30. Max object state size is... 23. 
@@ -1219,14 +1529,14 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 			self.test_set_size = 40
-			stat_dir_name = self.args.data
+			# stat_dir_name = self.args.data
 
-			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
-			elif self.args.normalization=='minmax':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+			# if self.args.normalization=='meanvar':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			# elif self.args.normalization=='minmax':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 		
 		elif self.args.data in ['GRABHand']:
 			
@@ -1243,14 +1553,19 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 			self.test_set_size = 40
-			stat_dir_name = self.args.data
+			# stat_dir_name = self.args.data
 
-			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
-			elif self.args.normalization=='minmax':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+			# if self.args.normalization=='meanvar':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			# elif self.args.normalization=='minmax':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+
+			# Modify to zero out for now..
+			if self.args.skip_wrist:
+				self.norm_sub_value[:3] = 0.
+				self.norm_denom_value[:3] = 1.
 		
 		elif self.args.data in ['GRABArmHand']:
 			
@@ -1270,14 +1585,14 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 			self.test_set_size = 40
-			stat_dir_name = self.args.data
+			# stat_dir_name = self.args.data
 
-			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
-			elif self.args.normalization=='minmax':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+			# if self.args.normalization=='meanvar':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			# elif self.args.normalization=='minmax':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 		
 		elif self.args.data in ['DAPG']:
 			
@@ -1301,7 +1616,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
 
-		elif self.args.data in ['RoboturkObjects']:
+		elif self.args.data in ['RoboturkObjects','RoboMimicObjects']:
 			# self.state_size = 14
 			# self.state_dim = 14
 
@@ -1316,16 +1631,17 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.conditional_info_size = 0
 			self.test_set_size = 50
 
-			stat_dir_name = "RoboturkObjects"			
+			# stat_dir_name = "RoboturkObjects"
+			# stat_dir_name = self.args.data			
 
-			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
-			elif self.args.normalization=='minmax':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+			# if self.args.normalization=='meanvar':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			# elif self.args.normalization=='minmax':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 
-		elif self.args.data in ['RoboturkRobotObjects']:
+		elif self.args.data in ['RoboturkRobotObjects','RoboMimicRobotObjects']:
 			# self.state_size = 14
 			# self.state_dim = 14
 
@@ -1340,14 +1656,15 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.conditional_info_size = 0
 			self.test_set_size = 50
 
-			stat_dir_name = "RoboturkRobotObjects"			
+			# stat_dir_name = "RoboturkRobotObjects"			
+			# stat_dir_name = self.args.data
 
-			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
-			elif self.args.normalization=='minmax':
-				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
-				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+			# if self.args.normalization=='meanvar':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			# elif self.args.normalization=='minmax':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 
 		# Training parameters. 		
 		self.baseline_value = 0.
@@ -1370,7 +1687,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.baseline = None
 
 		# Per step decay. 
-		self.decay_rate = (self.initial_epsilon-self.final_epsilon)/(self.decay_counter)
+		self.decay_rate = (self.initial_epsilon-self.final_epsilon)/(self.decay_counter)	
 
 	def create_networks(self):
 		# Create K Policy Networks. 
@@ -1391,7 +1708,15 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# if self.args.transformer:
 			# 	self.encoder_network = TransformerEncoder(self.input_size, self.hidden_size, self.latent_z_dimensionality, self.args).to(device)
 			# else:
-			self.encoder_network = ContinuousEncoderNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args).to(device)		
+
+			if self.args.split_stream_encoder:
+				self.encoder_network = ContinuousFactoredEncoderNetwork(self.input_size, self.args.var_hidden_size, int(self.latent_z_dimensionality/2), self.args).to(device)
+			else:
+				self.encoder_network = ContinuousEncoderNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args).to(device)
+				# self.encoder_network = OldContinuousEncoderNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args).to(device)
+
+		# print("Embed in create networks")
+		# embed()
 
 	def create_training_ops(self):
 		# self.negative_log_likelihood_loss_function = torch.nn.NLLLoss()
@@ -1663,7 +1988,13 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			return concatenated_traj, sample_action_seq, sample_traj
 		
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+
 		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG','RoboturkObjects','RoboturkRobotObjects']:
+
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap',\
+				'OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects',\
+				'RoboMimicObjects','RoboMimicRobotObjects']:
+
 			data_element = self.dataset[i]
 
 			####################################			
@@ -1723,7 +2054,12 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				# CONDITIONAL INFORMATION for the encoder... 
 
+
 				if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG', 'RoboturkObjects','RoboturkRobotObjects']:
+
+				if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
+					'GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
+
 					pass
 				# if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 				# 	pass
@@ -1928,6 +2264,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			########## (2) & (3) ##########
 			####################################
 
+			# print("Embed in rut iter")
+			# embed()
+
 			# Feed latent z and trajectory segment into policy network and evaluate likelihood. 
 			latent_z_seq, latent_b = self.construct_dummy_latents(latent_z)
 
@@ -1991,7 +2330,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				# Feed latent z to the rollout.
 				# rollout_trajectory = self.rollout_visuals(index, latent_z=latent_z, return_traj=True)
-				rollout_trajectory = self.rollout_robot_trajectory(sample_traj[0], latent_z, rollout_length=len(sample_traj))
+				rollout_trajectory, rendered_rollout_trajectory = self.rollout_robot_trajectory(sample_traj[0], latent_z, rollout_length=len(sample_traj))
 
 				self.distances[i] = ((sample_traj-rollout_trajectory)**2).mean()	
 
@@ -2009,7 +2348,13 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# if self.args.data=="MIME" or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+
 		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG']:			
+
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
+				'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand',\
+				'RoboMimicObjects','RoboMimicRobotObjects']:
+
 			print("Running Evaluation of State Distances on small test set.")
 			# self.evaluate_metrics()		
 
@@ -2098,49 +2443,36 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Use the dataset to get reasonable trajectories (because without the information bottleneck / KL between N(0,1), cannot just randomly sample.)
 		for i in range(self.N//self.args.batch_size+1):
 
+			########################################
 			# (1) Encoder trajectory. 
+			########################################
+
 			latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
 
-			if self.args.batch_size>1:
+			########################################
+			# Iterate over items in the batch.
+			########################################
 
-				for b in range(self.args.batch_size):
-
-					if i*self.args.batch_size+b>=self.N:
-						break 
-					# Copy z. 
-
-					self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
-					self.gt_trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
-
-					if get_visuals:
-						# (2) Now rollout policy.	
-						if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
-							self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
-						elif self.args.setting=='pretrain_sub':							
-							self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True, rollout_length=sample_trajs.shape[0]))
-						else:
-							self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True))
+			for b in range(self.args.batch_size):
 
 				if i*self.args.batch_size+b>=self.N:
 					break 
-
-			else:
-				if i>=self.N:
-					break 
-
 				# Copy z. 
-				self.latent_z_set[i] = copy.deepcopy(latent_z.detach().cpu().numpy())
-				self.gt_trajectory_set.append(copy.deepcopy(sample_trajs))
+
+				self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+				self.gt_trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
 
 				if get_visuals:
-					# (2) Now rollout policy.			
+					# (2) Now rollout policy.	
 					if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
-						self.trajectory_set[i] = self.rollout_visuals(i, latent_z=latent_z, return_traj=True)
-					else: 
-						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z, return_traj=True))
+						self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
+					elif self.args.setting=='pretrain_sub':							
+						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True, rollout_length=sample_trajs.shape[0]))
+					else:
+						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True))
 
-				# # (3) Plot trajectory.
-				# traj_image = self.visualize_trajectory(rollout_traj)
+			if i*self.args.batch_size+b>=self.N:
+				break 
 
 		# Compute average reconstruction error.
 		if get_visuals:
@@ -2255,7 +2587,13 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			return concatenated_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), sample_traj.transpose((1,0,2))
 				
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+
 		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG', 'RoboturkObjects','RoboturkRobotObjects']:			
+
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
+				'GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects',\
+				'RoboMimicObjects','RoboMimicRobotObjects']:
+
 
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 				data_element = self.dataset[i:i+self.args.batch_size]
@@ -2344,8 +2682,8 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			# Now assemble inputs for subpolicy.
 			
 			# Create subpolicy inputs tensor. 
-			# subpolicy_inputs = torch.zeros((len(input_trajectory),self.input_size+self.latent_z_dimensionality)).to(device)
-			
+			# subpolicy_inputs = torch.zeros((len(input_trajectory),self.input_size+self.latent_z_dimensionality)).to(device)			
+
 			subpolicy_inputs = torch.zeros((input_trajectory.shape[0], self.args.batch_size, self.input_size+self.latent_z_dimensionality)).to(device)
 
 			# Now copy over trajectory. 
@@ -2778,7 +3116,13 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 	def visualize_trajectory(self, trajectory, segmentations=None, i=0, suffix='_Img'):
 
 		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+
 		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG', 'RoboturkObjects','RoboturkRobotObjects']:
+
+		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
+				'GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects',\
+				'RoboMimicObjects','RoboMimicRobotObjects']:
+
 
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 				unnorm_trajectory = (trajectory*self.norm_denom_value)+self.norm_sub_value
@@ -3353,8 +3697,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			gripper_open = np.array([0.0115, -0.0115])
 			gripper_closed = np.array([-0.020833, 0.020833])
 
-			# The state that we want is ... joint state?
-			gripper_finger_values = step_res[0]['gripper_qpos']
+			# The state that we want is ... joint state?			
+			# gripper_finger_values = step_res[0]['gripper_qpos']
+			gripper_finger_values = step_res[0][self.visualizer.gripper_key]
 			gripper_values = (gripper_finger_values - gripper_open)/(gripper_closed - gripper_open)			
 
 			finger_diff = gripper_values[1]-gripper_values[0]
@@ -4497,7 +4842,13 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
 
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
+
 		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','DAPG', 'RoboturkObjects','RoboturkRobotObjects']:
+
+		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
+				'GRAB','GRABHand','GRABArmHand','RoboturkObjects','RoboturkRobotObjects',\
+				'RoboMimicObjects','RoboMimicRobotObjects']:
+
 					   
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 
@@ -4562,7 +4913,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
-			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic','RoboturkObjects','RoboturkRobotObjects']:
+			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic',\
+				'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
 
 				if self.args.batch_size==1:
 

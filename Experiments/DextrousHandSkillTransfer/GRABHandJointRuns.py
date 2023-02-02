@@ -9,3 +9,7 @@
 
 # Rerun with different log
 // CUDA_VISIBLE_DEVICES=1 python Master.py --train=1 --setting=learntsub --name=GHJ_002_Right --data=GRABHand --normalization=minmax --kl_weight=0.001 --subpolicy_ratio=1.0 --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --subpolicy_model=ExpWandbLogs/GHP_002_Right/saved_models/Model_epoch3700 --single_hand=right --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --epochs=4000 --human_pos_normalization=wrist --dataset_traj_length_limit=90 --epsilon_over=200 --var_number_layers=8 --var_hidden_size=128 --datadir=/data/tanmayshankar/Datasets/GRAB_Joints/ --logdir=/data/tanmayshankar/TrainingLogs/
+
+# Now run Joint training with zero-ed out wrist
+// CUDA_VISIBLE_DEVICES=3 python Master.py --train=1 --setting=learntsub --name=GHJ_003_Right_ZeroWrist --data=GRABHand --normalization=minmax --kl_weight=0.001 --subpolicy_ratio=1.0 --latentpolicy_ratio=0.0 --b_probability_factor=0.01 --subpolicy_model=/data/tanmayshankar/TrainingLogs/GHP_008_Right_ZeroWrist/saved_models/Model_epoch1260 --single_hand=right --latent_loss_weight=0.0 --z_dimensions=16 --traj_length=-1 --var_skill_length=1 --training_phase_size=2000 --epochs=4000 --human_pos_normalization=wrist --dataset_traj_length_limit=90 --epsilon_over=200 --var_number_layers=8 --var_hidden_size=128 --datadir=/data/tanmayshankar/Datasets/GRAB_Joints/ --logdir=/data/tanmayshankar/TrainingLogs/ --skip_wrist=1
+

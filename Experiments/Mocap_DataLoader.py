@@ -24,7 +24,8 @@ class Mocap_Dataset(Dataset):
 		self.data_list = np.load(os.path.join(self.dataset_directory, "Demo_Array.npy"),allow_pickle=True)
 		self.dataset_length = len(self.data_list)
 		self.ds_freq = self.args.ds_freq
-	
+		self.stat_dir_name='Mocap'
+
 	def __len__(self):
 		# Return length of file list. 
 		return self.dataset_length
