@@ -254,6 +254,7 @@ class DAPG_Dataset(Dataset):
 
 		# Some book-keeping first. 
 		self.args = args
+		self.stat_dir_name = 'DAPG'
 
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
