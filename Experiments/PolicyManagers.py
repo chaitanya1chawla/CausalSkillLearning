@@ -310,8 +310,8 @@ class PolicyManager_BaseClass():
 
 			########################################
 			# (4c) Shuffle based on extent of dataset. 
-			########################################
-			
+			########################################						
+
 			# np.random.shuffle(self.index_list)
 			self.shuffle(extent)
 			self.batch_indices_sizes = []
@@ -483,8 +483,8 @@ class PolicyManager_BaseClass():
 
 			self.shuffle(len(self.dataset)-self.test_set_size, shuffle=True)
 
-			print("Embedding before the robot visuals loop.s")
-			embed()
+			# print("Embedding before the robot visuals loop.s")
+			# embed()
 
 			for j in range(self.N//self.args.batch_size):
 				i = self.index_list[j]
@@ -509,7 +509,10 @@ class PolicyManager_BaseClass():
 						
 						self.indices.append(j*self.args.batch_size+b)
 						print("#########################################")	
-						print("Getting visuals for trajectory: ",i,j*self.args.batch_size+b)
+						# print("Getting visuals for trajectory: ",i,j*self.args.batch_size+b)
+						print("Getting visuals for trajectory:")
+						# print("j: ",j, "i: ",i,"b: ",b, "j*bs+b: ", j*self.args.batch_size+b, "il[j*bs+b]: ", self.index_list[j*self.args.batch_size+b], "env: ", self.dataset[self.index_list[j*self.args.batch_size+b]]['file'])
+
 
 						if self.args.setting in ['learntsub','joint']:
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
@@ -520,6 +523,10 @@ class PolicyManager_BaseClass():
 							# self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b,stream_z_indices].detach().cpu().numpy())
 			
+							# Set. 
+							print("Embed in Pretrain Viz")
+							embed()
+
 							# Rollout each individual trajectory in this batch.
 							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b], indexed_data_element=data_element[b])
 
@@ -830,7 +837,11 @@ class PolicyManager_BaseClass():
 		# 1) Get task ID. 
 		########################################
 		# Set task ID if the visualizer needs it. 
-		if indexed_data_element is None or ('task-id' not in indexed_data_element.keys()):
+		# Set task ID if the visualizer needs it. 
+		if indexed_data_element is not None and self.args.data == 'DAPG':
+			env_name = indexed_data_element['file']
+			print("Visualizing trajectory in task environment:", env_name)
+		elif indexed_data_element is None or ('task-id' not in indexed_data_element.keys()):
 			task_id = None
 			env_name = None
 		else:			

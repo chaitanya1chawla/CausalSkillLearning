@@ -209,3 +209,6 @@ CUDA_VISIBLE_DEVICES=0 python Master.py --train=0 --setting=pretrain_sub --name=
 #######
 # Repeat
 // CUDA_VISIBLE_DEVICES=1 python Master.py --train=0 --setting=pretrain_sub --name=RTP_300_v120_normst_jposcont_kp20k_sf1pt0_arep20_newenv --data=Roboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/Roboturk/ --model=ExpWandbLogs/RTP_300/saved_models/Model_epoch420 --viz_sim_rollout=1 --sim_viz_step_repetition=20 --sim_viz_action_scale_factor=1.0
+
+# 
+// CUDA_VISIBLE_DEVICES=1 python Master.py --train=0 --setting=pretrain_sub --name=RTP_300_v120_normst_jposcont_kp20k_sf1pt0_arep20_newenv_2 --data=Roboturk --kl_weight=0.0001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --normalization=minmax --no_mujoco=0 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/Roboturk/ --model=ExpWandbLogs/RTP_300/saved_models/Model_epoch420 --viz_sim_rollout=1 --sim_viz_step_repetition=20 --sim_viz_action_scale_factor=1.0
