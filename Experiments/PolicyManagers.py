@@ -487,17 +487,18 @@ class PolicyManager_BaseClass():
 			# embed()
 
 			for j in range(self.N//self.args.batch_size):
-				i = self.index_list[j]
+				# i = self.index_list[j]
 
 				# (1) Encode trajectory. 
 				if self.args.setting in ['learntsub','joint']:
 					print("Embed in viz robot data")
 					
-					input_dict, var_dict, eval_dict = self.run_iteration(0, i, return_dicts=True, train=False)
+					input_dict, var_dict, eval_dict = self.run_iteration(0, j, return_dicts=True, train=False)
 					latent_z = var_dict['latent_z_indices']
 					sample_trajs = input_dict['sample_traj']
 				else:
-					latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
+					print("Running iteration of segment in viz")
+					latent_z, sample_trajs, _, data_element = self.run_iteration(0, j, return_z=True, and_train=False)
 
 				if self.args.batch_size>1:
 
@@ -511,7 +512,7 @@ class PolicyManager_BaseClass():
 						print("#########################################")	
 						# print("Getting visuals for trajectory: ",i,j*self.args.batch_size+b)
 						print("Getting visuals for trajectory:")
-						# print("j: ",j, "i: ",i,"b: ",b, "j*bs+b: ", j*self.args.batch_size+b, "il[j*bs+b]: ", self.index_list[j*self.args.batch_size+b], "env: ", self.dataset[self.index_list[j*self.args.batch_size+b]]['file'])
+						print("j:", j, "b:", b, "j*bs+b:", j*self.args.batch_size+b, "il[j*bs+b]:", self.index_list[j*self.args.batch_size+b], "env:", self.dataset[self.index_list[j*self.args.batch_size+b]]['file'])
 
 
 						if self.args.setting in ['learntsub','joint']:
@@ -523,9 +524,9 @@ class PolicyManager_BaseClass():
 							# self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b,stream_z_indices].detach().cpu().numpy())
 			
-							# Set. 
-							print("Embed in Pretrain Viz")
-							embed()
+							# # # Set. 
+							# print("Embed in Pretrain Viz")
+							# embed()
 
 							# Rollout each individual trajectory in this batch.
 							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b], indexed_data_element=data_element[b])
@@ -1355,22 +1356,16 @@ class PolicyManager_BaseClass():
 		self.index_list = [b for bs in blocks for b in bs]
 
 	def shuffle(self, extent, shuffle=True):
-
-		# if isinstance(self, PolicyManager_BatchJoint):
-		# 	print("########### Running shuffle from Batch Joint")
-		# # if isinstance(self, PolicyManager_JointFixEmbedTransfer):
-		# if isinstance(self, PolicyManager_Transfer):
-		# 	print("########### Running shuffle from Transfer PM")
-
-		# If we're in a dataset that will have variable sized data.
-		# if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic']:
-		
-		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\
+	
+		realdata = (self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\
 			'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG', \
-				'RoboMimicObjects','RoboMimicRobotObjects']:
+				'RoboMimicObjects','RoboMimicRobotObjects'])
+		
+		if realdata and self.args.train:
+
 
 			if self.args.task_discriminability or self.args.task_based_supervision or self.args.task_based_shuffling:
-
+				print("About to run task based shuffling.")
 				# If we're in the BatchJoint setting, actually run task_based_shuffling.
 				if isinstance(self, PolicyManager_BatchJoint):						
 					if not(self.already_shuffled):
@@ -1383,17 +1378,33 @@ class PolicyManager_BaseClass():
 				np.random.shuffle(self.index_list)
 
 			else:
+				print("About to run trajectory length based shuffling.")
 				self.trajectory_length_based_shuffling(extent=extent,shuffle=shuffle)			
 
 		# If we're in Toy data, doesn't matter, just randomly shuffle. 
 		else:
-			# Replaces np.random.shuffle(self.index_list) with block based shuffling.
+
+			print("About to run random shuffling.")
+
+			################################
+			# Block based shuffling.		
+			################################
+		
+			# # Replaces np.random.shuffle(self.index_list) with block based shuffling.
+			# index_range = np.arange(0,extent)
+			# blocks = [index_range[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
+			# if shuffle:
+			# 	np.random.shuffle(blocks)
+			# # Shuffled index list is just a flattening of blocks.
+			# self.index_list = [b for bs in blocks for b in bs]
+
+			################################
+			# Single element based shuffling because datasets are ordered
+			################################
+
 			index_range = np.arange(0,extent)
-			blocks = [index_range[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
-			if shuffle:
-				np.random.shuffle(blocks)
-			# Shuffled index list is just a flattening of blocks.
-			self.index_list = [b for bs in blocks for b in bs]
+			np.random.shuffle(index_range)
+			self.index_list = index_range		
 
 class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
@@ -2530,10 +2541,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		# Now trying version of get_batch_element that shuffles..
 		# for b in range(self.index_list[i],self.index_list[i]+self.args.batch_size):		
 
-		# if i==4224 or self.blah: 
-		# 	print("Embedding in get batch element")
-		# 	embed()
-		# 	self.blah=1
+		print("running get batch element",i)
 
 		for b in range(self.args.batch_size):
 			# data_element.append(self.dataset[self.index_list[i+b]])
