@@ -269,23 +269,8 @@ class PolicyManager_BaseClass():
 		if self.args.task_discriminability or self.args.task_based_supervision:
 			extent = self.extent	
 
-		##########################
-		# Set training extents.
-		##########################
-
-		# Now that extent is set, create rounded down extent.
-		self.rounded_down_extent = extent//self.args.batch_size*self.args.batch_size
-
-		# Training extent:
-		if self.rounded_down_extent==extent:
-			self.training_extent = self.rounded_down_extent
-		else:
-			self.training_extent = self.rounded_down_extent+self.args.batch_size
-
 		return extent
-
-
-	# @tprofile
+	
 	def train(self, model=None):
 
 		print("Running MAIN Train function.")
@@ -550,9 +535,9 @@ class PolicyManager_BaseClass():
 						
 						self.indices.append(j*self.args.batch_size+b)
 						print("#########################################")	
-						# print("Getting visuals for trajectory: ",i,j*self.args.batch_size+b)
-						print("Getting visuals for trajectory:")
-						print("j:", j, "b:", b, "j*bs+b:", j*self.args.batch_size+b, "il[j*bs+b]:", self.index_list[j*self.args.batch_size+b], "env:", self.dataset[self.index_list[j*self.args.batch_size+b]]['file'])
+						print("Getting visuals for trajectory: ",j*self.args.batch_size+b)
+						# print("Getting visuals for trajectory:")
+						# print("j:", j, "b:", b, "j*bs+b:", j*self.args.batch_size+b, "il[j*bs+b]:", self.index_list[j*self.args.batch_size+b], "env:", self.dataset[self.index_list[j*self.args.batch_size+b]]['file'])
 
 
 						if self.args.setting in ['learntsub','joint']:
@@ -911,10 +896,6 @@ class PolicyManager_BaseClass():
 		else:
 			unnorm_gt_trajectory = trajectory
 			unnorm_pred_trajectory = trajectory_rollout
-
-
-		# print("Embedding in get robot visuals.")
-		# embed()
 
 		if self.args.data == 'Mocap':
 			# Get animation object from dataset. 
@@ -1366,9 +1347,6 @@ class PolicyManager_BaseClass():
 		#######################################################################
 		# New extent...
 		self.extent = len(np.concatenate(self.task_based_shuffling_blocks))
-		# self.new_index_task_id_map = np.zeros(self.extent//32,dtype=int)
-		# print("Embedding in task based shuffling")			
-		# embed()	
 
 	def trajectory_length_based_shuffling(self, extent, shuffle=True):
 		
@@ -1383,12 +1361,70 @@ class PolicyManager_BaseClass():
 		# 	self.sorted_indices = self.sorted_indices[self.traj_len_bias:]
 		
 		# Actually just uses sorted_indices...		
-		blocks = [self.sorted_indices[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]				
+		blocks = [self.sorted_indices[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
 		
 		if shuffle:
 			np.random.shuffle(blocks)
 		# Shuffled index list is just a flattening of blocks.
 		self.index_list = [b for bs in blocks for b in bs]
+
+	def randomized_trajectory_length_based_shuffling(self, extent, shuffle=True):
+		
+		# Pipline.
+		# 0) Set block size, and set extents. 
+		# 1) Create sample index list. 
+		# 2) Fluff indices upto training_extent size. 
+		# 3) Sort based on dataset trajectory length. 
+		# 4) Set block size. 
+		# 5) Block up. 
+		# 6) Shuffle blocks. 
+		# 7) Divide blocks. 
+
+		# 0) Set block size, and extents. 
+		# The higher the batches per block parameter, more randomness, but more suboptimality in terms of runtime. 
+		# With dataset trajectory limit, should not be too bad.  
+		batches_per_block = 2
+
+		# Now that extent is set, create rounded down extent.
+		self.rounded_down_extent = extent//self.args.batch_size*self.args.batch_size
+
+		# Training extent:
+		if self.rounded_down_extent==extent:
+			self.training_extent = self.rounded_down_extent
+		else:
+			# This needs to be done such that we have %3==0 batches. 
+			batches_to_add = batches_per_block-(self.rounded_down_extent//self.args.batch_size)%batches_per_block
+			self.training_extent = self.rounded_down_extent+self.args.batch_size*batches_to_add
+
+		# 1) Create sample index list. 
+		original_index_list = np.arange(0,extent)
+		
+		# 2) Fluff indices upto training_extent size. 		
+		if self.rounded_down_extent==extent:
+			index_list = original_index_list
+		else:
+			# additional_index_list = np.random.choice(original_index_list, size=extent-self.rounded_down_extent, replace=False)			
+			additional_index_list = np.random.choice(original_index_list, size=self.training_extent - extent, replace=False)			
+			index_list = np.concatenate([original_index_list, additional_index_list])		
+			
+		# 3) Sort based on dataset trajectory length. 
+		lengths = self.dataset.dataset_trajectory_lengths[index_list]
+		sorted_resampled_indices = np.argsort(lengths)[::-1]
+
+		block_size = batches_per_block * self.args.batch_size
+
+		# 5) Block up, now up till training extent.
+		blocks = [index_list[sorted_resampled_indices[i:i+block_size]] for i in range(0, self.training_extent, block_size)]
+		# blocks = [sorted_resampled_indices[i:i+block_size] for i in range(0, self.training_extent, block_size)]	
+		
+		# 6) Shuffle blocks. 
+		if shuffle:
+			for blk in blocks:			
+				np.random.shuffle(blk)
+
+		# 7) Divide blocks. 
+		# self.index_list = np.concatenate(blocks)
+		self.sorted_indices = np.concatenate(blocks)	
 
 	def random_shuffle(self, extent):
 
@@ -1403,6 +1439,23 @@ class PolicyManager_BaseClass():
 		# 	np.random.shuffle(blocks)
 		# # Shuffled index list is just a flattening of blocks.
 		# self.index_list = [b for bs in blocks for b in bs]
+
+		##########################
+		# Set training extents.
+		##########################
+
+		# Now that extent is set, create rounded down extent.
+		self.rounded_down_extent = extent//self.args.batch_size*self.args.batch_size
+
+		# Training extent:
+		if self.rounded_down_extent==extent:
+			self.training_extent = self.rounded_down_extent
+		else:
+			self.training_extent = self.rounded_down_extent+self.args.batch_size
+
+		##########################
+		# Now shuffle
+		##########################
 
 		original_index_list = np.arange(0,extent)
 		if self.rounded_down_extent==extent:
@@ -1420,9 +1473,16 @@ class PolicyManager_BaseClass():
 				'RoboMimicObjects','RoboMimicRobotObjects'])
 		
 		# Length based shuffling.
-		if isinstance(self, PolicyManager_BatchJoint) or isinstance(self, PolicyManager_IKTrainer):
+		if isinstance(self, PolicyManager_BatchJoint) or isinstance(self, PolicyManager_IKTrainer) or True:
+
+			print("##############################")
+			print("##############################")
+			print("Necessarily running randomized traj length based shuffling")
+			print("##############################")
+			print("##############################")
 			# print("About to run trajectory length based shuffling.")
-			self.trajectory_length_based_shuffling(extent=extent,shuffle=shuffle)
+			# self.trajectory_length_based_shuffling(extent=extent,shuffle=shuffle)
+			self.randomized_trajectory_length_based_shuffling(extent=extent, shuffle=shuffle)
 
 		# Task based shuffling.
 		elif self.args.task_discriminability or self.args.task_based_supervision or self.args.task_based_shuffling:
@@ -1438,7 +1498,6 @@ class PolicyManager_BaseClass():
 		
 		# Random shuffling.
 		else:
-
 
 			################################
 			# Single element based shuffling because datasets are ordered
@@ -1646,7 +1705,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.output_size = self.state_size
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
-			self.test_set_size = 8
+			self.test_set_size = 0
 			stat_dir_name = self.args.data
 
 			stat_dir_name = "DAPG"			
@@ -2135,8 +2194,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		latent_b = torch.zeros((self.current_traj_len)).to(device).float()
 		# latent_b[-1] = 1.
 
-		return latent_z_indices, latent_b	
-		# return latent_z_indices
+		return latent_z_indices, latent_b			
 
 	def update_policies_reparam(self, loglikelihood, latent_z, encoder_KL):
 		self.optimizer.zero_grad()
@@ -2414,9 +2472,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				if not(os.path.isdir(self.dir_name)):
 					os.mkdir(self.dir_name)
-
-			# np.save(os.path.join(self.dir_name,"Trajectory_Distances_{0}.npy".format(self.args.name)),self.distances)
-			# np.save(os.path.join(self.dir_name,"Mean_Trajectory_Distance_{0}.npy".format(self.args.name)),self.mean_distance)
 
 	def get_trajectory_and_latent_sets(self, get_visuals=True):
 		# For N number of random trajectories from MIME: 
@@ -2941,7 +2996,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.output_size = self.state_size
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
-			self.test_set_size = 40
+			self.test_set_size = 0
 			stat_dir_name = self.args.data
 			self.conditional_information = None
 			self.conditional_viz_env = False	
@@ -4878,7 +4933,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 					# Don't really need to use digitize, we need to digitize with respect to .. 0, 32, 64, ... 8448. 
 					# So.. just use... //32
 					if bucket_index is None:
-						bucket = i//32
+						bucket = i//self.args.batch_size
 					else:
 						bucket = bucket_index
 
