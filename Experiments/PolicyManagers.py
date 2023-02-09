@@ -243,7 +243,34 @@ class PolicyManager_BaseClass():
 
 			return trajectory, action_sequence, concatenated_traj, old_concatenated_traj, data_element
 
-	# @tprofile
+	def set_extents(self):
+
+		##########################
+		# Set extent.
+		##########################
+
+		# Modifying to make training functions handle batches. 
+		# For every item in the epoch:
+		if self.args.setting=='imitation':
+			extent = self.dataset.get_number_task_demos(self.demo_task_index)
+		# if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed' or self.args.setting=='jointtransfer':
+		if self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer','iktrainer']:
+			if self.args.debugging_datapoints>-1:
+				extent = self.args.debugging_datapoints
+				self.extent = self.args.debugging_datapoints
+			else:
+				extent = self.extent
+		else:
+			if self.args.debugging_datapoints>-1:				
+				extent = self.args.debugging_datapoints
+			else:
+				extent = len(self.dataset)-self.test_set_size
+
+		if self.args.task_discriminability or self.args.task_based_supervision:
+			extent = self.extent	
+
+		return extent
+	
 	def train(self, model=None):
 
 		print("Running MAIN Train function.")
@@ -261,7 +288,8 @@ class PolicyManager_BaseClass():
 
 		counter = self.args.initial_counter_value
 		epoch_time = 0.
-		cum_epoch_time = 0.
+		cum_epoch_time = 0.		
+		self.epoch_coverage = np.zeros(len(self.dataset))
 
 		########################################
 		# (3) Outer loop over epochs. 
@@ -289,29 +317,12 @@ class PolicyManager_BaseClass():
 			########################################
 
 			# Modifying to make training functions handle batches. 
-			# For every item in the epoch:
-			if self.args.setting=='imitation':
-				extent = self.dataset.get_number_task_demos(self.demo_task_index)
-			# if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed' or self.args.setting=='jointtransfer':
-			if self.args.setting in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer','iktrainer']:
-				if self.args.debugging_datapoints>-1:
-					extent = self.args.debugging_datapoints
-					self.extent = self.args.debugging_datapoints
-				else:
-					extent = self.extent
-			else:
-				if self.args.debugging_datapoints>-1:				
-					extent = self.args.debugging_datapoints
-				else:
-					extent = len(self.dataset)-self.test_set_size
-
-			if self.args.task_discriminability or self.args.task_based_supervision:
-				extent = self.extent
+			extent = self.set_extents()
 
 			########################################
 			# (4c) Shuffle based on extent of dataset. 
-			########################################
-			
+			########################################						
+
 			# np.random.shuffle(self.index_list)
 			self.shuffle(extent)
 			self.batch_indices_sizes = []
@@ -321,8 +332,10 @@ class PolicyManager_BaseClass():
 			########################################
 
 			t1 = time.time()
-						
-			for i in range(0,extent-self.args.batch_size,self.args.batch_size):
+			self.coverage = np.zeros(len(self.dataset))
+		
+			for i in range(0,self.training_extent,self.args.batch_size):				
+			# for i in range(0,extent-self.args.batch_size,self.args.batch_size):
 				
 				# Probably need to make run iteration handle batch of current index plus batch size.				
 				# with torch.autograd.set_detect_anomaly(True):
@@ -337,13 +350,16 @@ class PolicyManager_BaseClass():
 				if profile_iteration:
 					self.lp = LineProfiler()
 					self.lp_wrapper = self.lp(self.run_iteration)
-					self.lp_wrapper(counter, self.index_list[i])
+					# self.lp_wrapper(counter, self.index_list[i])
+					self.lp_wrapper(counter, i)
 					self.lp.print_stats()			
-				else:				
-					self.run_iteration(counter, self.index_list[i])
+				else:													
+					# self.run_iteration(counter, self.index_list[i])
+					self.run_iteration(counter, i)
 
 				t3 = time.time()
-				print("Epoch:",e,"Trajectory:",str(i).zfill(5), "Datapoints:",str(self.index_list[i]).zfill(5), "Iter Time:",format(t3-t2,".4f"),"PerET:",format(cum_epoch_time/max(e,1),".4f"),"CumET:",format(cum_epoch_time,".4f"),"Extent:",extent)
+				# print("Epoch:",e,"Trajectory:",str(i).zfill(5), "Datapoints:",str(self.index_list[i]).zfill(5), "Iter Time:",format(t3-t2,".4f"),"PerET:",format(cum_epoch_time/max(e,1),".4f"),"CumET:",format(cum_epoch_time,".4f"),"Extent:",extent)
+				print("Epoch:",e,"Trajectory:",str(i).zfill(5), "Datapoints:",str(i).zfill(5), "Iter Time:",format(t3-t2,".4f"),"PerET:",format(cum_epoch_time/max(e,1),".4f"),"CumET:",format(cum_epoch_time,".4f"),"Extent:",extent)
 
 				counter = counter+1
 				
@@ -359,8 +375,17 @@ class PolicyManager_BaseClass():
 			# (7) Automatic evaluation if we need it. 
 			##############################################
 				
-			if e%self.args.eval_freq==0:
-				self.automatic_evaluation(e)
+			# if e%self.args.eval_freq==0:
+			# 	self.automatic_evaluation(e)
+
+			##############################################
+			# (8) Debug
+			##############################################
+						
+			self.epoch_coverage += self.coverage
+			if e%100==0:
+				print("Debugging dataset coverage")
+				embed()
 
 	def automatic_evaluation(self, e):
 
@@ -483,21 +508,22 @@ class PolicyManager_BaseClass():
 
 			self.shuffle(len(self.dataset)-self.test_set_size, shuffle=True)
 
-			print("Embedding before the robot visuals loop.s")
-			embed()
+			# print("Embedding before the robot visuals loop.s")
+			# embed()
 
 			for j in range(self.N//self.args.batch_size):
-				i = self.index_list[j]
+				# i = self.index_list[j]
 
 				# (1) Encode trajectory. 
 				if self.args.setting in ['learntsub','joint']:
 					print("Embed in viz robot data")
 					
-					input_dict, var_dict, eval_dict = self.run_iteration(0, i, return_dicts=True, train=False)
+					input_dict, var_dict, eval_dict = self.run_iteration(0, j, return_dicts=True, train=False)
 					latent_z = var_dict['latent_z_indices']
 					sample_trajs = input_dict['sample_traj']
 				else:
-					latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
+					print("Running iteration of segment in viz")
+					latent_z, sample_trajs, _, data_element = self.run_iteration(0, j, return_z=True, and_train=False)
 
 				if self.args.batch_size>1:
 
@@ -509,7 +535,10 @@ class PolicyManager_BaseClass():
 						
 						self.indices.append(j*self.args.batch_size+b)
 						print("#########################################")	
-						print("Getting visuals for trajectory: ",i,j*self.args.batch_size+b)
+						print("Getting visuals for trajectory: ",j*self.args.batch_size+b)
+						# print("Getting visuals for trajectory:")
+						# print("j:", j, "b:", b, "j*bs+b:", j*self.args.batch_size+b, "il[j*bs+b]:", self.index_list[j*self.args.batch_size+b], "env:", self.dataset[self.index_list[j*self.args.batch_size+b]]['file'])
+
 
 						if self.args.setting in ['learntsub','joint']:
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
@@ -520,6 +549,10 @@ class PolicyManager_BaseClass():
 							# self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b,stream_z_indices].detach().cpu().numpy())
 			
+							# # # Set. 
+							# print("Embed in Pretrain Viz")
+							# embed()
+
 							# Rollout each individual trajectory in this batch.
 							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b], indexed_data_element=data_element[b])
 
@@ -830,7 +863,11 @@ class PolicyManager_BaseClass():
 		# 1) Get task ID. 
 		########################################
 		# Set task ID if the visualizer needs it. 
-		if indexed_data_element is None or ('task-id' not in indexed_data_element.keys()):
+		# Set task ID if the visualizer needs it. 
+		if indexed_data_element is not None and self.args.data == 'DAPG':
+			env_name = indexed_data_element['file']
+			print("Visualizing trajectory in task environment:", env_name)
+		elif indexed_data_element is None or ('task-id' not in indexed_data_element.keys()):
 			task_id = None
 			env_name = None
 		else:			
@@ -859,10 +896,6 @@ class PolicyManager_BaseClass():
 		else:
 			unnorm_gt_trajectory = trajectory
 			unnorm_pred_trajectory = trajectory_rollout
-
-
-		# print("Embedding in get robot visuals.")
-		# embed()
 
 		if self.args.data == 'Mocap':
 			# Get animation object from dataset. 
@@ -1314,75 +1347,164 @@ class PolicyManager_BaseClass():
 		#######################################################################
 		# New extent...
 		self.extent = len(np.concatenate(self.task_based_shuffling_blocks))
-		# self.new_index_task_id_map = np.zeros(self.extent//32,dtype=int)
-		# print("Embedding in task based shuffling")			
-		# embed()	
 
 	def trajectory_length_based_shuffling(self, extent, shuffle=True):
 		
-		index_range = np.arange(0,extent)
-		# This just needs to be created if we're in joint setting.
-		# if self.args.setting in ['joint','learntsub']:
-		if isinstance(self, PolicyManager_BatchJoint) or isinstance(self, PolicyManager_IKTrainer):
-			self.sorted_indices = np.argsort(self.dataset.dataset_trajectory_lengths)[::-1]
+		# If we're using full trajectories, do trajectory length based shuffling.
+		self.sorted_indices = np.argsort(self.dataset.dataset_trajectory_lengths)[::-1]
 
-			# # Bias towards using shorter trajectories if we're debugging.
-			# Use dataset_trajectory_length_bias arg isntaed.
-			# if self.args.debugging_datapoints > -1: 
-			# 	# BIAS SORTED INDICES AWAY FROM SUPER LONG TRAJECTORIES... 
-			# 	self.traj_len_bias = 3000
-			# 	self.sorted_indices = self.sorted_indices[self.traj_len_bias:]
-			
+		# # Bias towards using shorter trajectories if we're debugging.
+		# Use dataset_trajectory_length_bias arg isntaed.
+		# if self.args.debugging_datapoints > -1: 
+		# 	# BIAS SORTED INDICES AWAY FROM SUPER LONG TRAJECTORIES... 
+		# 	self.traj_len_bias = 3000
+		# 	self.sorted_indices = self.sorted_indices[self.traj_len_bias:]
+		
 		# Actually just uses sorted_indices...		
-
-		# blocks = [self.sorted_indices[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
-		blocks = [index_range[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
-		# ublocks = [self.sorted_indices[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
+		blocks = [self.sorted_indices[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
+		
 		if shuffle:
 			np.random.shuffle(blocks)
 		# Shuffled index list is just a flattening of blocks.
 		self.index_list = [b for bs in blocks for b in bs]
 
-	def shuffle(self, extent, shuffle=True):
-
-		# if isinstance(self, PolicyManager_BatchJoint):
-		# 	print("########### Running shuffle from Batch Joint")
-		# # if isinstance(self, PolicyManager_JointFixEmbedTransfer):
-		# if isinstance(self, PolicyManager_Transfer):
-		# 	print("########### Running shuffle from Transfer PM")
-
-		# If we're in a dataset that will have variable sized data.
-		# if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic']:
+	def randomized_trajectory_length_based_shuffling(self, extent, shuffle=True):
 		
-		if self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\
-			'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG', \
-				'RoboMimicObjects','RoboMimicRobotObjects']:
+		# Pipline.
+		# 0) Set block size, and set extents. 
+		# 1) Create sample index list. 
+		# 2) Fluff indices upto training_extent size. 
+		# 3) Sort based on dataset trajectory length. 
+		# 4) Set block size. 
+		# 5) Block up. 
+		# 6) Shuffle blocks. 
+		# 7) Divide blocks. 
 
-			if self.args.task_discriminability or self.args.task_based_supervision or self.args.task_based_shuffling:
+		# 0) Set block size, and extents. 
+		# The higher the batches per block parameter, more randomness, but more suboptimality in terms of runtime. 
+		# With dataset trajectory limit, should not be too bad.  
+		batches_per_block = 2
 
-				# If we're in the BatchJoint setting, actually run task_based_shuffling.
-				if isinstance(self, PolicyManager_BatchJoint):						
-					if not(self.already_shuffled):
-						self.task_based_shuffling(extent=extent,shuffle=shuffle)				
-						self.already_shuffled = 1				
-				
-				# if isinstance(self, PolicyManager_Transfer):
-				# Also create an index list to shuffle the order of blocks that we observe...
-				self.index_list = np.arange(0,extent)				
-				np.random.shuffle(self.index_list)
+		# Now that extent is set, create rounded down extent.
+		self.rounded_down_extent = extent//self.args.batch_size*self.args.batch_size
 
-			else:
-				self.trajectory_length_based_shuffling(extent=extent,shuffle=shuffle)			
-
-		# If we're in Toy data, doesn't matter, just randomly shuffle. 
+		# Training extent:
+		if self.rounded_down_extent==extent:
+			self.training_extent = self.rounded_down_extent
 		else:
-			# Replaces np.random.shuffle(self.index_list) with block based shuffling.
-			index_range = np.arange(0,extent)
-			blocks = [index_range[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
-			if shuffle:
-				np.random.shuffle(blocks)
-			# Shuffled index list is just a flattening of blocks.
-			self.index_list = [b for bs in blocks for b in bs]
+			# This needs to be done such that we have %3==0 batches. 
+			batches_to_add = batches_per_block-(self.rounded_down_extent//self.args.batch_size)%batches_per_block
+			self.training_extent = self.rounded_down_extent+self.args.batch_size*batches_to_add
+
+		# 1) Create sample index list. 
+		original_index_list = np.arange(0,extent)
+		
+		# 2) Fluff indices upto training_extent size. 		
+		if self.rounded_down_extent==extent:
+			index_list = original_index_list
+		else:
+			# additional_index_list = np.random.choice(original_index_list, size=extent-self.rounded_down_extent, replace=False)			
+			additional_index_list = np.random.choice(original_index_list, size=self.training_extent - extent, replace=False)			
+			index_list = np.concatenate([original_index_list, additional_index_list])		
+			
+		# 3) Sort based on dataset trajectory length. 
+		lengths = self.dataset.dataset_trajectory_lengths[index_list]
+		sorted_resampled_indices = np.argsort(lengths)[::-1]
+
+		block_size = batches_per_block * self.args.batch_size
+
+		# 5) Block up, now up till training extent.
+		blocks = [index_list[sorted_resampled_indices[i:i+block_size]] for i in range(0, self.training_extent, block_size)]
+		# blocks = [sorted_resampled_indices[i:i+block_size] for i in range(0, self.training_extent, block_size)]	
+		
+		# 6) Shuffle blocks. 
+		if shuffle:
+			for blk in blocks:			
+				np.random.shuffle(blk)
+
+		# 7) Divide blocks. 
+		# self.index_list = np.concatenate(blocks)
+		self.sorted_indices = np.concatenate(blocks)	
+
+	def random_shuffle(self, extent):
+
+		################################
+		# Old block based shuffling.		
+		################################
+	
+		# # Replaces np.random.shuffle(self.index_list) with block based shuffling.
+		# index_range = np.arange(0,extent)
+		# blocks = [index_range[i:i+self.args.batch_size] for i in range(0, extent, self.args.batch_size)]
+		# if shuffle:
+		# 	np.random.shuffle(blocks)
+		# # Shuffled index list is just a flattening of blocks.
+		# self.index_list = [b for bs in blocks for b in bs]
+
+		##########################
+		# Set training extents.
+		##########################
+
+		# Now that extent is set, create rounded down extent.
+		self.rounded_down_extent = extent//self.args.batch_size*self.args.batch_size
+
+		# Training extent:
+		if self.rounded_down_extent==extent:
+			self.training_extent = self.rounded_down_extent
+		else:
+			self.training_extent = self.rounded_down_extent+self.args.batch_size
+
+		##########################
+		# Now shuffle
+		##########################
+
+		original_index_list = np.arange(0,extent)
+		if self.rounded_down_extent==extent:
+			index_list = original_index_list
+		else:
+			additional_index_list = np.random.choice(original_index_list, size=extent-self.rounded_down_extent, replace=False)			
+			index_list = np.concatenate([original_index_list, additional_index_list])
+		np.random.shuffle(index_list)
+		self.index_list = index_list
+
+	def shuffle(self, extent, shuffle=True):
+	
+		realdata = (self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\
+			'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG', \
+				'RoboMimicObjects','RoboMimicRobotObjects'])
+		
+		# Length based shuffling.
+		if isinstance(self, PolicyManager_BatchJoint) or isinstance(self, PolicyManager_IKTrainer) or True:
+
+			print("##############################")
+			print("##############################")
+			print("Necessarily running randomized traj length based shuffling")
+			print("##############################")
+			print("##############################")
+			# print("About to run trajectory length based shuffling.")
+			# self.trajectory_length_based_shuffling(extent=extent,shuffle=shuffle)
+			self.randomized_trajectory_length_based_shuffling(extent=extent, shuffle=shuffle)
+
+		# Task based shuffling.
+		elif self.args.task_discriminability or self.args.task_based_supervision or self.args.task_based_shuffling:
+			if isinstance(self, PolicyManager_BatchJoint):						
+				if not(self.already_shuffled):
+					self.task_based_shuffling(extent=extent,shuffle=shuffle)				
+					self.already_shuffled = 1				
+			
+			# if isinstance(self, PolicyManager_Transfer):
+			# Also create an index list to shuffle the order of blocks that we observe...
+			self.index_list = np.arange(0,extent)				
+			np.random.shuffle(self.index_list)
+		
+		# Random shuffling.
+		else:
+
+			################################
+			# Single element based shuffling because datasets are ordered
+			################################
+
+			self.random_shuffle(extent)
+
 
 class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
@@ -1583,7 +1705,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.output_size = self.state_size
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
-			self.test_set_size = 3
+			self.test_set_size = 0
 			stat_dir_name = self.args.data
 
 			stat_dir_name = "DAPG"			
@@ -2072,8 +2194,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		latent_b = torch.zeros((self.current_traj_len)).to(device).float()
 		# latent_b[-1] = 1.
 
-		return latent_z_indices, latent_b	
-		# return latent_z_indices
+		return latent_z_indices, latent_b			
 
 	def update_policies_reparam(self, loglikelihood, latent_z, encoder_KL):
 		self.optimizer.zero_grad()
@@ -2209,7 +2330,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		####################################
 
 		# Sample trajectory segment from dataset. 			
-
 		if self.args.traj_segments:			
 			state_action_trajectory, sample_action_seq, sample_traj, data_element  = self.get_trajectory_segment(i)
 		else:
@@ -2274,7 +2394,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				stats['i'] = i
 				stats['epoch'] = self.current_epoch_running
 				stats['batch_size'] = self.args.batch_size			
-				self.update_plots(counter, loglikelihood, state_action_trajectory, stats)
+				# self.update_plots(counter, loglikelihood, state_action_trajectory, stats)
 
 				####################################
 				############# (5) #############
@@ -2352,9 +2472,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				if not(os.path.isdir(self.dir_name)):
 					os.mkdir(self.dir_name)
-
-			# np.save(os.path.join(self.dir_name,"Trajectory_Distances_{0}.npy".format(self.args.name)),self.distances)
-			# np.save(os.path.join(self.dir_name,"Mean_Trajectory_Distance_{0}.npy".format(self.args.name)),self.mean_distance)
 
 	def get_trajectory_and_latent_sets(self, get_visuals=True):
 		# For N number of random trajectories from MIME: 
@@ -2514,24 +2631,21 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		# Make data_element a list of dictionaries. 
 		data_element = []
 						
-		# for b in range(i,i+self.args.batch_size):	
-
-		# Now trying version of get_batch_element that shuffles..
-		# for b in range(self.index_list[i],self.index_list[i]+self.args.batch_size):		
-
-		# if i==4224 or self.blah: 
-		# 	print("Embedding in get batch element")
-		# 	embed()
-		# 	self.blah=1
-
 		for b in range(self.args.batch_size):
-			# data_element.append(self.dataset[self.index_list[i+b]])
-			data_element.append(self.dataset[min(len(self.dataset)-1,self.index_list[min(i+b,len(self.index_list)-1)])])
 
-		# # Checking what task we're solving if such a thing exists..
-		# if self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic','RoboMimic','RoboturkObjects']:
-		# 	self.current_task_for_viz = []				
-		# 	self.current_task_for_viz = data_element['task-id']
+			# Because of the new creation of index_list in random shuffling, this should be safe to index dataset with.
+			index = self.index_list[i+b]
+			# # data_element.append(self.dataset[self.index_list[i+b]])
+
+			# dataset_size_limit = len(self.dataset)-1 
+			# index_list_size_limit = min(i+b, len(self.index_list)-1)
+			# index = min (dataset_size_limit, index_list_size_limit)						
+			# # index = min( len(self.dataset)-1 , self.index_list[ min( i+b , len(self.index_list)-1)])
+
+			# print("i:", i, "b:", b, "datasetlim:", dataset_size_limit, "il_size_limit:", index_list_size_limit, "index:", index)
+			
+			self.coverage[index] += 1
+			data_element.append(self.dataset[index])
 
 		return data_element
 
@@ -2564,7 +2678,8 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 				'RoboMimicObjects','RoboMimicRobotObjects']:
 
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
-				data_element = self.dataset[i:i+self.args.batch_size]
+				# data_element = self.dataset[i:i+self.args.batch_size]
+				data_element = self.dataset[self.index_list[i:i+self.args.batch_size]]				
 			else:
 				data_element = self.get_batch_element(i)
 
@@ -2881,7 +2996,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.output_size = self.state_size
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
-			self.test_set_size = 40
+			self.test_set_size = 0
 			stat_dir_name = self.args.data
 			self.conditional_information = None
 			self.conditional_viz_env = False	
@@ -4818,7 +4933,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 					# Don't really need to use digitize, we need to digitize with respect to .. 0, 32, 64, ... 8448. 
 					# So.. just use... //32
 					if bucket_index is None:
-						bucket = i//32
+						bucket = i//self.args.batch_size
 					else:
 						bucket = bucket_index
 
