@@ -1473,7 +1473,7 @@ class PolicyManager_BaseClass():
 				'RoboMimicObjects','RoboMimicRobotObjects'])
 		
 		# Length based shuffling.
-		if isinstance(self, PolicyManager_BatchJoint) or isinstance(self, PolicyManager_IKTrainer) or True:
+		if isinstance(self, PolicyManager_BatchJoint) or isinstance(self, PolicyManager_IKTrainer):
 
 			print("##############################")
 			print("##############################")
