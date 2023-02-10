@@ -2692,7 +2692,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			
 			batch_trajectory = np.zeros((self.args.batch_size, self.current_traj_len, self.state_size))
 
-			for x in range(self.args.batch_size):
+			for x in range(min(self.args.batch_size, len(self.index_list) - i)):
 
 				# Select the trajectory for each instance in the batch. 
 				if self.args.ee_trajectories:
