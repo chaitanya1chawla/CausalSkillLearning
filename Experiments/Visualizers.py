@@ -906,6 +906,9 @@ class DAPGVisualizer(SawyerVisualizer):
 		# [:-6] drops "_demos" suffix
 		if task_id is None:
 			print("create_environment failed |", "task_id is None")
+			self.environment = GymEnv("relocate-v0")
+			self.env_name = task_id
+			return
 		if task_id == self.env_name:
 			return
 		task_id = task_id[:-6]
