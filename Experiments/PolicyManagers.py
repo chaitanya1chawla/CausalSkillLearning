@@ -2644,7 +2644,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 			# print("i:", i, "b:", b, "datasetlim:", dataset_size_limit, "il_size_limit:", index_list_size_limit, "index:", index)
 			
-			self.coverage[index] += 1
+			# self.coverage[index] += 1
 			data_element.append(self.dataset[index])
 
 		return data_element
