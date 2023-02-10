@@ -289,7 +289,7 @@ class PolicyManager_BaseClass():
 		counter = self.args.initial_counter_value
 		epoch_time = 0.
 		cum_epoch_time = 0.		
-		self.epoch_coverage = np.zeros(len(self.dataset))
+		# self.epoch_coverage = np.zeros(len(self.dataset))
 
 		########################################
 		# (3) Outer loop over epochs. 
@@ -332,7 +332,7 @@ class PolicyManager_BaseClass():
 			########################################
 
 			t1 = time.time()
-			self.coverage = np.zeros(len(self.dataset))
+			# self.coverage = np.zeros(len(self.dataset))
 		
 			for i in range(0,self.training_extent,self.args.batch_size):				
 			# for i in range(0,extent-self.args.batch_size,self.args.batch_size):
@@ -382,7 +382,7 @@ class PolicyManager_BaseClass():
 			# (8) Debug
 			##############################################
 						
-			self.epoch_coverage += self.coverage
+			# self.epoch_coverage += self.coverage
 			if e%100==0:
 				print("Debugging dataset coverage")
 				embed()
