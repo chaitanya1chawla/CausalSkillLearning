@@ -454,7 +454,7 @@ class GRAB_Dataset(Dataset):
 
 		# Some book-keeping first. 
 		self.args = args
-		self.stat_dir_name='GRAB'
+		self.stat_dir_name=self.getname()
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
 			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
