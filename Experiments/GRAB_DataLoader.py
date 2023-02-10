@@ -454,7 +454,7 @@ class GRAB_Dataset(Dataset):
 
 		# Some book-keeping first. 
 		self.args = args
-		self.stat_dir_name=self.getname()
+		self.stat_dir_name='GRAB'
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
 			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
@@ -512,6 +512,8 @@ class GRABArmHand_Dataset(GRAB_Dataset):
 
 	def __init__(self, args):
 		super(GRABArmHand_Dataset, self).__init__(args=args)
+		self.stat_dir_name="GRABArmHand"
+
 
 	def subsample_relevant_joints(self, datapoint):
 
@@ -526,6 +528,7 @@ class GRABArmHand_PreDataset(GRAB_PreDataset):
 
 	def __init__(self, args, split='train', short_traj=False, traj_length_threshold=500):
 		super(GRABArmHand_PreDataset, self).__init__(args, split=split, short_traj=short_traj, traj_length_threshold=traj_length_threshold)
+		self.stat_dir_name="GRABArmHand"
 
 	def set_relevant_joints(self):
 		self.joint_names = np.array(['pelvis',
@@ -784,6 +787,7 @@ class GRABHand_Dataset(GRAB_Dataset):
 
 	def __init__(self, args):
 		super(GRABHand_Dataset, self).__init__(args=args)
+		self.stat_dir_name='GRAB'
 
 	def subsample_relevant_joints(self, datapoint):
 
@@ -811,6 +815,7 @@ class GRABHand_PreDataset(GRAB_PreDataset):
 
 	def __init__(self, args):		
 		super(GRABHand_PreDataset, self).__init__(args)
+		self.stat_dir_name='GRAB'
 
 	def set_relevant_joints(self):
 		self.joint_names = np.array(['pelvis',
