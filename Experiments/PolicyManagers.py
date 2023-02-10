@@ -2631,7 +2631,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		# Make data_element a list of dictionaries. 
 		data_element = []
 						
-		for b in range(self.args.batch_size):
+		for b in range(min(self.args.batch_size, len(self.index_list - i))):
 
 			# Because of the new creation of index_list in random shuffling, this should be safe to index dataset with.
 			index = self.index_list[i+b]
