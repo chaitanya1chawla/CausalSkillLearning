@@ -289,7 +289,7 @@ class PolicyManager_BaseClass():
 		counter = self.args.initial_counter_value
 		epoch_time = 0.
 		cum_epoch_time = 0.		
-		self.epoch_coverage = np.zeros(len(self.dataset))
+		# self.epoch_coverage = np.zeros(len(self.dataset))
 
 		########################################
 		# (3) Outer loop over epochs. 
@@ -332,7 +332,7 @@ class PolicyManager_BaseClass():
 			########################################
 
 			t1 = time.time()
-			self.coverage = np.zeros(len(self.dataset))
+			# self.coverage = np.zeros(len(self.dataset))
 		
 			for i in range(0,self.training_extent,self.args.batch_size):				
 			# for i in range(0,extent-self.args.batch_size,self.args.batch_size):
@@ -382,7 +382,7 @@ class PolicyManager_BaseClass():
 			# (8) Debug
 			##############################################
 						
-			self.epoch_coverage += self.coverage
+			# self.epoch_coverage += self.coverage
 			# if e%100==0:
 			# 	print("Debugging dataset coverage")
 			# 	embed()
@@ -1473,7 +1473,7 @@ class PolicyManager_BaseClass():
 				'RoboMimicObjects','RoboMimicRobotObjects'])
 		
 		# Length based shuffling.
-		if isinstance(self, PolicyManager_BatchJoint) or isinstance(self, PolicyManager_IKTrainer) or True:
+		if isinstance(self, PolicyManager_BatchJoint) or isinstance(self, PolicyManager_IKTrainer):
 
 			print("##############################")
 			print("##############################")
@@ -2644,7 +2644,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 			# print("i:", i, "b:", b, "datasetlim:", dataset_size_limit, "il_size_limit:", index_list_size_limit, "index:", index)
 			
-			self.coverage[index] += 1
+			# self.coverage[index] += 1
 			data_element.append(self.dataset[index])
 
 		return data_element
