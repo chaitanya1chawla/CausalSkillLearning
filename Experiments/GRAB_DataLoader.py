@@ -787,7 +787,7 @@ class GRABHand_Dataset(GRAB_Dataset):
 
 	def __init__(self, args):
 		super(GRABHand_Dataset, self).__init__(args=args)
-		self.stat_dir_name='GRAB'
+		self.stat_dir_name='GRABHand'
 
 	def subsample_relevant_joints(self, datapoint):
 
@@ -813,9 +813,9 @@ class GRABHand_Dataset(GRAB_Dataset):
 
 class GRABHand_PreDataset(GRAB_PreDataset):
 
-	def __init__(self, args):		
+	def __init__(self, args):
 		super(GRABHand_PreDataset, self).__init__(args)
-		self.stat_dir_name='GRAB'
+		self.stat_dir_name='GRABHand'
 
 	def set_relevant_joints(self):
 		self.joint_names = np.array(['pelvis',
