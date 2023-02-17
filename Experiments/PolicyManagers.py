@@ -787,6 +787,7 @@ class PolicyManager_BaseClass():
 			else:
 				unnormalized_trajectory_start = trajectory_start 
 			# Now use unnormalized state to set the trajectory state. 
+			embed()
 			self.visualizer.set_joint_pose(unnormalized_trajectory_start)		
 			
 		########################################
