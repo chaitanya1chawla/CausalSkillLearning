@@ -514,6 +514,9 @@ class GRABVisualizer(object):
 		else:
 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
 
+	def create_environment(self, task_id=None):
+		pass
+
 class GRABHandVisualizer(GRABVisualizer):
 	
 	def __init__(self, args, has_display=False):
