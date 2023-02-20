@@ -91,7 +91,6 @@ class SawyerVisualizer(object):
 		# Set usual joint angles through set joint positions API.
 		self.environment.reset()
 		if self.new_robosuite==0:
-			embed()
 			self.environment.set_robot_joint_positions(joint_angles[:7])
 		else:
 			self.environment.robots[0].set_robot_joint_positions(joint_angles[:7])
