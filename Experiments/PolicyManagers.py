@@ -273,7 +273,7 @@ class PolicyManager_BaseClass():
 	
 	def train(self, model=None):
 
-		print("Running MAIN Train function.")
+		print("Running Main Train Function.")
 
 		########################################
 		# (1) Load Model If Necessary
@@ -1462,17 +1462,22 @@ class PolicyManager_BaseClass():
 		if self.rounded_down_extent==extent:
 			index_list = original_index_list
 		else:
-			additional_index_list = np.random.choice(original_index_list, size=extent-self.rounded_down_extent, replace=False)			
+			# additional_index_list = np.random.choice(original_index_list, size=extent-self.rounded_down_extent, replace=False)			
+			# additional_index_list = np.random.choice(original_index_list, size=self.training_extent-self.rounded_down_extent, replace=False)
+			additional_index_list = np.random.choice(original_index_list, size=self.training_extent-extent, replace=False)
 			index_list = np.concatenate([original_index_list, additional_index_list])
 		np.random.shuffle(index_list)
 		self.index_list = index_list
+
+		print("Embed in shuffle")
+		embed()
 
 	def shuffle(self, extent, shuffle=True):
 	
 		realdata = (self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\
 			'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG', \
 				'RoboMimicObjects','RoboMimicRobotObjects'])
-		
+
 		# Length based shuffling.
 		if isinstance(self, PolicyManager_BatchJoint) or isinstance(self, PolicyManager_IKTrainer):
 
@@ -1503,6 +1508,9 @@ class PolicyManager_BaseClass():
 			################################
 			# Single element based shuffling because datasets are ordered
 			################################
+			print("##############################")
+			print("Running random shuffling.")
+			print("##############################")
 
 			self.random_shuffle(extent)
 
