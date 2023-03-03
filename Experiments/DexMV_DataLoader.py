@@ -76,13 +76,11 @@ class DexMVHand_PreDataset(Dataset):
 		# For now use arm joint indices. 
 		# We can later consider adding other robots / hands.
 
-		# Used a dictionary to hold different indices by file
+		# sampled_joints = np.zeros(datapoint.shape)
+		# sampled_joints = datapoint[:, :]
 
-		sampled_joints = np.zeros(datapoint.shape)
-		sampled_joints = datapoint[:, :]
-
-		self.relevant_joint_indices = self.hand_joint_indices[dataset_name]
-		return sampled_joints
+		# self.relevant_joint_indices = self.hand_joint_indices[dataset_name]
+		return datapoint
 		
 	def setup(self):
 
@@ -106,8 +104,7 @@ class DexMVHand_PreDataset(Dataset):
 
 			for item in set:
 
-				embed()
-				datapoint = item['observations']
+				datapoint = item['qpos']
 
 				# Subsample relevant joints. 
 				# Modified for different dimensions by file.
