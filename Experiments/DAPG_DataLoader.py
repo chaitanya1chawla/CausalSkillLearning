@@ -35,7 +35,8 @@ class DAPG_PreDataset(Dataset):
 			self.dataset_directory = '/home/ahassan/CausalSkillLearning/Experiments/dapg/hand_dapg/dapg/demonstrations/'
 		else:
 			self.dataset_directory = self.args.datadir
-		   
+		
+		self.stat_dir_name = 'DAPG'   
 
 		# 1) Keep track of joints: 
 		#   a) Full joint name list from https://github.com/vchoutas/smplx/blob/master/smplx/joint_names.py. 
@@ -57,7 +58,6 @@ class DAPG_PreDataset(Dataset):
 
 		self.compute_statistics()
 
-		self.stat_dir_name = 'DAPG'
 
 	def set_relevant_joints(self):
 

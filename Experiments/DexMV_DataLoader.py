@@ -36,6 +36,7 @@ class DexMVHand_PreDataset(Dataset):
 		else:
 			self.dataset_directory = self.args.datadir
 		   
+		self.stat_dir_name = "DexMVHand"
 
 		# 1) Keep track of joints: 
 		#   a) Full joint name list from https://github.com/vchoutas/smplx/blob/master/smplx/joint_names.py. 
