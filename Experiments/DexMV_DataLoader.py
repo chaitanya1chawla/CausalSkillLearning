@@ -183,7 +183,9 @@ class DexMVHand_PreDataset(Dataset):
 
 			if data_element['is_valid']:
 				demo = data_element['demo']
-				vel = np.diff(demo,axis=0)				
+				vel = np.diff(demo,axis=0)
+
+				embed()				
 				mins[i] = demo.min(axis=0)
 				maxs[i] = demo.max(axis=0)
 				mean += demo.sum(axis=0)
