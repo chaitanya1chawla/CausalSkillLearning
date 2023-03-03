@@ -79,7 +79,7 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	elif args.data=='DAPG':
 		dataset = DAPG_DataLoader.DAPG_Dataset(args)
 	elif args.data=='DexMVPreproc' or args.data=='DexMVHandPreproc':
-		dataset = DexMV_DataLoader.DexMVHand_Dataset
+		dataset = DexMV_DataLoader.DexMVHand_PreDataset
 	elif args.data=='DexMV' or args.data=='DexMVHand':
 		dataset = DexMV_DataLoader.DexMVHand_Dataset
 	return dataset
