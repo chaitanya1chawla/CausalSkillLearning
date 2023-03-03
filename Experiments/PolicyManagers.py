@@ -1721,8 +1721,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		elif self.args.data in ['DexMV', 'DexMVHand']:
 			
-			self.state_size = 37
-			self.state_dim = 37
+			self.state_size = 43
+			self.state_dim = 43
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
@@ -2282,7 +2282,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.state_dim = 30
 			self.rollout_timesteps = self.traj_length
 		elif self.args.data in ['DexMV', 'DexMVHand']:
-			self.state_dim = 37
+			self.state_dim = 43
 			self.rollout_timesteps = self.traj_length
 
 		if rollout_length is not None:
@@ -2542,7 +2542,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.state_dim = 30
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['DexMV', 'DexMVHand']:
-				self.state_dim = 37
+				self.state_dim = 43
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['RoboturkObjects']:
 				# Now switching to using 7 dimensions instead of 14, so as to not use relative pose.
@@ -3044,8 +3044,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		elif self.args.data in ['DexMV', 'DexMVHand']:
 			
-			self.state_size = 37
-			self.state_dim = 37
+			self.state_size = 43
+			self.state_dim = 43
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
