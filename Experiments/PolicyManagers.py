@@ -383,9 +383,9 @@ class PolicyManager_BaseClass():
 			##############################################
 						
 			# self.epoch_coverage += self.coverage
-			if e%100==0:
-				print("Debugging dataset coverage")
-				embed()
+			# if e%100==0:
+			# 	print("Debugging dataset coverage")
+			# 	embed()
 
 	def automatic_evaluation(self, e):
 
