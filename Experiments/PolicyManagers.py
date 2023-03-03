@@ -995,7 +995,8 @@ class PolicyManager_BaseClass():
 				file_prefix = self.dir_name
 
 				# Create gif_list by prefixing base_gif_list with file prefix.
-				html_file.write('<div style="display: flex; justify-content: row;">  <img src="Traj_{0}_GT.gif"/>  <img src="Traj_{0}_Rollout.gif"/> </div>'.format(i))
+				# html_file.write('<div style="display: flex; justify-content: row;">  <img src="Traj_{0}_GT.gif"/>  <img src="Traj_{0}_Rollout.gif"/> </div>'.format(i))
+				html_file.write('<div style="display: flex; justify-content: row;">  <img src="Traj_{0}_GIF_GT.gif"/>  <img src="Traj_{0}_GIF_Rollout.gif"/> </div>'.format(i))
 					
 				# Add gap space.
 				html_file.write('<p> </p>')
