@@ -104,8 +104,8 @@ class DexMVHand_PreDataset(Dataset):
 
 			for item in set:
 
-				embed()
-				datapoint = item['qpos']
+				# embed()
+				datapoint = set[item]['observations']
 
 				# Subsample relevant joints. 
 				# Modified for different dimensions by file.
