@@ -106,6 +106,7 @@ class DexMVHand_PreDataset(Dataset):
 
 			for item in set:
 
+				embed()
 				datapoint = item['observations']
 
 				# Subsample relevant joints. 
