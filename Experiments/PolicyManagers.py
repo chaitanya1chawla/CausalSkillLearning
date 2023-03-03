@@ -1469,9 +1469,6 @@ class PolicyManager_BaseClass():
 		np.random.shuffle(index_list)
 		self.index_list = index_list
 
-		print("Embed in shuffle")
-		embed()
-
 	def shuffle(self, extent, shuffle=True):
 	
 		realdata = (self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\
@@ -2403,7 +2400,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				stats['i'] = i
 				stats['epoch'] = self.current_epoch_running
 				stats['batch_size'] = self.args.batch_size			
-				# self.update_plots(counter, loglikelihood, state_action_trajectory, stats)
+				self.update_plots(counter, loglikelihood, state_action_trajectory, stats)
 
 				####################################
 				############# (5) #############
