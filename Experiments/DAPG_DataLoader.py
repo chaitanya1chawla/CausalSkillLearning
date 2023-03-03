@@ -57,6 +57,8 @@ class DAPG_PreDataset(Dataset):
 
 		self.compute_statistics()
 
+		self.stat_dir_name = 'DAPG'
+
 	def set_relevant_joints(self):
 
 		# Create index arrays
