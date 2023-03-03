@@ -1539,6 +1539,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.number_epochs = self.args.epochs
 		self.test_set_size = 500
 
+		embed()
 		stat_dir_name = self.dataset.stat_dir_name
 		if self.args.normalization=='meanvar':
 			self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
