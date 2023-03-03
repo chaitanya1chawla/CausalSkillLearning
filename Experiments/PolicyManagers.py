@@ -1505,10 +1505,6 @@ class PolicyManager_BaseClass():
 			################################
 			# Single element based shuffling because datasets are ordered
 			################################
-			print("##############################")
-			print("Running random shuffling.")
-			print("##############################")
-
 			self.random_shuffle(extent)
 
 
