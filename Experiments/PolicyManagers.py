@@ -275,7 +275,7 @@ class PolicyManager_BaseClass():
 	
 	def train(self, model=None):
 
-		print("Running MAIN Train function.")
+		print("Running Main Train Function.")
 
 		########################################
 		# (1) Load Model If Necessary
@@ -996,7 +996,8 @@ class PolicyManager_BaseClass():
 				file_prefix = self.dir_name
 
 				# Create gif_list by prefixing base_gif_list with file prefix.
-				html_file.write('<div style="display: flex; justify-content: row;">  <img src="Traj_{0}_GT.gif"/>  <img src="Traj_{0}_Rollout.gif"/> </div>'.format(i))
+				# html_file.write('<div style="display: flex; justify-content: row;">  <img src="Traj_{0}_GT.gif"/>  <img src="Traj_{0}_Rollout.gif"/> </div>'.format(i))
+				html_file.write('<div style="display: flex; justify-content: row;">  <img src="Traj_{0}_GIF_GT.gif"/>  <img src="Traj_{0}_GIF_Rollout.gif"/> </div>'.format(i))
 					
 				# Add gap space.
 				html_file.write('<p> </p>')
@@ -1462,7 +1463,9 @@ class PolicyManager_BaseClass():
 		if self.rounded_down_extent==extent:
 			index_list = original_index_list
 		else:
-			additional_index_list = np.random.choice(original_index_list, size=extent-self.rounded_down_extent, replace=False)			
+			# additional_index_list = np.random.choice(original_index_list, size=extent-self.rounded_down_extent, replace=False)			
+			# additional_index_list = np.random.choice(original_index_list, size=self.training_extent-self.rounded_down_extent, replace=False)
+			additional_index_list = np.random.choice(original_index_list, size=self.training_extent-extent, replace=False)
 			index_list = np.concatenate([original_index_list, additional_index_list])
 		np.random.shuffle(index_list)
 		self.index_list = index_list
@@ -1472,7 +1475,7 @@ class PolicyManager_BaseClass():
 		realdata = (self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\
 			'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG', \
 				'RoboMimicObjects','RoboMimicRobotObjects'])
-		
+
 		# Length based shuffling.
 		if isinstance(self, PolicyManager_BatchJoint) or isinstance(self, PolicyManager_IKTrainer):
 
@@ -1503,7 +1506,6 @@ class PolicyManager_BaseClass():
 			################################
 			# Single element based shuffling because datasets are ordered
 			################################
-
 			self.random_shuffle(extent)
 
 

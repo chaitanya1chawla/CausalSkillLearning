@@ -922,9 +922,8 @@ class DAPGVisualizer(SawyerVisualizer):
 		else:
 			print("create_environment failed |", "task_id:", task_id, "current env:", self.env_name)
 
-	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False, save_image=False):
-		# print("Visualizing in", self.env_name)
-		
+	def set_joint_pose(self, joint_angles):
+
 		state = self.environment.get_env_state()
 		qvel = np.zeros_like(state['qvel'])
 
@@ -952,11 +951,19 @@ class DAPGVisualizer(SawyerVisualizer):
 		else:
 			print("Unknown environment", self.env_name)
 
-		state['qvel'] = qvel
-
+		state['qvel'] = qvel		
 		self.environment.set_env_state(state)
 		self.environment.env.env.sim.forward()
+
+	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False, save_image=False):
+		# print("Visualizing in", self.env_name)
 		
+
+		# self.environment.set_env_state(state)
+		# self.environment.env.env.sim.forward()
+		
+		self.set_joint_pose(joint_angles)
+
 		# Trying to use the sim render instead of the display based rendering, so that we can grab images.. 
 		img = np.flipud(self.environment.env.sim.render(600, 600))
 		if save_image:
