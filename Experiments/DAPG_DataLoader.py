@@ -325,7 +325,7 @@ class DAPG_Dataset(Dataset):
 		# task_index = np.searchsorted(self.cumulative_num_demos, index, side='right')-1
 		# data_element['file'] = self.filelist[task_index][81:-7]
 		data_element['file'] = self.environment_names[index]
-		data_element['task_id'] = index
+		data_element['task-id'] = index
 		# print("Printing the index and the task ID from dataset:", index, data_element['file'])
 
 		return data_element
