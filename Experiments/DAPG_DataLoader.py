@@ -261,7 +261,7 @@ class DAPG_Dataset(Dataset):
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
 			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
-			self.dataset_directory = self.dataset_directory = '/home/ahassan/CausalSkillLearning/Experiments/dapg/hand_dapg/dapg/demonstrations'
+			self.dataset_directory = '/home/almutwakel/Data/DAPG/'
 
 		else:
 			self.dataset_directory = self.args.datadir
