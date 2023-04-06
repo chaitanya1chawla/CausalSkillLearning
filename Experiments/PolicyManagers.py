@@ -7127,11 +7127,8 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		elif projection=='densne':
 			# Use density preserving T-SNE
-			try:
-				embedded_zs, _, _  = densne.run_densne(normed_z, no_dims=2,randseed=0,perplexity=perplexity, verbose=True)
-			except:
-				embed()
-			# embedded_zs, _, _  = densne.run_densne(normed_z, no_dims=2,randseed=0,perplexity=perplexity)
+			# embedded_zs, _, _  = densne.run_densne(normed_z, no_dims=2,randseed=0,perplexity=perplexity, verbose=True)
+			embedded_zs, _, _  = densne.run_densne(normed_z, no_dims=2,randseed=0,perplexity=perplexity)
 			
 			return embedded_zs, None
 		
@@ -8522,7 +8519,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Do this with just the perplexity set to 30 for now.. 
 
 		tsne_embedded_zs , _ = self.get_transform(self.shared_z_tuples)
-		densne_embedded_zs , _ = self.get_transform(self.shared_z_tuples, projection='densne')
+
+		try:
+			densne_embedded_zs , _ = self.get_transform(self.shared_z_tuples, projection='densne')
+		except:
+			densne_embedded_zs = None
+
 		pca_embedded_zs , _ = self.get_transform(self.shared_z_tuples, projection='pca')
 
 		# tsne_embedded_zs , _ = self.get_transform(self.target_latent_zs)
@@ -8533,7 +8535,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# 	embed()
 
 		tsne_image = self.plot_density_embedding(tsne_embedded_zs, colors, "{0} Density Coded Z Tuple TSNE Embeddings.".format(prefix))
-		densne_image = self.plot_density_embedding(densne_embedded_zs, colors, "{0} Density Coded Z Tuple DENSNE Embeddings.".format(prefix))
+		
+		if densne_embedded_zs is not None:
+			densne_image = self.plot_density_embedding(densne_embedded_zs, colors, "{0} Density Coded Z Tuple DENSNE Embeddings.".format(prefix))
+	
 		pca_image = self.plot_density_embedding(pca_embedded_zs, colors, "{0} Density Coded Z Tuple PCA Embeddings.".format(prefix))
 
 		##################################################
@@ -8541,7 +8546,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		##################################################
 
 		log_dict['{0} Density Coded Z Tuple TSNE Embeddings Perp30'.format(prefix)] = self.return_wandb_image(tsne_image)
-		log_dict['{0} Density Coded Z Tuple DENSNE Embeddings Perp30'.format(prefix)] = self.return_wandb_image(densne_image)
+		
+		if densne_embedded_zs is not None:
+			log_dict['{0} Density Coded Z Tuple DENSNE Embeddings Perp30'.format(prefix)] = self.return_wandb_image(densne_image)
+	
 		log_dict['{0} Density Coded Z Tuple PCA Embeddings'.format(prefix)] = self.return_wandb_image(pca_image)
 	
 
