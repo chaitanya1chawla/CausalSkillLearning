@@ -7127,8 +7127,9 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 
 		elif projection=='densne':
 			# Use density preserving T-SNE
-			# embedded_zs, _, _  = densne.run_densne(normed_z, no_dims=2,randseed=0,perplexity=perplexity, verbose=True)
-			embedded_zs, _, _  = densne.run_densne(normed_z, no_dims=2,randseed=0,perplexity=perplexity)
+			embed()
+			embedded_zs, _, _  = densne.run_densne(normed_z, no_dims=2,randseed=0,perplexity=perplexity, verbose=True)
+			# embedded_zs, _, _  = densne.run_densne(normed_z, no_dims=2,randseed=0,perplexity=perplexity)
 			
 			return embedded_zs, None
 		
