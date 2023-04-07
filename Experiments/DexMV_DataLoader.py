@@ -80,7 +80,7 @@ class DexMV_PreDataset(Dataset):
 		# sampled_joints = datapoint[:, :]
 
 		self.set_relevant_joints()
-		return datapoint[self.hand_joint_indices]
+		return datapoint[:, self.hand_joint_indices]
 		
 	def setup(self):
 
