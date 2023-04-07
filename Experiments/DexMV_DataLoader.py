@@ -281,12 +281,12 @@ class DexMV_Dataset(Dataset):
 				
 		self.data_list_array = np.array(self.data_list)		
 
-		# self.environment_names = []
-		# for i in range(len(self.filelist)):
-			# f = self.filelist[i][81:-7] # remove path and .pickle
-			# for j in range(self.cumulative_num_demos[i], self.cumulative_num_demos[i+1]):
-				# self.environment_names.append(f)
-		# print("Env names:\n", np.unique(self.environment_names))
+		self.environment_names = []
+		for i in range(len(self.filelist)):
+			f = self.filelist[i][len(self.dataset_directory):-4] # remove path and .pkl
+			for j in range(self.cumulative_num_demos[i], self.cumulative_num_demos[i+1]):
+				self.environment_names.append(f)
+		print("Env names:\n", np.unique(self.environment_names))
 
 
 	def getname(self):
