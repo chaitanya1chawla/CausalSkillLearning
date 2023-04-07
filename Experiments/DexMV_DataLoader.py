@@ -79,8 +79,8 @@ class DexMV_PreDataset(Dataset):
 		# sampled_joints = np.zeros(datapoint.shape)
 		# sampled_joints = datapoint[:, :]
 
-		self.relevant_joint_indices = self.hand_joint_indices[dataset_name]
-		return datapoint[self.relevant_joint_indices]
+		self.set_relevant_joints
+		return datapoint[self.hand_joint_indices]
 		
 	def setup(self):
 
