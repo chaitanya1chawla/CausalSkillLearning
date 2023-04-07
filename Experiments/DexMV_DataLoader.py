@@ -112,7 +112,7 @@ class DexMV_PreDataset(Dataset):
 				v = v.replace(self.dataset_directory, '')
 
 				relevant_joints_datapoint = self.subsample_relevant_joints(datapoint, v)
-				print("Preloading from", v)
+				print("Preloading from", v, "with shape", relevant_joints_datapoint.shape)
 
 				# normalized_relevant_joint_datapoint = self.normalize(relevant_joints_datapoint)
 
