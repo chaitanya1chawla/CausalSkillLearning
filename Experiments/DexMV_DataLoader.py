@@ -23,7 +23,7 @@ def resample(original_trajectory, desired_number_timepoints):
 # 	return relevant_joints_datapoint
 
 
-class DexMVHand_PreDataset(Dataset):
+class DexMV_PreDataset(Dataset):
 
 	def __init__(self, args, split='train', short_traj=False, traj_length_threshold=500):
 
@@ -32,11 +32,11 @@ class DexMVHand_PreDataset(Dataset):
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
 			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
-			self.dataset_directory = '/data/ahassan/DexMVHand'
+			self.dataset_directory = '/home/almutwakel/Data/DexMV/'
 		else:
 			self.dataset_directory = self.args.datadir
 		   
-		self.stat_dir_name = "DexMVHand"
+		self.stat_dir_name = "DexMV"
 
 		# 1) Keep track of joints: 
 		#   a) Full joint name list from https://github.com/vchoutas/smplx/blob/master/smplx/joint_names.py. 
@@ -61,7 +61,7 @@ class DexMVHand_PreDataset(Dataset):
 	def set_relevant_joints(self):
 
 		# Create index arrays
-		self.hand_joint_indices = {}
+		self.hand_joint_indices = list(range(0, 24))
 
 		
 
@@ -79,8 +79,8 @@ class DexMVHand_PreDataset(Dataset):
 		# sampled_joints = np.zeros(datapoint.shape)
 		# sampled_joints = datapoint[:, :]
 
-		# self.relevant_joint_indices = self.hand_joint_indices[dataset_name]
-		return datapoint
+		self.relevant_joint_indices = self.hand_joint_indices[dataset_name]
+		return datapoint[self.relevant_joint_indices]
 		
 	def setup(self):
 
@@ -146,7 +146,7 @@ class DexMVHand_PreDataset(Dataset):
 		return relevant_joints_datapoint
 
 	def getname(self):
-		return "DexMVHand"
+		return "DexMV"
 
 	def __len__(self):
 		return self.total_length
@@ -226,6 +226,7 @@ class DexMVHand_PreDataset(Dataset):
 		vel_min_value = vel_mins.min(axis=0)
 
 		statdir = "Statistics/" + self.getname()
+		os.mkdir(statdir)
 
 		np.save(os.path.join(statdir, self.getname() + "_Mean.npy"), mean)
 		np.save(os.path.join(statdir, self.getname() + "_Var.npy"), variance)
@@ -236,19 +237,19 @@ class DexMVHand_PreDataset(Dataset):
 		np.save(os.path.join(statdir, self.getname() + "_Vel_Min.npy"), vel_min_value)
 		np.save(os.path.join(statdir, self.getname() + "_Vel_Max.npy"), vel_max_value)
 
-class DexMVHand_Dataset(Dataset):
+class DexMV_Dataset(Dataset):
 
 	def __init__(self, args):
 
 		# Some book-keeping first. 
 		self.args = args
-		self.stat_dir_name = 'DexMVHand'
+		self.stat_dir_name = 'DexMV'
 
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
 			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/MIME/'
-			self.dataset_directory = self.dataset_directory = '/home/ahassan/CausalSkillLearning/Experiments/dapg/hand_dapg/dapg/demonstrations'
-
+			# self.dataset_directory = self.dataset_directory = '/home/ahassan/CausalSkillLearning/Experiments/dapg/hand_dapg/dapg/demonstrations'
+			self.dataset_directory = '/home/almutwakel/Data/DexMV/'
 		else:
 			self.dataset_directory = self.args.datadir
 		   
@@ -289,7 +290,7 @@ class DexMVHand_Dataset(Dataset):
 
 
 	def getname(self):
-		return "DAPG"
+		return "DexMV"
 
 	def __len__(self):
 		# Return length of file list. 
