@@ -1733,7 +1733,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.test_set_size = 0
 			stat_dir_name = self.args.data
 
-			stat_dir_name = "DexMVHand"			
+			stat_dir_name = "DexMV"			
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
@@ -3060,7 +3060,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			self.visualizer = None
 
-			stat_dir_name = "DexMVHand"			
+			stat_dir_name = "DexMV"			
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
