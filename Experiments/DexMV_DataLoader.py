@@ -225,7 +225,8 @@ class DexMV_PreDataset(Dataset):
 		vel_min_value = vel_mins.min(axis=0)
 
 		statdir = "Statistics/" + self.getname()
-		os.mkdir(statdir)
+		if not os.path.exists(statdir):
+			os.makedirs(statdir)
 
 		np.save(os.path.join(statdir, self.getname() + "_Mean.npy"), mean)
 		np.save(os.path.join(statdir, self.getname() + "_Var.npy"), variance)
