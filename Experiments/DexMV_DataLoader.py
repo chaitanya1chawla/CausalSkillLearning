@@ -79,7 +79,7 @@ class DexMV_PreDataset(Dataset):
 		# sampled_joints = np.zeros(datapoint.shape)
 		# sampled_joints = datapoint[:, :]
 
-		self.set_relevant_joints
+		self.set_relevant_joints()
 		return datapoint[self.hand_joint_indices]
 		
 	def setup(self):
@@ -185,7 +185,6 @@ class DexMV_PreDataset(Dataset):
 				demo = data_element['demo']
 				vel = np.diff(demo,axis=0)
 
-				embed()				
 				mins[i] = demo.min(axis=0)
 				maxs[i] = demo.max(axis=0)
 				mean += demo.sum(axis=0)
