@@ -23,6 +23,10 @@ use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 torch.set_printoptions(sci_mode=False, precision=2)
 
+# Global data list
+global global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk', \
+			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG', \
+			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']
 class PolicyManager_BaseClass():
 
 	def __init__(self):
@@ -179,9 +183,7 @@ class PolicyManager_BaseClass():
 			else:
 				return sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj
 
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk', \
-			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG', \
-			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
+		elif self.args.data in global_data_list:
 
 			# If we're imitating... select demonstrations from the particular task.
 			if self.args.setting=='imitation' and \
@@ -1471,9 +1473,11 @@ class PolicyManager_BaseClass():
 
 	def shuffle(self, extent, shuffle=True):
 	
-		realdata = (self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\
-			'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG', \
-				'RoboMimicObjects','RoboMimicRobotObjects'])
+		# realdata = (self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\
+		# 	'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG', \
+		# 		'RoboMimicObjects','RoboMimicRobotObjects'])
+
+		realdata = (self.args.data in global_dataset_list)
 
 		# Length based shuffling.
 		if isinstance(self, PolicyManager_BatchJoint) or isinstance(self, PolicyManager_IKTrainer):
@@ -2092,10 +2096,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			return concatenated_traj, sample_action_seq, sample_traj
 		
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap',\
-				'OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects',\
-				'RoboMimicObjects','RoboMimicRobotObjects']:
+		
+		elif self.args.data in global_dataset_list:
+		
 
 			data_element = self.dataset[i]
 
@@ -2155,8 +2158,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 					trajectory = (trajectory-self.norm_sub_value)/self.norm_denom_value
 
 				# CONDITIONAL INFORMATION for the encoder... 
-				if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-					'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
+				if self.args.data in global_dataset_list:
+				# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
+					# 'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
 
 					pass
 				# if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
@@ -2445,9 +2449,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# if self.args.data=="MIME" or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:	
 
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-				'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG', \
-				'RoboMimicObjects','RoboMimicRobotObjects']:
+		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
+		# 		'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG', \
+		# 		'RoboMimicObjects','RoboMimicRobotObjects']:
+
+		if self.args.data in global_dataset_list:
 
 			print("Running Evaluation of State Distances on small test set.")
 			# self.evaluate_metrics()		
@@ -2675,9 +2681,10 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			return concatenated_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), sample_traj.transpose((1,0,2))
 				
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:	
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-				'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects',\
-				'RoboMimicObjects','RoboMimicRobotObjects']:
+		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
+		# 		'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects',\
+		# 		'RoboMimicObjects','RoboMimicRobotObjects']:
+		elif self.args.data in global_dataset_list:
 
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 				# data_element = self.dataset[i:i+self.args.batch_size]
@@ -3201,10 +3208,10 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 	def visualize_trajectory(self, trajectory, segmentations=None, i=0, suffix='_Img'):
 
 		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-				'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects',\
-				'RoboMimicObjects','RoboMimicRobotObjects']:
-
+		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
+		# 		'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects',\
+		# 		'RoboMimicObjects','RoboMimicRobotObjects']:
+		if self.args.data in global_dataset_list:
 
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 				unnorm_trajectory = (trajectory*self.norm_denom_value)+self.norm_sub_value
@@ -3327,7 +3334,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			latent_rollout_image = np.array(latent_rollout_image)
 			
 			# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-			if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG']:
+			# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG']:
+			if self.args.data in global_dataset_list:
 				# Feeding as list of image because gif_summary.				
 
 				# print("Embedding in joint update plots, L2511 ")
@@ -4211,8 +4219,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# Visualize space if the subpolicy has been trained...
 		# Running even with the fix_subpolicy, so that we can evaluate joint reconstruction.
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic', 'GRABHand', 'GRABArmHand', 'DAPG']:			
-					
+		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic', 'GRABHand', 'GRABArmHand', 'DAPG']:			
+		if self.args.data in global_dataset_list:
 			print("Running Visualization on Robot Data.")	
 
 			########################################
@@ -4923,9 +4931,10 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
 
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-				'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects',\
-				'RoboMimicObjects','RoboMimicRobotObjects']:
+		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
+				# 'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects',\
+				# 'RoboMimicObjects','RoboMimicRobotObjects']:
+		elif self.args.data in global_dataset_list:
 
 					   
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':

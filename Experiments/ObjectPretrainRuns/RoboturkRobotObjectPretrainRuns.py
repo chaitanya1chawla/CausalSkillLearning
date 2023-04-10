@@ -47,6 +47,7 @@ from locale import normalize
 #######################
 # Debug rollout viz
 // CUDA_VISIBLE_DEVICES=3 python Master.py --train=1 --setting=pretrain_sub --name=RT_RO_JointSpace_Pre_debugviz --data=RoboturkRobotObjects --kl_weight=0.01 --var_skill_length=1 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/Roboturk/ --smoothen=0 --task_based_shuffling=1 --logdir=/data/tanmayshankar/TrainingLogs/ --z_dimensions=32 --split_stream_encoder=1 --debug=1
+/home/tshankar/Research/Code/Data/Datasets/Roboturk/
 
 # Debug rollout viz
 // CUDA_VISIBLE_DEVICES=2 python Master.py --train=0 --setting=pretrain_sub --name=RT_RO_JointSpace_testviz --data=RoboturkRobotObjects --kl_weight=0.001 --var_skill_length=1 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/Roboturk/ --smoothen=0 --task_based_shuffling=1 --logdir=/data/tanmayshankar/TrainingLogs/ --z_dimensions=32 --split_stream_encoder=1 --model=/data/tanmayshankar/TrainingLogs/RT_RO_JointSpace_Pre_005/saved_models/Model_epoch400 --viz_sim_rollout=1
@@ -122,4 +123,7 @@ from locale import normalize
 ##########################################
 ##########################################
 
-python Master.py --train=1 --setting=pretrain_sub --name=RT_RO_JointSpace_Pre_debugenv --data=RoboturkRobotObjects --kl_weight=0.0001 --var_skill_length=1 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/Roboturk/ --smoothen=0 --task_based_shuffling=1 --logdir=/data/tanmayshankar/TrainingLogs/ --z_dimensions=32 --split_stream_encoder=1
+/ python Master.py --train=1 --setting=pretrain_sub --name=RT_RO_JointSpace_Pre_debugenv --data=RoboturkRobotObjects --kl_weight=0.0001 --var_skill_length=1 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/Roboturk/ --smoothen=0 --task_based_shuffling=1 --logdir=/data/tanmayshankar/TrainingLogs/ --z_dimensions=32 --split_stream_encoder=1
+
+##########################################
+/ python Master.py --train=1 --setting=pretrain_sub --name=RT_RO_JointSpace_Pre_debugviz --data=RoboturkRobotObjects --kl_weight=0.01 --var_skill_length=1 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --smoothen=0 --task_based_shuffling=1 --logdir=/home/tshankar/Research/Code/CausalSkillLearning/Experiments/TrainingLogs/ --z_dimensions=32 --split_stream_encoder=1 --datadir=/home/tshankar/Research/Data/Datasets/Roboturk/
