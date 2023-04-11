@@ -1406,7 +1406,7 @@ class PolicyManager_BaseClass():
 			index_list = original_index_list
 		else:
 			# additional_index_list = np.random.choice(original_index_list, size=extent-self.rounded_down_extent, replace=False)			
-			additional_index_list = np.random.choice(original_index_list, size=self.training_extent - extent, replace=False)			
+			additional_index_list = np.random.choice(original_index_list, size=self.training_extent - extent, replace=self.args.replace_samples)			
 			index_list = np.concatenate([original_index_list, additional_index_list])		
 			
 		# 3) Sort based on dataset trajectory length. 
@@ -1465,7 +1465,7 @@ class PolicyManager_BaseClass():
 		else:
 			# additional_index_list = np.random.choice(original_index_list, size=extent-self.rounded_down_extent, replace=False)			
 			# additional_index_list = np.random.choice(original_index_list, size=self.training_extent-self.rounded_down_extent, replace=False)
-			additional_index_list = np.random.choice(original_index_list, size=self.training_extent-extent, replace=False)
+			additional_index_list = np.random.choice(original_index_list, size=self.training_extent-extent, replace=self.args.replace_samples)
 			index_list = np.concatenate([original_index_list, additional_index_list])
 		np.random.shuffle(index_list)
 		self.index_list = index_list

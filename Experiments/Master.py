@@ -249,6 +249,7 @@ def parse_arguments():
 	parser.add_argument('--epochs',dest='epochs',type=int,default=500) # Number of epochs to train for. Reduce for Mocap.
 	parser.add_argument('--debugging_datapoints',dest='debugging_datapoints',type=int,default=-1,help='How many data points to run training on. If greater than 0, only select that many datapoints for debugging.')
 	parser.add_argument('--seed',dest='seed',type=int,default=0,help='Seed value to initialize random processes.')
+	parser.add_argument('--replace_samples', dest='replace_samples',type=bool,default=False,help='Use replace=true when sampling trajectories for training.')
 
 	# Training setting. 
 	parser.add_argument('--discrete_z',dest='discrete_z',type=int,default=0)
