@@ -13,7 +13,7 @@ from PPO_Utilities import PPOBuffer
 from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, \
 	GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, DAPGVisualizer, \
 	RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer,\
-	RoboMimicObjectVisualizer, RoboMimicRobotObjectVisualizer #, MocapVisualizer
+	RoboMimicObjectVisualizer, RoboMimicRobotObjectVisualizer, DexMVVisualizer #, MocapVisualizer
 
 # from Visualizers import *
 import TFLogger, DMP, RLUtils
@@ -106,7 +106,7 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['DAPG']:
 			self.visualizer = DAPGVisualizer(args=self.args)
 		elif self.args.data in ['DexMV', 'DexMVHand']:
-			self.visualizer = None
+			self.visualizer = DexMVVisualizer(args=self.args)
 		elif self.args.data in ['RoboturkObjects']:		
 			self.visualizer = RoboturkObjectVisualizer(args=self.args)
 		elif self.args.data in ['RoboturkRobotObjects']:
@@ -446,7 +446,7 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['DAPG']:
 			self.visualizer = DAPGVisualizer(args=self.args)		
 		elif self.args.data in ['DexMV', 'DexMVHand']:
-			self.visualizer = DAPGVisualizer(args=self.args)		
+			self.visualizer = DexMVVisualizer(args=self.args)		
 		elif self.args.data in ['RoboturkRobotObjects']:		
 			self.visualizer = RoboturkRobotObjectVisualizer(args=self.args)
 		elif self.args.data in ['RoboMimicObjects']:
@@ -3058,7 +3058,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.conditional_information = None
 			self.conditional_viz_env = False	
 
-			self.visualizer = None
+			self.visualizer = DexMVVisualizer(args=self.args)
 
 			stat_dir_name = "DexMV"			
 
