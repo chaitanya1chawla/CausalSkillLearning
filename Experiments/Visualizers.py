@@ -978,7 +978,7 @@ class DexMVVisualizer(SawyerVisualizer):
 	def __init__(self, args=None):
 		super().__init__()
 		self.args = args
-		self.environment = YCBRelocate(has_renderer=True, object_name="foam_brick", friction=(1, 0.5, 0.01),
+		self.environment = YCBRelocate(has_renderer=False, object_name="foam_brick", friction=(1, 0.5, 0.01),
                           object_scale=0.8, version="v2")
 		self.env_name = "relocate-v2"
 
@@ -1010,7 +1010,7 @@ class DexMVVisualizer(SawyerVisualizer):
 		if task_id == self.env_name:
 			return
 		print("create_environment failed |", "task_id is None")
-		self.environment = YCBRelocate(has_renderer=True, object_name="foam_brick", friction=(1, 0.5, 0.01),
+		self.environment = YCBRelocate(has_renderer=False, object_name="foam_brick", friction=(1, 0.5, 0.01),
 						object_scale=0.8, version="v2")
 		self.env_name = "relocate-v2"
 		# 	return
