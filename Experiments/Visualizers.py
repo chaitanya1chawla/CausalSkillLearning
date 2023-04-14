@@ -28,7 +28,7 @@ from moviepy.video.io.bindings import mplfig_to_npimage
 from PIL import Image
 import mj_envs
 from mjrl.utils.gym_env import GymEnv
-from dexmv_sim.hand_imitation.env.environments.ycb_relocate_env import YCBRelocate
+from hand_imitation.env.environments.ycb_relocate_env import YCBRelocate
 
 
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
