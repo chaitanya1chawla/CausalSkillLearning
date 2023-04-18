@@ -291,6 +291,7 @@ class DAPG_Dataset(Dataset):
 			self.filelist = self.short_file_list
 			self.dataset_length = len(self.data_list)
 			self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)
+			print("dataset lengths", self.dataset_trajectory_lengths.shape, self.dataset_trajectory_lengths)
 				
 		self.data_list_array = np.array(self.data_list)		
 
