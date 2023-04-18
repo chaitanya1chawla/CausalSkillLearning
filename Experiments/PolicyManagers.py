@@ -1410,7 +1410,6 @@ class PolicyManager_BaseClass():
 			index_list = np.concatenate([original_index_list, additional_index_list])		
 			
 		# 3) Sort based on dataset trajectory length. 
-		embed()
 		lengths = self.dataset.dataset_trajectory_lengths[index_list]
 		sorted_resampled_indices = np.argsort(lengths)[::-1]
 
