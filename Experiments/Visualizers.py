@@ -26,7 +26,7 @@ from PolicyNetworks import *
 import torch
 from moviepy.video.io.bindings import mplfig_to_npimage
 from PIL import Image
-import mj_envs
+# import robohive
 from mjrl.utils.gym_env import GymEnv
 from hand_imitation.env.environments.ycb_relocate_env import YCBRelocate
 
