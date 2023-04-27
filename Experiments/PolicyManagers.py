@@ -24,7 +24,8 @@ device = torch.device("cuda" if use_cuda else "cpu")
 torch.set_printoptions(sci_mode=False, precision=2)
 
 # Global data list
-global global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk', \
+global global_dataset_list 
+global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk', \
 			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG', \
 			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']
 class PolicyManager_BaseClass():
