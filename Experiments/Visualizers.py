@@ -1050,7 +1050,7 @@ class DexMVVisualizer(SawyerVisualizer):
 		self.set_joint_pose(joint_angles)
 
 		# Trying to use the sim render instead of the display based rendering, so that we can grab images.. 
-		img = np.flipud(self.environment.env.sim.render(600, 600))
+		img = np.flipud(self.environment.sim.render(600, 600))
 		if save_image:
 			image_object = Image.fromarray(img)
 			image_object.save("DexMVHand.jpg")
