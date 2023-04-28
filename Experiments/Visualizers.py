@@ -1025,6 +1025,8 @@ class DexMVVisualizer(SawyerVisualizer):
 
 	def set_joint_pose(self, joint_angles):
 
+		embed()
+		
 		state = self.environment.get_env_state()
 		qvel = np.zeros_like(state['qvel'])
 
