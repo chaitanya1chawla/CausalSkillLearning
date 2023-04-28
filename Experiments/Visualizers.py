@@ -1009,10 +1009,11 @@ class DexMVVisualizer(SawyerVisualizer):
 		# if task_id is None:
 		if task_id == self.env_name:
 			return
-		print("create_environment failed |", "task_id is None")
+		# print("create_environment failed |", "task_id is None")
 		self.environment = YCBRelocate(has_renderer=False, object_name="foam_brick", friction=(1, 0.5, 0.01),
 						object_scale=0.8, version="v2")
 		self.env_name = "relocate-v2"
+		self.environment.target_object_bid = 27
 		# 	return
 
 		# task_id = task_id[:-6]
@@ -1025,26 +1026,19 @@ class DexMVVisualizer(SawyerVisualizer):
 
 	def set_joint_pose(self, joint_angles):
 
-		embed()
-		
 		state = self.environment.get_env_state()
 		qvel = np.zeros_like(state['qvel'])
+		qpos = state['qpos']
 
 		if self.env_name == "relocate-v2":
-			hand_qpos = state['hand_qpos']
-			hand_qpos[:24] = joint_angles[:24]
-			obj_pos = 100*np.ones(3)
-			target_pos = -100*np.ones(3)
-			state['hand_qpos'] = hand_qpos
-			state['qpos'][:24] = state['hand_qpos']
-			state['obj_pos'] = obj_pos
-			state['target_pos'] = target_pos
+			obj_pos = 100*np.ones(7)
+			qpos[6:30] = joint_angles[:24]
+			qpos[30:37] = obj_pos[0:7]
 		else:
 			print("Unknown environment", self.env_name)
-
-		state['qvel'] = qvel		
-		self.environment.set_env_state(state)
-		self.environment.env.env.sim.forward()
+	
+		self.environment.set_state(qpos, qvel)
+		self.environment.sim.forward()
 
 	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False, save_image=False):
 		# print("Visualizing in", self.env_name)
