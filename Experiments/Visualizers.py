@@ -1032,7 +1032,7 @@ class DexMVVisualizer(SawyerVisualizer):
 
 		if self.env_name == "relocate-v2":
 			obj_pos = 100*np.ones(7)
-			qpos[6:30] = joint_angles[:24]
+			qpos[:30] = joint_angles[:30]
 			qpos[30:37] = obj_pos[0:7]
 		else:
 			print("Unknown environment", self.env_name)

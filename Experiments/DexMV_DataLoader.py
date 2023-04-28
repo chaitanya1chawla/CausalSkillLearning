@@ -61,7 +61,7 @@ class DexMV_PreDataset(Dataset):
 	def set_relevant_joints(self):
 
 		# Create index arrays
-		self.hand_joint_indices = list(range(0, 24))
+		self.hand_joint_indices = list(range(0, 30))
 
 		
 
