@@ -36,7 +36,7 @@ class DexMV_PreDataset(Dataset):
 		else:
 			self.dataset_directory = self.args.datadir
 		   
-		self.stat_dir_name = "DexMV"
+		self.stat_dir_name = "DexMVFull"
 
 		# 1) Keep track of joints: 
 		#   a) Full joint name list from https://github.com/vchoutas/smplx/blob/master/smplx/joint_names.py. 
@@ -161,7 +161,7 @@ class DexMV_PreDataset(Dataset):
 		return relevant_joints_datapoint
 
 	def getname(self):
-		return "DexMV"
+		return "DexMVFull"
 
 	def __len__(self):
 		return self.total_length
@@ -260,7 +260,7 @@ class DexMV_Dataset(Dataset):
 
 		# Some book-keeping first. 
 		self.args = args
-		self.stat_dir_name = 'DexMV'
+		self.stat_dir_name = 'DexMVFull'
 
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
@@ -311,7 +311,7 @@ class DexMV_Dataset(Dataset):
 
 
 	def getname(self):
-		return "DexMV"
+		return "DexMVFull"
 
 	def __len__(self):
 		# Return length of file list. 
