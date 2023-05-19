@@ -59,10 +59,17 @@ class DexMV_PreDataset(Dataset):
 		self.compute_statistics()
 
 	def set_relevant_joints(self):
+		
+		self.hand_joint_max = 30
+		self.object_joint_max = 43
 
 		# Create index arrays
-		self.hand_joint_indices = list(range(0, 30))
-		self.object_joint_indices = list(range(0, 7))
+		if self.getname() == "DexMVHand":
+			self.joint_indices = list(range(0, self.hand_joint_max))
+		elif self.getname() == "DexMVObject":
+			self.joint_indices = list(range(self.hand_joint_max, self.object_joint_max))
+		else:
+			self.joint_indices = list(range(0, self.object_joint_max))
 
 		
 
@@ -81,13 +88,13 @@ class DexMV_PreDataset(Dataset):
 		# sampled_joints = datapoint[:, :]
 
 		self.set_relevant_joints()
-		return datapoint[:, self.hand_joint_indices]
+		return datapoint[:, self.joint_indices]
 		
 	def setup(self):
 
 		# Load all files.. 
 		self.files = []
-		self.object_files = []
+		# self.object_files = []
 		self.dataset_trajectory_lengths = np.zeros(self.total_length)
 		
 		# set joints
@@ -106,18 +113,23 @@ class DexMV_PreDataset(Dataset):
 
 			for item in set:
 
-				embed()
+				# embed()
 				datapoint = set[item]['observations']
-				objects_datapoint = set[item]['object']
+				# objects_datapoint = set[item]['object']
 
 				# Subsample relevant joints. 
 				# Modified for different dimensions by file.
 				v = v.replace(self.dataset_directory, '')
 
-				relevant_joints_datapoint = self.subsample_relevant_joints(datapoint, v)
-				relevant_objects_datapoint = self.subsample_relevant_object_joints(objects_datapoint, v)
+
+				# Add padding to align the object environment sizes
+				datapoint_padded = np.pad(datapoint, [(0, self.object_joint_max - datapoint.shape[i]) for i in range(len(datapoint.shape))], "constant")
+
+
+				relevant_joints_datapoint = self.subsample_relevant_joints(datapoint_padded, v)
+				# relevant_objects_datapoint = self.subsample_relevant_object_joints(objects_datapoint, v)
 				print("Preloading from", v, "with shape", relevant_joints_datapoint.shape)
-				print("Preloading objects from", v, "with shape", relevant_objects_datapoint.shape)
+				# print("Preloading objects from", v, "with shape", relevant_objects_datapoint.shape)
 
 
 
@@ -125,32 +137,32 @@ class DexMV_PreDataset(Dataset):
 
 				# Reshape. 
 				reshaped_normalized_datapoint = relevant_joints_datapoint.reshape(relevant_joints_datapoint.shape[0],-1)
-				reshaped_normalized_object_datapoint = relevant_objects_datapoint.reshape(relevant_objects_datapoint.shape[0],-1)
+				# reshaped_normalized_object_datapoint = relevant_objects_datapoint.reshape(relevant_objects_datapoint.shape[0],-1)
 
 
-				self.state_size = reshaped_normalized_datapoint.shape[1] + reshaped_normalized_object_datapoint.shape[1]
+				self.state_size = reshaped_normalized_datapoint.shape[1]
 
 				# Subsample in time. 
 				number_of_timesteps = datapoint.shape[0]//self.ds_freq
 				# subsampled_data = resample(relevant_joints_datapoint, number_of_timesteps)
 				subsampled_data = resample(reshaped_normalized_datapoint, number_of_timesteps)
-				subsampled_object_data = resample(reshaped_normalized_object_datapoint, number_of_timesteps)
+				# subsampled_object_data = resample(reshaped_normalized_object_datapoint, number_of_timesteps)
 				
 
 				# Add subsampled datapoint to file. 
 				self.files.append(subsampled_data)      
-				self.files2.append(subsampled_object_data)      
+				# self.files2.append(subsampled_object_data)      
 			self.cumulative_num_demos.append(len(self.files))
 			print("Cumulative length:", len(self.files))      
 
 		# Create array. 
 		self.file_array = np.array(self.files)
-		self.object_file_array = np.array(self.object_files)
+		# self.object_file_array = np.array(self.object_files)
 
 		# Now save this file.
 		# np.save(os.path.join(self.dataset_directory,"GRAB_DataFile.npy"), self.file_array)
 		np.save(os.path.join(self.dataset_directory, self.getname() + "_DataFile_BaseNormalize.npy"), self.file_array)
-		np.save(os.path.join(self.dataset_directory, self.getname() + "_Object_DataFile_BaseNormalize.npy"), self.object_file_array)
+		# np.save(os.path.join(self.dataset_directory, self.getname() + "_Object_DataFile_BaseNormalize.npy"), self.object_file_array)
 
 		np.save(os.path.join(self.dataset_directory, self.getname() + "_OrderedFileList.npy"), self.filelist)
 
@@ -169,9 +181,9 @@ class DexMV_PreDataset(Dataset):
 	def __getitem__(self, index):
 		
 		if isinstance(index, np.ndarray):
-			return list(self.file_array[index]), list(self.object_file_array[index])
+			return list(self.file_array[index])
 		else:
-			return self.file_array[index], self.object_file_array[index]
+			return self.file_array[index]
 
 	def compute_statistics(self):
 
@@ -194,7 +206,7 @@ class DexMV_PreDataset(Dataset):
 			data_element = {}
 			data_element['is_valid'] = True
 			data_element['demo'] = self.file_array[i]
-			data_element['object'] = self.object_file_array[i]
+			# data_element['object'] = self.object_file_array[i]
 			data_element['file'] = self.filelist[i]
 
 			if data_element['is_valid']:
@@ -219,7 +231,7 @@ class DexMV_PreDataset(Dataset):
 			data_element = {}
 			data_element['is_valid'] = True
 			data_element['demo'] = self.file_array[i]
-			data_element['object'] = self.object_file_array[i]
+			# data_element['object'] = self.object_file_array[i]
 			data_element['file'] = self.filelist[i]
 			
 			# Just need to normalize the demonstration. Not the rest. 
@@ -272,7 +284,7 @@ class DexMV_Dataset(Dataset):
 		   
 		# Load file.
 		self.data_list = np.load(os.path.join(self.dataset_directory, self.getname() + "_DataFile_BaseNormalize.npy"), allow_pickle=True)
-		self.object_data_list = np.load(os.path.join(self.dataset_directory, self.getname() + "_Object_DataFile_BaseNormalize.npy"), allow_pickle=True)
+		# self.object_data_list = np.load(os.path.join(self.dataset_directory, self.getname() + "_Object_DataFile_BaseNormalize.npy"), allow_pickle=True)
 		self.filelist = np.load(os.path.join(self.dataset_directory, self.getname() + "_OrderedFileList.npy"), allow_pickle=True)
 		self.cumulative_num_demos = np.load(os.path.join(self.dataset_directory, self.getname() + "_Lengths.npy"), allow_pickle=True)
 
@@ -281,13 +293,13 @@ class DexMV_Dataset(Dataset):
 
 		if self.args.dataset_traj_length_limit>0:			
 			self.short_data_list = []
-			self.short_data_list2 = []
+			# self.short_data_list2 = []
 			self.short_file_list = []
 			self.dataset_trajectory_lengths = []
 			for i in range(self.dataset_length):
 				if self.data_list[i].shape[0]<self.args.dataset_traj_length_limit:
 					self.short_data_list.append(self.data_list[i])
-					self.short_data_list2.append(self.object_data_list[i])
+					# self.short_data_list2.append(self.object_data_list[i])
 					self.dataset_trajectory_lengths.append(self.data_list[i].shape[0])
 
 			for i in range(len(self.filelist)):
@@ -295,7 +307,7 @@ class DexMV_Dataset(Dataset):
 
 
 			self.data_list = self.short_data_list
-			self.object_data_list = self.short_data_list2
+			# self.object_data_list = self.short_data_list2
 			self.filelist = self.short_file_list
 			self.dataset_length = len(self.data_list)
 			self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)
@@ -328,9 +340,82 @@ class DexMV_Dataset(Dataset):
 
 		data_element = {}
 		data_element['is_valid'] = True
-		data_element['robot-demo'] = self.data_list[index]
-		data_element['object-state'] = self.object_data_list[index]
-		data_element['demo'] = np.concatenate((self.data_list[index], self.object_data_list[index]), axis=1)
+		data_element['demo'] = self.data_list[index]
+		# data_element['object-state'] = self.object_data_list[index]
+		# data_element['demo'] = np.concatenate((self.data_list[index], self.object_data_list[index]), axis=1)
+		# task_index = np.searchsorted(self.cumulative_num_demos, index, side='right')-1
+		# data_element['file'] = self.filelist[task_index][81:-7]
+		data_element['file'] = self.environment_names[index]
+		data_element['task_id'] = index
+		# print("Printing the index and the task ID from dataset:", index, data_element['file'])
+
+		return data_element
+	
+
+class DexMV_ObjectDataset(DexMV_Dataset):
+
+	def __init__(self, args):
+
+		super().__init__(args)
+		self.stat_dir_name = 'DexMVObject'
+
+	def getname(self):
+		return "DexMVObject"
+
+	def __len__(self):
+		# Return length of file list. 
+		return self.dataset_length
+
+	def __getitem__(self, index):
+		# Return n'th item of dataset.
+		# This has already processed everything.
+
+		# if isinstance(index,np.ndarray):			
+		# 	return list(self.data_list_array[index])
+		# else:
+		# 	return self.data_list[index]
+
+		data_element = {}
+		data_element['is_valid'] = True
+		data_element['demo'] = self.data_list[index][:, 30:43]
+		# data_element['object-state'] = self.object_data_list[index]
+		# data_element['demo'] = np.concatenate((self.data_list[index], self.object_data_list[index]), axis=1)
+		# task_index = np.searchsorted(self.cumulative_num_demos, index, side='right')-1
+		# data_element['file'] = self.filelist[task_index][81:-7]
+		data_element['file'] = self.environment_names[index]
+		data_element['task_id'] = index
+		# print("Printing the index and the task ID from dataset:", index, data_element['file'])
+
+		return data_element
+	
+class DexMV_HandDataset(DexMV_Dataset):
+
+	def __init__(self, args):
+
+		super().__init__(args)
+		self.stat_dir_name = 'DexMVHand'
+
+	def getname(self):
+		return "DexMVHand"
+
+	def __len__(self):
+		# Return length of file list. 
+		return self.dataset_length
+
+	def __getitem__(self, index):
+		# Return n'th item of dataset.
+		# This has already processed everything.
+
+		# if isinstance(index,np.ndarray):			
+		# 	return list(self.data_list_array[index])
+		# else:
+		# 	return self.data_list[index]
+
+		data_element = {}
+		data_element['is_valid'] = True
+		data_element['demo'] = self.data_list[index][:, 0:30]
+		# data_element['object-state'] = self.object_data_list[index]
+		# data_element['demo'] = np.concatenate((self.data_list[index], self.object_data_list[index]), axis=1)
 		# task_index = np.searchsorted(self.cumulative_num_demos, index, side='right')-1
 		# data_element['file'] = self.filelist[task_index][81:-7]
 		data_element['file'] = self.environment_names[index]
