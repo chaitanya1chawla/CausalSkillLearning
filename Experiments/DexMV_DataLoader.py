@@ -388,7 +388,7 @@ class DexMV_ObjectDataset(DexMV_Dataset):
 
 		return data_element
 	
-class DexMV_HandDataset(DexMV_Dataset):
+class DexMVHand_Dataset(DexMV_Dataset):
 
 	def __init__(self, args):
 

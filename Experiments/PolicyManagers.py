@@ -1721,7 +1721,31 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
 
-		elif self.args.data in ['DexMV', 'DexMVHand']:
+		elif self.args.data in ['DexMV']:
+			
+			self.state_size = 43
+			self.state_dim = 43
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 0
+			stat_dir_name = self.args.data
+
+			stat_dir_name = "DexMVFull"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+			self.norm_sub_value = self.norm_sub_value[:, self.state_dim]
+			self.norm_denom_value = self.norm_denom_value[:, self.state_dim]
+		
+		elif self.args.data in ['DexMVHand']:
 			
 			self.state_size = 30
 			self.state_dim = 30
@@ -1733,7 +1757,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.test_set_size = 0
 			stat_dir_name = self.args.data
 
-			stat_dir_name = "DexMV"			
+			stat_dir_name = "DexMVFull"			
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
@@ -1742,6 +1766,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+			self.norm_sub_value = self.norm_sub_value[:, self.state_dim]
+			self.norm_denom_value = self.norm_denom_value[:, self.state_dim]
+
 
 		elif self.args.data in ['RoboturkObjects','RoboMimicObjects']:
 			# self.state_size = 14
@@ -2283,7 +2310,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		elif self.args.data in ['DAPG']:
 			self.state_dim = 30
 			self.rollout_timesteps = self.traj_length
-		elif self.args.data in ['DexMV', 'DexMVHand']:
+		elif self.args.data in ['DexMV']:
+			self.state_dim = 43
+			self.rollout_timesteps = self.traj_length
+		elif self.args.data in ['DexMVHand']:
 			self.state_dim = 30
 			self.rollout_timesteps = self.traj_length
 
@@ -2543,7 +2573,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			if self.args.data in ['DAPG']:
 				self.state_dim = 30
 				self.rollout_timesteps = self.traj_length
-			if self.args.data in ['DexMV', 'DexMVHand']:
+			elif self.args.data in ['DexMV']:
+				self.state_dim = 43
+				self.rollout_timesteps = self.traj_length
+			elif self.args.data in ['DexMVHand']:
 				self.state_dim = 30
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['RoboturkObjects']:
@@ -3044,7 +3077,35 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
 
-		elif self.args.data in ['DexMV', 'DexMVHand']:
+		elif self.args.data in ['DexMV']:
+			
+			self.state_size = 43
+			self.state_dim = 43
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 0
+			stat_dir_name = self.args.data
+			self.conditional_information = None
+			self.conditional_viz_env = False	
+
+			self.visualizer = DexMVVisualizer(args=self.args)
+
+			stat_dir_name = "DexMVFull"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+			self.norm_sub_value = self.norm_sub_value[:, self.state_dim]
+			self.norm_denom_value = self.norm_denom_value[:, self.state_dim]
+
+		elif self.args.data in ['DexMVHand']:
 			
 			self.state_size = 30
 			self.state_dim = 30
@@ -3060,7 +3121,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			self.visualizer = DexMVVisualizer(args=self.args)
 
-			stat_dir_name = "DexMV"			
+			stat_dir_name = "DexMVFull"			
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
@@ -3069,6 +3130,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+			self.norm_sub_value = self.norm_sub_value[:, self.state_dim]
+			self.norm_denom_value = self.norm_denom_value[:, self.state_dim]
+			
 
 		elif self.args.data=='RoboturkObjects':
 			# self.state_size = 14
