@@ -123,7 +123,7 @@ class DexMV_PreDataset(Dataset):
 
 
 				# Add padding to align the object environment sizes
-				datapoint_padded = np.pad(datapoint, [(0, self.object_joint_max - datapoint.shape[i]) for i in range(len(datapoint.shape))], "constant")
+				datapoint_padded = np.pad(datapoint, (0, self.object_joint_max - datapoint.shape[1]), "constant")
 
 
 				relevant_joints_datapoint = self.subsample_relevant_joints(datapoint_padded, v)
