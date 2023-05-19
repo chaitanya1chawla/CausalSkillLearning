@@ -62,6 +62,7 @@ class DexMV_PreDataset(Dataset):
 
 		# Create index arrays
 		self.hand_joint_indices = list(range(0, 30))
+		self.object_joint_indices = list(range(0, 7))
 
 		
 
