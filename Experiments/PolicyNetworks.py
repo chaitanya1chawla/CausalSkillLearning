@@ -5,8 +5,6 @@
 # LICENSE file in the root directory of this source tree.
 
 from headers import *
-
-
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")

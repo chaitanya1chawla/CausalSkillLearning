@@ -28,6 +28,7 @@ global global_dataset_list
 global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk', \
 			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG', \
 			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']
+
 class PolicyManager_BaseClass():
 
 	def __init__(self):
@@ -455,6 +456,12 @@ class PolicyManager_BaseClass():
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
+		# print("Embed after setting visualizer")
+		# embed()
+		# SETTING SEED
+		np.random.seed(seed=self.args.seed)
+
+
 		#####################################################
 		# Get latent z sets.
 		#####################################################
@@ -646,8 +653,9 @@ class PolicyManager_BaseClass():
 			########################################
 			# Numpy-fy and subsample. (It's 1x|S|, that's why we need to index into first dimension.)
 			########################################
-
-			action_np = action.detach().cpu().numpy()[0,:8]
+			
+			# action_np = action.detach().cpu().numpy()[0,:8]			
+			action_np = action.detach().cpu().squeeze(0).numpy()[:8]
 
 			########################################
 			# Unnormalize action.
@@ -772,7 +780,7 @@ class PolicyManager_BaseClass():
 			# Return - remember this is already a torch tensor now.
 			return next_state, None
 
-	def rollout_robot_trajectory(self, trajectory_start, latent_z, rollout_length=None, z_seq=False):
+	def rollout_robot_trajectory(self, trajectory_start, latent_z, rollout_length=None, z_seq=False, original_trajectory=None):
 
 		rendered_rollout_trajectory = []
 		
@@ -819,17 +827,39 @@ class PolicyManager_BaseClass():
 
 		for t in range(length):
 			
+			# print("Pause in rollout")
+			# embed()
+			current_state = subpolicy_inputs[t,:self.state_dim].clone().detach().cpu().numpy()
+
 			########################################
 			# 3) Get action from policy. 
 			########################################
-			# Assume we always query the policy for actions with batch_size 1 here. 
-			actions = self.policy_network.get_actions(subpolicy_inputs, greedy=True, batch_size=1)
+			
+			# Check if we're visualizing the GT trajectory. 
+			if self.args.viz_gt_sim_rollout:
+				# If we are, then get the action from the original trajectory, not the policy. 
 
-			# Select last action to execute. 
-			action_to_execute = actions[-1].squeeze(1)
+				# Open loop trajectory execution.
+				action_to_execute_ol = torch.from_numpy(original_trajectory[t+1]-original_trajectory[t]).cuda()
+				# Closed loop 
+				action_to_execute_cl = torch.from_numpy(original_trajectory[t+1]-current_state).cuda()
 
-			# Downscale the actions by action_scale_factor.
-			action_to_execute = action_to_execute/self.args.action_scale_factor
+				action_to_execute = action_to_execute_cl
+
+				print("T:", t, " S:", current_state[:8])
+				print("A_ol:", action_to_execute_ol[:8].cpu().numpy())
+				print("A_cl:", action_to_execute_cl[:8].cpu().numpy())
+
+				
+			else:
+				# Assume we always query the policy for actions with batch_size 1 here. 
+				actions = self.policy_network.get_actions(subpolicy_inputs, greedy=True, batch_size=1)
+
+				# Select last action to execute. 
+				action_to_execute = actions[-1].squeeze(1)
+
+				# Downscale the actions by action_scale_factor.
+				action_to_execute = action_to_execute/self.args.action_scale_factor
 
 			########################################
 			# 4) Compute next state. 
@@ -847,7 +877,7 @@ class PolicyManager_BaseClass():
 			input_row = torch.zeros((1,2*self.state_dim+self.latent_z_dimensionality)).to(device).float()
 			input_row[0,:self.state_dim] = new_state
 			# Feed in the ORIGINAL prediction from the network as input. Not the downscaled thing. 
-			input_row[0,self.state_dim:2*self.state_dim] = actions[-1].squeeze(1)
+			input_row[0,self.state_dim:2*self.state_dim] = action_to_execute
 
 			if z_seq:
 				input_row[0,2*self.state_dim:] = torch.tensor(latent_z[t+1]).to(device).float()
@@ -887,7 +917,7 @@ class PolicyManager_BaseClass():
 
 		print("Rollout length:", trajectory.shape[0])
 		self.visualizer.create_environment(task_id=env_name)
-		trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq)
+		trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq, original_trajectory=trajectory)
 
 		########################################
 		# 3) Unnormalize data. 
@@ -948,8 +978,13 @@ class PolicyManager_BaseClass():
 		if self.args.viz_sim_rollout:
 			# No call to visualizer here means we have to save things on our own. 
 			self.rollout_gif = rendered_rollout_trajectory
-			self.visualizer.visualize_prerendered_gif(self.rollout_gif, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_SimRollout.gif".format(i))
-			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_SimRollout.png".format(i)))		
+			
+			# Set prefix...
+			prefix_list = ['Sim','GTSim']
+			gtsim_prefix = prefix_list[self.args.viz_gt_sim_rollout]
+
+			self.visualizer.visualize_prerendered_gif(self.rollout_gif, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_{1}Rollout.gif".format(i, gtsim_prefix))
+			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_{1}Rollout.png".format(i, gtsim_prefix)))		
 		else:
 			self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_Rollout.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_Rollout.png".format(i)))
@@ -1014,7 +1049,11 @@ class PolicyManager_BaseClass():
 
 		# Adding prefix.
 		if self.args.viz_sim_rollout:
-			sim_or_not = 'Sim'
+			# Modifying prefix based on whether we're visualizing GT Or rollout.
+			if self.args.viz_gt_sim_rollout:
+				sim_or_not = 'GT_Sim'
+			else: 
+				sim_or_not = 'Sim'
 		else:
 			sim_or_not = 'Viz'
 
@@ -1351,6 +1390,8 @@ class PolicyManager_BaseClass():
 		#######################################################################
 		# New extent...
 		self.extent = len(np.concatenate(self.task_based_shuffling_blocks))
+		# Try setting  training extent to same hting...
+		self.training_extent = len(np.concatenate(self.task_based_shuffling_blocks))
 
 	def trajectory_length_based_shuffling(self, extent, shuffle=True):
 		
@@ -1501,9 +1542,12 @@ class PolicyManager_BaseClass():
 			
 			# if isinstance(self, PolicyManager_Transfer):
 			# Also create an index list to shuffle the order of blocks that we observe...
-			self.index_list = np.arange(0,extent)				
-			np.random.shuffle(self.index_list)
-		
+
+			# 
+			# self.index_list = np.arange(0,extent)				
+			# np.random.shuffle(self.index_list)
+			self.random_shuffle(extent)
+
 		# Random shuffling.
 		else:
 
@@ -1511,7 +1555,6 @@ class PolicyManager_BaseClass():
 			# Single element based shuffling because datasets are ordered
 			################################
 			self.random_shuffle(extent)
-
 
 class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
@@ -1523,6 +1566,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			super(PolicyManager_Pretrain, self).__init__()
 
 		self.args = args
+		# Fixing seeds.
+		print("Setting random seeds.")
+		np.random.seed(seed=self.args.seed)
+		torch.manual_seed(self.args.seed)	
+
 		self.data = self.args.data
 		# Not used if discrete_z is false.
 		self.number_policies = number_policies
@@ -2441,6 +2489,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		if model:
 			self.load_all_models(model)
+
+		# Set seed. 
+
 
 		np.set_printoptions(suppress=True,precision=2)
 
