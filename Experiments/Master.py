@@ -78,12 +78,14 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = DAPG_DataLoader.DAPG_PreDataset(args)
 	elif args.data=='DAPG':
 		dataset = DAPG_DataLoader.DAPG_Dataset(args)
-	elif args.data=='DexMVPreproc' or args.data=='DexMVHandPreproc':
+	elif args.data in ['DexMVPreproc', 'DexMVHandPreproc', 'DexMVObjectPreproc']:
 		dataset = DexMV_DataLoader.DexMV_PreDataset(args)
 	elif args.data=='DexMV':
 		dataset = DexMV_DataLoader.DexMV_Dataset(args)
 	elif args.data=='DexMVHand':
 		dataset = DexMV_DataLoader.DexMVHand_Dataset(args)
+	elif args.data=='DexMVObject':
+		dataset = DexMV_DataLoader.DexMV_ObjectDataset(args)
 	return dataset
 
 class Master():
