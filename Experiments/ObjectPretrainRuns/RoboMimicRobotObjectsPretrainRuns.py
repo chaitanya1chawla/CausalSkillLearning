@@ -47,4 +47,17 @@ scp /data/tanmayshankar/TrainingLogs/RMROP_001/saved_models/Model_epoch1995 tsha
 
 scp /data/tanmayshankar/TrainingLogs/RMOP_001/saved_models/Model_epoch1995 tshankar@bach:~/../../data/tanmayshankar/TrainingLogs/RMOP_001/saved_models/
 
-// CUDA_VISIBLE_DEVICES=0 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_001_Vid --data=RoboMimicRobotObjects --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=/data/tanmayshankar/TrainingLogs/ --model=/data/tanmayshankar/TrainingLogs/RMOP_001/saved_models/Model_epoch1995 --task_based_shuffling=1 --viz_sim_rollout=0
+// CUDA_VISIBLE_DEVICES=0 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_001_Vid --data=RoboMimicRobotObjects --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1--epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=/data/tanmayshankar/TrainingLogs/ --model=/data/tanmayshankar/TrainingLogs/RMOP_001/saved_models/Model_epoch1995 --task_based_shuffling=1 --viz_sim_rollout=1 --viz_gt_sim_rollout=0 --seed=0
+
+#########################################
+# Copying template roboturk run
+/ CUDA_VISIBLE_DEVICES=1 python Master.py --train=0 --setting=pretrain_sub --name=RT_NewObjectPoseset_v121_p0501_n05500 --data=RoboturkRobotObjects --kl_weight=0.001 --var_skill_length=1 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/Roboturk/ --smoothen=0 --task_based_shuffling=1 --logdir=/data/tanmayshankar/TrainingLogs/ --z_dimensions=32 --split_stream_encoder=1 --model=/data/tanmayshankar/TrainingLogs/RT_RO_JointSpace_Pre_104/saved_models/Model_epoch2000 --sim_viz_action_scale_factor=1 --sim_viz_step_repetition=20 --viz_sim_rollout=1 --viz_gt_sim_rollout=0 --seed=2
+
+#############################
+# Rerun RMOP
+// CUDA_VISIBLE_DEVICES=0 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_001_NewViz2 --data=RoboMimicRobotObjects --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=/data/tanmayshankar/TrainingLogs/ --model=/data/tanmayshankar/TrainingLogs/RMOP_001/saved_models/Model_epoch1995 --task_based_shuffling=1 --viz_sim_rollout=0 --viz_gt_sim_rollout=0 --seed=0
+
+# 
+#############################
+# Rerun RMOP
+// CUDA_VISIBLE_DEVICES=0 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_001_NewViz3 --data=RoboMimicRobotObjects --kl_weight=0.001 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=/data/tanmayshankar/TrainingLogs/ --model=/data/tanmayshankar/TrainingLogs/RMOP_001/saved_models/Model_epoch1995 --task_based_shuffling=1 --viz_sim_rollout=0 --viz_gt_sim_rollout=0 --seed=0

@@ -83,7 +83,7 @@ class GRAB_PreDataset(Dataset):
 		self.total_length = len(self.filelist)
 
 		# Set downsampling frequency.
-		self.ds_freq = 16        
+		self.ds_freq = 16
 
 		# Setup. 
 		self.setup()

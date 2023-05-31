@@ -2198,6 +2198,11 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 				
 		return robot_input, env_input
 
+	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
+		# robot_latent_z, robot_logprob, robot_entropy, robot_kl_divergence = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample)
+
+		return super().forward(input, epsilon=epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=z_sample_to_evaluate)
+
 	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
 
 		# (1) Split input. 
@@ -2228,8 +2233,6 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 			# (2b) Run forward on env stream.		
 			env_latent_z, env_logprob, env_entropy, env_kl_divergence = super().forward(env_input, epsilon, network_dict=self.env_network_dict, size_dict=self.env_size_dict, z_sample_to_evaluate=env_z_sample)
 
-			# print("Embedding in forward")
-			# embed()
 
 			##################################
 			# (3) Aggregate stream outputs. 

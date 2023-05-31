@@ -890,7 +890,7 @@ class PolicyManager_BaseClass():
 		
 		return trajectory, rendered_rollout_trajectory
 		
-	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None):		
+	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None):
 
 		########################################
 		# 1) Get task ID. 
@@ -908,15 +908,13 @@ class PolicyManager_BaseClass():
 			env_name = self.dataset.environment_names[task_id]
 			print("Visualizing a trajectory of task:", env_name)
 
-		# print('Embed in get robot visuals.')
-		# embed()
-
 		########################################
 		# 2) Feed Z into policy, rollout trajectory.
 		########################################
 
 		print("Rollout length:", trajectory.shape[0])
 		self.visualizer.create_environment(task_id=env_name)
+
 		trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq, original_trajectory=trajectory)
 
 		########################################
@@ -935,14 +933,6 @@ class PolicyManager_BaseClass():
 			animation_object = self.dataset[i]['animation']
 
 		print("We are in the PM visualizer function.")
-
-		# Set task ID if the visualizer needs it. 
-		if indexed_data_element is not None and self.args.data == 'DAPG':
-			env_name = indexed_data_element['file']
-			print("Visualizing trajectory in task environment:", env_name)
-		elif indexed_data_element is None or ('task_id' not in indexed_data_element.keys()):
-			task_id = None
-			env_name = None
 
 		if self.args.data=='Mocap':
 			# Get animation object from dataset. 
@@ -2666,6 +2656,93 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Format with name.
 		plt.savefig("{0}/Embedding_Joint_{1}.png".format(self.dir_name,self.args.name))
 		plt.close()
+
+	def nearest_neighbor_forward_inverse_models(self):
+		
+		####################################
+		# Algorithm to construct models
+		####################################
+
+		# 0) Assume that the encoder(s) are trained, and that the latent space is trained.
+		# 1) Maintain map of Z_R <--> Z_E. 
+		# 	1a) Check that the latent_z_sets are tuples. 
+		# 2) Construct KD Trees. 
+		# 	2a) KD_R = KDTREE( {Z_R} )
+		# 	2b) KD_E = KDTREE( {Z_E} )
+		
+		# self.kdtree_robot_z = KDTree()
+		# self.kdtree_env_z = KDTree()
+
+		pass 
+
+	def retrieve_desired_nn_env_abstraction(self, robot_state_action_trajectory):
+
+		####################################
+		# Query, given a robot trajectory
+		####################################
+
+		# 0) Assumes that we have a concatenation of states and actions.
+		# 1) z_r = E_r (Tau_r)
+		# 2) z_r^{*NN} = KDT_r.query(z_r)
+		# 3) z_e^* = Map (z_r^{*NN} --> Z_E)
+
+		# 1) Query Robot Encoder for the Robot Trajectory. 
+		# Well, we just run super.forward() of the encoder network, which is a continuous factored encoder
+		# which inherits its forward function from the continuous encoder. 
+		# We can run forward for just the individual stream, using this template. 
+		# robot_latent_z, robot_logprob, robot_entropy, robot_kl_divergence = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample)
+		
+		# Do not need epsilon or eval. 
+		retrieved_z_r, _, _, _ = self.encoder_network.run_super_forward(robot_state_action_trajectory, epsilon=0.0, \
+			network_dict=self.encoder_network.robot_network_dict, size_dict=self.encoder_network.robot_size_dict)
+		
+		# 2) Query KD Tree with encoding of given robot trajectory. 
+		_, z_r_nearest_neighbor_index = self.kdtree_robot_z.query(retrieved_z_r)
+
+		# 3) Retrieve corresponding env abstraction.
+		desired_z_e = self.robot_latent_z_set[z_r_nearest_neighbor_index]
+
+		return desired_z_e
+
+	def retrieve_desired_nn_robot_abstraction(self, env_state_action_trajectory):
+		
+		####################################
+		# Query, given an env trajectory
+		####################################
+
+		# 0) Assumes that we have a concatenation of states and actions.
+		# 1) z_e = E_e (Tau_e)
+		# 2) z_e^{*NN} = KDT_e.query(z_e)
+		# 3) z_r^* = Map (z_e^{*NN} --> Z_R)
+
+		# 1) Query Env Encoder for the Env Trajectory. 
+		# Well, we just run super.forward() of the encoder network, which is a continuous factored encoder
+		# which inherits its forward function from the continuous encoder. 
+		
+		# Do not need epsilon or eval. 
+		retrieved_z_e, _, _, _ = self.encoder_network.run_super_forward(env_state_action_trajectory, epsilon=0.0, \
+			network_dict=self.encoder_network.env_network_dict, size_dict=self.encoder_network.env_size_dict)
+		
+		# 2) Query KD Tree with encoding of given env trajectory. 
+		_, z_e_nearest_neighbor_index = self.kdtree_robot_e.query(retrieved_z_e)
+
+		# 3) Retrieve corresponding robot abstraction.
+		desired_z_r = self.env_latent_z_set[z_e_nearest_neighbor_index]
+
+		return desired_z_r
+
+	def retrieve_desired_network_env_abstraction(self, robot_state_action_trajectory):
+
+		pass
+
+	def retrieve_desired_network_robot_abstraction(self, env_state_action_trajectory):
+
+		pass
+
+	def define_forward_inverse_models(self):
+
+		pass
+	
 
 class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
