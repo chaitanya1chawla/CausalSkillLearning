@@ -320,16 +320,30 @@ class GRAB_PreDataset(Dataset):
 				print("Loading file: ",k)
 
 			# Now actually load file. 
-			datapoint = np.load(v, allow_pickle=True)['body_joints']			
+			datapoint = np.load(v, allow_pickle=True)['body_joints']	
 
+			# Get object filepath
+			object_path = v.replace("GRAB_Joints", "grab").replace("_body_joints.npz", ".npz")
+
+			# Load object data
+			object_dict_raw = np.load(object_path, allow_pickle=True)
+			object_dict = object_dict_raw['object'].flatten()[0]
+			object_transl = object_dict['params']['transl']
+			object_orient = object_dict['params']['global_orient']
+			object_datapoint = np.concatenate(object_transl, object_orient, axis=1)
+
+		# Without normalizing object:
 			# Subsample relevant joints. 
 			relevant_joints_datapoint = self.subsample_relevant_joints(datapoint)
 
 			# Normalize using the pelvis joint (i.e. the first joint).
 			normalized_relevant_joint_datapoint = self.normalize(relevant_joints_datapoint)
 
+		# Combine object + body joints
+			normalized_relevant_joint_datapoint_with_objects = np.concatenate(normalized_relevant_joint_datapoint, object_datapoint, axis=1)
+
 			# Reshape. 
-			reshaped_normalized_datapoint = normalized_relevant_joint_datapoint.reshape(normalized_relevant_joint_datapoint.shape[0],-1)
+			reshaped_normalized_datapoint = normalized_relevant_joint_datapoint.reshape(normalized_relevant_joint_datapoint_with_objects.shape[0],-1)
 
 			self.state_size = reshaped_normalized_datapoint.shape[1]
 
