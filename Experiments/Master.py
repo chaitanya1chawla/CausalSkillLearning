@@ -74,6 +74,14 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = GRAB_DataLoader.GRABHand_PreDataset(args)
 	elif args.data=='GRABHand':
 		dataset = GRAB_DataLoader.GRABHand_Dataset(args)
+	elif args.data=='GRABArmHandObjectPreproc':
+		dataset = GRAB_DataLoader.GRABArmHandObject_PreDataset(args)
+	elif args.data=='GRABArmHandObject':
+		dataset = GRAB_DataLoader.GRABArmHandObject_Dataset(args)
+	elif args.data=='GRABObjectPreproc':
+		dataset = GRAB_DataLoader.GRABObject_PreDataset(args)
+	elif args.data=='GRABObject':
+		dataset = GRAB_DataLoader.GRABObject_Dataset(args)
 	elif args.data=='DAPGPreproc':
 		dataset = DAPG_DataLoader.DAPG_PreDataset(args)
 	elif args.data=='DAPG':
