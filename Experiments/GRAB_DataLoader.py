@@ -341,7 +341,7 @@ class GRAB_PreDataset(Dataset):
 			object_dict = object_dict_raw['object'].flatten()[0]
 			object_transl = object_dict['params']['transl']
 			object_orient = object_dict['params']['global_orient']
-			object_datapoint = np.concatenate(object_transl, object_orient, axis=1)
+			object_datapoint = np.concatenate((object_transl, object_orient), axis=1)
 
 		# Without normalizing object:
 			# Subsample relevant joints. 
@@ -351,7 +351,7 @@ class GRAB_PreDataset(Dataset):
 			normalized_relevant_joint_datapoint = self.normalize(relevant_joints_datapoint)
 
 		# Combine object + body joints
-			normalized_relevant_joint_datapoint_with_objects = np.concatenate(normalized_relevant_joint_datapoint, object_datapoint, axis=1)
+			normalized_relevant_joint_datapoint_with_objects = np.concatenate((normalized_relevant_joint_datapoint, object_datapoint), axis=1)
 
 			# Reshape. 
 			reshaped_normalized_datapoint = normalized_relevant_joint_datapoint.reshape(normalized_relevant_joint_datapoint_with_objects.shape[0],-1)
