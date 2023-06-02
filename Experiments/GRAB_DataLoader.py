@@ -341,6 +341,9 @@ class GRAB_PreDataset(Dataset):
 			object_dict = object_dict_raw['object'].flatten()[0]
 			object_transl = object_dict['params']['transl']
 			object_orient = object_dict['params']['global_orient']
+
+			embed()
+
 			object_datapoint = np.concatenate((object_transl, object_orient), axis=1)
 
 		# Without normalizing object:
