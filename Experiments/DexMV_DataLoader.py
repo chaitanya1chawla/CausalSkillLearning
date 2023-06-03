@@ -354,17 +354,9 @@ class DexMV_Dataset(Dataset):
 
 class DexMV_ObjectDataset(DexMV_Dataset):
 
-	def __init__(self, args):
-
-		super().__init__(args)
-		self.stat_dir_name = 'DexMVObject'
 
 	def getname(self):
 		return "DexMVObject"
-
-	def __len__(self):
-		# Return length of file list. 
-		return self.dataset_length
 
 	def __getitem__(self, index):
 		# Return n'th item of dataset.
@@ -390,17 +382,8 @@ class DexMV_ObjectDataset(DexMV_Dataset):
 	
 class DexMVHand_Dataset(DexMV_Dataset):
 
-	def __init__(self, args):
-
-		super().__init__(args)
-		self.stat_dir_name = 'DexMVHand'
-
 	def getname(self):
 		return "DexMVHand"
-
-	def __len__(self):
-		# Return length of file list. 
-		return self.dataset_length
 
 	def __getitem__(self, index):
 		# Return n'th item of dataset.

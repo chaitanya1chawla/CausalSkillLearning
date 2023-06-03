@@ -82,10 +82,14 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = GRAB_DataLoader.GRABObject_PreDataset(args)
 	elif args.data=='GRABObject':
 		dataset = GRAB_DataLoader.GRABObject_Dataset(args)
-	elif args.data=='DAPGPreproc':
+	elif args.data in ['DAPGPreproc', 'DAPGHandPreproc', 'DAPGObjectPreproc']:
 		dataset = DAPG_DataLoader.DAPG_PreDataset(args)
 	elif args.data=='DAPG':
 		dataset = DAPG_DataLoader.DAPG_Dataset(args)
+	elif args.data=='DAPGHand':
+		dataset = DAPG_DataLoader.DAPGHand_Dataset(args)
+	elif args.data=='DAPGObject':
+		dataset = DAPG_DataLoader.DAPGObject_Dataset(args)
 	elif args.data in ['DexMVPreproc', 'DexMVHandPreproc', 'DexMVObjectPreproc']:
 		dataset = DexMV_DataLoader.DexMV_PreDataset(args)
 	elif args.data=='DexMV':

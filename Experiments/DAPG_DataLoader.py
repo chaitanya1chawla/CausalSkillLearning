@@ -36,7 +36,7 @@ class DAPG_PreDataset(Dataset):
 		else:
 			self.dataset_directory = self.args.datadir
 		
-		self.stat_dir_name = 'DAPG'   
+		self.stat_dir_name = 'DAPGFull'   
 
 		# 1) Keep track of joints: 
 		#   a) Full joint name list from https://github.com/vchoutas/smplx/blob/master/smplx/joint_names.py. 
@@ -83,7 +83,10 @@ class DAPG_PreDataset(Dataset):
 
 		# Used a dictionary to hold different indices by file
 
-		sampled_joints = np.zeros((datapoint.shape[0], 30))
+		HAND_JOINTS = 30
+		OBJECT_JOINTS = 21
+
+		sampled_joints = np.zeros((datapoint.shape[0], HAND_JOINTS + OBJECT_JOINTS))
 
 		self.relevant_joint_indices = self.hand_joint_indices[dataset_name]
 		sampled_joints[:, 6:30] = datapoint[:, self.relevant_joint_indices]
@@ -92,10 +95,15 @@ class DAPG_PreDataset(Dataset):
 
 		if dataset_name == 'door-v0_demos.pickle':
 			sampled_joints[:, 2:6] = datapoint[:, 0:4]
-		if dataset_name == 'relocate-v0_demos.pickle':
+			sampled_joints[:, 30:41] = datapoint[:, 28:39]
+		elif dataset_name == 'relocate-v0_demos.pickle':
 			sampled_joints[:, 0:6] = datapoint[:, 0:6]
-		if dataset_name == 'hammer-v0_demos.pickle':
+			sampled_joints[:, 30:41] = datapoint[:, 30:39]
+		elif dataset_name == 'hammer-v0_demos.pickle':
 			sampled_joints[:, 3:5] = datapoint[:, 0:2]
+			sampled_joints[:, 30:50] = datapoint[:, 26:46]
+		else:
+			sampled_joints[:, 30:51] = datapoint[:, 24:45]
 
 		return sampled_joints
 		
@@ -252,13 +260,14 @@ class DAPG_PreDataset(Dataset):
 		np.save(os.path.join(statdir, self.getname() + "_Vel_Min.npy"), vel_min_value)
 		np.save(os.path.join(statdir, self.getname() + "_Vel_Max.npy"), vel_max_value)
 
+
 class DAPG_Dataset(Dataset):
 
 	def __init__(self, args):
 
 		# Some book-keeping first. 
 		self.args = args
-		self.stat_dir_name = 'DAPG'
+		self.stat_dir_name = 'DAPGFull'
 
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
@@ -323,6 +332,60 @@ class DAPG_Dataset(Dataset):
 		data_element = {}
 		data_element['is_valid'] = True
 		data_element['demo'] = self.data_list[index]
+
+		# task_index = np.searchsorted(self.cumulative_num_demos, index, side='right')-1
+		# data_element['file'] = self.filelist[task_index][81:-7]
+		data_element['file'] = self.environment_names[index]
+		data_element['task-id'] = index
+		# print("Printing the index and the task ID from dataset:", index, data_element['file'])
+
+		return data_element
+	
+
+class DAPGHand_Dataset(DAPG_Dataset):
+
+	def getname(self):
+		return "DAPGHand"
+
+	def __getitem__(self, index):
+		# Return n'th item of dataset.
+		# This has already processed everything.
+
+		# if isinstance(index,np.ndarray):			
+		# 	return list(self.data_list_array[index])
+		# else:
+		# 	return self.data_list[index]
+
+		data_element = {}
+		data_element['is_valid'] = True
+		data_element['demo'] = self.data_list[index][:, 0:30]
+
+		# task_index = np.searchsorted(self.cumulative_num_demos, index, side='right')-1
+		# data_element['file'] = self.filelist[task_index][81:-7]
+		data_element['file'] = self.environment_names[index]
+		data_element['task-id'] = index
+		# print("Printing the index and the task ID from dataset:", index, data_element['file'])
+
+		return data_element
+	
+
+class DAPGObject_Dataset(DAPG_Dataset):
+
+	def getname(self):
+		return "DAPGObject"
+
+	def __getitem__(self, index):
+		# Return n'th item of dataset.
+		# This has already processed everything.
+
+		# if isinstance(index,np.ndarray):			
+		# 	return list(self.data_list_array[index])
+		# else:
+		# 	return self.data_list[index]
+
+		data_element = {}
+		data_element['is_valid'] = True
+		data_element['demo'] = self.data_list[index][:, 30:51]
 
 		# task_index = np.searchsorted(self.cumulative_num_demos, index, side='right')-1
 		# data_element['file'] = self.filelist[task_index][81:-7]
