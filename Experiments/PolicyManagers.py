@@ -3130,12 +3130,17 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		
 		elif self.args.data in ['GRABArmHand']:
 			
-			if self.args.position_normalization == 'pelvis':
-				self.state_size = 144
-				self.state_dim = 144
-			else:
-				self.state_size = 147
-				self.state_dim = 147
+
+			self.state_size = 144
+			self.state_dim = 144
+			if self.args.single_hand in ['left', 'right']:
+				self.state_size //= 2
+				self.state_dim //= 2
+
+			if self.args.position_normalization != 'pelvis':
+				self.state_size += 3
+				self.state_dim += 3
+			
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
@@ -3157,12 +3162,19 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		elif self.args.data in ['GRABArmHandObject']:
 			
-			if self.args.position_normalization == 'pelvis':
-				self.state_size = 150
-				self.state_dim = 150
-			else:
-				self.state_size = 153
-				self.state_dim = 153
+			self.state_size = 144
+			self.state_dim = 144
+			if self.args.single_hand in ['left', 'right']:
+				self.state_size //= 2
+				self.state_dim //= 2
+
+			if self.args.position_normalization != 'pelvis':
+				self.state_size += 3
+				self.state_dim += 3			
+			# Object dimensions
+			self.state_size += 6
+			self.state_dim += 6
+		
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
