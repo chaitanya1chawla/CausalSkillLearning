@@ -342,8 +342,6 @@ class GRAB_PreDataset(Dataset):
 			object_transl = object_dict['params']['transl']
 			object_orient = object_dict['params']['global_orient']
 
-			embed()
-
 			object_datapoint = np.concatenate((object_transl, object_orient), axis=1)
 
 		# Without normalizing object:
@@ -358,7 +356,6 @@ class GRAB_PreDataset(Dataset):
 
 			# Combine object + body joints
 			reshaped_datapoint_with_objects = np.concatenate((reshaped_normalized_datapoint, object_datapoint), axis=1)
-
 
 			self.state_size = reshaped_datapoint_with_objects.shape[1]
 
