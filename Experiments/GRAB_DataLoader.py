@@ -353,18 +353,19 @@ class GRAB_PreDataset(Dataset):
 			# Normalize using the pelvis joint (i.e. the first joint).
 			normalized_relevant_joint_datapoint = self.normalize(relevant_joints_datapoint)
 
-		# Combine object + body joints
-			normalized_relevant_joint_datapoint_with_objects = np.concatenate((normalized_relevant_joint_datapoint, object_datapoint), axis=1)
-
 			# Reshape. 
-			reshaped_normalized_datapoint = normalized_relevant_joint_datapoint.reshape(normalized_relevant_joint_datapoint_with_objects.shape[0],-1)
+			reshaped_normalized_datapoint = normalized_relevant_joint_datapoint.reshape(normalized_relevant_joint_datapoint.shape[0],-1)
 
-			self.state_size = reshaped_normalized_datapoint.shape[1]
+			# Combine object + body joints
+			reshaped_datapoint_with_objects = np.concatenate((reshaped_normalized_datapoint, object_datapoint), axis=1)
+
+
+			self.state_size = reshaped_datapoint_with_objects.shape[1]
 
 			# Subsample in time. 
 			number_of_timesteps = datapoint.shape[0]//self.ds_freq
 			# subsampled_data = resample(relevant_joints_datapoint, number_of_timesteps)
-			subsampled_data = resample(reshaped_normalized_datapoint, number_of_timesteps)
+			subsampled_data = resample(reshaped_datapoint_with_objects, number_of_timesteps)
 			
 			# Add subsampled datapoint to file. 
 			self.files.append(subsampled_data)            
