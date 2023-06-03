@@ -1701,19 +1701,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		
 		elif self.args.data in ['GRABArmHandObject']:
 			
-			self.state_size = 144
-			self.state_dim = 144
-			if self.args.single_hand in ['left', 'right']:
-				self.state_size //= 2
-				self.state_dim //= 2
-
-			if self.args.position_normalization != 'pelvis':
-				self.state_size += 3
-				self.state_dim += 3			
-				
-			# Object dimensions
-			self.state_size += 6
-			self.state_dim += 6
+			self.state_size = 96
+			self.state_dim = 96
 
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
@@ -2377,14 +2366,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.state_dim = 147
 			self.rollout_timesteps = self.traj_length
 		elif self.args.data in ['GRABArmHandObject']:
-			self.state_size = 144
-			if self.args.single_hand in ['left', 'right']:
-				self.state_size //= 2
-			if self.args.position_normalization != 'pelvis':
-				self.state_size += 3
-			# Object dimensions
-			self.state_size += 6
-			self.state_dim = self.state_size
+			self.state_size = 96
+			self.state_dim = 96
 			self.rollout_timesteps = self.traj_length
 		elif self.args.data in ['GRABObject']:
 			self.state_dim = 6
@@ -2656,13 +2639,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 					self.state_dim = 147
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['GRABArmHandObject']:
-				self.state_dim = 144
-				if self.args.single_hand in ['left', 'right']:
-					self.state_dim //= 2
-				if self.args.position_normalization != 'pelvis':
-					self.state_dim += 3
-				# Object dimensions
-				self.state_dim += 6
+				self.state_dim = 96
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['GRABObject']:
 				self.state_dim = 6
@@ -3163,19 +3140,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		elif self.args.data in ['GRABArmHandObject']:
 			
-			self.state_size = 144
-			self.state_dim = 144
-			if self.args.single_hand in ['left', 'right']:
-				self.state_size //= 2
-				self.state_dim //= 2
-
-			if self.args.position_normalization != 'pelvis':
-				self.state_size += 3
-				self.state_dim += 3			
-
-			# Object dimensions
-			self.state_size += 6
-			self.state_dim += 6
+			self.state_size = 96
+			self.state_dim = 96
 		
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
