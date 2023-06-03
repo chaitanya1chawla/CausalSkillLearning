@@ -119,6 +119,8 @@ class DAPG_PreDataset(Dataset):
 			# Now actually load file. 
 			set = np.load(v, allow_pickle=True)
 
+			embed()
+
 			for item in set:
 
 				datapoint = item['observations']
