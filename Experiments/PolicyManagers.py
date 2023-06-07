@@ -1952,6 +1952,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		
 		# log_dict['Subpolicy Loglikelihood'] = loglikelihood.mean()
 		log_dict = {'Subpolicy Loglikelihood': loglikelihood.mean(), 'Total Loss': self.total_loss.mean(), 'Encoder KL': self.encoder_KL.mean()}
+		if self.args.relative_state_reconstruction_loss_weight>0.:
+			log_dict['Relative State Recon Loss'] = self.relative_state_reconstruction_loss
+			log_dict['Auxillary Loss'] = self.aux_loss
 
 		if counter%self.args.display_freq==0:
 			
@@ -2277,7 +2280,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		policy_predicted_relative_state_traj = initial_relative_state + torch.cumsum(mean_policy_relative_state_actions, axis=0)
 
 		# Set reconsturction loss.
-		relative_state_reconstruction_loss = (policy_predicted_relative_state_traj - relative_state_traj).norm()	
+		self.relative_state_reconstruction_loss = (policy_predicted_relative_state_traj - relative_state_traj).norm()	
 
 		# Weighting the auxillary loss...
 		self.aux_loss = self.args.relative_state_reconstruction_loss_weight*relative_state_reconstruction_loss
