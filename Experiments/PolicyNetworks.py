@@ -182,9 +182,9 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 
 		# Predict Gaussian means and variances. 
 		if self.args.mean_nonlinearity:
-			mean_outputs = self.activation_layer(self.mean_output_layer(lstm_outputs))
+			self.mean_outputs = self.activation_layer(self.mean_output_layer(lstm_outputs))
 		else:
-			mean_outputs = self.mean_output_layer(lstm_outputs)
+			self.mean_outputs = self.mean_output_layer(lstm_outputs)
 		variance_outputs = (self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
 		# variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon
 
@@ -197,7 +197,7 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		covariance_matrix = torch.diag_embed(variance_outputs)
 
 		# Executing distribution creation on CPU and then copying back to GPU.
-		dist = torch.distributions.MultivariateNormal(mean_outputs.cpu(), covariance_matrix.cpu())
+		dist = torch.distributions.MultivariateNormal(self.mean_outputs.cpu(), covariance_matrix.cpu())
 		log_probabilities = dist.log_prob(format_action_seq.cpu()).to(device)
 
 		# dist = torch.distributions.MultivariateNormal(mean_outputs, covariance_matrix)
@@ -2154,6 +2154,7 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 		##############################
 
 		self.args = args
+
 
 		# Define state sizes for each partition of state space.
 		# Keep track of robot input and output state size. 

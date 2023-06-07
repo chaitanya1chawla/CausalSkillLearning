@@ -420,7 +420,13 @@ class PolicyManager_BaseClass():
 		if number_of_trajectories_to_visualize is not None:
 			self.N = number_of_trajectories_to_visualize
 		else:
-			self.N = 100
+
+			####################################
+			# TEMPORARILY SET N to 10
+			####################################
+			
+			self.N = 40
+
 		self.rollout_timesteps = self.args.traj_length
 	
 		#####################################################
@@ -2241,7 +2247,43 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		return latent_z_indices, latent_b			
 
+	def set_auxillary_losses(self):
+
+		# Get mean of actions from the policy networks.
+		mean_policy_actions = self.policy_network.mean_outputs
+
+		# Get translational states. 
+		mean_policy_robot_actions = mean_policy_actions[...,:3]
+		mean_policy_env_actions = mean_policy_actions[...,self.args.robot_state_size:self.args.robot_state_size+3]
+		# Compute relative actions. 
+		mean_policy_relative_state_actions = mean_policy_robot_actions - mean_policy_env_actions
+
+		# Rollout states, then compute relative states - although this shouldn't matter because it's linear. 
+
+		# # Compute relative initial state. 		
+		# initial_state = self.sample_traj_var[0]
+		# initial_robot_state = initial_state[:,:3]
+		# initial_env_state = initial_state[:,self.args.robot_state_size:self.args.robot_state_size+3]
+		# relative_initial_state = initial_robot_state - initial_env_state
+
+		# Get relative states.
+		robot_traj = self.sample_traj_var[...,:3]
+		env_traj = self.sample_traj_var[...,self.args.robot_state_size:self.args.robot_state_size+3]
+		relative_state_traj = torch.tensor(robot_traj - env_traj).cuda()
+		initial_relative_state = relative_state_traj[0]
+		# torch_initial_relative_state = torch.tensor(initial_relative_state).cuda()		
+
+		# Differentiable rollouts. 
+		policy_predicted_relative_state_traj = initial_relative_state + torch.cumsum(mean_policy_relative_state_actions, axis=0)
+
+		# Set reconsturction loss.
+		relative_state_reconstruction_loss = (policy_predicted_relative_state_traj - relative_state_traj).norm()	
+
+		# Weighting the auxillary loss...
+		self.aux_loss = self.args.relative_state_reconstruction_loss_weight*relative_state_reconstruction_loss
+
 	def update_policies_reparam(self, loglikelihood, latent_z, encoder_KL):
+		
 		self.optimizer.zero_grad()
 
 		# Losses computed as sums.
@@ -2253,11 +2295,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.likelihood_loss = -loglikelihood.mean()
 		self.encoder_KL = encoder_KL.mean()
 
-
+		self.set_auxillary_losses()
 		# Adding a penalty for link lengths. 
 		# self.link_length_loss = ... 
 
-		self.total_loss = (self.likelihood_loss + self.kl_weight*self.encoder_KL) 
+		self.total_loss = (self.likelihood_loss + self.kl_weight*self.encoder_KL + self.aux_loss) 
 		# + self.link_length_loss) 
 
 		if self.args.debug:
@@ -2377,6 +2419,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Sample trajectory segment from dataset. 			
 		if self.args.traj_segments:			
 			state_action_trajectory, sample_action_seq, sample_traj, data_element  = self.get_trajectory_segment(i)
+			self.sample_traj_var = sample_traj
 		else:
 			sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj, data_element = self.collect_inputs(i)
 			state_action_trajectory = concatenated_traj
@@ -2507,6 +2550,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				# self.visualize_robot_data(load_sets=True)
 				self.visualize_robot_data(load_sets=False)
 
+				print("Embed after viz Blah blah")
+				embed()
+
 				# Get reconstruction error... 
 				self.get_trajectory_and_latent_sets(get_visuals=True)
 				print("The Average Reconstruction Error is: ", self.avg_reconstruction_error)
@@ -2534,7 +2580,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Set N:
 		self.N = 500
 
-		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
+		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))
 			
 		if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
 			if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
@@ -2657,7 +2703,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		plt.savefig("{0}/Embedding_Joint_{1}.png".format(self.dir_name,self.args.name))
 		plt.close()
 
-	def nearest_neighbor_forward_inverse_models(self):
+	def create_z_kdtrees(self):
 		
 		####################################
 		# Algorithm to construct models
@@ -2666,14 +2712,13 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# 0) Assume that the encoder(s) are trained, and that the latent space is trained.
 		# 1) Maintain map of Z_R <--> Z_E. 
 		# 	1a) Check that the latent_z_sets are tuples. 
+		# 	1b) Seems like we don't actually need the map if the latent z sets are constructed by the same function / indexing.
 		# 2) Construct KD Trees. 
 		# 	2a) KD_R = KDTREE( {Z_R} )
 		# 	2b) KD_E = KDTREE( {Z_E} )
 		
-		# self.kdtree_robot_z = KDTree()
-		# self.kdtree_env_z = KDTree()
-
-		pass 
+		self.kdtree_robot_z = KDTree(self.robot_latent_z_set)
+		self.kdtree_env_z = KDTree(self.env_latent_z_set)		
 
 	def retrieve_desired_nn_env_abstraction(self, robot_state_action_trajectory):
 
@@ -2741,8 +2786,23 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 	def define_forward_inverse_models(self):
 
-		pass
+		# 0) Get latent z sets.
+		# 1) Create KD trees. 
+		# 2) (Query)
+		# 3) Rollout results. 
+
+		# 0) Make sure we've run visualize_robot_data; then split z sets. 
+
+		# Run visualize_robot_data. 
+
+		# Create z sets. 
+		self.robot_latent_z_set = copy.deepcopy(self.latent_z_set[:,:int(self.latent_z_dimensionality/2)])
+		self.env_latent_z_set = copy.deepcopy(self.latent_z_set[:,int(self.latent_z_dimensionality/2):])
+		
+		# 1) Create KD Trees.
+		self.create_z_kdtrees()	
 	
+		# 2) 
 
 class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
