@@ -2283,7 +2283,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.relative_state_reconstruction_loss = (policy_predicted_relative_state_traj - relative_state_traj).norm()	
 
 		# Weighting the auxillary loss...
-		self.aux_loss = self.args.relative_state_reconstruction_loss_weight*relative_state_reconstruction_loss
+		self.aux_loss = self.args.relative_state_reconstruction_loss_weight*self.relative_state_reconstruction_loss
 
 	def update_policies_reparam(self, loglikelihood, latent_z, encoder_KL):
 		
