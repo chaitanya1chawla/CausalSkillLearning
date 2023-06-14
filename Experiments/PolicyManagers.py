@@ -424,8 +424,8 @@ class PolicyManager_BaseClass():
 			####################################
 			# TEMPORARILY SET N to 10
 			####################################
-			
-			self.N = 40
+			# self.N = 33
+			self.N = 100
 
 		self.rollout_timesteps = self.args.traj_length
 	
@@ -1953,9 +1953,18 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# log_dict['Subpolicy Loglikelihood'] = loglikelihood.mean()
 		log_dict = {'Subpolicy Loglikelihood': loglikelihood.mean(), 'Total Loss': self.total_loss.mean(), 'Encoder KL': self.encoder_KL.mean()}
 		if self.args.relative_state_reconstruction_loss_weight>0.:
+			log_dict['Unweighted Relative State Recon Loss'] = self.unweighted_relative_state_reconstruction_loss
 			log_dict['Relative State Recon Loss'] = self.relative_state_reconstruction_loss
 			log_dict['Auxillary Loss'] = self.aux_loss
-
+		if self.args.task_based_aux_loss_weight>0.:
+			log_dict['Unweighted Task Based Auxillary Loss'] = self.unweighted_task_based_aux_loss
+			log_dict['Task Based Auxillary Loss'] = self.task_based_aux_loss
+			log_dict['Auxillary Loss'] = self.aux_loss
+		if self.args.relative_state_phase_aux_loss_weight>0.:
+			log_dict['Unweighted Relative Phase Auxillary Loss'] = self.unweighted_relative_state_phase_aux_loss
+			log_dict['Relative Phase Auxillary Loss'] = self.relative_state_phase_aux_loss
+			log_dict['Auxillary Loss'] = self.aux_loss
+			
 		if counter%self.args.display_freq==0:
 			
 			if self.args.batch_size>1:
@@ -2250,8 +2259,87 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		return latent_z_indices, latent_b			
 
-	def set_auxillary_losses(self):
+	def initialize_aux_losses(self):
+		
+		# Initialize losses.
+		self.unweighted_relative_state_reconstruction_loss = 0.
+		self.relative_state_reconstruction_loss = 0.
+		# 
+		self.unweighted_relative_state_phase_aux_loss = 0.
+		self.relative_state_phase_aux_loss = 0.
+		# 
+		self.unweighted_task_based_aux_loss = 0.
+		self.task_based_aux_loss = 0.
 
+	def compute_auxillary_losses(self, update_dict):
+
+		self.initialize_aux_losses()
+
+		# Set the relative state reconstruction loss.
+		if self.args.relative_state_reconstruction_loss_weight>0.:
+			self.compute_relative_state_reconstruction_loss()
+
+		if self.args.task_based_aux_loss_weight>0. or self.args.relative_state_phase_aux_loss_weight>0.:
+			self.compute_pairwise_z_distance(update_dict['latent_z'][0])
+		if self.args.task_based_aux_loss_weight>0.:
+			self.compute_task_based_aux_loss(update_dict)
+		if self.args.relative_state_phase_aux_loss_weight>0.:
+			self.compute_relative_state_phase_aux_loss(update_dict)
+
+		# Weighting the auxillary loss...
+		self.aux_loss = self.relative_state_reconstruction_loss + self.relative_state_phase_aux_loss + self.task_based_aux_loss
+
+	def compute_pairwise_z_distance(self, z_set):
+
+		# Compute pairwise task based weights.
+		self.pairwise_z_distance = torch.cdist(z_set, z_set)[0]
+
+		# Clamped z distance loss. 
+		self.clamped_pairwise_z_distance = torch.clamp(self.pairwise_z_distance - self.args.pairwise_z_distance_threshold, min=0.)
+
+	def compute_relative_state_class_vectors(self, update_dict):
+
+		# Compute relative state vectors.
+
+		# Compute relative state. 
+		
+		# Compute diff. 
+		
+		# Compute norm. 
+
+		# Compute sum.
+		pass
+
+	def compute_task_based_aux_loss(self, update_dict):
+
+		# Task list. 
+		task_list = []
+		for k in range(self.args.batch_size):
+			task_list.append(update_dict['data_element'][k]['task-id'])
+		# task_array = np.array(task_list).reshape(self.args.batch_size,1)
+		torch_task_array = torch.tensor(task_list, dtype=float).reshape(self.args.batch_size,1).cuda()
+		
+		# Compute pairwise task based weights. 
+		# pairwise_task_matrix = (scipy.spatial.distance.cdist(task_array)==0).astype(int).astype(float)
+		pairwise_task_matrix = (torch.cdist(torch_task_array, torch_task_array)==0).int().float()
+
+		# Positive weighted task loss. 
+		positive_weighted_task_loss = pairwise_task_matrix*self.pairwise_z_distance
+
+		# Negative weighted task loss. 
+		# MUST CHECK SIGNAGE OF THIS. 
+		negative_weighted_task_loss = (1.-pairwise_task_matrix)*self.clamped_pairwise_z_distance
+
+		# Total task_based_aux_loss.
+		self.unweighted_task_based_aux_loss = positive_weighted_task_loss + negative_weighted_task_loss
+		self.task_based_aux_loss = self.args.task_based_aux_loss_weight*self.unweighted_task_based_aux_loss.mean()
+
+	def compute_relative_state_phase_aux_loss(self, update_dict):
+
+		# Compute 
+		pass
+
+	def compute_relative_state_reconstruction_loss(self):
 		# Get mean of actions from the policy networks.
 		mean_policy_actions = self.policy_network.mean_outputs
 
@@ -2280,12 +2368,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		policy_predicted_relative_state_traj = initial_relative_state + torch.cumsum(mean_policy_relative_state_actions, axis=0)
 
 		# Set reconsturction loss.
-		self.relative_state_reconstruction_loss = (policy_predicted_relative_state_traj - relative_state_traj).norm()	
+		self.unweighted_relative_state_reconstruction_loss = (policy_predicted_relative_state_traj - relative_state_traj).norm(dim=2).mean()
+		self.relative_state_reconstruction_loss = self.args.relative_state_reconstruction_loss_weight*self.unweighted_relative_state_reconstruction_loss
 
-		# Weighting the auxillary loss...
-		self.aux_loss = self.args.relative_state_reconstruction_loss_weight*self.relative_state_reconstruction_loss
-
-	def update_policies_reparam(self, loglikelihood, latent_z, encoder_KL):
+	def update_policies_reparam(self, loglikelihood, encoder_KL, update_dict=None):
 		
 		self.optimizer.zero_grad()
 
@@ -2298,7 +2384,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.likelihood_loss = -loglikelihood.mean()
 		self.encoder_KL = encoder_KL.mean()
 
-		self.set_auxillary_losses()
+		self.compute_auxillary_losses(update_dict)
 		# Adding a penalty for link lengths. 
 		# self.link_length_loss = ... 
 
@@ -2408,31 +2494,26 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# 		# Update parameters. 
 
 		####################################
-		####################################
+
 		self.set_epoch(counter)
 
-		####################################
 		############# (0) #############
-
 		# Sample trajectory segment from dataset. 
-		
-
 		####################################
 
-		# Sample trajectory segment from dataset. 			
-		if self.args.traj_segments:			
-			state_action_trajectory, sample_action_seq, sample_traj, data_element  = self.get_trajectory_segment(i)
-			self.sample_traj_var = sample_traj
-		else:
-			sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj, data_element = self.collect_inputs(i)
-			state_action_trajectory = concatenated_traj
+		# Sample trajectory segment from dataset.
+		input_dict = {}
+		input_dict['state_action_trajectory'], input_dict['sample_action_seq'], input_dict['sample_traj'], input_dict['data_element'] = self.get_trajectory_segment(i)
+		# state_action_trajectory, sample_action_seq, sample_traj, data_element  = self.get_trajectory_segment(i)
+		# self.sample_traj_var = sample_traj
+		self.sample_traj_var = input_dict['sample_traj']
 
 		####################################
 		############# (0a) #############
 		####################################
 
 		# Corrupt the inputs according to how much input_corruption_noise is set to.
-		state_action_trajectory = self.corrupt_inputs(state_action_trajectory)
+		state_action_trajectory = self.corrupt_inputs(input_dict['state_action_trajectory'])
 
 		if state_action_trajectory is not None:
 			
@@ -2456,7 +2537,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			latent_z_seq, latent_b = self.construct_dummy_latents(latent_z)
 
 			############# (3a) #############
-			_, subpolicy_inputs, sample_action_seq = self.assemble_inputs(state_action_trajectory, latent_z_seq, latent_b, sample_action_seq)
+			_, subpolicy_inputs, sample_action_seq = self.assemble_inputs(state_action_trajectory, latent_z_seq, latent_b, input_dict['sample_action_seq'])
 			
 			############# (3b) #############
 			# Policy net doesn't use the decay epislon. (Because we never sample from it in training, only rollouts.)
@@ -2476,7 +2557,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				############# (4a) #############
 				# Update parameters based on likelihood, subpolicy inputs, and kl divergence.
-				self.update_policies_reparam(loglikelihood, subpolicy_inputs, kl_divergence)
+				update_dict = input_dict
+				update_dict['latent_z'] = latent_z				
+
+				self.update_policies_reparam(loglikelihood, kl_divergence, update_dict=update_dict)
 
 				############# (4b) #############
 				# Update Plots. 
@@ -2495,10 +2579,109 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# 	return latent_z, sample_traj, sample_action_seq
 			
 			if return_z:
-				return latent_z, sample_traj, sample_action_seq, data_element
+				return latent_z, input_dict['sample_traj'], sample_action_seq, input_dict['data_element']
 									
 		else: 
 			return None, None, None
+
+	# def run_iteration(self, counter, i, return_z=False, and_train=True):
+
+	# 	# Basic Training Algorithm: 
+	# 	# For E epochs:
+	# 	# 	# For all trajectories:
+	# 	#		# Sample trajectory segment from dataset. 
+	# 	# 		# Encode trajectory segment into latent z. 
+	# 	# 		# Feed latent z and trajectory segment into policy network and evaluate likelihood. 
+	# 	# 		# Update parameters. 
+
+	# 	####################################
+
+	# 	self.set_epoch(counter)
+
+	# 	############# (0) #############
+	# 	# Sample trajectory segment from dataset. 
+	# 	####################################
+
+	# 	# Sample trajectory segment from dataset. 			
+	# 	if self.args.traj_segments:		
+	# 		state_action_trajectory, sample_action_seq, sample_traj, data_element  = self.get_trajectory_segment(i)
+	# 		self.sample_traj_var = sample_traj
+	# 	else:
+	# 		sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj, data_element = self.collect_inputs(i)
+	# 		state_action_trajectory = concatenated_traj
+
+	# 	####################################
+	# 	############# (0a) #############
+	# 	####################################
+
+	# 	# Corrupt the inputs according to how much input_corruption_noise is set to.
+	# 	state_action_trajectory = self.corrupt_inputs(state_action_trajectory)
+
+	# 	if state_action_trajectory is not None:
+			
+	# 		####################################
+	# 		############# (1) #############
+	# 		####################################
+
+	# 		torch_traj_seg = torch.tensor(state_action_trajectory).to(device).float()
+	# 		# Encode trajectory segment into latent z. 		
+						
+	# 		latent_z, encoder_loglikelihood, encoder_entropy, kl_divergence = self.encoder_network.forward(torch_traj_seg, self.epsilon)
+			
+	# 		####################################
+	# 		########## (2) & (3) ##########
+	# 		####################################
+
+	# 		# print("Embed in rut iter")
+	# 		# embed()
+
+	# 		# Feed latent z and trajectory segment into policy network and evaluate likelihood. 
+	# 		latent_z_seq, latent_b = self.construct_dummy_latents(latent_z)
+
+	# 		############# (3a) #############
+	# 		_, subpolicy_inputs, sample_action_seq = self.assemble_inputs(state_action_trajectory, latent_z_seq, latent_b, sample_action_seq)
+			
+	# 		############# (3b) #############
+	# 		# Policy net doesn't use the decay epislon. (Because we never sample from it in training, only rollouts.)
+	# 		loglikelihoods, _ = self.policy_network.forward(subpolicy_inputs, sample_action_seq)
+	# 		loglikelihood = loglikelihoods[:-1].mean()
+			 
+	# 		if self.args.debug:
+	# 			print("Embedding in Train.")
+	# 			embed()
+
+	# 		####################################
+	# 		############# (4) #############
+	# 		####################################
+
+	# 		# Update parameters. 
+	# 		if self.args.train and and_train:
+
+	# 			############# (4a) #############
+	# 			# Update parameters based on likelihood, subpolicy inputs, and kl divergence.
+	# 			self.update_policies_reparam(loglikelihood, subpolicy_inputs, kl_divergence)
+
+	# 			############# (4b) #############
+	# 			# Update Plots. 
+	# 			stats = {}
+	# 			stats['counter'] = counter
+	# 			stats['i'] = i
+	# 			stats['epoch'] = self.current_epoch_running
+	# 			stats['batch_size'] = self.args.batch_size			
+	# 			self.update_plots(counter, loglikelihood, state_action_trajectory, stats)
+
+	# 			####################################
+	# 			############# (5) #############
+	# 			####################################
+
+	# 		# if return_z: 
+	# 		# 	return latent_z, sample_traj, sample_action_seq
+			
+	# 		if return_z:
+	# 			return latent_z, sample_traj, sample_action_seq, data_element
+									
+	# 	else: 
+	# 		return None, None, None
 
 	def evaluate_metrics(self):		
 		self.distances = -np.ones((self.test_set_size))
@@ -2553,8 +2736,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				# self.visualize_robot_data(load_sets=True)
 				self.visualize_robot_data(load_sets=False)
 
-				print("Embed after viz Blah blah")
-				embed()
+				# print("Embed after viz Blah blah")
+				# embed()
 
 				# Get reconstruction error... 
 				self.get_trajectory_and_latent_sets(get_visuals=True)

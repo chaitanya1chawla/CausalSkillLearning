@@ -348,7 +348,10 @@ def parse_arguments():
 
 	# Relative state reconstruction loss.
 	parser.add_argument('--relative_state_reconstruction_loss_weight', dest='relative_state_reconstruction_loss_weight', type=float, default=0., help='What weight to place on the relative state reconstruction loss in the robot-object setting..')	
-	
+	parser.add_argument('--relative_state_phase_aux_loss_weight', dest='relative_state_phase_aux_loss_weight', type=float, default=0., help='Weight to place on the relative state phase aux loss.')
+	parser.add_argument('--task_based_aux_loss_weight', dest='task_based_aux_loss_weight', type=float, default=0., help='Weight to place on task based auxillary loss.')
+	parser.add_argument('--pairwise_z_distance_threshold', dest='pairwise_z_distance_threshold', type=float, default=2., help='Minimum distance to push apart different parts of latent space that are semantically different.')
+
 	# Cross Domain Skill Transfer parameters. 
 	parser.add_argument('--discriminability_weight',dest='discriminability_weight',type=float,default=1.,help='Weight of discriminability loss in cross domain skill transfer.') 
 	parser.add_argument('--discriminator_weight',dest='discriminator_weight',type=float,default=1.,help='Weight of z discriminator loss.')

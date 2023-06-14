@@ -90,9 +90,47 @@ scp /data/tanmayshankar/TrainingLogs/RMOP_001/saved_models/Model_epoch1995 tshan
 
 #############################
 # Eval
-# Debug relative state recon loss. 
 // CUDA_VISIBLE_DEVICES=3 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_200 --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=/data/tanmayshankar/TrainingLogs/ --relative_state_reconstruction_loss_weight=0.01 --model=/data/tanmayshankar/TrainingLogs/RMOP_200/saved_models/Model_epoch2000
 
 // CUDA_VISIBLE_DEVICES=1 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_201 --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=/data/tanmayshankar/TrainingLogs/ --relative_state_reconstruction_loss_weight=0.1 --model=/data/tanmayshankar/TrainingLogs/RMOP_201/saved_models/Model_epoch2000
 
 // CUDA_VISIBLE_DEVICES=2 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_202 --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=/data/tanmayshankar/TrainingLogs/ --relative_state_reconstruction_loss_weight=1.0 --model=/data/tanmayshankar/TrainingLogs/RMOP_202/saved_models/Model_epoch2000
+
+# RECREATE RESULTS FILE WITH SIM ROLLOUT = 0 
+#############################
+# Eval
+// CUDA_VISIBLE_DEVICES=3 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_200 --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=/data/tanmayshankar/TrainingLogs/ --relative_state_reconstruction_loss_weight=0.01 --model=/data/tanmayshankar/TrainingLogs/RMOP_200/saved_models/Model_epoch2000 --viz_sim_rollout=0
+
+// CUDA_VISIBLE_DEVICES=1 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_201 --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=/data/tanmayshankar/TrainingLogs/ --relative_state_reconstruction_loss_weight=0.1 --model=/data/tanmayshankar/TrainingLogs/RMOP_201/saved_models/Model_epoch2000 --viz_sim_rollout=0
+
+// CUDA_VISIBLE_DEVICES=2 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_202 --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=2000 --epochs=2000 --datadir=/home/tshankar/Research/Code/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=/data/tanmayshankar/TrainingLogs/ --relative_state_reconstruction_loss_weight=1.0 --model=/data/tanmayshankar/TrainingLogs/RMOP_202/saved_models/Model_epoch2000 --viz_sim_rollout=0
+
+# Run relative state reconstruction loss, but with larger number of epochs. 
+#############################
+# Debug relative state recon loss. 
+// CUDA_VISIBLE_DEVICES=0 python Master.py --train=1 --setting=pretrain_sub --name=RMOP_203 --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=10000 --epochs=20000 --save_freq=100 --datadir=/home/tshankar/Research/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=ExpWandbLogs/ --relative_state_reconstruction_loss_weight=0.01
+
+// CUDA_VISIBLE_DEVICES=1 python Master.py --train=1 --setting=pretrain_sub --name=RMOP_204 --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=10000 --epochs=20000 --save_freq=100 --datadir=/home/tshankar/Research/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=ExpWandbLogs/ --relative_state_reconstruction_loss_weight=0.1
+
+// CUDA_VISIBLE_DEVICES=0 python Master.py --train=1 --setting=pretrain_sub --name=RMOP_205 --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=10000 --epochs=20000 --save_freq=100 --datadir=/home/tshankar/Research/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=ExpWandbLogs/ --relative_state_reconstruction_loss_weight=1.0
+
+
+# debug big env
+// CUDA_VISIBLE_DEVICES=0 python Master.py --train=1 --setting=pretrain_sub --name=RMOP_debugbig --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=10000 --epochs=20000 --save_freq=100 --datadir=/home/tshankar/Research/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=ExpWandbLogs/ --relative_state_reconstruction_loss_weight=0.01
+ 
+
+#############################
+# Eval
+// CUDA_VISIBLE_DEVICES=1 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_203 --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=10000 --epochs=20000 --save_freq=100 --datadir=/home/tshankar/Research/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=ExpWandbLogs/ --relative_state_reconstruction_loss_weight=0.01 --model=ExpWandbLogs/RMOP_203/saved_models/Model_epoch4400 --viz_sim_rollout=0
+
+// CUDA_VISIBLE_DEVICES=1 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_204 --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=10000 --epochs=20000 --save_freq=100 --datadir=/home/tshankar/Research/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=ExpWandbLogs/ --relative_state_reconstruction_loss_weight=0.1 --model=ExpWandbLogs/RMOP_204/saved_models/Model_epoch4400 --viz_sim_rollout=0
+
+// CUDA_VISIBLE_DEVICES=0 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_205 --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=10000 --epochs=20000 --save_freq=100 --datadir=/home/tshankar/Research/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=ExpWandbLogs/ --relative_state_reconstruction_loss_weight=1.0 --model=ExpWandbLogs/RMOP_205/saved_models/Model_epoch4400 --viz_sim_rollout=0
+
+#############################
+# Eval
+// CUDA_VISIBLE_DEVICES=1 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_203 --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=10000 --epochs=20000 --save_freq=100 --datadir=/home/tshankar/Research/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=ExpWandbLogs/ --relative_state_reconstruction_loss_weight=0.01 --model=ExpWandbLogs/RMOP_203/saved_models/Model_epoch20000 --viz_sim_rollout=0
+
+// CUDA_VISIBLE_DEVICES=1 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_204 --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=10000 --epochs=20000 --save_freq=100 --datadir=/home/tshankar/Research/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=ExpWandbLogs/ --relative_state_reconstruction_loss_weight=0.1 --model=ExpWandbLogs/RMOP_204/saved_models/Model_epoch20000 --viz_sim_rollout=0
+
+// CUDA_VISIBLE_DEVICES=0 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_205 --data=RoboMimicRobotObjects --kl_weight=0.01 --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=300 --display_freq=10000 --epochs=20000 --save_freq=100 --datadir=/home/tshankar/Research/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=ExpWandbLogs/ --relative_state_reconstruction_loss_weight=1.0 --model=ExpWandbLogs/RMOP_205/saved_models/Model_epoch20000 --viz_sim_rollout=0
