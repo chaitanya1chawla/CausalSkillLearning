@@ -283,12 +283,23 @@ class GRAB_PreDataset(Dataset):
 		# Create index arrays
 		self.arm_joint_indices = np.zeros(len(self.arm_joint_names))
 		self.arm_and_hand_joint_indices = np.zeros(len(self.arm_and_hand_joint_names))
+		self.object_indices = np.zeros(6)
+
 
 		for k, v in enumerate(self.arm_joint_names):			
 			self.arm_joint_indices[k] = np.where(self.joint_names==v)[0][0]
 		
-		# for k, v in enumerate(self.arm_and_hand_joint_indices):
-		# 	self.arm_and_hand_joint_indices[k] = np.where(self.joint_names==v)[0][0]
+		for k, v in enumerate(self.arm_and_hand_joint_indices):
+			self.arm_and_hand_joint_indices[k] = np.where(self.joint_names==v)[0][0]
+
+		for i in range(self.object_indices.shape[0]):
+			self.object_indices[i] = len(self.arm_and_hand_joint_indices) + i
+
+
+		self.arm_hand_object_indices = np.zeros(len(self.arm_and_hand_joint_names) + 6)
+		self.arm_hand_object_indices[0:len(self.arm_and_hand_joint_names)] = self.arm_and_hand_joint_indices
+		self.arm_hand_object_indices[-6:] = self.object_indices
+		
 		
 	def subsample_relevant_joints(self, datapoint):
 
@@ -320,8 +331,20 @@ class GRAB_PreDataset(Dataset):
 				print("Loading file: ",k)
 
 			# Now actually load file. 
-			datapoint = np.load(v, allow_pickle=True)['body_joints']			
+			datapoint = np.load(v, allow_pickle=True)['body_joints']	
 
+			# Get object filepath
+			object_path = v.replace("GRAB_Joints", "grab").replace("_body_joints.npz", ".npz")
+
+			# Load object data
+			object_dict_raw = np.load(object_path, allow_pickle=True)
+			object_dict = object_dict_raw['object'].flatten()[0]
+			object_transl = object_dict['params']['transl']
+			object_orient = object_dict['params']['global_orient']
+
+			object_datapoint = np.concatenate((object_transl, object_orient), axis=1)
+
+		# Without normalizing object:
 			# Subsample relevant joints. 
 			relevant_joints_datapoint = self.subsample_relevant_joints(datapoint)
 
@@ -331,12 +354,15 @@ class GRAB_PreDataset(Dataset):
 			# Reshape. 
 			reshaped_normalized_datapoint = normalized_relevant_joint_datapoint.reshape(normalized_relevant_joint_datapoint.shape[0],-1)
 
-			self.state_size = reshaped_normalized_datapoint.shape[1]
+			# Combine object + body joints
+			reshaped_datapoint_with_objects = np.concatenate((reshaped_normalized_datapoint, object_datapoint), axis=1)
+
+			self.state_size = reshaped_datapoint_with_objects.shape[1]
 
 			# Subsample in time. 
 			number_of_timesteps = datapoint.shape[0]//self.ds_freq
 			# subsampled_data = resample(relevant_joints_datapoint, number_of_timesteps)
-			subsampled_data = resample(reshaped_normalized_datapoint, number_of_timesteps)
+			subsampled_data = resample(reshaped_datapoint_with_objects, number_of_timesteps)
 			
 			# Add subsampled datapoint to file. 
 			self.files.append(subsampled_data)            
@@ -512,6 +538,8 @@ class GRABArmHand_Dataset(GRAB_Dataset):
 
 	def __init__(self, args):
 		super(GRABArmHand_Dataset, self).__init__(args=args)
+		self.stat_dir_name="GRABArmHand"
+
 
 	def subsample_relevant_joints(self, datapoint):
 
@@ -526,6 +554,7 @@ class GRABArmHand_PreDataset(GRAB_PreDataset):
 
 	def __init__(self, args, split='train', short_traj=False, traj_length_threshold=500):
 		super(GRABArmHand_PreDataset, self).__init__(args, split=split, short_traj=short_traj, traj_length_threshold=traj_length_threshold)
+		self.stat_dir_name="GRABArmHand"
 
 	def set_relevant_joints(self):
 		self.joint_names = np.array(['pelvis',
@@ -784,6 +813,7 @@ class GRABHand_Dataset(GRAB_Dataset):
 
 	def __init__(self, args):
 		super(GRABHand_Dataset, self).__init__(args=args)
+		self.stat_dir_name='GRABHand'
 
 	def subsample_relevant_joints(self, datapoint):
 
@@ -809,8 +839,9 @@ class GRABHand_Dataset(GRAB_Dataset):
 
 class GRABHand_PreDataset(GRAB_PreDataset):
 
-	def __init__(self, args):		
+	def __init__(self, args):
 		super(GRABHand_PreDataset, self).__init__(args)
+		self.stat_dir_name='GRABHand'
 
 	def set_relevant_joints(self):
 		self.joint_names = np.array(['pelvis',
@@ -1049,3 +1080,324 @@ class GRABHand_PreDataset(GRAB_PreDataset):
 	
 	def getname(self):
 		return "GRABHand"
+
+
+
+class GRABArmHandObject_Dataset(GRAB_Dataset):
+
+	def __init__(self, args):
+		super(GRABArmHandObject_Dataset, self).__init__(args=args)
+		self.stat_dir_name="GRABArmHandObject"
+
+
+	def subsample_relevant_joints(self, datapoint):
+
+		self.relevant_joint_indices = self.arm_hand_object_indices.astype(int)
+
+		return datapoint[:, self.relevant_joint_indices]
+
+	def getname(self):
+		return "GRABArmHandObject"
+
+class GRABArmHandObject_PreDataset(GRAB_PreDataset):
+
+	def __init__(self, args, split='train', short_traj=False, traj_length_threshold=500):
+		super(GRABArmHandObject_PreDataset, self).__init__(args, split=split, short_traj=short_traj, traj_length_threshold=traj_length_threshold)
+		self.stat_dir_name="GRABArmHandObject"
+
+	def set_relevant_joints(self):
+		self.joint_names = np.array(['pelvis',
+									 'left_hip',
+									 'right_hip',
+									 'spine1',
+									 'left_knee',
+									 'right_knee',
+									 'spine2',
+									 'left_ankle',
+									 'right_ankle',
+									 'spine3',
+									 'left_foot',
+									 'right_foot',
+									 'neck',
+									 'left_collar',
+									 'right_collar',
+									 'head',
+									 'left_shoulder',
+									 'right_shoulder',
+									 'left_elbow',
+									 'right_elbow',
+									 'left_wrist',
+									 'right_wrist',
+									 'jaw',
+									 'left_eye_smplhf',
+									 'right_eye_smplhf',
+									 'left_index1',
+									 'left_index2',
+									 'left_index3',
+									 'left_middle1',
+									 'left_middle2',
+									 'left_middle3',
+									 'left_pinky1',
+									 'left_pinky2',
+									 'left_pinky3',
+									 'left_ring1',
+									 'left_ring2',
+									 'left_ring3',
+									 'left_thumb1',
+									 'left_thumb2',
+									 'left_thumb3',
+									 'right_index1',
+									 'right_index2',
+									 'right_index3',
+									 'right_middle1',
+									 'right_middle2',
+									 'right_middle3',
+									 'right_pinky1',
+									 'right_pinky2',
+									 'right_pinky3',
+									 'right_ring1',
+									 'right_ring2',
+									 'right_ring3',
+									 'right_thumb1',
+									 'right_thumb2',
+									 'right_thumb3',
+									 'nose',
+									 'right_eye',
+									 'left_eye',
+									 'right_ear',
+									 'left_ear',
+									 'left_big_toe',
+									 'left_small_toe',
+									 'left_heel',
+									 'right_big_toe',
+									 'right_small_toe',
+									 'right_heel',
+									 'left_thumb',
+									 'left_index',
+									 'left_middle',
+									 'left_ring',
+									 'left_pinky',
+									 'right_thumb',
+									 'right_index',
+									 'right_middle',
+									 'right_ring',
+									 'right_pinky',
+									 'right_eye_brow1',
+									 'right_eye_brow2',
+									 'right_eye_brow3',
+									 'right_eye_brow4',
+									 'right_eye_brow5',
+									 'left_eye_brow5',
+									 'left_eye_brow4',
+									 'left_eye_brow3',
+									 'left_eye_brow2',
+									 'left_eye_brow1',
+									 'nose1',
+									 'nose2',
+									 'nose3',
+									 'nose4',
+									 'right_nose_2',
+									 'right_nose_1',
+									 'nose_middle',
+									 'left_nose_1',
+									 'left_nose_2',
+									 'right_eye1',
+									 'right_eye2',
+									 'right_eye3',
+									 'right_eye4',
+									 'right_eye5',
+									 'right_eye6',
+									 'left_eye4',
+									 'left_eye3',
+									 'left_eye2',
+									 'left_eye1',
+									 'left_eye6',
+									 'left_eye5',
+									 'right_mouth_1',
+									 'right_mouth_2',
+									 'right_mouth_3',
+									 'mouth_top',
+									 'left_mouth_3',
+									 'left_mouth_2',
+									 'left_mouth_1',
+									 'left_mouth_5',  # 59 in OpenPose output
+									 'left_mouth_4',  # 58 in OpenPose output
+									 'mouth_bottom',
+									 'right_mouth_4',
+									 'right_mouth_5',
+									 'right_lip_1',
+									 'right_lip_2',
+									 'lip_top',
+									 'left_lip_2',
+									 'left_lip_1',
+									 'left_lip_3',
+									 'lip_bottom',
+									 'right_lip_3'])
+
+		self.arm_and_hand_joint_names = np.array([ #'pelvis',
+												'left_shoulder', # index 0
+												'left_elbow',
+												'left_collar',
+												'left_wrist', 
+												'left_index1',
+												'left_index2',
+												'left_index3',
+												'left_middle1',
+												'left_middle2',
+												'left_middle3',
+												'left_pinky1',
+												'left_pinky2',
+												'left_pinky3',
+												'left_ring1',
+												'left_ring2',
+												'left_ring3',
+												'left_thumb1',
+												'left_thumb2',
+												'left_thumb3',
+												'left_thumb',
+												'left_index',
+												'left_middle',
+												'left_ring',
+												'left_pinky',
+												'right_shoulder', # index 24
+												'right_elbow',
+												'right_collar',
+												'right_wrist',
+												'right_index1',
+												'right_index2',
+												'right_index3',
+												'right_middle1',
+												'right_middle2',
+												'right_middle3',
+												'right_pinky1',
+												'right_pinky2',
+												'right_pinky3',
+												'right_ring1',
+												'right_ring2',
+												'right_ring3',
+												'right_thumb1',
+												'right_thumb2',
+												'right_thumb3',
+												'right_thumb',
+												'right_index',
+												'right_middle',
+												'right_ring',
+												'right_pinky'])
+
+		self.left_arm_and_hand_joint_names = np.array([ #'pelvis',
+												'left_shoulder',
+												'left_elbow',
+												'left_collar',
+												'left_wrist', 
+												'left_index1',
+												'left_index2',
+												'left_index3',
+												'left_middle1',
+												'left_middle2',
+												'left_middle3',
+												'left_pinky1',
+												'left_pinky2',
+												'left_pinky3',
+												'left_ring1',
+												'left_ring2',
+												'left_ring3',
+												'left_thumb1',
+												'left_thumb2',
+												'left_thumb3',
+												'left_thumb',
+												'left_index',
+												'left_middle',
+												'left_ring',
+												'left_pinky'])
+
+		self.right_arm_and_hand_joint_names = np.array([ #'pelvis',
+												'right_shoulder',
+												'right_elbow',
+												'right_collar',
+												'right_wrist',
+												'right_index1',
+												'right_index2',
+												'right_index3',
+												'right_middle1',
+												'right_middle2',
+												'right_middle3',
+												'right_pinky1',
+												'right_pinky2',
+												'right_pinky3',
+												'right_ring1',
+												'right_ring2',
+												'right_ring3',
+												'right_thumb1',
+												'right_thumb2',
+												'right_thumb3',
+												'right_thumb',
+												'right_index',
+												'right_middle',
+												'right_ring',
+												'right_pinky'])
+
+		# Create index arrays
+		if self.args.single_hand == "left":
+			selection = self.left_arm_and_hand_joint_names
+		elif self.args.single_hand == "right":
+			selection = self.right_arm_and_hand_joint_names
+		else:
+			selection = self.arm_and_hand_joint_names
+
+		self.arm_and_hand_joint_indices = np.zeros(len(selection))
+		self.object_indices = np.zeros(6)
+
+		for k, v in enumerate(selection):
+			self.arm_and_hand_joint_indices[k] = np.where(self.joint_names==v)[0][0]
+
+		for i in range(self.object_indices.shape[0]):
+			self.object_indices[i] = len(self.arm_and_hand_joint_names) + i
+
+
+		self.arm_hand_object_indices = np.zeros(len(self.arm_and_hand_joint_indices) + 6)
+		self.arm_hand_object_indices[0:len(self.arm_and_hand_joint_indices)] = self.arm_and_hand_joint_indices
+		self.arm_hand_object_indices[-6:] = self.object_indices
+		
+		
+
+	def subsample_relevant_joints(self, datapoint):
+
+		self.relevant_joint_indices = self.arm_hand_object_indices.astype(int)
+
+		return datapoint[:, self.relevant_joint_indices]
+
+	def getname(self):
+		return "GRABArmHandObject"
+	
+
+
+class GRABObject_Dataset(GRAB_Dataset):
+
+	def __init__(self, args):
+		super(GRABObject_Dataset, self).__init__(args=args)
+		self.stat_dir_name="GRABObject"
+
+
+	def subsample_relevant_joints(self, datapoint):
+
+		self.relevant_joint_indices = self.object_indices.astype(int)
+
+		return datapoint[:, self.relevant_joint_indices]
+
+	def getname(self):
+		return "GRABObject"
+
+class GRABObject_PreDataset(GRAB_PreDataset):
+
+	def __init__(self, args, split='train', short_traj=False, traj_length_threshold=500):
+		super(GRABObject_PreDataset, self).__init__(args, split=split, short_traj=short_traj, traj_length_threshold=traj_length_threshold)
+		self.stat_dir_name="GRABObject"
+
+	def subsample_relevant_joints(self, datapoint):
+
+		self.relevant_joint_indices = self.object_indices.astype(int)
+
+		return datapoint[:, self.relevant_joint_indices]
+
+	def getname(self):
+		return "GRABObject"

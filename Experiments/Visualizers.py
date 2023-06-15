@@ -30,8 +30,9 @@ from PolicyNetworks import *
 import torch
 from moviepy.video.io.bindings import mplfig_to_npimage
 from PIL import Image
-import mj_envs
+# import robohive
 from mjrl.utils.gym_env import GymEnv
+from hand_imitation.env.environments.ycb_relocate_env import YCBRelocate
 
 
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
@@ -518,6 +519,9 @@ class GRABVisualizer(object):
 		else:
 			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
 
+	def create_environment(self, task_id=None):
+		pass
+
 class GRABHandVisualizer(GRABVisualizer):
 	
 	def __init__(self, args, has_display=False):
@@ -881,8 +885,8 @@ class DAPGVisualizer(SawyerVisualizer):
 	def __init__(self, args=None):
 		super().__init__()
 		self.args = args
-		self.environment = GymEnv("relocate-v0")
-		self.env_name = "relocate-v0"
+		# self.environment = GymEnv("relocate-v0")
+		# self.env_name = "relocate-v0"
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 		
@@ -910,6 +914,9 @@ class DAPGVisualizer(SawyerVisualizer):
 		# [:-6] drops "_demos" suffix
 		if task_id is None:
 			print("create_environment failed |", "task_id is None")
+			self.environment = GymEnv("relocate-v0")
+			self.env_name = "relocate-v0"
+			return
 		if task_id == self.env_name:
 			return
 		task_id = task_id[:-6]
@@ -967,6 +974,90 @@ class DAPGVisualizer(SawyerVisualizer):
 		if save_image:
 			image_object = Image.fromarray(img)
 			image_object.save("DextrousHand.jpg")
+		return img
+	
+
+class DexMVVisualizer(SawyerVisualizer):
+		
+	def __init__(self, args=None):
+		super().__init__()
+		self.args = args
+		self.environment = YCBRelocate(has_renderer=False, object_name="foam_brick", friction=(1, 0.5, 0.01),
+                          object_scale=0.8, version="v2")
+		self.env_name = "relocate-v2"
+
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
+		
+		self.create_environment(task_id)
+		
+		image_list = []
+		for t in range(trajectory.shape[0]):
+			new_image = self.set_joint_pose_return_image(trajectory[t])
+			image_list.append(new_image)
+
+			# Insert white 
+			if segmentations is not None:
+				if t>0 and segmentations[t]==1:
+					image_list.append(255*np.ones_like(new_image)+new_image)
+
+		if return_and_save:
+			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			return image_list
+		elif return_gif:
+			return image_list
+		else:
+			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)    
+
+	def create_environment(self, task_id=None):
+		# [:-6] drops "_demos" suffix
+		# if task_id is None:
+		if task_id == self.env_name:
+			return
+		# print("create_environment failed |", "task_id is None")
+		self.environment = YCBRelocate(has_renderer=False, object_name="foam_brick", friction=(1, 0.5, 0.01),
+						object_scale=0.8, version="v2")
+		self.env_name = "relocate-v2"
+		self.environment.target_object_bid = 27
+		# 	return
+
+		# task_id = task_id[:-6]
+		# if task_id in ["relocate-v0", "door-v0", "hammer-v0", "pen-v0"]:
+			# self.environment = GymEnv(task_id)
+			# self.env_name = task_id
+			# print("create_environment set to", self.env_name)
+		# else:
+			# print("create_environment failed |", "task_id:", task_id, "current env:", self.env_name)
+
+	def set_joint_pose(self, joint_angles):
+
+		state = self.environment.get_env_state()
+		qvel = np.zeros_like(state['qvel'])
+		qpos = state['qpos']
+
+		if self.env_name == "relocate-v2":
+			obj_pos = 100*np.ones(7)
+			qpos[:30] = joint_angles[:30]
+			qpos[30:37] = obj_pos[0:7]
+		else:
+			print("Unknown environment", self.env_name)
+	
+		self.environment.set_state(qpos, qvel)
+		self.environment.sim.forward()
+
+	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False, save_image=False):
+		# print("Visualizing in", self.env_name)
+		
+
+		# self.environment.set_env_state(state)
+		# self.environment.env.env.sim.forward()
+		
+		self.set_joint_pose(joint_angles)
+
+		# Trying to use the sim render instead of the display based rendering, so that we can grab images.. 
+		img = np.flipud(self.environment.sim.render(600, 600))
+		if save_image:
+			image_object = Image.fromarray(img)
+			image_object.save("DexMVHand.jpg")
 		return img
 
 class RoboturkObjectVisualizer(object):

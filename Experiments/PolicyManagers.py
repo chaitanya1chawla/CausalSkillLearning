@@ -13,7 +13,7 @@ from PPO_Utilities import PPOBuffer
 from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, \
 	GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, DAPGVisualizer, \
 	RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer,\
-	RoboMimicObjectVisualizer, RoboMimicRobotObjectVisualizer #, MocapVisualizer
+	RoboMimicObjectVisualizer, RoboMimicRobotObjectVisualizer, DexMVVisualizer #, MocapVisualizer
 
 # from Visualizers import *
 import TFLogger, DMP, RLUtils
@@ -26,7 +26,8 @@ torch.set_printoptions(sci_mode=False, precision=2)
 # Global data list
 global global_dataset_list 
 global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk', \
-			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG', \
+			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', \
+      'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', 'DexMV', 'DexMVHand', 'DexMVObject', \
 			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']
 
 class PolicyManager_BaseClass():
@@ -107,10 +108,12 @@ class PolicyManager_BaseClass():
 			self.visualizer = GRABVisualizer()
 		elif self.args.data in ['GRABHand']:
 			self.visualizer = GRABHandVisualizer(args=self.args)
-		elif self.args.data in ['GRABArmHand']:
+		elif self.args.data in ['GRABArmHand', 'GRABArmHandObject', 'GRABObject']:
 			self.visualizer = GRABArmHandVisualizer(args=self.args)		
-		elif self.args.data in ['DAPG']:
+		elif self.args.data in ['DAPG', 'DAPGHand', 'DAPGObject']:
 			self.visualizer = DAPGVisualizer(args=self.args)
+		elif self.args.data in ['DexMV', 'DexMVHand', 'DexMVObject']:
+			self.visualizer = DexMVVisualizer(args=self.args)
 		elif self.args.data in ['RoboturkObjects']:		
 			self.visualizer = RoboturkObjectVisualizer(args=self.args)
 		elif self.args.data in ['RoboturkRobotObjects']:
@@ -209,7 +212,7 @@ class PolicyManager_BaseClass():
 
 			self.current_traj_len = len(trajectory)
 
-			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand', 'DAPG']:
+			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', 'DexMV', 'DexMVHand', 'DexMVObject']:
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
 			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic',\
@@ -448,11 +451,13 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['GRABHand']:
 			self.visualizer = GRABHandVisualizer(args=self.args)
 			self.N = 200
-		elif self.args.data in ['GRABArmHand']:
+		elif self.args.data in ['GRABArmHand', 'GRABArmHandObject', 'GRABObject']:
 			self.visualizer = GRABArmHandVisualizer(args=self.args)
 			self.N = 200
-		elif self.args.data in ['DAPG']:
+		elif self.args.data in ['DAPG', 'DAPGHand', 'DAPGObject']:
 			self.visualizer = DAPGVisualizer(args=self.args)		
+		elif self.args.data in ['DexMV', 'DexMVHand', 'DexMVObject']:
+			self.visualizer = DexMVVisualizer(args=self.args)		
 		elif self.args.data in ['RoboturkRobotObjects']:		
 			self.visualizer = RoboturkRobotObjectVisualizer(args=self.args)
 		elif self.args.data in ['RoboMimicObjects']:
@@ -903,10 +908,7 @@ class PolicyManager_BaseClass():
 		########################################
 		# Set task ID if the visualizer needs it. 
 		# Set task ID if the visualizer needs it. 
-		if indexed_data_element is not None and self.args.data == 'DAPG':
-			env_name = indexed_data_element['file']
-			print("Visualizing trajectory in task environment:", env_name)
-		elif indexed_data_element is None or ('task-id' not in indexed_data_element.keys()):
+		if indexed_data_element is None or ('task-id' not in indexed_data_element.keys()):
 			task_id = None
 			env_name = None
 		else:			
@@ -939,6 +941,14 @@ class PolicyManager_BaseClass():
 			animation_object = self.dataset[i]['animation']
 
 		print("We are in the PM visualizer function.")
+
+		# Set task ID if the visualizer needs it. 
+		# if indexed_data_element is not None and self.args.data == 'DAPG':
+		# 	env_name = indexed_data_element['file']
+		# 	print("Visualizing trajectory in task environment:", env_name)
+		# elif indexed_data_element is None or ('task_id' not in indexed_data_element.keys()):
+		# 	task_id = None
+		# 	env_name = None
 
 		if self.args.data=='Mocap':
 			# Get animation object from dataset. 
@@ -1445,7 +1455,7 @@ class PolicyManager_BaseClass():
 			index_list = original_index_list
 		else:
 			# additional_index_list = np.random.choice(original_index_list, size=extent-self.rounded_down_extent, replace=False)			
-			additional_index_list = np.random.choice(original_index_list, size=self.training_extent - extent, replace=False)			
+			additional_index_list = np.random.choice(original_index_list, size=self.training_extent - extent, replace=self.args.replace_samples)			
 			index_list = np.concatenate([original_index_list, additional_index_list])		
 			
 		# 3) Sort based on dataset trajectory length. 
@@ -1504,17 +1514,13 @@ class PolicyManager_BaseClass():
 		else:
 			# additional_index_list = np.random.choice(original_index_list, size=extent-self.rounded_down_extent, replace=False)			
 			# additional_index_list = np.random.choice(original_index_list, size=self.training_extent-self.rounded_down_extent, replace=False)
-			additional_index_list = np.random.choice(original_index_list, size=self.training_extent-extent, replace=False)
+			additional_index_list = np.random.choice(original_index_list, size=self.training_extent-extent, replace=self.args.replace_samples)
 			index_list = np.concatenate([original_index_list, additional_index_list])
 		np.random.shuffle(index_list)
 		self.index_list = index_list
 
 	def shuffle(self, extent, shuffle=True):
 	
-		# realdata = (self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\
-		# 	'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG', \
-		# 		'RoboMimicObjects','RoboMimicRobotObjects'])
-
 		realdata = (self.args.data in global_dataset_list)
 
 		# Length based shuffling.
@@ -1747,7 +1753,68 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
 			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 		
+		elif self.args.data in ['GRABArmHandObject']:
+			
+			self.state_size = 96
+			self.state_dim = 96
+
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 40
+			# stat_dir_name = self.args.data
+
+			# if self.args.normalization=='meanvar':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			# elif self.args.normalization=='minmax':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+
+		elif self.args.data in ['GRABObject']:
+			
+			self.state_size = 6
+			self.state_dim = 6
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 40
+			# stat_dir_name = self.args.data
+
+			# if self.args.normalization=='meanvar':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			# elif self.args.normalization=='minmax':
+			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+		
 		elif self.args.data in ['DAPG']:
+			
+			self.state_size = 51
+			self.state_dim = 51
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 0
+			stat_dir_name = self.args.data
+
+			stat_dir_name = "DAPGFull"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+		
+		elif self.args.data in ['DAPGHand']:
 			
 			self.state_size = 30
 			self.state_dim = 30
@@ -1759,7 +1826,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.test_set_size = 0
 			stat_dir_name = self.args.data
 
-			stat_dir_name = "DAPG"			
+			stat_dir_name = "DAPGFull"			
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
@@ -1768,6 +1835,101 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+			
+		elif self.args.data in ['DAPGObject']:
+			
+			self.state_size = 21
+			self.state_dim = 21
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 0
+			stat_dir_name = self.args.data
+
+			stat_dir_name = "DAPGFull"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+
+		elif self.args.data in ['DexMV']:
+			
+			self.state_size = 43
+			self.state_dim = 43
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 0
+			stat_dir_name = self.args.data
+
+			stat_dir_name = "DexMVFull"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+			self.norm_sub_value = self.norm_sub_value[:self.state_dim]
+			self.norm_denom_value = self.norm_denom_value[:self.state_dim]
+		
+		elif self.args.data in ['DexMVHand']:
+			
+			self.state_size = 30
+			self.state_dim = 30
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 0
+			stat_dir_name = self.args.data
+
+			stat_dir_name = "DexMVFull"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+			self.norm_sub_value = self.norm_sub_value[:self.state_dim]
+			self.norm_denom_value = self.norm_denom_value[:self.state_dim]
+
+		elif self.args.data in ['DexMVObject']:
+			
+			self.state_size = 13
+			self.state_dim = 13
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 0
+			stat_dir_name = self.args.data
+
+			stat_dir_name = "DexMVFull"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+			self.norm_sub_value = self.norm_sub_value[:self.state_dim]
+			self.norm_denom_value = self.norm_denom_value[:self.state_dim]
+
 
 		elif self.args.data in ['RoboturkObjects','RoboMimicObjects']:
 			# self.state_size = 14
@@ -2153,10 +2315,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			return concatenated_traj, sample_action_seq, sample_traj
 		
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		
+	
 		elif self.args.data in global_dataset_list:
 		
-
 			data_element = self.dataset[i]
 
 			####################################			
@@ -2216,8 +2377,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				# CONDITIONAL INFORMATION for the encoder... 
 				if self.args.data in global_dataset_list:
-				# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-					# 'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
+
 
 					pass
 				# if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
@@ -2427,13 +2587,35 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			else:
 				self.state_dim = 147
 			self.rollout_timesteps = self.traj_length
+		elif self.args.data in ['GRABArmHandObject']:
+			self.state_size = 96
+			self.state_dim = 96
+			self.rollout_timesteps = self.traj_length
+		elif self.args.data in ['GRABObject']:
+			self.state_dim = 6
+			self.rollout_timesteps = self.traj_length
 		elif self.args.data in ['GRABHand']:
 			self.state_dim = 120
 			if self.args.single_hand in ['left', 'right']:
 				self.state_dim //= 2
 			self.rollout_timesteps = self.traj_length
 		elif self.args.data in ['DAPG']:
+			self.state_dim = 51
+			self.rollout_timesteps = self.traj_length
+		elif self.args.data in ['DAPGHand']:
 			self.state_dim = 30
+			self.rollout_timesteps = self.traj_length
+		elif self.args.data in ['DAPGObject']:
+			self.state_dim = 21
+			self.rollout_timesteps = self.traj_length
+		elif self.args.data in ['DexMV']:
+			self.state_dim = 43
+			self.rollout_timesteps = self.traj_length
+		elif self.args.data in ['DexMVHand']:
+			self.state_dim = 30
+			self.rollout_timesteps = self.traj_length
+		elif self.args.data in ['DexMVObject']:
+			self.state_dim = 13
 			self.rollout_timesteps = self.traj_length
 
 		if rollout_length is not None:
@@ -2721,10 +2903,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# if self.args.data=="MIME" or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:	
 
-		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-		# 		'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'DAPG', \
-		# 		'RoboMimicObjects','RoboMimicRobotObjects']:
-
 		if self.args.data in global_dataset_list:
 
 			print("Running Evaluation of State Distances on small test set.")
@@ -2790,13 +2968,34 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				else:
 					self.state_dim = 147
 				self.rollout_timesteps = self.traj_length
+			if self.args.data in ['GRABArmHandObject']:
+				self.state_dim = 96
+				self.rollout_timesteps = self.traj_length
+			if self.args.data in ['GRABObject']:
+				self.state_dim = 6
+				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['GRABHand']:
 				self.state_dim = 126
 				if self.args.single_hand in ['left', 'right']:
 					self.state_dim //= 2
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['DAPG']:
+				self.state_dim = 51
+				self.rollout_timesteps = self.traj_length
+			if self.args.data in ['DAPGHand']:
 				self.state_dim = 30
+				self.rollout_timesteps = self.traj_length
+			if self.args.data in ['DAPGObject']:
+				self.state_dim = 21
+				self.rollout_timesteps = self.traj_length
+			if self.args.data in ['DexMV']:
+				self.state_dim = 43
+				self.rollout_timesteps = self.traj_length
+			if self.args.data in ['DexMVHand']:
+				self.state_dim = 30
+				self.rollout_timesteps = self.traj_length
+			if self.args.data in ['DexMVObject']:
+				self.state_dim = 13
 				self.rollout_timesteps = self.traj_length
 			if self.args.data in ['RoboturkObjects']:
 				# Now switching to using 7 dimensions instead of 14, so as to not use relative pose.
@@ -3015,7 +3214,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		# Make data_element a list of dictionaries. 
 		data_element = []
 						
-		for b in range(self.args.batch_size):
+		for b in range(min(self.args.batch_size, len(self.index_list) - i)):
 
 			# Because of the new creation of index_list in random shuffling, this should be safe to index dataset with.
 			index = self.index_list[i+b]
@@ -3056,10 +3255,6 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 			return concatenated_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), sample_traj.transpose((1,0,2))
 				
-		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:	
-		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-		# 		'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects',\
-		# 		'RoboMimicObjects','RoboMimicRobotObjects']:
 		elif self.args.data in global_dataset_list:
 
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
@@ -3077,7 +3272,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			
 			batch_trajectory = np.zeros((self.args.batch_size, self.current_traj_len, self.state_size))
 
-			for x in range(self.args.batch_size):
+			for x in range(min(self.args.batch_size, len(self.index_list) - i)):
 
 				# Select the trajectory for each instance in the batch. 
 				if self.args.ee_trajectories:
@@ -3347,12 +3542,64 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		
 		elif self.args.data in ['GRABArmHand']:
 			
-			if self.args.position_normalization == 'pelvis':
-				self.state_size = 144
-				self.state_dim = 144
-			else:
-				self.state_size = 147
-				self.state_dim = 147
+
+			self.state_size = 144
+			self.state_dim = 144
+			if self.args.single_hand in ['left', 'right']:
+				self.state_size //= 2
+				self.state_dim //= 2
+
+			if self.args.position_normalization != 'pelvis':
+				self.state_size += 3
+				self.state_dim += 3
+			
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 40
+			stat_dir_name = self.args.data
+			self.conditional_information = None
+			self.conditional_viz_env = False	
+
+			self.visualizer = GRABArmHandVisualizer(args=self.args)		
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+
+		elif self.args.data in ['GRABArmHandObject']:
+			
+			self.state_size = 96
+			self.state_dim = 96
+		
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 40
+			stat_dir_name = self.args.data
+			self.conditional_information = None
+			self.conditional_viz_env = False	
+
+			self.visualizer = GRABArmHandVisualizer(args=self.args)		
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+
+		elif self.args.data in ['GRABObject']:
+			
+			self.state_size = 6
+			self.state_dim = 6
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
 			self.output_size = self.state_size
@@ -3374,6 +3621,32 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			
 		elif self.args.data in ['DAPG']:
 			
+			self.state_size = 51
+			self.state_dim = 51
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 0
+			stat_dir_name = self.args.data
+			self.conditional_information = None
+			self.conditional_viz_env = False	
+
+			self.visualizer = DAPGVisualizer(args=self.args)
+
+			stat_dir_name = "DAPGFull"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+		
+		elif self.args.data in ['DAPGHand']:
+			
 			self.state_size = 30
 			self.state_dim = 30
 			self.input_size = 2*self.state_size
@@ -3388,7 +3661,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			self.visualizer = DAPGVisualizer(args=self.args)
 
-			stat_dir_name = "DAPG"			
+			stat_dir_name = "DAPGFull"			
 
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
@@ -3397,6 +3670,117 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+
+		elif self.args.data in ['DAPGObject']:
+			
+			self.state_size = 21
+			self.state_dim = 21
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 0
+			stat_dir_name = self.args.data
+			self.conditional_information = None
+			self.conditional_viz_env = False	
+
+			self.visualizer = DAPGVisualizer(args=self.args)
+
+			stat_dir_name = "DAPGFull"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+
+		elif self.args.data in ['DexMV']:
+			
+			self.state_size = 43
+			self.state_dim = 43
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 0
+			stat_dir_name = self.args.data
+			self.conditional_information = None
+			self.conditional_viz_env = False	
+
+			self.visualizer = DexMVVisualizer(args=self.args)
+
+			stat_dir_name = "DexMVFull"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+			self.norm_sub_value = self.norm_sub_value[:self.state_dim]
+			self.norm_denom_value = self.norm_denom_value[:self.state_dim]
+
+		elif self.args.data in ['DexMVHand']:
+			
+			self.state_size = 30
+			self.state_dim = 30
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 0
+			stat_dir_name = self.args.data
+			self.conditional_information = None
+			self.conditional_viz_env = False	
+
+			self.visualizer = DexMVVisualizer(args=self.args)
+
+			stat_dir_name = "DexMVFull"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+			self.norm_sub_value = self.norm_sub_value[:self.state_dim]
+			self.norm_denom_value = self.norm_denom_value[:self.state_dim]
+
+		elif self.args.data in ['DexMVObject']:
+			
+			self.state_size = 13
+			self.state_dim = 13
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 0
+			stat_dir_name = self.args.data
+			self.conditional_information = None
+			self.conditional_viz_env = False	
+
+			self.visualizer = DexMVVisualizer(args=self.args)
+
+			stat_dir_name = "DexMVFull"			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
+			self.norm_sub_value = self.norm_sub_value[:self.state_dim]
+			self.norm_denom_value = self.norm_denom_value[:self.state_dim]
+			
 
 		elif self.args.data=='RoboturkObjects':
 			# self.state_size = 14
@@ -3583,10 +3967,6 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 	def visualize_trajectory(self, trajectory, segmentations=None, i=0, suffix='_Img'):
 
-		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-		# 		'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects',\
-		# 		'RoboMimicObjects','RoboMimicRobotObjects']:
 		if self.args.data in global_dataset_list:
 
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
@@ -3709,9 +4089,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			variational_rollout_image = np.array(variational_rollout_image)
 			latent_rollout_image = np.array(latent_rollout_image)
 			
-			# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-			# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'DAPG']:
 			if self.args.data in global_dataset_list:
+
 				# Feeding as list of image because gif_summary.				
 
 				# print("Embedding in joint update plots, L2511 ")
@@ -4595,8 +4974,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# Visualize space if the subpolicy has been trained...
 		# Running even with the fix_subpolicy, so that we can evaluate joint reconstruction.
-		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic', 'GRABHand', 'GRABArmHand', 'DAPG']:			
 		if self.args.data in global_dataset_list:
+
 			print("Running Visualization on Robot Data.")	
 
 			########################################
@@ -5307,11 +5686,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
 
-		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-				# 'GRAB','GRABHand','GRABArmHand','DAPG','RoboturkObjects','RoboturkRobotObjects',\
-				# 'RoboMimicObjects','RoboMimicRobotObjects']:
 		elif self.args.data in global_dataset_list:
-
 					   
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 
@@ -5372,7 +5747,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				
 
 			# Set condiitonal information. 
-			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand', 'DAPG']:
+			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject','DAPG', 'DAPGHand', 'DAPGObject','DexMV','DexMVHand','DexMVObject']:
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
@@ -8350,7 +8725,7 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 					for k in range(self.start_index,self.start_index+self.number_of_datapoints_per_batch):
 						# Now visualize the original .. target trajectory. 			
 
-						if self.args.target_domain in ['GRAB','GRABHand','GRABArmHand']:
+						if self.args.target_domain in ['GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject']:
 							GRAB_gif_name = self.GRAB_trajectory_ID[k].lstrip(self.args.target_datadir+'/')
 						else:
 							GRAB_gif_name = None
@@ -8849,7 +9224,12 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# Do this with just the perplexity set to 30 for now.. 
 
 		tsne_embedded_zs , _ = self.get_transform(self.shared_z_tuples)
-		densne_embedded_zs , _ = self.get_transform(self.shared_z_tuples, projection='densne')
+
+		try:
+			densne_embedded_zs , _ = self.get_transform(self.shared_z_tuples, projection='densne')
+		except:
+			densne_embedded_zs = None
+
 		pca_embedded_zs , _ = self.get_transform(self.shared_z_tuples, projection='pca')
 
 		# tsne_embedded_zs , _ = self.get_transform(self.target_latent_zs)
@@ -8860,7 +9240,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		# 	embed()
 
 		tsne_image = self.plot_density_embedding(tsne_embedded_zs, colors, "{0} Density Coded Z Tuple TSNE Embeddings.".format(prefix))
-		densne_image = self.plot_density_embedding(densne_embedded_zs, colors, "{0} Density Coded Z Tuple DENSNE Embeddings.".format(prefix))
+		
+		if densne_embedded_zs is not None:
+			densne_image = self.plot_density_embedding(densne_embedded_zs, colors, "{0} Density Coded Z Tuple DENSNE Embeddings.".format(prefix))
+	
 		pca_image = self.plot_density_embedding(pca_embedded_zs, colors, "{0} Density Coded Z Tuple PCA Embeddings.".format(prefix))
 
 		##################################################
@@ -8868,7 +9251,10 @@ class PolicyManager_Transfer(PolicyManager_BaseClass):
 		##################################################
 
 		log_dict['{0} Density Coded Z Tuple TSNE Embeddings Perp30'.format(prefix)] = self.return_wandb_image(tsne_image)
-		log_dict['{0} Density Coded Z Tuple DENSNE Embeddings Perp30'.format(prefix)] = self.return_wandb_image(densne_image)
+		
+		if densne_embedded_zs is not None:
+			log_dict['{0} Density Coded Z Tuple DENSNE Embeddings Perp30'.format(prefix)] = self.return_wandb_image(densne_image)
+	
 		log_dict['{0} Density Coded Z Tuple PCA Embeddings'.format(prefix)] = self.return_wandb_image(pca_image)
 	
 
@@ -10524,7 +10910,7 @@ class PolicyManager_JointFixEmbedTransfer(PolicyManager_Transfer):
 		source_input_dict, source_var_dict, source_eval_dict = policy_manager.run_iteration(self.counter, i, return_dicts=True, train=False, bucket_index=bucket_index)		
 
 		# If we're using GRAB data, also remember the trajectory information. to visualize. 
-		if policy_manager.args.data in ['GRAB','GRABHand','GRABArmHand']:
+		if policy_manager.args.data in ['GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject']:
 			
 			# Use the get batch eleemnt function. 
 			batched_data_element = policy_manager.get_batch_element(i)

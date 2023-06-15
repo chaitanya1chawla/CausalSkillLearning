@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 from headers import *
-import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders, GRAB_DataLoader, DAPG_DataLoader
+import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders, GRAB_DataLoader, DAPG_DataLoader, DexMV_DataLoader
 from PolicyManagers import *
 import TestClass
 import faulthandler
@@ -74,10 +74,30 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = GRAB_DataLoader.GRABHand_PreDataset(args)
 	elif args.data=='GRABHand':
 		dataset = GRAB_DataLoader.GRABHand_Dataset(args)
-	elif args.data=='DAPGPreproc':
+	elif args.data=='GRABArmHandObjectPreproc':
+		dataset = GRAB_DataLoader.GRABArmHandObject_PreDataset(args)
+	elif args.data=='GRABArmHandObject':
+		dataset = GRAB_DataLoader.GRABArmHandObject_Dataset(args)
+	elif args.data=='GRABObjectPreproc':
+		dataset = GRAB_DataLoader.GRABObject_PreDataset(args)
+	elif args.data=='GRABObject':
+		dataset = GRAB_DataLoader.GRABObject_Dataset(args)
+	elif args.data in ['DAPGPreproc', 'DAPGHandPreproc', 'DAPGObjectPreproc']:
 		dataset = DAPG_DataLoader.DAPG_PreDataset(args)
 	elif args.data=='DAPG':
 		dataset = DAPG_DataLoader.DAPG_Dataset(args)
+	elif args.data=='DAPGHand':
+		dataset = DAPG_DataLoader.DAPGHand_Dataset(args)
+	elif args.data=='DAPGObject':
+		dataset = DAPG_DataLoader.DAPGObject_Dataset(args)
+	elif args.data in ['DexMVPreproc', 'DexMVHandPreproc', 'DexMVObjectPreproc']:
+		dataset = DexMV_DataLoader.DexMV_PreDataset(args)
+	elif args.data=='DexMV':
+		dataset = DexMV_DataLoader.DexMV_Dataset(args)
+	elif args.data=='DexMVHand':
+		dataset = DexMV_DataLoader.DexMVHand_Dataset(args)
+	elif args.data=='DexMVObject':
+		dataset = DexMV_DataLoader.DexMV_ObjectDataset(args)
 	return dataset
 
 class Master():
@@ -245,6 +265,7 @@ def parse_arguments():
 	parser.add_argument('--epochs',dest='epochs',type=int,default=500) # Number of epochs to train for. Reduce for Mocap.
 	parser.add_argument('--debugging_datapoints',dest='debugging_datapoints',type=int,default=-1,help='How many data points to run training on. If greater than 0, only select that many datapoints for debugging.')
 	parser.add_argument('--seed',dest='seed',type=int,default=0,help='Seed value to initialize random processes.')
+	parser.add_argument('--replace_samples', dest='replace_samples',type=bool,default=False,help='Use replace=true when sampling trajectories for training.')
 
 	# Training setting. 
 	parser.add_argument('--discrete_z',dest='discrete_z',type=int,default=0)
