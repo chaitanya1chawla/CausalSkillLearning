@@ -1964,7 +1964,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			log_dict['Unweighted Relative Phase Auxillary Loss'] = self.unweighted_relative_state_phase_aux_loss
 			log_dict['Relative Phase Auxillary Loss'] = self.relative_state_phase_aux_loss
 			log_dict['Auxillary Loss'] = self.aux_loss
-			
+
 		if counter%self.args.display_freq==0:
 			
 			if self.args.batch_size>1:
@@ -2295,7 +2295,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.pairwise_z_distance = torch.cdist(z_set, z_set)[0]
 
 		# Clamped z distance loss. 
-		self.clamped_pairwise_z_distance = torch.clamp(self.pairwise_z_distance - self.args.pairwise_z_distance_threshold, min=0.)
+		# self.clamped_pairwise_z_distance = torch.clamp(self.pairwise_z_distance - self.args.pairwise_z_distance_threshold, min=0.)
+		self.clamped_pairwise_z_distance = torch.clamp(self.args.pairwise_z_distance_threshold - self.pairwise_z_distance, min=0.)
 
 	def compute_relative_state_class_vectors(self, update_dict):
 
@@ -2331,8 +2332,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		negative_weighted_task_loss = (1.-pairwise_task_matrix)*self.clamped_pairwise_z_distance
 
 		# Total task_based_aux_loss.
-		self.unweighted_task_based_aux_loss = positive_weighted_task_loss + negative_weighted_task_loss
-		self.task_based_aux_loss = self.args.task_based_aux_loss_weight*self.unweighted_task_based_aux_loss.mean()
+		self.unweighted_task_based_aux_loss = (positive_weighted_task_loss + negative_weighted_task_loss).mean()
+		self.task_based_aux_loss = self.args.task_based_aux_loss_weight*self.unweighted_task_based_aux_loss
 
 	def compute_relative_state_phase_aux_loss(self, update_dict):
 
