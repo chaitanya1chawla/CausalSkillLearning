@@ -23,6 +23,13 @@ use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 torch.set_printoptions(sci_mode=False, precision=2)
 
+# Global data list
+global global_dataset_list 
+global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk', \
+			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', \
+      'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', 'DexMV', 'DexMVHand', 'DexMVObject', \
+			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']
+
 class PolicyManager_BaseClass():
 
 	def __init__(self):
@@ -181,9 +188,7 @@ class PolicyManager_BaseClass():
 			else:
 				return sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj
 
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk', \
-			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', 'DexMV', 'DexMVHand', 'DexMVObject' \
-			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
+		elif self.args.data in global_data_list:
 
 			# If we're imitating... select demonstrations from the particular task.
 			if self.args.setting=='imitation' and \
@@ -418,7 +423,13 @@ class PolicyManager_BaseClass():
 		if number_of_trajectories_to_visualize is not None:
 			self.N = number_of_trajectories_to_visualize
 		else:
+
+			####################################
+			# TEMPORARILY SET N to 10
+			####################################
+			# self.N = 33
 			self.N = 100
+
 		self.rollout_timesteps = self.args.traj_length
 	
 		#####################################################
@@ -455,6 +466,12 @@ class PolicyManager_BaseClass():
 			self.visualizer = RoboMimicRobotObjectVisualizer(args=self.args)			
 		else: 
 			self.visualizer = ToyDataVisualizer()
+
+		# print("Embed after setting visualizer")
+		# embed()
+		# SETTING SEED
+		np.random.seed(seed=self.args.seed)
+
 
 		#####################################################
 		# Get latent z sets.
@@ -647,8 +664,9 @@ class PolicyManager_BaseClass():
 			########################################
 			# Numpy-fy and subsample. (It's 1x|S|, that's why we need to index into first dimension.)
 			########################################
-
-			action_np = action.detach().cpu().numpy()[0,:8]
+			
+			# action_np = action.detach().cpu().numpy()[0,:8]			
+			action_np = action.detach().cpu().squeeze(0).numpy()[:8]
 
 			########################################
 			# Unnormalize action.
@@ -773,7 +791,7 @@ class PolicyManager_BaseClass():
 			# Return - remember this is already a torch tensor now.
 			return next_state, None
 
-	def rollout_robot_trajectory(self, trajectory_start, latent_z, rollout_length=None, z_seq=False):
+	def rollout_robot_trajectory(self, trajectory_start, latent_z, rollout_length=None, z_seq=False, original_trajectory=None):
 
 		rendered_rollout_trajectory = []
 		
@@ -820,17 +838,39 @@ class PolicyManager_BaseClass():
 
 		for t in range(length):
 			
+			# print("Pause in rollout")
+			# embed()
+			current_state = subpolicy_inputs[t,:self.state_dim].clone().detach().cpu().numpy()
+
 			########################################
 			# 3) Get action from policy. 
 			########################################
-			# Assume we always query the policy for actions with batch_size 1 here. 
-			actions = self.policy_network.get_actions(subpolicy_inputs, greedy=True, batch_size=1)
+			
+			# Check if we're visualizing the GT trajectory. 
+			if self.args.viz_gt_sim_rollout:
+				# If we are, then get the action from the original trajectory, not the policy. 
 
-			# Select last action to execute. 
-			action_to_execute = actions[-1].squeeze(1)
+				# Open loop trajectory execution.
+				action_to_execute_ol = torch.from_numpy(original_trajectory[t+1]-original_trajectory[t]).cuda()
+				# Closed loop 
+				action_to_execute_cl = torch.from_numpy(original_trajectory[t+1]-current_state).cuda()
 
-			# Downscale the actions by action_scale_factor.
-			action_to_execute = action_to_execute/self.args.action_scale_factor
+				action_to_execute = action_to_execute_cl
+
+				print("T:", t, " S:", current_state[:8])
+				print("A_ol:", action_to_execute_ol[:8].cpu().numpy())
+				print("A_cl:", action_to_execute_cl[:8].cpu().numpy())
+
+				
+			else:
+				# Assume we always query the policy for actions with batch_size 1 here. 
+				actions = self.policy_network.get_actions(subpolicy_inputs, greedy=True, batch_size=1)
+
+				# Select last action to execute. 
+				action_to_execute = actions[-1].squeeze(1)
+
+				# Downscale the actions by action_scale_factor.
+				action_to_execute = action_to_execute/self.args.action_scale_factor
 
 			########################################
 			# 4) Compute next state. 
@@ -848,7 +888,7 @@ class PolicyManager_BaseClass():
 			input_row = torch.zeros((1,2*self.state_dim+self.latent_z_dimensionality)).to(device).float()
 			input_row[0,:self.state_dim] = new_state
 			# Feed in the ORIGINAL prediction from the network as input. Not the downscaled thing. 
-			input_row[0,self.state_dim:2*self.state_dim] = actions[-1].squeeze(1)
+			input_row[0,self.state_dim:2*self.state_dim] = action_to_execute
 
 			if z_seq:
 				input_row[0,2*self.state_dim:] = torch.tensor(latent_z[t+1]).to(device).float()
@@ -861,7 +901,7 @@ class PolicyManager_BaseClass():
 		
 		return trajectory, rendered_rollout_trajectory
 		
-	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None):		
+	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None):
 
 		########################################
 		# 1) Get task ID. 
@@ -876,16 +916,14 @@ class PolicyManager_BaseClass():
 			env_name = self.dataset.environment_names[task_id]
 			print("Visualizing a trajectory of task:", env_name)
 
-		# print('Embed in get robot visuals.')
-		# embed()
-
 		########################################
 		# 2) Feed Z into policy, rollout trajectory.
 		########################################
 
 		print("Rollout length:", trajectory.shape[0])
 		self.visualizer.create_environment(task_id=env_name)
-		trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq)
+
+		trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq, original_trajectory=trajectory)
 
 		########################################
 		# 3) Unnormalize data. 
@@ -946,8 +984,13 @@ class PolicyManager_BaseClass():
 		if self.args.viz_sim_rollout:
 			# No call to visualizer here means we have to save things on our own. 
 			self.rollout_gif = rendered_rollout_trajectory
-			self.visualizer.visualize_prerendered_gif(self.rollout_gif, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_SimRollout.gif".format(i))
-			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_SimRollout.png".format(i)))		
+			
+			# Set prefix...
+			prefix_list = ['Sim','GTSim']
+			gtsim_prefix = prefix_list[self.args.viz_gt_sim_rollout]
+
+			self.visualizer.visualize_prerendered_gif(self.rollout_gif, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_{1}Rollout.gif".format(i, gtsim_prefix))
+			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_{1}Rollout.png".format(i, gtsim_prefix)))		
 		else:
 			self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_Rollout.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_Rollout.png".format(i)))
@@ -1012,7 +1055,11 @@ class PolicyManager_BaseClass():
 
 		# Adding prefix.
 		if self.args.viz_sim_rollout:
-			sim_or_not = 'Sim'
+			# Modifying prefix based on whether we're visualizing GT Or rollout.
+			if self.args.viz_gt_sim_rollout:
+				sim_or_not = 'GT_Sim'
+			else: 
+				sim_or_not = 'Sim'
 		else:
 			sim_or_not = 'Viz'
 
@@ -1349,6 +1396,8 @@ class PolicyManager_BaseClass():
 		#######################################################################
 		# New extent...
 		self.extent = len(np.concatenate(self.task_based_shuffling_blocks))
+		# Try setting  training extent to same hting...
+		self.training_extent = len(np.concatenate(self.task_based_shuffling_blocks))
 
 	def trajectory_length_based_shuffling(self, extent, shuffle=True):
 		
@@ -1472,9 +1521,7 @@ class PolicyManager_BaseClass():
 
 	def shuffle(self, extent, shuffle=True):
 	
-		realdata = (self.args.data in ['MIME','OldMIME','Roboturk','FullRoboturk','OrigRoboturk','RoboMimic','OrigRoboMimic',\
-			'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', \
-				'RoboMimicObjects','RoboMimicRobotObjects'])
+		realdata = (self.args.data in global_dataset_list)
 
 		# Length based shuffling.
 		if isinstance(self, PolicyManager_BatchJoint) or isinstance(self, PolicyManager_IKTrainer):
@@ -1497,9 +1544,12 @@ class PolicyManager_BaseClass():
 			
 			# if isinstance(self, PolicyManager_Transfer):
 			# Also create an index list to shuffle the order of blocks that we observe...
-			self.index_list = np.arange(0,extent)				
-			np.random.shuffle(self.index_list)
-		
+
+			# 
+			# self.index_list = np.arange(0,extent)				
+			# np.random.shuffle(self.index_list)
+			self.random_shuffle(extent)
+
 		# Random shuffling.
 		else:
 
@@ -1507,7 +1557,6 @@ class PolicyManager_BaseClass():
 			# Single element based shuffling because datasets are ordered
 			################################
 			self.random_shuffle(extent)
-
 
 class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
@@ -1519,6 +1568,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			super(PolicyManager_Pretrain, self).__init__()
 
 		self.args = args
+		# Fixing seeds.
+		print("Setting random seeds.")
+		np.random.seed(seed=self.args.seed)
+		torch.manual_seed(self.args.seed)	
+
 		self.data = self.args.data
 		# Not used if discrete_z is false.
 		self.number_policies = number_policies
@@ -2060,6 +2114,18 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		
 		# log_dict['Subpolicy Loglikelihood'] = loglikelihood.mean()
 		log_dict = {'Subpolicy Loglikelihood': loglikelihood.mean(), 'Total Loss': self.total_loss.mean(), 'Encoder KL': self.encoder_KL.mean()}
+		if self.args.relative_state_reconstruction_loss_weight>0.:
+			log_dict['Unweighted Relative State Recon Loss'] = self.unweighted_relative_state_reconstruction_loss
+			log_dict['Relative State Recon Loss'] = self.relative_state_reconstruction_loss
+			log_dict['Auxillary Loss'] = self.aux_loss
+		if self.args.task_based_aux_loss_weight>0.:
+			log_dict['Unweighted Task Based Auxillary Loss'] = self.unweighted_task_based_aux_loss
+			log_dict['Task Based Auxillary Loss'] = self.task_based_aux_loss
+			log_dict['Auxillary Loss'] = self.aux_loss
+		if self.args.relative_state_phase_aux_loss_weight>0.:
+			log_dict['Unweighted Relative Phase Auxillary Loss'] = self.unweighted_relative_state_phase_aux_loss
+			log_dict['Relative Phase Auxillary Loss'] = self.relative_state_phase_aux_loss
+			log_dict['Auxillary Loss'] = self.aux_loss
 
 		if counter%self.args.display_freq==0:
 			
@@ -2249,11 +2315,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			return concatenated_traj, sample_action_seq, sample_traj
 		
 		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap',\
-				'OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject','DAPG', 'DAPGHand', 'DAPGObject', 'RoboturkObjects','RoboturkRobotObjects',\
-				'RoboMimicObjects','RoboMimicRobotObjects', 'DexMV', 'DexMVHand', 'DexMVObject']:
-
+	
+		elif self.args.data in global_dataset_list:
+		
 			data_element = self.dataset[i]
 
 			####################################			
@@ -2312,8 +2376,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 					trajectory = (trajectory-self.norm_sub_value)/self.norm_denom_value
 
 				# CONDITIONAL INFORMATION for the encoder... 
-				if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-					'GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject','DAPG', 'DAPGHand', 'DAPGObject','DexMV','DexMVHand','DexMVObject','RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']:
+				if self.args.data in global_dataset_list:
+
 
 					pass
 				# if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
@@ -2355,7 +2419,121 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		return latent_z_indices, latent_b			
 
-	def update_policies_reparam(self, loglikelihood, latent_z, encoder_KL):
+	def initialize_aux_losses(self):
+		
+		# Initialize losses.
+		self.unweighted_relative_state_reconstruction_loss = 0.
+		self.relative_state_reconstruction_loss = 0.
+		# 
+		self.unweighted_relative_state_phase_aux_loss = 0.
+		self.relative_state_phase_aux_loss = 0.
+		# 
+		self.unweighted_task_based_aux_loss = 0.
+		self.task_based_aux_loss = 0.
+
+	def compute_auxillary_losses(self, update_dict):
+
+		self.initialize_aux_losses()
+
+		# Set the relative state reconstruction loss.
+		if self.args.relative_state_reconstruction_loss_weight>0.:
+			self.compute_relative_state_reconstruction_loss()
+
+		if self.args.task_based_aux_loss_weight>0. or self.args.relative_state_phase_aux_loss_weight>0.:
+			self.compute_pairwise_z_distance(update_dict['latent_z'][0])
+		if self.args.task_based_aux_loss_weight>0.:
+			self.compute_task_based_aux_loss(update_dict)
+		if self.args.relative_state_phase_aux_loss_weight>0.:
+			self.compute_relative_state_phase_aux_loss(update_dict)
+
+		# Weighting the auxillary loss...
+		self.aux_loss = self.relative_state_reconstruction_loss + self.relative_state_phase_aux_loss + self.task_based_aux_loss
+
+	def compute_pairwise_z_distance(self, z_set):
+
+		# Compute pairwise task based weights.
+		self.pairwise_z_distance = torch.cdist(z_set, z_set)[0]
+
+		# Clamped z distance loss. 
+		# self.clamped_pairwise_z_distance = torch.clamp(self.pairwise_z_distance - self.args.pairwise_z_distance_threshold, min=0.)
+		self.clamped_pairwise_z_distance = torch.clamp(self.args.pairwise_z_distance_threshold - self.pairwise_z_distance, min=0.)
+
+	def compute_relative_state_class_vectors(self, update_dict):
+
+		# Compute relative state vectors.
+
+		# Compute relative state. 
+		
+		# Compute diff. 
+		
+		# Compute norm. 
+
+		# Compute sum.
+		pass
+
+	def compute_task_based_aux_loss(self, update_dict):
+
+		# Task list. 
+		task_list = []
+		for k in range(self.args.batch_size):
+			task_list.append(update_dict['data_element'][k]['task-id'])
+		# task_array = np.array(task_list).reshape(self.args.batch_size,1)
+		torch_task_array = torch.tensor(task_list, dtype=float).reshape(self.args.batch_size,1).cuda()
+		
+		# Compute pairwise task based weights. 
+		# pairwise_task_matrix = (scipy.spatial.distance.cdist(task_array)==0).astype(int).astype(float)
+		pairwise_task_matrix = (torch.cdist(torch_task_array, torch_task_array)==0).int().float()
+
+		# Positive weighted task loss. 
+		positive_weighted_task_loss = pairwise_task_matrix*self.pairwise_z_distance
+
+		# Negative weighted task loss. 
+		# MUST CHECK SIGNAGE OF THIS. 
+		negative_weighted_task_loss = (1.-pairwise_task_matrix)*self.clamped_pairwise_z_distance
+
+		# Total task_based_aux_loss.
+		self.unweighted_task_based_aux_loss = (positive_weighted_task_loss + negative_weighted_task_loss).mean()
+		self.task_based_aux_loss = self.args.task_based_aux_loss_weight*self.unweighted_task_based_aux_loss
+
+	def compute_relative_state_phase_aux_loss(self, update_dict):
+
+		# Compute 
+		pass
+
+	def compute_relative_state_reconstruction_loss(self):
+		# Get mean of actions from the policy networks.
+		mean_policy_actions = self.policy_network.mean_outputs
+
+		# Get translational states. 
+		mean_policy_robot_actions = mean_policy_actions[...,:3]
+		mean_policy_env_actions = mean_policy_actions[...,self.args.robot_state_size:self.args.robot_state_size+3]
+		# Compute relative actions. 
+		mean_policy_relative_state_actions = mean_policy_robot_actions - mean_policy_env_actions
+
+		# Rollout states, then compute relative states - although this shouldn't matter because it's linear. 
+
+		# # Compute relative initial state. 		
+		# initial_state = self.sample_traj_var[0]
+		# initial_robot_state = initial_state[:,:3]
+		# initial_env_state = initial_state[:,self.args.robot_state_size:self.args.robot_state_size+3]
+		# relative_initial_state = initial_robot_state - initial_env_state
+
+		# Get relative states.
+		robot_traj = self.sample_traj_var[...,:3]
+		env_traj = self.sample_traj_var[...,self.args.robot_state_size:self.args.robot_state_size+3]
+		relative_state_traj = torch.tensor(robot_traj - env_traj).cuda()
+		initial_relative_state = relative_state_traj[0]
+		# torch_initial_relative_state = torch.tensor(initial_relative_state).cuda()		
+
+		# Differentiable rollouts. 
+		policy_predicted_relative_state_traj = initial_relative_state + torch.cumsum(mean_policy_relative_state_actions, axis=0)
+
+		# Set reconsturction loss.
+		self.unweighted_relative_state_reconstruction_loss = (policy_predicted_relative_state_traj - relative_state_traj).norm(dim=2).mean()
+		self.relative_state_reconstruction_loss = self.args.relative_state_reconstruction_loss_weight*self.unweighted_relative_state_reconstruction_loss
+
+	def update_policies_reparam(self, loglikelihood, encoder_KL, update_dict=None):
+		
 		self.optimizer.zero_grad()
 
 		# Losses computed as sums.
@@ -2367,11 +2545,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.likelihood_loss = -loglikelihood.mean()
 		self.encoder_KL = encoder_KL.mean()
 
-
+		self.compute_auxillary_losses(update_dict)
 		# Adding a penalty for link lengths. 
 		# self.link_length_loss = ... 
 
-		self.total_loss = (self.likelihood_loss + self.kl_weight*self.encoder_KL) 
+		self.total_loss = (self.likelihood_loss + self.kl_weight*self.encoder_KL + self.aux_loss) 
 		# + self.link_length_loss) 
 
 		if self.args.debug:
@@ -2499,30 +2677,26 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# 		# Update parameters. 
 
 		####################################
-		####################################
+
 		self.set_epoch(counter)
 
-		####################################
 		############# (0) #############
-
 		# Sample trajectory segment from dataset. 
-		
-
 		####################################
 
-		# Sample trajectory segment from dataset. 			
-		if self.args.traj_segments:			
-			state_action_trajectory, sample_action_seq, sample_traj, data_element  = self.get_trajectory_segment(i)
-		else:
-			sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj, data_element = self.collect_inputs(i)
-			state_action_trajectory = concatenated_traj
+		# Sample trajectory segment from dataset.
+		input_dict = {}
+		input_dict['state_action_trajectory'], input_dict['sample_action_seq'], input_dict['sample_traj'], input_dict['data_element'] = self.get_trajectory_segment(i)
+		# state_action_trajectory, sample_action_seq, sample_traj, data_element  = self.get_trajectory_segment(i)
+		# self.sample_traj_var = sample_traj
+		self.sample_traj_var = input_dict['sample_traj']
 
 		####################################
 		############# (0a) #############
 		####################################
 
 		# Corrupt the inputs according to how much input_corruption_noise is set to.
-		state_action_trajectory = self.corrupt_inputs(state_action_trajectory)
+		state_action_trajectory = self.corrupt_inputs(input_dict['state_action_trajectory'])
 
 		if state_action_trajectory is not None:
 			
@@ -2546,7 +2720,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			latent_z_seq, latent_b = self.construct_dummy_latents(latent_z)
 
 			############# (3a) #############
-			_, subpolicy_inputs, sample_action_seq = self.assemble_inputs(state_action_trajectory, latent_z_seq, latent_b, sample_action_seq)
+			_, subpolicy_inputs, sample_action_seq = self.assemble_inputs(state_action_trajectory, latent_z_seq, latent_b, input_dict['sample_action_seq'])
 			
 			############# (3b) #############
 			# Policy net doesn't use the decay epislon. (Because we never sample from it in training, only rollouts.)
@@ -2566,7 +2740,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				############# (4a) #############
 				# Update parameters based on likelihood, subpolicy inputs, and kl divergence.
-				self.update_policies_reparam(loglikelihood, subpolicy_inputs, kl_divergence)
+				update_dict = input_dict
+				update_dict['latent_z'] = latent_z				
+
+				self.update_policies_reparam(loglikelihood, kl_divergence, update_dict=update_dict)
 
 				############# (4b) #############
 				# Update Plots. 
@@ -2585,10 +2762,109 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# 	return latent_z, sample_traj, sample_action_seq
 			
 			if return_z:
-				return latent_z, sample_traj, sample_action_seq, data_element
+				return latent_z, input_dict['sample_traj'], sample_action_seq, input_dict['data_element']
 									
 		else: 
 			return None, None, None
+
+	# def run_iteration(self, counter, i, return_z=False, and_train=True):
+
+	# 	# Basic Training Algorithm: 
+	# 	# For E epochs:
+	# 	# 	# For all trajectories:
+	# 	#		# Sample trajectory segment from dataset. 
+	# 	# 		# Encode trajectory segment into latent z. 
+	# 	# 		# Feed latent z and trajectory segment into policy network and evaluate likelihood. 
+	# 	# 		# Update parameters. 
+
+	# 	####################################
+
+	# 	self.set_epoch(counter)
+
+	# 	############# (0) #############
+	# 	# Sample trajectory segment from dataset. 
+	# 	####################################
+
+	# 	# Sample trajectory segment from dataset. 			
+	# 	if self.args.traj_segments:		
+	# 		state_action_trajectory, sample_action_seq, sample_traj, data_element  = self.get_trajectory_segment(i)
+	# 		self.sample_traj_var = sample_traj
+	# 	else:
+	# 		sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj, data_element = self.collect_inputs(i)
+	# 		state_action_trajectory = concatenated_traj
+
+	# 	####################################
+	# 	############# (0a) #############
+	# 	####################################
+
+	# 	# Corrupt the inputs according to how much input_corruption_noise is set to.
+	# 	state_action_trajectory = self.corrupt_inputs(state_action_trajectory)
+
+	# 	if state_action_trajectory is not None:
+			
+	# 		####################################
+	# 		############# (1) #############
+	# 		####################################
+
+	# 		torch_traj_seg = torch.tensor(state_action_trajectory).to(device).float()
+	# 		# Encode trajectory segment into latent z. 		
+						
+	# 		latent_z, encoder_loglikelihood, encoder_entropy, kl_divergence = self.encoder_network.forward(torch_traj_seg, self.epsilon)
+			
+	# 		####################################
+	# 		########## (2) & (3) ##########
+	# 		####################################
+
+	# 		# print("Embed in rut iter")
+	# 		# embed()
+
+	# 		# Feed latent z and trajectory segment into policy network and evaluate likelihood. 
+	# 		latent_z_seq, latent_b = self.construct_dummy_latents(latent_z)
+
+	# 		############# (3a) #############
+	# 		_, subpolicy_inputs, sample_action_seq = self.assemble_inputs(state_action_trajectory, latent_z_seq, latent_b, sample_action_seq)
+			
+	# 		############# (3b) #############
+	# 		# Policy net doesn't use the decay epislon. (Because we never sample from it in training, only rollouts.)
+	# 		loglikelihoods, _ = self.policy_network.forward(subpolicy_inputs, sample_action_seq)
+	# 		loglikelihood = loglikelihoods[:-1].mean()
+			 
+	# 		if self.args.debug:
+	# 			print("Embedding in Train.")
+	# 			embed()
+
+	# 		####################################
+	# 		############# (4) #############
+	# 		####################################
+
+	# 		# Update parameters. 
+	# 		if self.args.train and and_train:
+
+	# 			############# (4a) #############
+	# 			# Update parameters based on likelihood, subpolicy inputs, and kl divergence.
+	# 			self.update_policies_reparam(loglikelihood, subpolicy_inputs, kl_divergence)
+
+	# 			############# (4b) #############
+	# 			# Update Plots. 
+	# 			stats = {}
+	# 			stats['counter'] = counter
+	# 			stats['i'] = i
+	# 			stats['epoch'] = self.current_epoch_running
+	# 			stats['batch_size'] = self.args.batch_size			
+	# 			self.update_plots(counter, loglikelihood, state_action_trajectory, stats)
+
+	# 			####################################
+	# 			############# (5) #############
+	# 			####################################
+
+	# 		# if return_z: 
+	# 		# 	return latent_z, sample_traj, sample_action_seq
+			
+	# 		if return_z:
+	# 			return latent_z, sample_traj, sample_action_seq, data_element
+									
+	# 	else: 
+	# 		return None, None, None
 
 	def evaluate_metrics(self):		
 		self.distances = -np.ones((self.test_set_size))
@@ -2616,6 +2892,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		if model:
 			self.load_all_models(model)
 
+		# Set seed. 
+
+
 		np.set_printoptions(suppress=True,precision=2)
 
 		if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
@@ -2624,9 +2903,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# if self.args.data=="MIME" or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
 		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:	
 
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-				'RoboturkObjects','RoboturkRobotObjects','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', \
-				'DexMV','DexMVHand','DexMVObject','RoboMimicObjects','RoboMimicRobotObjects']:
+		if self.args.data in global_dataset_list:
 
 			print("Running Evaluation of State Distances on small test set.")
 			# self.evaluate_metrics()		
@@ -2637,6 +2914,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				# self.visualize_robot_data(load_sets=True)
 				self.visualize_robot_data(load_sets=False)
+
+				# print("Embed after viz Blah blah")
+				# embed()
 
 				# Get reconstruction error... 
 				self.get_trajectory_and_latent_sets(get_visuals=True)
@@ -2665,7 +2945,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Set N:
 		self.N = 500
 
-		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
+		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))
 			
 		if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
 			if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
@@ -2809,6 +3089,107 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		plt.savefig("{0}/Embedding_Joint_{1}.png".format(self.dir_name,self.args.name))
 		plt.close()
 
+	def create_z_kdtrees(self):
+		
+		####################################
+		# Algorithm to construct models
+		####################################
+
+		# 0) Assume that the encoder(s) are trained, and that the latent space is trained.
+		# 1) Maintain map of Z_R <--> Z_E. 
+		# 	1a) Check that the latent_z_sets are tuples. 
+		# 	1b) Seems like we don't actually need the map if the latent z sets are constructed by the same function / indexing.
+		# 2) Construct KD Trees. 
+		# 	2a) KD_R = KDTREE( {Z_R} )
+		# 	2b) KD_E = KDTREE( {Z_E} )
+		
+		self.kdtree_robot_z = KDTree(self.robot_latent_z_set)
+		self.kdtree_env_z = KDTree(self.env_latent_z_set)		
+
+	def retrieve_desired_nn_env_abstraction(self, robot_state_action_trajectory):
+
+		####################################
+		# Query, given a robot trajectory
+		####################################
+
+		# 0) Assumes that we have a concatenation of states and actions.
+		# 1) z_r = E_r (Tau_r)
+		# 2) z_r^{*NN} = KDT_r.query(z_r)
+		# 3) z_e^* = Map (z_r^{*NN} --> Z_E)
+
+		# 1) Query Robot Encoder for the Robot Trajectory. 
+		# Well, we just run super.forward() of the encoder network, which is a continuous factored encoder
+		# which inherits its forward function from the continuous encoder. 
+		# We can run forward for just the individual stream, using this template. 
+		# robot_latent_z, robot_logprob, robot_entropy, robot_kl_divergence = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample)
+		
+		# Do not need epsilon or eval. 
+		retrieved_z_r, _, _, _ = self.encoder_network.run_super_forward(robot_state_action_trajectory, epsilon=0.0, \
+			network_dict=self.encoder_network.robot_network_dict, size_dict=self.encoder_network.robot_size_dict)
+		
+		# 2) Query KD Tree with encoding of given robot trajectory. 
+		_, z_r_nearest_neighbor_index = self.kdtree_robot_z.query(retrieved_z_r)
+
+		# 3) Retrieve corresponding env abstraction.
+		desired_z_e = self.robot_latent_z_set[z_r_nearest_neighbor_index]
+
+		return desired_z_e
+
+	def retrieve_desired_nn_robot_abstraction(self, env_state_action_trajectory):
+		
+		####################################
+		# Query, given an env trajectory
+		####################################
+
+		# 0) Assumes that we have a concatenation of states and actions.
+		# 1) z_e = E_e (Tau_e)
+		# 2) z_e^{*NN} = KDT_e.query(z_e)
+		# 3) z_r^* = Map (z_e^{*NN} --> Z_R)
+
+		# 1) Query Env Encoder for the Env Trajectory. 
+		# Well, we just run super.forward() of the encoder network, which is a continuous factored encoder
+		# which inherits its forward function from the continuous encoder. 
+		
+		# Do not need epsilon or eval. 
+		retrieved_z_e, _, _, _ = self.encoder_network.run_super_forward(env_state_action_trajectory, epsilon=0.0, \
+			network_dict=self.encoder_network.env_network_dict, size_dict=self.encoder_network.env_size_dict)
+		
+		# 2) Query KD Tree with encoding of given env trajectory. 
+		_, z_e_nearest_neighbor_index = self.kdtree_robot_e.query(retrieved_z_e)
+
+		# 3) Retrieve corresponding robot abstraction.
+		desired_z_r = self.env_latent_z_set[z_e_nearest_neighbor_index]
+
+		return desired_z_r
+
+	def retrieve_desired_network_env_abstraction(self, robot_state_action_trajectory):
+
+		pass
+
+	def retrieve_desired_network_robot_abstraction(self, env_state_action_trajectory):
+
+		pass
+
+	def define_forward_inverse_models(self):
+
+		# 0) Get latent z sets.
+		# 1) Create KD trees. 
+		# 2) (Query)
+		# 3) Rollout results. 
+
+		# 0) Make sure we've run visualize_robot_data; then split z sets. 
+
+		# Run visualize_robot_data. 
+
+		# Create z sets. 
+		self.robot_latent_z_set = copy.deepcopy(self.latent_z_set[:,:int(self.latent_z_dimensionality/2)])
+		self.env_latent_z_set = copy.deepcopy(self.latent_z_set[:,int(self.latent_z_dimensionality/2):])
+		
+		# 1) Create KD Trees.
+		self.create_z_kdtrees()	
+	
+		# 2) 
+
 class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 	def __init__(self, number_policies=4, dataset=None, args=None):
@@ -2874,10 +3255,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 			return concatenated_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), sample_traj.transpose((1,0,2))
 				
-		# elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:	
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-				'GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject','DAPG', 'DAPGHand', 'DAPGObject','DexMV','DexMVHand','DexMVObject','RoboturkObjects','RoboturkRobotObjects',\
-				'RoboMimicObjects','RoboMimicRobotObjects']:
+		elif self.args.data in global_dataset_list:
 
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 				# data_element = self.dataset[i:i+self.args.batch_size]
@@ -3589,11 +3967,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 	def visualize_trajectory(self, trajectory, segmentations=None, i=0, suffix='_Img'):
 
-		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-				'GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject','DAPG', 'DAPGHand', 'DAPGObject','DexMV','DexMVHand','DexMVObject','RoboturkObjects','RoboturkRobotObjects',\
-				'RoboMimicObjects','RoboMimicRobotObjects']:
-
+		if self.args.data in global_dataset_list:
 
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 				unnorm_trajectory = (trajectory*self.norm_denom_value)+self.norm_sub_value
@@ -3715,8 +4089,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			variational_rollout_image = np.array(variational_rollout_image)
 			latent_rollout_image = np.array(latent_rollout_image)
 			
-			# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:
-			if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject','DAPG', 'DAPGHand', 'DAPGObject','DexMV','DexMVHand','DexMVObject']:
+			if self.args.data in global_dataset_list:
+
 				# Feeding as list of image because gif_summary.				
 
 				# print("Embedding in joint update plots, L2511 ")
@@ -4600,8 +4974,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 		# Visualize space if the subpolicy has been trained...
 		# Running even with the fix_subpolicy, so that we can evaluate joint reconstruction.
-		if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject','DAPG', 'DAPGHand', 'DAPGObject','DexMV','DexMVHand','DexMVObject']:			
-					
+		if self.args.data in global_dataset_list:
+
 			print("Running Visualization on Robot Data.")	
 
 			########################################
@@ -5312,10 +5686,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 			return sample_traj.transpose((1,0,2)), sample_action_seq.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
 
-		elif self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic',\
-				'GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject','DAPG', 'DAPGHand', 'DAPGObject','DexMV','DexMVHand','DexMVObject','RoboturkObjects','RoboturkRobotObjects',\
-				'RoboMimicObjects','RoboMimicRobotObjects']:
-
+		elif self.args.data in global_dataset_list:
 					   
 			if self.args.data in ['MIME','OldMIME'] or self.args.data=='Mocap':
 

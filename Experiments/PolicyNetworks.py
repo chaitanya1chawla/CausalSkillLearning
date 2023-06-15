@@ -5,8 +5,6 @@
 # LICENSE file in the root directory of this source tree.
 
 from headers import *
-
-
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
@@ -184,9 +182,9 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 
 		# Predict Gaussian means and variances. 
 		if self.args.mean_nonlinearity:
-			mean_outputs = self.activation_layer(self.mean_output_layer(lstm_outputs))
+			self.mean_outputs = self.activation_layer(self.mean_output_layer(lstm_outputs))
 		else:
-			mean_outputs = self.mean_output_layer(lstm_outputs)
+			self.mean_outputs = self.mean_output_layer(lstm_outputs)
 		variance_outputs = (self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
 		# variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon
 
@@ -199,7 +197,7 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		covariance_matrix = torch.diag_embed(variance_outputs)
 
 		# Executing distribution creation on CPU and then copying back to GPU.
-		dist = torch.distributions.MultivariateNormal(mean_outputs.cpu(), covariance_matrix.cpu())
+		dist = torch.distributions.MultivariateNormal(self.mean_outputs.cpu(), covariance_matrix.cpu())
 		log_probabilities = dist.log_prob(format_action_seq.cpu()).to(device)
 
 		# dist = torch.distributions.MultivariateNormal(mean_outputs, covariance_matrix)
@@ -2157,6 +2155,7 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 
 		self.args = args
 
+
 		# Define state sizes for each partition of state space.
 		# Keep track of robot input and output state size. 
 		self.robot_size_dict = {}
@@ -2200,6 +2199,11 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 				
 		return robot_input, env_input
 
+	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
+		# robot_latent_z, robot_logprob, robot_entropy, robot_kl_divergence = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample)
+
+		return super().forward(input, epsilon=epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=z_sample_to_evaluate)
+
 	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
 
 		# (1) Split input. 
@@ -2230,8 +2234,6 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 			# (2b) Run forward on env stream.		
 			env_latent_z, env_logprob, env_entropy, env_kl_divergence = super().forward(env_input, epsilon, network_dict=self.env_network_dict, size_dict=self.env_size_dict, z_sample_to_evaluate=env_z_sample)
 
-			# print("Embedding in forward")
-			# embed()
 
 			##################################
 			# (3) Aggregate stream outputs. 

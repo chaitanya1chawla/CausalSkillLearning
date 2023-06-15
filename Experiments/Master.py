@@ -322,6 +322,7 @@ def parse_arguments():
 	parser.add_argument('--latent_set_file_path',dest='latent_set_file_path',type=str,help='File path to pre-computed latent sets to visualize.')
 	parser.add_argument('--viz_latent_rollout',dest='viz_latent_rollout',type=int,default=0,help='Whether to visualize latent rollout or not.')
 	parser.add_argument('--viz_sim_rollout',dest='viz_sim_rollout',type=int,default=1,help='Whether to visualize rollout by magically setting state, or stepping in the environment.')
+	parser.add_argument('--viz_gt_sim_rollout',dest='viz_gt_sim_rollout',type=int,default=0,help='Whether or not to visualize the GT trajectory by replaying through the simulator.')
 	parser.add_argument('--sim_viz_action_scale_factor',dest='sim_viz_action_scale_factor',type=float,default=0.3,help='Factor by which to scale actions when visualizing in simulation env.')
 	parser.add_argument('--sim_viz_step_repetition',dest='sim_viz_step_repetition',type=int,default=20,help='Number of times to repeat simulation step of visualization of traj.')
 
@@ -365,7 +366,13 @@ def parse_arguments():
 	parser.add_argument('--embedding_visualization_stream',dest='embedding_visualization_stream',type=str,default=None,help='Which stream to use to embed and visualize Z space.')
 	parser.add_argument('--robot_state_size',dest='robot_state_size',type=int,default=8,help='Default robot state size.')
 	parser.add_argument('--env_state_size',dest='env_state_size',type=int,default=7,help='Default environment state size.')
-	
+
+	# Relative state reconstruction loss.
+	parser.add_argument('--relative_state_reconstruction_loss_weight', dest='relative_state_reconstruction_loss_weight', type=float, default=0., help='What weight to place on the relative state reconstruction loss in the robot-object setting..')	
+	parser.add_argument('--relative_state_phase_aux_loss_weight', dest='relative_state_phase_aux_loss_weight', type=float, default=0., help='Weight to place on the relative state phase aux loss.')
+	parser.add_argument('--task_based_aux_loss_weight', dest='task_based_aux_loss_weight', type=float, default=0., help='Weight to place on task based auxillary loss.')
+	parser.add_argument('--pairwise_z_distance_threshold', dest='pairwise_z_distance_threshold', type=float, default=2., help='Minimum distance to push apart different parts of latent space that are semantically different.')
+
 	# Cross Domain Skill Transfer parameters. 
 	parser.add_argument('--discriminability_weight',dest='discriminability_weight',type=float,default=1.,help='Weight of discriminability loss in cross domain skill transfer.') 
 	parser.add_argument('--discriminator_weight',dest='discriminator_weight',type=float,default=1.,help='Weight of z discriminator loss.')

@@ -15,6 +15,10 @@ from signal import default_int_handler
 from absl import flags, app
 import copy, os, imageio, scipy.misc, pdb, math, time, numpy as np
 
+# print("###########################")
+# print("Temporarily fixing the seed.")
+# print("###########################")
+# np.random.seed(seed=0)
 
 import matplotlib
 matplotlib.use('Agg')
@@ -1068,9 +1072,44 @@ class RoboturkObjectVisualizer(object):
 
 	def set_object_pose(self, position, orientation):
 
+		if self.new_robosuite:
+			joint_name_suffix = "_joint0"
+			if "PickPlace" in self.task_id:
+				position[0] -= 0.5
+				position[1] -= 0.1
+			elif "NutAssembly" in self.task_id:
+				# position[1] -= 0.15
+				position[0] -= 0.55
+				position[1] -= 0.0
+		else:
+			joint_name_suffix = ""
+
+		# Get mujoco object name.		
+		mujoco_obj_name = self.environment.obj_to_use+joint_name_suffix
+
+		# Reorient. 
+		new_orientation = np.roll(orientation,1)
+		# Rebuild pose. 
+		pose = np.concatenate((position, new_orientation))
+		self.environment.sim.data.set_joint_qpos(mujoco_obj_name, pose)
+				
+		self.environment.sim.forward()
+
+	def old_set_object_pose(self, position, orientation):
+
+		# if self.new_robosuite:
+		# 	if "PickPlace" in self.task_id.lstrip("Sawyer"):
+		# 		position[0] -= 0.4
+		# 		position[1] -= 0.05
+		# 	elif "NutAssembly" in self.task_id.lstrip("Sawyer"):
+		# 		# position[1] -= 0.15
+		# 		position[0] -= 0.4
+		# 		position[1] -= 0.05
+
 		# Sets object position for environment with one object. 
 		# Indices of object position are 9-12. 
 		self.environment.sim.data.qpos[9:12] = position
+
 		# Orientation is indexed from 12-16., but is ordered differently. 
 		# Orientation argument is ordered as x,y,z,w / This is what Mujoco observation gives us.
 		# This qpos argument is ordered as w,x,y,z. 
@@ -1102,6 +1141,8 @@ class RoboturkObjectVisualizer(object):
 	def create_environment(self, task_id=None):
 
 		print("Creating environment for task: ",task_id)
+		self.task_id = task_id
+
 
 		import robosuite, threading
 		if float(robosuite.__version__[:3])<1.:
@@ -1131,11 +1172,21 @@ class RoboturkObjectVisualizer(object):
 		# Recreate environment with new task ID potentially.
 		self.create_environment(task_id=task_id)
 
+		backup_traj = copy.deepcopy(trajectory)
+
+		# print("Embedding in Viz Joint Traj of Viz")
+		# embed()
+
+		
+
 		for t in range(trajectory.shape[0]):
 
 			# Check whether it's end effector or joint trajectory. 
 			# Calls joint pose function, but is really setting the object position
 			new_image = self.set_joint_pose_return_image(trajectory[t])
+
+			# Temporarily print states to debug offsets..
+			print(self.environment.observation_spec())
 
 			image_list.append(new_image)
 
@@ -1198,19 +1249,36 @@ class RoboMimicObjectVisualizer(object):
 
 	def set_object_pose(self, position, orientation):
 
-		# Sets object position for environment with one object. 
-		# Indices of object position are 9-12. 
-		self.environment.sim.data.qpos[9:12] = position
-		# Orientation is indexed from 12-16., but is ordered differently. 
-		# Orientation argument is ordered as x,y,z,w / This is what Mujoco observation gives us.
-		# This qpos argument is ordered as w,x,y,z. 
-		self.environment.sim.data.qpos[13:16] = orientation[:-1]
-		self.environment.sim.data.qpos[12] = orientation[-1]
+		joint_name_suffix = "_joint0"
 
-		# Sets posiitons correctly. Quaternions slightly off - trend is sstill correct.
-		self.environment.sim.forward()
+		if self.task_id in ["Lift", "Stack", "ToolHang"]:
 
-		# print("Exiting object pose")
+			# Sets object position for environment with one object. 
+			# Assuming in the lift and stack environments, the first object is the one we want to set the position of. 
+			# Indices of object position are 9-12. 
+			self.environment.sim.data.qpos[9:12] = position
+			# Orientation is indexed from 12-16., but is ordered differently. 
+			# Orientation argument is ordered as x,y,z,w / This is what Mujoco observation gives us.
+			# This qpos argument is ordered as w,x,y,z. 
+			self.environment.sim.data.qpos[13:16] = orientation[:-1]
+			self.environment.sim.data.qpos[12] = orientation[-1]
+
+			# Sets posiitons correctly. Quaternions slightly off - trend is sstill correct.
+			self.environment.sim.forward()
+
+			# print("Exiting object pose")
+
+		else:
+			# Get mujoco object name.		
+			mujoco_obj_name = self.environment.obj_to_use+joint_name_suffix
+
+			# Reorient. 
+			new_orientation = np.roll(orientation,1)
+			# Rebuild pose. 
+			pose = np.concatenate((position, new_orientation))
+			self.environment.sim.data.set_joint_qpos(mujoco_obj_name, pose)
+					
+			self.environment.sim.forward()
 
 	def set_joint_pose(self, pose, arm='both', gripper=False):
 		
@@ -1233,6 +1301,7 @@ class RoboMimicObjectVisualizer(object):
 
 		print("Creating environment for task: ",task_id)
 
+		self.task_id = task_id
 		import robosuite, threading
 		if float(robosuite.__version__[:3])<1.:
 			self.new_robosuite = 0
