@@ -1186,7 +1186,7 @@ class RoboturkObjectVisualizer(object):
 			new_image = self.set_joint_pose_return_image(trajectory[t])
 
 			# Temporarily print states to debug offsets..
-			print(self.environment.observation_spec())
+			# print(self.environment.observation_spec())
 
 			image_list.append(new_image)
 

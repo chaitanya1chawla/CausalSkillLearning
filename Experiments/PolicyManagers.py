@@ -620,9 +620,11 @@ class PolicyManager_BaseClass():
 
 				# Set the max length if it's less than this batch of trajectories. 
 				if self.gt_trajectory_set[i].shape[0]>self.max_len:
-					self.max_len = self.gt_trajectory_set[i].shape[0]
+					self.max_len = self.gt_trajectory_set[i].shape[0]			
 
-				trajectory_rollout = self.get_robot_visuals(i, self.latent_z_set[i], self.gt_trajectory_set[i])
+				dummy_task_id_dict = {}
+				dummy_task_id_dict['task-id'] = self.task_id_set[i]
+				trajectory_rollout = self.get_robot_visuals(i, self.latent_z_set[i], self.gt_trajectory_set[i], indexed_data_element=dummy_task_id_dict)
 
 			self.indices = range(self.N)
 
@@ -1996,7 +1998,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.kl_begin_increment_epochs = self.args.kl_begin_increment_epochs
 			self.kl_begin_increment_counter = self.kl_begin_increment_epochs*len(self.dataset)
 			self.kl_increment_rate = (self.args.final_kl_weight-self.args.initial_kl_weight)/(self.kl_increment_counter)
-
+			self.kl_phase_length_counter = self.args.kl_cyclic_phase_epochs*len(self.dataset)
 		# Log-likelihood penalty.
 		self.lambda_likelihood_penalty = self.args.likelihood_penalty
 		self.baseline = None
@@ -2080,8 +2082,13 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		else:
 			self.epsilon = self.final_epsilon
 
-		# If KL schedule.
-		if self.args.kl_schedule:
+		# Set KL weight. 
+		self.set_kl_weight(counter)		
+
+	def set_kl_weight(self, counter):
+		
+		# Monotonic KL increase.
+		if self.args.kl_schedule=='Monotonic':
 			if counter>self.kl_begin_increment_counter:
 				if (counter-self.kl_begin_increment_counter)<self.kl_increment_counter:
 					self.kl_weight = self.args.initial_kl_weight + self.kl_increment_rate*counter
@@ -2089,9 +2096,36 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 					self.kl_weight = self.args.final_kl_weight
 			else:
 				self.kl_weight = self.args.initial_kl_weight
+
+		# Cyclic KL.
+		elif self.args.kl_schedule=='Cyclic':
+
+			# Setup is before X epochs, don't decay / cycle. 
+			# After X epochs, cycle. 
+			
+			if counter<self.kl_begin_increment_counter:
+				self.kl_weight = self.args.initial_kl_weight				
+			else: 			
+
+				
+				# While cycling, self.kl_phase_length_counter is the number of iterations over which we repeat. 
+				# self.kl_increment_counter is the iterations (within a cycle) over which we increment KL to maximum.
+				# Get where in a single cycle it is. 
+				kl_counter = counter % self.kl_phase_length_counter
+
+				# If we're done with incremenet, just set to final weight. 
+				if kl_counter>self.kl_increment_counter:
+					self.kl_weight = self.args.final_kl_weight
+				# Otherwise, do the incremene.t 
+				else:
+					self.kl_weight = self.args.initial_kl_weight + self.kl_increment_rate*kl_counter		
+		
+		# No Schedule. 
 		else:
 			self.kl_weight = self.args.kl_weight
-		
+
+		# Adding branch for cyclic KL weight.		
+
 	def visualize_trajectory(self, traj, no_axes=False):
 
 		fig = plt.figure()		
@@ -2113,7 +2147,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 	def update_plots(self, counter, loglikelihood, sample_traj, stat_dictionary):
 		
 		# log_dict['Subpolicy Loglikelihood'] = loglikelihood.mean()
-		log_dict = {'Subpolicy Loglikelihood': loglikelihood.mean(), 'Total Loss': self.total_loss.mean(), 'Encoder KL': self.encoder_KL.mean()}
+		log_dict = {'Subpolicy Loglikelihood': loglikelihood.mean(), 'Total Loss': self.total_loss.mean(), 'Encoder KL': self.encoder_KL.mean(), 'KL Weight': self.kl_weight}
 		if self.args.relative_state_reconstruction_loss_weight>0.:
 			log_dict['Unweighted Relative State Recon Loss'] = self.unweighted_relative_state_reconstruction_loss
 			log_dict['Relative State Recon Loss'] = self.relative_state_reconstruction_loss
@@ -2229,16 +2263,17 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		if not(os.path.isdir(self.dir_name)):
 			os.mkdir(self.dir_name)
 
-
 		np.save(os.path.join(self.dir_name, "LatentSet.npy") , self.latent_z_set)
 		np.save(os.path.join(self.dir_name, "GT_TrajSet.npy") , self.gt_trajectory_set)
 		np.save(os.path.join(self.dir_name, "EmbeddedZSet.npy") , self.embedded_z_dict)
+		np.save(os.path.join(self.dir_name, "TaskIDSet.npy"), self.task_id_set)
 
 	def load_latent_sets(self, file_path):
 		
 		self.latent_z_set = np.load(os.path.join(file_path, "LatentSet.npy"))
 		self.gt_trajectory_set = np.load(os.path.join(file_path, "GT_TrajSet.npy"), allow_pickle=True)
 		self.embedded_zs = np.load(os.path.join(file_path, "EmbeddedZSet.npy"), allow_pickle=True)
+		self.task_id_set = np.load(os.path.join(file_path, "TaskIDSet.npy"), allow_pickle=True)
 
 	def assemble_inputs(self, input_trajectory, latent_z_indices, latent_b, sample_action_seq):
 
@@ -2261,9 +2296,17 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			return assembled_inputs, subpolicy_inputs, padded_action_seq
 
 		else:
+			
+		
 			# Append latent z indices to sample_traj data to feed as input to BOTH the latent policy network and the subpolicy network. 
 			assembled_inputs = torch.zeros((len(input_trajectory),self.input_size+self.latent_z_dimensionality+1)).to(device)
-			assembled_inputs[:,:self.input_size] = torch.tensor(input_trajectory).view(len(input_trajectory),self.input_size).to(device).float()			
+
+			# Mask input trajectory according to subpolicy dropout. 
+			self.subpolicy_input_dropout_layer = torch.nn.Dropout(self.args.subpolicy_input_dropout)
+
+			torch_input_trajectory = torch.tensor(input_trajectory).view(len(input_trajectory),self.input_size).to(device).float()
+			masked_input_trajectory = self.subpolicy_input_dropout_layer(torch_input_trajectory)
+			assembled_inputs[:,:self.input_size] = masked_input_trajectory
 
 			assembled_inputs[range(1,len(input_trajectory)),self.input_size:-1] = latent_z_indices[:-1]
 			assembled_inputs[range(1,len(input_trajectory)),-1] = latent_b[:-1].float()
@@ -2462,14 +2505,31 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# Compute relative state vectors.
 
+		# Get original states. 
+		robot_traj = self.sample_traj_var[...,:3]
+		env_traj = self.sample_traj_var[...,self.args.robot_state_size:self.args.robot_state_size+3]
+		relative_state_traj = robot_traj - env_traj		
+
 		# Compute relative state. 
+		# relative_state_traj = torch.tensor(robot_traj - env_traj).to(device)
 		
 		# Compute diff. 
-		
+		robot_traj_diff = np.diff(robot_traj, axis=0)
+		env_traj_diff = np.diff(env_traj, axis=0)
+		relative_state_traj_diff = np.diff(relative_state_traj, axis=0)		
+
 		# Compute norm. 
+		robot_traj_norm = np.linalg.norm(robot_traj_diff, axis=-1)
+		env_traj_norm = np.linalg.norm(env_traj_diff, axis=-1)
+		relative_state_traj_norm = np.linalg.norm(relative_state_traj_diff, axis=-1)
 
 		# Compute sum.
-		pass
+		beta_vector = np.stack([robot_traj_norm.sum(axis=0), env_traj_norm.sum(axis=0), relative_state_traj_norm.sum(axis=0)])
+
+		# Threshold this vector. 
+		self.beta_threshold_value = 0.5
+		self.thresholded_beta_vector = np.swapaxes((beta_vector>self.beta_threshold_value).astype(float), 0, 1)		
+		self.torch_thresholded_beta_vector = torch.tensor(self.thresholded_beta_vector).to(device)
 
 	def compute_task_based_aux_loss(self, update_dict):
 
@@ -2478,7 +2538,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		for k in range(self.args.batch_size):
 			task_list.append(update_dict['data_element'][k]['task-id'])
 		# task_array = np.array(task_list).reshape(self.args.batch_size,1)
-		torch_task_array = torch.tensor(task_list, dtype=float).reshape(self.args.batch_size,1).cuda()
+		torch_task_array = torch.tensor(task_list, dtype=float).reshape(self.args.batch_size,1).to(device)
 		
 		# Compute pairwise task based weights. 
 		# pairwise_task_matrix = (scipy.spatial.distance.cdist(task_array)==0).astype(int).astype(float)
@@ -2492,15 +2552,30 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		negative_weighted_task_loss = (1.-pairwise_task_matrix)*self.clamped_pairwise_z_distance
 
 		# Total task_based_aux_loss.
-		self.unweighted_task_based_aux_loss = (positive_weighted_task_loss + negative_weighted_task_loss).mean()
+		self.unweighted_task_based_aux_loss = (positive_weighted_task_loss + self.args.negative_task_based_component_weight*negative_weighted_task_loss).mean()
 		self.task_based_aux_loss = self.args.task_based_aux_loss_weight*self.unweighted_task_based_aux_loss
 
 	def compute_relative_state_phase_aux_loss(self, update_dict):
 
-		# Compute 
-		pass
+		# Compute vectors first for the batch.
+		self.compute_relative_state_class_vectors(update_dict)
+
+		# Compute similarity of rel state vector across batch.
+		self.relative_state_vector_distance = torch.cdist(self.torch_thresholded_beta_vector, self.torch_thresholded_beta_vector)
+		self.relative_state_vector_similarity_matrix = (self.relative_state_vector_distance==0).float()
+	
+		# Now set positive loss.
+		positive_weighted_rel_state_phase_loss = self.relative_state_vector_similarity_matrix*self.pairwise_z_distance
+
+		# Set negative component
+		negative_weighted_rel_state_phase_loss = (1.-self.relative_state_vector_similarity_matrix)*self.clamped_pairwise_z_distance
+
+		# Total rel state phase loss.
+		self.unweighted_relative_state_phase_aux_loss = (positive_weighted_rel_state_phase_loss + self.args.negative_task_based_component_weight*negative_weighted_rel_state_phase_loss).mean()
+		self.relative_state_phase_aux_loss = self.args.relative_state_phase_aux_loss_weight*self.unweighted_relative_state_phase_aux_loss
 
 	def compute_relative_state_reconstruction_loss(self):
+		
 		# Get mean of actions from the policy networks.
 		mean_policy_actions = self.policy_network.mean_outputs
 
@@ -2521,7 +2596,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Get relative states.
 		robot_traj = self.sample_traj_var[...,:3]
 		env_traj = self.sample_traj_var[...,self.args.robot_state_size:self.args.robot_state_size+3]
-		relative_state_traj = torch.tensor(robot_traj - env_traj).cuda()
+		relative_state_traj = torch.tensor(robot_traj - env_traj).to(device)
 		initial_relative_state = relative_state_traj[0]
 		# torch_initial_relative_state = torch.tensor(initial_relative_state).cuda()		
 
@@ -2767,105 +2842,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		else: 
 			return None, None, None
 
-	# def run_iteration(self, counter, i, return_z=False, and_train=True):
-
-	# 	# Basic Training Algorithm: 
-	# 	# For E epochs:
-	# 	# 	# For all trajectories:
-	# 	#		# Sample trajectory segment from dataset. 
-	# 	# 		# Encode trajectory segment into latent z. 
-	# 	# 		# Feed latent z and trajectory segment into policy network and evaluate likelihood. 
-	# 	# 		# Update parameters. 
-
-	# 	####################################
-
-	# 	self.set_epoch(counter)
-
-	# 	############# (0) #############
-	# 	# Sample trajectory segment from dataset. 
-	# 	####################################
-
-	# 	# Sample trajectory segment from dataset. 			
-	# 	if self.args.traj_segments:		
-	# 		state_action_trajectory, sample_action_seq, sample_traj, data_element  = self.get_trajectory_segment(i)
-	# 		self.sample_traj_var = sample_traj
-	# 	else:
-	# 		sample_traj, sample_action_seq, concatenated_traj, old_concatenated_traj, data_element = self.collect_inputs(i)
-	# 		state_action_trajectory = concatenated_traj
-
-	# 	####################################
-	# 	############# (0a) #############
-	# 	####################################
-
-	# 	# Corrupt the inputs according to how much input_corruption_noise is set to.
-	# 	state_action_trajectory = self.corrupt_inputs(state_action_trajectory)
-
-	# 	if state_action_trajectory is not None:
-			
-	# 		####################################
-	# 		############# (1) #############
-	# 		####################################
-
-	# 		torch_traj_seg = torch.tensor(state_action_trajectory).to(device).float()
-	# 		# Encode trajectory segment into latent z. 		
-						
-	# 		latent_z, encoder_loglikelihood, encoder_entropy, kl_divergence = self.encoder_network.forward(torch_traj_seg, self.epsilon)
-			
-	# 		####################################
-	# 		########## (2) & (3) ##########
-	# 		####################################
-
-	# 		# print("Embed in rut iter")
-	# 		# embed()
-
-	# 		# Feed latent z and trajectory segment into policy network and evaluate likelihood. 
-	# 		latent_z_seq, latent_b = self.construct_dummy_latents(latent_z)
-
-	# 		############# (3a) #############
-	# 		_, subpolicy_inputs, sample_action_seq = self.assemble_inputs(state_action_trajectory, latent_z_seq, latent_b, sample_action_seq)
-			
-	# 		############# (3b) #############
-	# 		# Policy net doesn't use the decay epislon. (Because we never sample from it in training, only rollouts.)
-	# 		loglikelihoods, _ = self.policy_network.forward(subpolicy_inputs, sample_action_seq)
-	# 		loglikelihood = loglikelihoods[:-1].mean()
-			 
-	# 		if self.args.debug:
-	# 			print("Embedding in Train.")
-	# 			embed()
-
-	# 		####################################
-	# 		############# (4) #############
-	# 		####################################
-
-	# 		# Update parameters. 
-	# 		if self.args.train and and_train:
-
-	# 			############# (4a) #############
-	# 			# Update parameters based on likelihood, subpolicy inputs, and kl divergence.
-	# 			self.update_policies_reparam(loglikelihood, subpolicy_inputs, kl_divergence)
-
-	# 			############# (4b) #############
-	# 			# Update Plots. 
-	# 			stats = {}
-	# 			stats['counter'] = counter
-	# 			stats['i'] = i
-	# 			stats['epoch'] = self.current_epoch_running
-	# 			stats['batch_size'] = self.args.batch_size			
-	# 			self.update_plots(counter, loglikelihood, state_action_trajectory, stats)
-
-	# 			####################################
-	# 			############# (5) #############
-	# 			####################################
-
-	# 		# if return_z: 
-	# 		# 	return latent_z, sample_traj, sample_action_seq
-			
-	# 		if return_z:
-	# 			return latent_z, sample_traj, sample_action_seq, data_element
-									
-	# 	else: 
-	# 		return None, None, None
-
 	def evaluate_metrics(self):		
 		self.distances = -np.ones((self.test_set_size))
 
@@ -2892,9 +2868,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		if model:
 			self.load_all_models(model)
 
-		# Set seed. 
-
-
 		np.set_printoptions(suppress=True,precision=2)
 
 		if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
@@ -2913,7 +2886,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				print("Running Visualization on Robot Data.")	
 
 				# self.visualize_robot_data(load_sets=True)
-				self.visualize_robot_data(load_sets=False)
+				whether_load_z_set = self.args.latent_set_file_path is not None
+				self.visualize_robot_data(load_sets=whether_load_z_set)
 
 				# print("Embed after viz Blah blah")
 				# embed()
@@ -2933,6 +2907,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				if not(os.path.isdir(self.dir_name)):
 					os.mkdir(self.dir_name)
+
+		# Test out embedding stuff 
+		print("Embedding in evaluate 2")
+		embed()
 
 	def get_trajectory_and_latent_sets(self, get_visuals=True):
 		# For N number of random trajectories from MIME: 
@@ -3010,6 +2988,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# self.gt_trajectory_set = np.zeros((self.N, self., self.state_dim))
 		
 		self.gt_trajectory_set = []
+		# Save TASK IDs 
+		self.task_id_set = []
 
 		# Use the dataset to get reasonable trajectories (because without the information bottleneck / KL between N(0,1), cannot just randomly sample.)
 		for i in range(self.N//self.args.batch_size+1):
@@ -3032,6 +3012,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 				self.gt_trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
+
+				# print("Embed in latent set creation")
+				# embed()
+
+				self.task_id_set.append(data_element[b]['task-id'])
 
 				if get_visuals:
 					# (2) Now rollout policy.	
@@ -3125,10 +3110,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		
 		# Do not need epsilon or eval. 
 		retrieved_z_r, _, _, _ = self.encoder_network.run_super_forward(robot_state_action_trajectory, epsilon=0.0, \
-			network_dict=self.encoder_network.robot_network_dict, size_dict=self.encoder_network.robot_size_dict)
+			network_dict=self.encoder_network.robot_network_dict, size_dict=self.encoder_network.robot_size_dict, artificial_batch_size=1)
 		
 		# 2) Query KD Tree with encoding of given robot trajectory. 
-		_, z_r_nearest_neighbor_index = self.kdtree_robot_z.query(retrieved_z_r)
+		_, z_r_nearest_neighbor_index = self.kdtree_robot_z.query(retrieved_z_r.detach().cpu().numpy())
 
 		# 3) Retrieve corresponding env abstraction.
 		desired_z_e = self.robot_latent_z_set[z_r_nearest_neighbor_index]
@@ -3152,7 +3137,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		
 		# Do not need epsilon or eval. 
 		retrieved_z_e, _, _, _ = self.encoder_network.run_super_forward(env_state_action_trajectory, epsilon=0.0, \
-			network_dict=self.encoder_network.env_network_dict, size_dict=self.encoder_network.env_size_dict)
+			network_dict=self.encoder_network.env_network_dict, size_dict=self.encoder_network.env_size_dict, artificial_batch_size=1)
 		
 		# 2) Query KD Tree with encoding of given env trajectory. 
 		_, z_e_nearest_neighbor_index = self.kdtree_robot_e.query(retrieved_z_e)
@@ -4464,7 +4449,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		# self.total_variational_loss = (self.reinforce_variational_loss.sum() + self.args.kl_weight*kl_divergence.squeeze(1).sum()).sum()
 		
 		# self.total_variational_loss = (self.reinforce_variational_loss + self.args.kl_weight*kl_divergence.squeeze(1)).mean()
-		self.total_variational_loss = (self.reinforce_variational_loss + self.args.kl_weight*kl_divergence.squeeze(1)).sum()/(self.batch_mask[:-1].sum())
+		self.total_variational_loss = (self.reinforce_variational_loss + self.kl_weight*kl_divergence.squeeze(1)).sum()/(self.batch_mask[:-1].sum())
 
 		######################################################
 		# Set other losses, subpolicy, latent, and prior.

@@ -8,6 +8,7 @@ from headers import *
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
+
 # torch.cuda.set_device(torch.device('cuda:1'))
 # if use_cuda:
 # 	torch.cuda.set_device(2)
@@ -2075,7 +2076,7 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		self.network_dict = torch.nn.ModuleDict()
 		self.network_dict['lstm'], self.network_dict['mean_output_layer'], self.network_dict['variances_output_layer'] = self.define_networks(self.size_dict['input_size'], self.size_dict['output_size'])
 
-	def forward(self, input, epsilon=0.001, network_dict=None, size_dict=None, z_sample_to_evaluate=None):
+	def forward(self, input, epsilon=0.001, network_dict=None, size_dict=None, z_sample_to_evaluate=None, artificial_batch_size=None):
 
 		##############################
 		# Set default inputs.
@@ -2090,7 +2091,10 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		# Format input to the appropriate size: Sequence_Length x Batch_Size x Input_Size. 
 		##############################
 
-		format_input = input.view((input.shape[0], self.batch_size, size_dict['input_size']))
+		batch_size = self.batch_size
+		if artificial_batch_size is not None:
+			batch_size = artificial_batch_size
+		format_input = input.view((input.shape[0], batch_size, size_dict['input_size']))
 
 		##############################
 		# Forward pass through LSTM. 
@@ -2199,10 +2203,10 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 				
 		return robot_input, env_input
 
-	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
+	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, artificial_batch_size=None):
 		# robot_latent_z, robot_logprob, robot_entropy, robot_kl_divergence = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample)
 
-		return super().forward(input, epsilon=epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=z_sample_to_evaluate)
+		return super().forward(input, epsilon=epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=z_sample_to_evaluate, artificial_batch_size=artificial_batch_size)
 
 	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
 

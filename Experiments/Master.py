@@ -98,6 +98,7 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = DexMV_DataLoader.DexMVHand_Dataset(args)
 	elif args.data=='DexMVObject':
 		dataset = DexMV_DataLoader.DexMV_ObjectDataset(args)
+
 	return dataset
 
 class Master():
@@ -321,7 +322,7 @@ def parse_arguments():
 	parser.add_argument('--perplexity',dest='perplexity',type=float,default=30,help='Value of perplexity fed to TSNE.')
 	parser.add_argument('--latent_set_file_path',dest='latent_set_file_path',type=str,help='File path to pre-computed latent sets to visualize.')
 	parser.add_argument('--viz_latent_rollout',dest='viz_latent_rollout',type=int,default=0,help='Whether to visualize latent rollout or not.')
-	parser.add_argument('--viz_sim_rollout',dest='viz_sim_rollout',type=int,default=1,help='Whether to visualize rollout by magically setting state, or stepping in the environment.')
+	parser.add_argument('--viz_sim_rollout',dest='viz_sim_rollout',type=int,default=0,help='Whether to visualize rollout by magically setting state, or stepping in the environment.')
 	parser.add_argument('--viz_gt_sim_rollout',dest='viz_gt_sim_rollout',type=int,default=0,help='Whether or not to visualize the GT trajectory by replaying through the simulator.')
 	parser.add_argument('--sim_viz_action_scale_factor',dest='sim_viz_action_scale_factor',type=float,default=0.3,help='Factor by which to scale actions when visualizing in simulation env.')
 	parser.add_argument('--sim_viz_step_repetition',dest='sim_viz_step_repetition',type=int,default=20,help='Number of times to repeat simulation step of visualization of traj.')
@@ -356,11 +357,13 @@ def parse_arguments():
 	parser.add_argument('--prior_weight',dest='prior_weight',type=float,default=0.00001)
 	# parser.add_argument('--context_loss_weight',dest='context_loss_weight',type=float,default=1.,help='Weight of context loss.')
 	parser.add_argument('--kl_weight',dest='kl_weight',type=float,default=0.01,help='KL weight when constant.')
-	parser.add_argument('--kl_schedule',dest='kl_schedule',type=int,default=0,help='Whether to schedule KL weight.')
+	parser.add_argument('--kl_schedule',dest='kl_schedule',type=str,default=None,choices=[None, 'Monotonic', 'Cyclic'],help='Whether to schedule KL weight.')
 	parser.add_argument('--initial_kl_weight',dest='initial_kl_weight',type=float,default=0.0,help='Initial KL weight.')
 	parser.add_argument('--final_kl_weight',dest='final_kl_weight',type=float,default=1.0,help='Initial KL weight.')
 	parser.add_argument('--kl_increment_epochs',dest='kl_increment_epochs',type=int,default=100,help='Number of epochs to increment KL over.')
-	parser.add_argument('--kl_begin_increment_epochs',dest='kl_begin_increment_epochs',type=int,default=100,help='Number of epochs after which to increment KL.')	
+	parser.add_argument('--kl_begin_increment_epochs',dest='kl_begin_increment_epochs',type=int,default=100,help='Number of epochs after which to increment KL.')
+	parser.add_argument('--kl_cyclic_phase_epochs',dest='kl_cyclic_phase_epochs',type=int,default=100,help='Number of epochs to cycle KL weight over.')	
+
 	# architecture
 	parser.add_argument('--split_stream_encoder',dest='split_stream_encoder',type=int,default=0,help='Whether to use split stream encoder or not.')
 	parser.add_argument('--embedding_visualization_stream',dest='embedding_visualization_stream',type=str,default=None,help='Which stream to use to embed and visualize Z space.')
@@ -371,6 +374,7 @@ def parse_arguments():
 	parser.add_argument('--relative_state_reconstruction_loss_weight', dest='relative_state_reconstruction_loss_weight', type=float, default=0., help='What weight to place on the relative state reconstruction loss in the robot-object setting..')	
 	parser.add_argument('--relative_state_phase_aux_loss_weight', dest='relative_state_phase_aux_loss_weight', type=float, default=0., help='Weight to place on the relative state phase aux loss.')
 	parser.add_argument('--task_based_aux_loss_weight', dest='task_based_aux_loss_weight', type=float, default=0., help='Weight to place on task based auxillary loss.')
+	parser.add_argument('--negative_task_based_component_weight', dest='negative_task_based_component_weight', type=float, default=1., help='Weight to place on the negative component of the task based aux loss.')
 	parser.add_argument('--pairwise_z_distance_threshold', dest='pairwise_z_distance_threshold', type=float, default=2., help='Minimum distance to push apart different parts of latent space that are semantically different.')
 
 	# Cross Domain Skill Transfer parameters. 
@@ -439,6 +443,8 @@ def parse_arguments():
 	parser.add_argument('--small_translation_model',dest='small_translation_model',type=int,default=0,help='Whether to use a small model for translation or not. Restricts network capacity.')
 	parser.add_argument('--recurrent_translation',dest='recurrent_translation',type=int,default=0,help='Whether to implement a recurrent translation model.')
 	parser.add_argument('--input_corruption_noise',dest='input_corruption_noise',type=float,default=0.,help='How much noise to add to the input to corrupt it. Default no corruption.')
+	parser.add_argument('--subpolicy_input_dropout',dest='subpolicy_input_dropout',type=float,default=0.,help='What fraction to set subpolicy dropout to.') 
+
 	parser.add_argument('--equivariance',dest='equivariance',type=int,default=0,help='Whether to implement equivariance objective in (Joint) Fix Embed setting.')
 	parser.add_argument('--equivariance_loss_weight',dest='equivariance_loss_weight',type=float,default=1.,help='Weight associated with the equivariance loss.')
 	parser.add_argument('--cross_domain_supervision',dest='cross_domain_supervision',type=int,default=0,help='Whether to use cross domain supervision when operating in pair of same domains.')
