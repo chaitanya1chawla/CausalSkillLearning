@@ -3320,23 +3320,20 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 	def assemble_inputs(self, input_trajectory, latent_z_indices, latent_b, sample_action_seq):
 
 		if not(self.args.discrete_z):
-			# # Append latent z indices to sample_traj data to feed as input to BOTH the latent policy network and the subpolicy network. 
-			# assembled_inputs = torch.zeros((len(input_trajectory),self.input_size+self.latent_z_dimensionality+1)).to(device)
-			# assembled_inputs[:,:self.input_size] = torch.tensor(input_trajectory).view(len(input_trajectory),self.input_size).to(device).float()			
-
-			# assembled_inputs[range(1,len(input_trajectory)),self.input_size:-1] = latent_z_indices[:-1]
-			# assembled_inputs[range(1,len(input_trajectory)),-1] = latent_b[:-1].float()
-
 			# Now assemble inputs for subpolicy.
 			
-			# Create subpolicy inputs tensor. 
-			# subpolicy_inputs = torch.zeros((len(input_trajectory),self.input_size+self.latent_z_dimensionality)).to(device)			
-
+			# Create subpolicy inputs tensor. 			
 			subpolicy_inputs = torch.zeros((input_trajectory.shape[0], self.args.batch_size, self.input_size+self.latent_z_dimensionality)).to(device)
+
+			# Mask input trajectory according to subpolicy dropout. 
+			self.subpolicy_input_dropout_layer = torch.nn.Dropout(self.args.subpolicy_input_dropout)
+
+			torch_input_trajectory = torch.tensor(input_trajectory).view(input_trajectory.shape[0],self.args.batch_size,self.input_size).to(device).float()
+			masked_input_trajectory = self.subpolicy_input_dropout_layer(torch_input_trajectory)
 
 			# Now copy over trajectory. 
 			# subpolicy_inputs[:,:self.input_size] = torch.tensor(input_trajectory).view(len(input_trajectory),self.input_size).to(device).float()         
-			subpolicy_inputs[:,:,:self.input_size] = torch.tensor(input_trajectory).view(input_trajectory.shape[0],self.args.batch_size,self.input_size).to(device).float()
+			subpolicy_inputs[:,:,:self.input_size] = masked_input_trajectory
 
 			# Now copy over latent z's. 
 			subpolicy_inputs[range(input_trajectory.shape[0]),:,self.input_size:] = latent_z_indices
