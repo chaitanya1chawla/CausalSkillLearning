@@ -2101,7 +2101,7 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		##############################
 				
 		outputs, hidden = network_dict['lstm'](format_input)
-		concatenated_outputs = torch.cat([outputs[0,:,self.hidden_size:],outputs[-1,:,:self.hidden_size]],dim=-1).view((1,self.batch_size,-1))
+		concatenated_outputs = torch.cat([outputs[0,:,self.hidden_size:],outputs[-1,:,:self.hidden_size]],dim=-1).view((1,batch_size,-1))
 
 		##############################
 		# Predict Gaussian means and variances. 
@@ -2151,6 +2151,13 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 		# Using its own init function.
 		super(ContinuousFactoredEncoderNetwork, self).__init__(input_size, hidden_size, output_size, args)
 
+		# Define indices. 
+		self.robot_indices = np.concatenate([np.arange(0,self.robot_size_dict['state_size']), \
+			np.arange(self.robot_size_dict['state_size']+self.env_size_dict['state_size'],2*self.robot_size_dict['state_size']+self.env_size_dict['state_size'])])
+	
+		self.env_indices = np.concatenate([ np.arange(self.robot_size_dict['state_size'],self.robot_size_dict['state_size']+self.env_size_dict['state_size']), \
+			np.arange( self.robot_size_dict['state_size']*2+self.env_size_dict['state_size'], self.robot_size_dict['state_size']*2+self.env_size_dict['state_size']*2) ])
+
 	def define_dimensions(self, input_size, hidden_size, output_size, args):
 
 		##############################
@@ -2193,14 +2200,9 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 		# Split input between robot and environment streams. 
 		# The joint stream input is of size: (Time Dimensions) x (Batch Size) x (Robot state size + Env state size + Robot action size + Env action size). 
 
-		robot_indices = np.concatenate([np.arange(0,self.robot_size_dict['state_size']), \
-			np.arange(self.robot_size_dict['state_size']+self.env_size_dict['state_size'],2*self.robot_size_dict['state_size']+self.env_size_dict['state_size'])])
-		robot_input = input[:,:,robot_indices]
+		robot_input = input[:,:,self.robot_indices]
+		env_input = input[:,:,self.env_indices]
 
-		env_indices = np.concatenate([ np.arange(self.robot_size_dict['state_size'],self.robot_size_dict['state_size']+self.env_size_dict['state_size']), \
-			np.arange( self.robot_size_dict['state_size']*2+self.env_size_dict['state_size'], self.robot_size_dict['state_size']*2+self.env_size_dict['state_size']*2) ])
-		env_input = input[:,:,env_indices]
-				
 		return robot_input, env_input
 
 	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, artificial_batch_size=None):
@@ -2242,8 +2244,7 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 			##################################
 			# (3) Aggregate stream outputs. 
 			##################################
-			
-			
+					
 			# Remember, robot_z and env_z are both [1 x Batch_Size x (2 x Z_Dimensions)]. Concatenate across last dimension. 
 			concatenated_latent_z = torch.cat([robot_latent_z, env_latent_z],axis=-1)
 

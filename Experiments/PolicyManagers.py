@@ -577,6 +577,8 @@ class PolicyManager_BaseClass():
 							# Rollout each individual trajectory in this batch.
 							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b], indexed_data_element=data_element[b])
 
+						# print("TRAJECTORY ANALYSIS")
+						# embed()
 						# Now append this particular sample traj and the rollout into trajectroy and rollout sets.
 						self.trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
 						self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))
@@ -612,6 +614,9 @@ class PolicyManager_BaseClass():
 			# Instead of computing latent sets, just load them from File path. 
 			self.load_latent_sets(self.args.latent_set_file_path)
 			
+			print("embedding after load")
+			embed()
+
 			# Get embedded z based on what the perplexity is. 			
 			embedded_z = self.embedded_zs.item()["perp{0}".format(int(self.args.perplexity))]
 			self.max_len = 0
@@ -3091,6 +3096,30 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.kdtree_robot_z = KDTree(self.robot_latent_z_set)
 		self.kdtree_env_z = KDTree(self.env_latent_z_set)		
 
+	def get_query_trajectory(self, input_state_trajectory, stream=None):
+		
+		# Assume trajectory is dimensions |T| x |S|. 
+		if stream=='robot':
+			indices = np.arange(0,8)
+		elif stream=='env':
+			indices = np.arange(8,15)
+		
+		stream_input_state_trajectory = input_state_trajectory[:,indices]
+		
+		# Get actions. 
+		actions = np.diff(stream_input_state_trajectory, axis=0)
+
+		# Pad actions.
+		padded_actions = np.concatenate([actions,np.zeros((1,stream_input_state_trajectory.shape[1]))], axis=0)
+
+		# Concatenate state and actions. 
+		state_action_traj = np.concatenate([stream_input_state_trajectory, padded_actions], axis=1)
+
+		# Torchify. 
+		torch_state_action_traj = torch.from_numpy(state_action_traj).to(device).float()
+
+		return torch_state_action_traj
+
 	def retrieve_desired_nn_env_abstraction(self, robot_state_action_trajectory):
 
 		####################################
@@ -5081,6 +5110,10 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				if self.args.z_tuple_gmm:
 					self.number_distinct_zs.append(len(distinct_z_indices))
 				
+
+				# print("Embedding in Traj Setting Business")
+				# embed()
+
 				# Copy over these into lists.
 				self.latent_z_set.append(copy.deepcopy(distinct_zs))
 				self.trajectory_set.append(copy.deepcopy(input_dict['sample_traj'][:,b]))
