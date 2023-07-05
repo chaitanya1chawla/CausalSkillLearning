@@ -3122,6 +3122,16 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 	def retrieve_desired_nn_env_abstraction(self, robot_state_action_trajectory):
 
+		# (0-2) 
+		self.retrieve_nearest_robot_neighbors(robot_state_action_trajectory)
+
+		# 3) Retrieve corresponding env abstraction.
+		desired_z_e = self.robot_latent_z_set[z_r_nearest_neighbor_index]
+
+		return desired_z_e
+
+	def retrieve_nearest_robot_neighbors(self, robot_state_action_trajectory, number_neighbors=1):
+
 		####################################
 		# Query, given a robot trajectory
 		####################################
@@ -3142,14 +3152,21 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			network_dict=self.encoder_network.robot_network_dict, size_dict=self.encoder_network.robot_size_dict, artificial_batch_size=1)
 		
 		# 2) Query KD Tree with encoding of given robot trajectory. 
-		_, z_r_nearest_neighbor_index = self.kdtree_robot_z.query(retrieved_z_r.detach().cpu().numpy())
+		z_r_nearest_neighbor, z_r_nearest_neighbor_index = self.kdtree_robot_z.query(retrieved_z_r.detach().cpu().numpy(), k=number_neighbors)
 
-		# 3) Retrieve corresponding env abstraction.
-		desired_z_e = self.robot_latent_z_set[z_r_nearest_neighbor_index]
-
-		return desired_z_e
+		return z_r_nearest_neighbor, z_r_nearest_neighbor_index	
 
 	def retrieve_desired_nn_robot_abstraction(self, env_state_action_trajectory):
+
+		# (0-2) 
+		self.retrieve_nearest_env_neighbors(env_state_action_trajectory)
+
+		# 3) Retrieve corresponding robot abstraction.
+		desired_z_r = self.env_latent_z_set[z_e_nearest_neighbor_index]
+
+		return desired_z_r
+
+	def retrieve_nearest_env_neighbors(self, env_state_action_trajectory, number_neighbors=1):
 		
 		####################################
 		# Query, given an env trajectory
@@ -3169,12 +3186,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			network_dict=self.encoder_network.env_network_dict, size_dict=self.encoder_network.env_size_dict, artificial_batch_size=1)
 		
 		# 2) Query KD Tree with encoding of given env trajectory. 
-		_, z_e_nearest_neighbor_index = self.kdtree_robot_e.query(retrieved_z_e)
+		z_e_nearest_neighbor, z_e_nearest_neighbor_index = self.kdtree_robot_e.query(retrieved_z_e, k=number_neighbors)
 
-		# 3) Retrieve corresponding robot abstraction.
-		desired_z_r = self.env_latent_z_set[z_e_nearest_neighbor_index]
-
-		return desired_z_r
+		return z_e_nearest_neighbor, z_e_nearest_neighbor_index
 
 	def retrieve_desired_network_env_abstraction(self, robot_state_action_trajectory):
 
@@ -3188,21 +3202,60 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# 0) Get latent z sets.
 		# 1) Create KD trees. 
-		# 2) (Query)
-		# 3) Rollout results. 
 
 		# 0) Make sure we've run visualize_robot_data; then split z sets. 
-
 		# Run visualize_robot_data. 
 
 		# Create z sets. 
 		self.robot_latent_z_set = copy.deepcopy(self.latent_z_set[:,:int(self.latent_z_dimensionality/2)])
 		self.env_latent_z_set = copy.deepcopy(self.latent_z_set[:,int(self.latent_z_dimensionality/2):])
+
+		# # Single stream latent z set dict. 
+		# self.stream_latent_z_dict = {}
+		# self.stream_latent_z_dict['robot_latents']= copy.deepcopy(self.latent_z_set[:,:int(self.latent_z_dimensionality/2)])
+		# self.stream_latent_z_dict['env_latents']= copy.deepcopy(self.latent_z_set[:,int(self.latent_z_dimensionality/2):])
 		
 		# 1) Create KD Trees.
 		self.create_z_kdtrees()	
-	
-		# 2) 
+
+	def sample_trajectories_for_evaluating_spaces(self):
+
+		# Paradigm for evaluating latent spaces. 
+		# (0) For number of evaluate trajectories:
+		# (1) 	Get trajectory from dataset.
+		# (1a) 	Parse trajectory into robot and env trajectory T_r, T_e. 
+		# (2) 	Encode trajectory into z_R, z_E via global / joint encoder. 
+		# (3)	Find nearest neighbor of z_R / z_E in {Z}_R / {Z}_E i.e. z_R^* \ z_E^*.
+
+		# 0-2 is just run_iteration. 
+		# 3 is query. 
+
+		pass
+
+	def evaluate_forward_inverse_models(self):
+
+		# Paradigm for forward model.
+		# (0) For number of evaluate trajectories:
+		# (1) 	Get trajectory from dataset.
+		# (1a) 	Parse trajectory into robot and env trajectory T_r, T_e. 
+		# (2) 	Encode trajectory into z_R, z_E via global / joint encoder. 
+		# (3)	Find nearest neighbor of z_R / z_E in {Z}_R / {Z}_E i.e. z_R^* \ z_E^*.
+		# (4) 	Find corresponding z_E^* / z_R^*.
+		# (5)	Evaluate |z_E^* - z_E|_2 / .
+		# (6) 	Decode z_E to T_e^* / .
+		# (7) 	Evaluate |T_e^* - T_e|_2 / . 
+
+		# Remember, steps 0-3 are executed in sample_trajectories_for_evaluating spaces. 
+
+		pass
+
+	def create_evaluate_dynamics_models(self):
+
+		# After we've created latent sets.
+		self.define_forward_inverse_models()
+
+		# Eval
+		self.evaluate_forward_inverse_models()
 
 class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
