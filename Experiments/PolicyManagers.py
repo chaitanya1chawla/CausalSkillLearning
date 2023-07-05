@@ -3097,8 +3097,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# self.kdtree_env_z = KDTree(self.env_latent_z_set)		
 
 		self.kdtree_dict = {}
-		self.kdtree_dict['robot'] = KDTree(self.robot_latent_z_set)
-		self.kdtree_dict['env'] = KDTree(self.env_latent_z_set)
+		self.kdtree_dict['robot'] = KDTree(self.stream_latent_z_dict['robot'])
+		self.kdtree_dict['env'] = KDTree(self.stream_latent_z_dict['env'])
 
 	def get_query_trajectory(self, input_state_trajectory, stream=None):
 		
@@ -3155,102 +3155,24 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			network_dict=net_dict, size_dict=size_dict, artificial_batch_size=1)
 		
 		# 2) Query KD Tree with encoding of given trajectory. 
-		z_neighbors, z_neighbors_indices = kdtree.query(retrieved_z.detach().cpu().numpy(), k=number_neighbors)
+		z_neighbor_distances, z_neighbors_indices = kdtree.query(retrieved_z.detach().cpu().numpy(), k=number_neighbors)
 
-		return z_neighbors, z_neighbors_indices
+		return z_neighbor_distances, z_neighbor_indices
 
 	def retrieve_cross_indexed_nearest_neighbor(self, trajectory, stream, number_neighbors=1):
 
 		# Get neighbors. 
-		z_neighbors, z_neighbors_indices = self.retrieve_nearest_neighbors(trajectory, stream, number_neighbors)
+		z_neighbor_distances , z_neighbor_indices = self.retrieve_nearest_neighbors(trajectory, stream, number_neighbors)
 
 		# Cross index. 				
 		cross_stream = set(self.stream_latent_z_dict.keys()) - set([stream])
-		latent_set = self.stream_latent_z_dict[cross_stream]
+		cross_latent_set = self.stream_latent_z_dict[cross_stream]
 		# 	desired_z_e = self.robot_latent_z_set[z_r_nearest_neighbor_index]
 
-		cross_indexed_z = latent_set[z_neighbors_indices]
+		cross_indexed_z = cross_latent_set[z_neighbor_indices]
 
 		return cross_indexed_z
 	
-	# def retrieve_desired_nn_env_abstraction(self, robot_state_action_trajectory):
-
-	# 	# (0-2) 
-	# 	self.retrieve_nearest_robot_neighbors(robot_state_action_trajectory)
-
-	# 	# 3) Retrieve corresponding env abstraction.
-	# 	desired_z_e = self.robot_latent_z_set[z_r_nearest_neighbor_index]
-
-	# 	return desired_z_e
-
-	# def retrieve_nearest_robot_neighbors(self, robot_state_action_trajectory, number_neighbors=1):
-
-	# 	####################################
-	# 	# Query, given a robot trajectory
-	# 	####################################
-
-	# 	# 0) Assumes that we have a concatenation of states and actions.
-	# 	# 1) z_r = E_r (Tau_r)
-	# 	# 2) z_r^{*NN} = KDT_r.query(z_r)
-	# 	# 3) z_e^* = Map (z_r^{*NN} --> Z_E)
-
-	# 	# 1) Query Robot Encoder for the Robot Trajectory. 
-	# 	# Well, we just run super.forward() of the encoder network, which is a continuous factored encoder
-	# 	# which inherits its forward function from the continuous encoder. 
-	# 	# We can run forward for just the individual stream, using this template. 
-	# 	# robot_latent_z, robot_logprob, robot_entropy, robot_kl_divergence = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample)
-		
-	# 	# Do not need epsilon or eval. 
-	# 	retrieved_z_r, _, _, _ = self.encoder_network.run_super_forward(robot_state_action_trajectory, epsilon=0.0, \
-	# 		network_dict=self.encoder_network.robot_network_dict, size_dict=self.encoder_network.robot_size_dict, artificial_batch_size=1)
-		
-	# 	# 2) Query KD Tree with encoding of given robot trajectory. 
-	# 	z_r_nearest_neighbor, z_r_nearest_neighbor_index = self.kdtree_robot_z.query(retrieved_z_r.detach().cpu().numpy(), k=number_neighbors)
-
-	# 	return z_r_nearest_neighbor, z_r_nearest_neighbor_index	
-
-	# def retrieve_desired_nn_robot_abstraction(self, env_state_action_trajectory):
-
-	# 	# (0-2) 
-	# 	self.retrieve_nearest_env_neighbors(env_state_action_trajectory)
-
-	# 	# 3) Retrieve corresponding robot abstraction.
-	# 	desired_z_r = self.env_latent_z_set[z_e_nearest_neighbor_index]
-
-	# 	return desired_z_r
-
-	# def retrieve_nearest_env_neighbors(self, env_state_action_trajectory, number_neighbors=1):
-		
-	# 	####################################
-	# 	# Query, given an env trajectory
-	# 	####################################
-
-	# 	# 0) Assumes that we have a concatenation of states and actions.
-	# 	# 1) z_e = E_e (Tau_e)
-	# 	# 2) z_e^{*NN} = KDT_e.query(z_e)
-	# 	# 3) z_r^* = Map (z_e^{*NN} --> Z_R)
-
-	# 	# 1) Query Env Encoder for the Env Trajectory. 
-	# 	# Well, we just run super.forward() of the encoder network, which is a continuous factored encoder
-	# 	# which inherits its forward function from the continuous encoder. 
-		
-	# 	# Do not need epsilon or eval. 
-	# 	retrieved_z_e, _, _, _ = self.encoder_network.run_super_forward(env_state_action_trajectory, epsilon=0.0, \
-	# 		network_dict=self.encoder_network.env_network_dict, size_dict=self.encoder_network.env_size_dict, artificial_batch_size=1)
-		
-	# 	# 2) Query KD Tree with encoding of given env trajectory. 
-	# 	z_e_nearest_neighbor, z_e_nearest_neighbor_index = self.kdtree_robot_e.query(retrieved_z_e, k=number_neighbors)
-
-	# 	return z_e_nearest_neighbor, z_e_nearest_neighbor_index
-
-	# def retrieve_desired_network_env_abstraction(self, robot_state_action_trajectory):
-
-	# 	pass
-
-	# def retrieve_desired_network_robot_abstraction(self, env_state_action_trajectory):
-
-	# 	pass
-
 	def define_forward_inverse_models(self):
 
 		# 0) Get latent z sets.
