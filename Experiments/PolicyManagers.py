@@ -3073,7 +3073,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# Format with name.
 		plt.savefig("{0}/Embedding_Joint_{1}.png".format(self.dir_name,self.args.name))
-		plt.close()
+		plt.close()	
 
 	def create_z_kdtrees(self):
 		
@@ -3430,6 +3430,58 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 		return latent_z_indices, latent_b	
 		# return latent_z_indices
+
+	def differentiable_rollout(self, trajectory_start, latent_z, rollout_length=None):
+
+
+		subpolicy_inputs = torch.zeros((self.args.batch_size,2*self.state_dim+self.latent_z_dimensionality)).to(device).float()
+		subpolicy_inputs[:,:self.state_dim] = torch.tensor(trajectory_start).to(device).float()
+		# subpolicy_inputs[:,2*self.state_dim:] = torch.tensor(latent_z).to(device).float()
+		subpolicy_inputs[:,2*self.state_dim:] = latent_z[0]
+
+		if self.args.batch_size>1:
+			subpolicy_inputs = subpolicy_inputs.unsqueeze(0)
+
+		if rollout_length is not None: 
+			length = rollout_length-1
+		else:
+			length = self.rollout_timesteps-1
+
+		for t in range(length):
+
+			# Get actions from the policy.
+			actions = self.policy_network.reparameterized_get_actions(subpolicy_inputs, greedy=True)
+
+			# Select last action to execute. 
+			action_to_execute = actions[-1].squeeze(1)
+
+			# Downscale the actions by action_scale_factor.
+			action_to_execute = action_to_execute/self.args.action_scale_factor
+			
+			# Compute next state. 
+			new_state = subpolicy_inputs[t,...,:self.state_dim]+action_to_execute
+
+			# Create new input row. 
+			input_row = torch.zeros((self.args.batch_size, 2*self.state_dim+self.latent_z_dimensionality)).to(device).float()
+			input_row[:,:self.state_dim] = new_state
+			# Feed in the ORIGINAL prediction from the network as input. Not the downscaled thing. 
+			input_row[:,self.state_dim:2*self.state_dim] = actions[-1].squeeze(1)
+			input_row[:,2*self.state_dim:] = latent_z[t+1]
+
+			# Now that we have assembled the new input row, concatenate it along temporal dimension with previous inputs. 
+			if self.args.batch_size>1:
+				subpolicy_inputs = torch.cat([subpolicy_inputs,input_row.unsqueeze(0)],dim=0)
+			else:
+				subpolicy_inputs = torch.cat([subpolicy_inputs,input_row],dim=0)
+
+		trajectory = subpolicy_inputs[...,:self.state_dim].detach().cpu().numpy()
+		differentiable_trajectory = subpolicy_inputs[...,:self.state_dim]
+		differentiable_action_seq = subpolicy_inputs[...,self.state_dim:2*self.state_dim]
+		differentiable_state_action_seq = subpolicy_inputs[...,:2*self.state_dim]
+
+		# For differentiabiity, return tuple of trajectory, actions, state actions, and subpolicy_inputs. 
+		return differentiable_trajectory, differentiable_action_seq, differentiable_state_action_seq, subpolicy_inputs
+	
 
 class PolicyManager_Joint(PolicyManager_BaseClass):
 
