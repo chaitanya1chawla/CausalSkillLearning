@@ -609,6 +609,10 @@ scp /data/tanmayshankar/TrainingLogs/RMOP_001/saved_models/Model_epoch1995 tshan
 
 // CUDA_VISIBLE_DEVICES=1 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_756_EvalEnvS --data=RoboMimicRobotObjects --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=500 --display_freq=10000 --epochs=4000 --save_freq=100 --datadir=/home/tshankar/Research/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=ExpWandbLogs/ --kl_weight=0.0 --split_stream_encoder=1 --relative_state_reconstruction_loss_weight=10. --model=ExpWandbLogs/RMOP_756/saved_models/Model_epoch2900 --embedding_visualization_stream='env'
 
+###############################################
+# Eval sim
+// CUDA_VISIBLE_DEVICES=1 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_756_Eval --data=RoboMimicRobotObjects --var_skill_length=1 --z_dimensions=16 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=500 --display_freq=10000 --epochs=4000 --save_freq=100 --datadir=/home/tshankar/Research/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=ExpWandbLogs/ --kl_weight=0.0 --split_stream_encoder=1 --relative_state_reconstruction_loss_weight=10. --model=ExpWandbLogs/RMOP_756/saved_models/Model_epoch2900 --viz_sim_rollout=1
+
 
 
 // CUDA_VISIBLE_DEVICES=2 python Master.py --train=0 --setting=pretrain_sub --name=RMOP_757_Eval --data=RoboMimicRobotObjects --var_skill_length=1 --z_dimensions=32 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=500 --display_freq=10000 --epochs=4000 --save_freq=100 --datadir=/home/tshankar/Research/Code/Data/Datasets/RoboMimic/ --smoothen=0 --logdir=/data/tanmayshankar/TrainingLogs/ --kl_weight=0.0 --split_stream_encoder=1 --relative_state_reconstruction_loss_weight=10. --model=/data/tanmayshankar/TrainingLogs/RMOP_757/saved_models/Model_epoch2900

@@ -2849,7 +2849,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 	def evaluate_metrics(self):		
 		self.distances = -np.ones((self.test_set_size))
-
+		self.robot_z_nn_distances = -np.ones((self.test_set_size))
+		self.env_z_nn_distances = -np.ones((self.test_set_size))
 		# Get test set elements as last (self.test_set_size) number of elements of dataset.
 		for i in range(self.test_set_size):
 
@@ -2865,6 +2866,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				rollout_trajectory, rendered_rollout_trajectory = self.rollout_robot_trajectory(sample_traj[0], latent_z, rollout_length=len(sample_traj))
 
 				self.distances[i] = ((sample_traj-rollout_trajectory)**2).mean()	
+
+			robot_nn_z_dist, env_nn_z_dist = self.evaluate_z_distances_for_batch(latent_z)
 
 		self.mean_distance = self.distances[self.distances>0].mean()
 
@@ -2894,9 +2897,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				whether_load_z_set = self.args.latent_set_file_path is not None
 				self.visualize_robot_data(load_sets=whether_load_z_set)
 
-				# print("Embed after viz Blah blah")
-				# embed()
-
 				# Get reconstruction error... 
 				self.get_trajectory_and_latent_sets(get_visuals=True)
 				print("The Average Reconstruction Error is: ", self.avg_reconstruction_error)
@@ -2912,10 +2912,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				if not(os.path.isdir(self.dir_name)):
 					os.mkdir(self.dir_name)
-
-		# Test out embedding stuff 
-		print("Embedding in evaluate 2")
-		embed()
 
 	def get_trajectory_and_latent_sets(self, get_visuals=True):
 		# For N number of random trajectories from MIME: 
@@ -3125,7 +3121,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		return torch_state_action_traj
 
-	def retrieve_nearest_neighbors(self, trajectory, stream, number_neighbors=1):
+	def retrieve_nearest_neighbors_from_trajectory(self, trajectory, stream, number_neighbors=1, artificial_batch_size=1):
 
 		# Based on stream, set which KDTree and which latent set to use. 
 		kdtree = self.kdtree_dict[stream]
@@ -3152,17 +3148,17 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Do not need epsilon or eval. 
 		retrieved_z, _, _, _ = self.encoder_network.run_super_forward(trajectory, epsilon=0.0, \
 			# network_dict=self.encoder_network.robot_network_dict, size_dict=self.encoder_network.robot_size_dict, artificial_batch_size=1)
-			network_dict=net_dict, size_dict=size_dict, artificial_batch_size=1)
+			network_dict=net_dict, size_dict=size_dict, artificial_batch_size=artificial_batch_size)
 		
 		# 2) Query KD Tree with encoding of given trajectory. 
 		z_neighbor_distances, z_neighbors_indices = kdtree.query(retrieved_z.detach().cpu().numpy(), k=number_neighbors)
 
 		return z_neighbor_distances, z_neighbor_indices
 
-	def retrieve_cross_indexed_nearest_neighbor(self, trajectory, stream, number_neighbors=1):
+	def retrieve_cross_indexed_nearest_neighbor_from_trajectory(self, trajectory, stream, number_neighbors=1):
 
 		# Get neighbors. 
-		z_neighbor_distances , z_neighbor_indices = self.retrieve_nearest_neighbors(trajectory, stream, number_neighbors)
+		z_neighbor_distances , z_neighbor_indices = self.retrieve_nearest_neighbors_from_trajectory(trajectory, stream, number_neighbors)
 
 		# Cross index. 				
 		cross_stream = set(self.stream_latent_z_dict.keys()) - set([stream])
@@ -3193,19 +3189,37 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# 1) Create KD Trees.
 		self.create_z_kdtrees()	
 
-	def sample_trajectories_for_evaluating_spaces(self):
+	# def evaluate_latent_space(self):
 
-		# Paradigm for evaluating latent spaces. 
-		# (0) For number of evaluate trajectories:
-		# (1) 	Get trajectory from dataset.
-		# (1a) 	Parse trajectory into robot and env trajectory T_r, T_e. 
-		# (2) 	Encode trajectory into z_R, z_E via global / joint encoder. 
-		# (3)	Find nearest neighbor of z_R / z_E in {Z}_R / {Z}_E i.e. z_R^* \ z_E^*.
+	# 	# Paradigm for evaluating latent spaces. 
+	# 	# (0) For number of evaluate trajectories:
+	# 	# (1) 	Get trajectory from dataset.
+	# 	# (1a) 	Parse trajectory into robot and env trajectory T_r, T_e. 
+	# 	# (2) 	Encode trajectory into z_R, z_E via global / joint encoder. 
+	# 	# (3)	Find nearest neighbor of z_R / z_E in {Z}_R / {Z}_E i.e. z_R^* \ z_E^*.
 
-		# 0-2 is just run_iteration. 
-		# 3 is query. 
+	# 	# Notes - we can evaluate both streams together. 
+	# 	# 0-2 is just run_iteration. 
+	# 	# 3 is query. 
 
-		pass
+	# 	# Get latent z's for batch of trajectories. 
+	# 	iteration = 48
+	# 	latent_z, _, _, _ = self.run_iteration(0, iteration, return_z=True, and_train=False)
+
+	def evaluate_z_distances_for_batch(self, latent_z):
+
+		latent_z_sets = {}
+		latent_z_sets['robot'] = latent_z[:,:,:int(self.latent_z_dimensionality/2)].detach().cpu().numpy()
+		latent_z_sets['env'] = latent_z[:,:,int(self.latent_z_dimensionality/2):].detach().cpu().numpy()
+		
+		# Robot nearest neighbors.. 
+		# Number nearest neighbor
+		number_nearest_neighbors = 5
+		robot_nn_distances, robot_nn_indices = self.stream_latent_z_dict['robot'].query(latent_z_sets['robot'], k=number_nearest_neighbors)
+		env_nn_distances, env_nn_indices = self.stream_latent_z_dict['env'].query(latent_z_sets['env'], k=number_nearest_neighbors)
+
+		# print("Robot Latent Space Average Distance: ", robot_nn_distances.mean())
+		return robot_nn_distances, env_nn_distances
 
 	def evaluate_forward_inverse_models(self):
 
