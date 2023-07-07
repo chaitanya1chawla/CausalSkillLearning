@@ -3431,8 +3431,45 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		return latent_z_indices, latent_b	
 		# return latent_z_indices
 
-	def differentiable_rollout(self, trajectory_start, latent_z, rollout_length=None):
+	def setup_vectorized_environments(self):
 
+		# Don't try to recreate env here, just use the env from the visualizer. 
+		self.base_env = self.visualizer.env
+		# self.vectorized_environments = gym.vector.SyncVectorEnv([ lambda: GymWrapper(robosuite.make("Door", robots=['Sawyer'], has_renderer=False)) for k in range(self.args.batch_size)])
+
+		if not(isinstance(self.base_env, gym.Env)):
+			self.base_env = GymWrapper(self.base_env)
+		
+		# Vectorized.. 		
+		self.vectorized_environments = gym.vector.SyncVectorEnv([ lambda: self.base_env for k in range(self.args.batch_size)])
+
+	def batch_compute_next_state(self, current_state, action):
+
+		# Reset. 
+		# Set state.
+		# Step. 
+		# Return state. 
+
+		if self.viz_sim_rollout:
+			
+			# Reset env. 
+			self.vectorized_environments.reset()
+
+			# Set state. 		
+			# Option 1 - do this iteratively - not ideal, but probably fine because this is not the bottleneck. 
+			# Option 2 - set using set_attr? - testing this out doesn't seem to work? 
+			# 
+			for k in range(self.args.batch_size):
+				# self.vectorized_environments.envs[k].set_state_from_flattened()
+				
+			
+			
+		else:
+			next_state = current_state + action
+
+		return next_state
+
+	def differentiable_rollout(self, trajectory_start, latent_z, rollout_length=None):
 
 		subpolicy_inputs = torch.zeros((self.args.batch_size,2*self.state_dim+self.latent_z_dimensionality)).to(device).float()
 		subpolicy_inputs[:,:self.state_dim] = torch.tensor(trajectory_start).to(device).float()
@@ -3459,7 +3496,8 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			action_to_execute = action_to_execute/self.args.action_scale_factor
 			
 			# Compute next state. 
-			new_state = subpolicy_inputs[t,...,:self.state_dim]+action_to_execute
+			new_state = self.batch_compute_next_state(subpolicy_inputs[t,...,:self.state_dim], action_to_execute)
+			# new_state = subpolicy_inputs[t,...,:self.state_dim]+action_to_execute
 
 			# Create new input row. 
 			input_row = torch.zeros((self.args.batch_size, 2*self.state_dim+self.latent_z_dimensionality)).to(device).float()
