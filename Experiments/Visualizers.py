@@ -88,8 +88,40 @@ class SawyerVisualizer(object):
 		# Updates all joint states
 		self.full_state = self.environment._get_observation()
 
-	def set_joint_pose(self, joint_angles):
+	def set_joint_pose(self, joint_angles, env=None):
+		
+		if env is None:
+			env = self.environment
+		
+		# In the roboturk dataset, we've the following joint angles: 
+		# ('time','right_j0', 'head_pan', 'right_j1', 'right_j2', 'right_j3', 'right_j4', 'right_j5', 'right_j6', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint')
 
+		# Set usual joint angles through set joint positions API.
+		env.reset()
+		if self.new_robosuite==0:
+			env.set_robot_joint_positions(joint_angles[:7])
+		else:
+			env.robots[0].set_robot_joint_positions(joint_angles[:7])
+
+		# For gripper, use "step". 
+		# Mujoco requires actions that are -1 for Open and 1 for Close.
+
+		# [l,r]
+		# gripper_open = [0.0115, -0.0115]
+		# gripper_closed = [-0.020833, 0.020833]
+		# In mujoco, -1 is open, and 1 is closed.
+		
+		actions = np.zeros((8))
+		actions[-1] = joint_angles[-1]
+
+		# Move gripper positions.
+		env.step(actions)
+
+		# Should set positions correctly.. Only really relevant for OBJECTS
+		env.sim.forward()
+
+	def old_set_joint_pose(self, joint_angles):
+		
 		# In the roboturk dataset, we've the following joint angles: 
 		# ('time','right_j0', 'head_pan', 'right_j1', 'right_j2', 'right_j3', 'right_j4', 'right_j5', 'right_j6', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint')
 
@@ -116,7 +148,6 @@ class SawyerVisualizer(object):
 
 		# Should set positions correctly.. Only really relevant for OBJECTS
 		self.environment.sim.forward()
-
 
 	def set_joint_pose_return_image(self, joint_angles, arm='both', gripper=False):
 
@@ -1070,7 +1101,7 @@ class RoboturkObjectVisualizer(object):
 		default_task_id = "SawyerViz"
 		self.create_environment(task_id=default_task_id)
 
-	def set_object_pose(self, position, orientation):
+	def set_object_pose(self, position, orientation, env=None):
 
 		if self.new_robosuite:
 			joint_name_suffix = "_joint0"
@@ -1084,6 +1115,10 @@ class RoboturkObjectVisualizer(object):
 		else:
 			joint_name_suffix = ""
 
+		# Artificially set env if we aren't passed an argument.
+		if env is None:
+			env = self.environment
+
 		# Get mujoco object name.		
 		mujoco_obj_name = self.environment.obj_to_use+joint_name_suffix
 
@@ -1091,9 +1126,10 @@ class RoboturkObjectVisualizer(object):
 		new_orientation = np.roll(orientation,1)
 		# Rebuild pose. 
 		pose = np.concatenate((position, new_orientation))
-		self.environment.sim.data.set_joint_qpos(mujoco_obj_name, pose)
-				
-		self.environment.sim.forward()
+		
+		# Propagate into mujoco sim.
+		env.sim.data.set_joint_qpos(mujoco_obj_name, pose)				
+		env.sim.forward()
 
 	def old_set_object_pose(self, position, orientation):
 
@@ -1121,7 +1157,7 @@ class RoboturkObjectVisualizer(object):
 
 		# print("Exiting object pose")
 
-	def set_joint_pose(self, pose, arm='both', gripper=False):
+	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
 		
 		# Is wrapper for set object pose.		
 		object_position = pose[:3]
@@ -1129,7 +1165,7 @@ class RoboturkObjectVisualizer(object):
 		# object_to_eef_position = pose[7:10]
 		# object_to_eef_quaternion = pose[10:]
 
-		self.set_object_pose(object_position, object_orientation)
+		self.set_object_pose(object_position, object_orientation, env=env)
 
 	def set_joint_pose_return_image(self, pose, arm='both', gripper=False):
 
@@ -1215,7 +1251,7 @@ class RoboturkRobotObjectVisualizer(RoboturkObjectVisualizer):
 
 		super(RoboturkRobotObjectVisualizer, self).__init__(has_display=has_display, args=args, just_objects=False)
 
-	def set_joint_pose(self, pose, arm='both', gripper=False):
+	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
 
 		############################
 		# Set object pose.
@@ -1225,17 +1261,20 @@ class RoboturkRobotObjectVisualizer(RoboturkObjectVisualizer):
 		object_position = pose[-7:-4]
 		object_orientation = pose[-4:]
 
-		self.set_object_pose(object_position, object_orientation)
+		self.set_object_pose(object_position, object_orientation, env=env)
 		
 		############################
 		# Set robot pose.
 		############################
 
+		if env is None:
+			env = self.environment
+
 		# Assumes the  first seven elements are the robot pose.
 		if self.new_robosuite==0:
-			self.environment.set_robot_joint_positions(pose[:7])
+			env.set_robot_joint_positions(pose[:7])
 		else:
-			self.environment.robots[0].set_robot_joint_positions(pose[:7])
+			env.robots[0].set_robot_joint_positions(pose[:7])
 	
 class RoboMimicObjectVisualizer(object):
 
@@ -1247,40 +1286,43 @@ class RoboMimicObjectVisualizer(object):
 		default_task_id = "Viz"
 		self.create_environment(task_id=default_task_id)
 
-	def set_object_pose(self, position, orientation):
+	def set_object_pose(self, position, orientation, env=None):
 
 		joint_name_suffix = "_joint0"
+
+		if env is None:
+			env = self.environment
 
 		if self.task_id in ["Lift", "Stack", "ToolHang"]:
 
 			# Sets object position for environment with one object. 
 			# Assuming in the lift and stack environments, the first object is the one we want to set the position of. 
 			# Indices of object position are 9-12. 
-			self.environment.sim.data.qpos[9:12] = position
+			env.sim.data.qpos[9:12] = position
 			# Orientation is indexed from 12-16., but is ordered differently. 
 			# Orientation argument is ordered as x,y,z,w / This is what Mujoco observation gives us.
 			# This qpos argument is ordered as w,x,y,z. 
-			self.environment.sim.data.qpos[13:16] = orientation[:-1]
-			self.environment.sim.data.qpos[12] = orientation[-1]
+			env.sim.data.qpos[13:16] = orientation[:-1]
+			env.sim.data.qpos[12] = orientation[-1]
 
 			# Sets posiitons correctly. Quaternions slightly off - trend is sstill correct.
-			self.environment.sim.forward()
+			env.sim.forward()
 
 			# print("Exiting object pose")
 
 		else:
 			# Get mujoco object name.		
-			mujoco_obj_name = self.environment.obj_to_use+joint_name_suffix
+			mujoco_obj_name = env.obj_to_use+joint_name_suffix
 
 			# Reorient. 
 			new_orientation = np.roll(orientation,1)
 			# Rebuild pose. 
 			pose = np.concatenate((position, new_orientation))
-			self.environment.sim.data.set_joint_qpos(mujoco_obj_name, pose)
+			env.sim.data.set_joint_qpos(mujoco_obj_name, pose)
 					
-			self.environment.sim.forward()
+			env.sim.forward()
 
-	def set_joint_pose(self, pose, arm='both', gripper=False):
+	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
 		
 		# Is wrapper for set object pose.		
 		object_position = pose[:3]
@@ -1288,7 +1330,7 @@ class RoboMimicObjectVisualizer(object):
 		# object_to_eef_position = pose[7:10]
 		# object_to_eef_quaternion = pose[10:]
 
-		self.set_object_pose(object_position, object_orientation)
+		self.set_object_pose(object_position, object_orientation, env=env)
 
 	def set_joint_pose_return_image(self, pose, arm='both', gripper=False):
 
@@ -1364,7 +1406,7 @@ class RoboMimicRobotObjectVisualizer(RoboMimicObjectVisualizer):
 
 		super(RoboMimicRobotObjectVisualizer, self).__init__(has_display=has_display, args=args, just_objects=False)
 
-	def set_joint_pose(self, pose, arm='both', gripper=False):
+	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
 
 		############################
 		# Set object pose.
@@ -1374,17 +1416,20 @@ class RoboMimicRobotObjectVisualizer(RoboMimicObjectVisualizer):
 		object_position = pose[-7:-4]
 		object_orientation = pose[-4:]
 
-		self.set_object_pose(object_position, object_orientation)
+		self.set_object_pose(object_position, object_orientation, env=env)
 		
 		############################
 		# Set robot pose.
 		############################
 
+		if env is None:
+			env = self.environment
+
 		# Assumes the  first seven elements are the robot pose.
 		if self.new_robosuite==0:
-			self.environment.set_robot_joint_positions(pose[:7])
+			env.set_robot_joint_positions(pose[:7])
 		else:
-			self.environment.robots[0].set_robot_joint_positions(pose[:7])
+			env.robots[0].set_robot_joint_positions(pose[:7])
 
 
 class ToyDataVisualizer():

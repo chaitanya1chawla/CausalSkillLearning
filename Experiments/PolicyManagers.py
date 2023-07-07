@@ -3457,11 +3457,11 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 			# Set state. 		
 			# Option 1 - do this iteratively - not ideal, but probably fine because this is not the bottleneck. 
-			# Option 2 - set using set_attr? - testing this out doesn't seem to work? 
+			# Option 2 - set using set_attr? - testing this out doesn't seem to work? Anyhow, set_attr iterates internally, so might as well do this ourselves. 
 			# 
 			for k in range(self.args.batch_size):
 				# self.vectorized_environments.envs[k].set_state_from_flattened()
-				
+
 			
 			
 		else:
