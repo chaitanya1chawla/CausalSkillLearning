@@ -651,6 +651,62 @@ class PolicyManager_BaseClass():
 		# Save webpage. 
 		self.write_results_HTML()
 
+	def preprocess_action(self, action=None):
+
+		########################################
+		# Numpy-fy and subsample. (It's 1x|S|, that's why we need to index into first dimension.)
+
+		# It is now 1x|S| or Bx|S|? So squeezing should still be okay... 
+		########################################
+		
+		# action_np = action.detach().cpu().numpy()[0,:8]			
+		action_np = action.detach().cpu().squeeze(0).numpy()[...,:8]
+
+		########################################
+		# Unnormalize action.
+		########################################
+
+		if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
+			# Remember. actions are normalized just by multiplying denominator, no addition of mean.
+			unnormalized_action = (action_np*self.norm_denom_value)
+		else:
+			unnormalized_action = action_np
+		
+		########################################
+		# Scale action.
+		########################################
+
+		scaled_action = unnormalized_action*self.args.sim_viz_action_scale_factor
+		# Step repetition
+		number_of_step_repeats = self.args.sim_viz_step_repetition
+
+		########################################
+		# Second unnormalization to undo the visualizer environment normalization.... 
+		########################################
+
+		ctrl_range = self.visualizer.environment.sim.model.actuator_ctrlrange
+		bias = 0.5 * (ctrl_range[:, 1] + ctrl_range[:, 0])
+		weight = 0.5 * (ctrl_range[:, 1] - ctrl_range[:, 0])
+		# Modify gripper normalization, so that the env normalization actually happens.
+		bias = bias[:-1]
+		bias[-1] = 0.
+		weight = weight[:-1]
+		weight[-1] = 1.
+		
+		# Unnormalized_scaled_action_for_env_step
+		if self.visualizer.new_robosuite:
+			unnormalized_scaled_action_for_env_step = scaled_action
+		else:
+			unnormalized_scaled_action_for_env_step = (scaled_action - bias)/weight
+
+		# print("#####################")
+		# print("Vanilla A:", action_np)
+		# print("Stat Unnorm A: ", unnormalized_action)
+		# print("Scaled A: ", scaled_action)
+		# print("Env Unnorm A: ", unnormalized_scaled_action_for_env_step)
+
+		return unnormalized_scaled_action_for_env_step
+
 	def compute_next_state(self, current_state=None, action=None):
 
 		####################################
@@ -663,60 +719,7 @@ class PolicyManager_BaseClass():
 			# Take environment step.
 			####################################
 
-			# if self.args.data in ['RoboturkRobotObjects']:
-			# 	action_np = action.detach().cpu().numpy()[:8]
-			# else:
-			# 	action_np = action.detach().cpu().numpy()
-
-			########################################
-			# Numpy-fy and subsample. (It's 1x|S|, that's why we need to index into first dimension.)
-			########################################
-			
-			# action_np = action.detach().cpu().numpy()[0,:8]			
-			action_np = action.detach().cpu().squeeze(0).numpy()[:8]
-
-			########################################
-			# Unnormalize action.
-			########################################
-
-			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
-				# Remember. actions are normalized just by multiplying denominator, no addition of mean.
-				unnormalized_action = (action_np*self.norm_denom_value)
-			else:
-				unnormalized_action = action_np
-			
-			########################################
-			# Scale action.
-			########################################
-
-			scaled_action = unnormalized_action*self.args.sim_viz_action_scale_factor
-			# Step repetition
-			number_of_step_repeats = self.args.sim_viz_step_repetition
-
-			########################################
-			# Second unnormalization to undo the visualizer environment normalization.... 
-			########################################
-
-			ctrl_range = self.visualizer.environment.sim.model.actuator_ctrlrange
-			bias = 0.5 * (ctrl_range[:, 1] + ctrl_range[:, 0])
-			weight = 0.5 * (ctrl_range[:, 1] - ctrl_range[:, 0])
-			# Modify gripper normalization, so that the env normalization actually happens.
-			bias = bias[:-1]
-			bias[-1] = 0.
-			weight = weight[:-1]
-			weight[-1] = 1.
-			
-			# Unnormalized_scaled_action_for_env_step
-			if self.visualizer.new_robosuite:
-				unnormalized_scaled_action_for_env_step = scaled_action
-			else:
-				unnormalized_scaled_action_for_env_step = (scaled_action - bias)/weight
-
-			# print("#####################")
-			# print("Vanilla A:", action_np)
-			# print("Stat Unnorm A: ", unnormalized_action)
-			# print("Scaled A: ", scaled_action)
-			# print("Env Unnorm A: ", unnormalized_scaled_action_for_env_step)
+			action_to_execute = self.preprocess_action(action)
 
 			########################################
 			# Repeat steps for K times.
@@ -724,7 +727,7 @@ class PolicyManager_BaseClass():
 			
 			for k in range(number_of_step_repeats):
 				# Use environment to take step.
-				env_next_state_dict, _, _, _ = self.visualizer.environment.step(unnormalized_scaled_action_for_env_step)
+				env_next_state_dict, _, _, _ = self.visualizer.environment.step(action_to_execute)
 				gripper_state = env_next_state_dict[self.visualizer.gripper_key]
 				if self.visualizer.new_robosuite:
 					joint_state = self.visualizer.environment.sim.get_state()[1][:7]
@@ -3441,28 +3444,52 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			self.base_env = GymWrapper(self.base_env)
 		
 		# Vectorized.. 		
-		self.vectorized_environments = gym.vector.SyncVectorEnv([ lambda: self.base_env for k in range(self.args.batch_size)])
+		self.vectorized_environment = gym.vector.SyncVectorEnv([ lambda: self.base_env for k in range(self.args.batch_size)])
 
 	def batch_compute_next_state(self, current_state, action):
 
 		# Reset. 
 		# Set state.
+		# Preprocess action. 
 		# Step. 
 		# Return state. 
 
 		if self.viz_sim_rollout:
 			
-			# Reset env. 
-			self.vectorized_environments.reset()
+			####################
+			# (0) Reset envs. 
+			####################
 
-			# Set state. 		
+			self.vectorized_environment.reset()
+
+			####################
+			# (1) Set state. 		
+			####################
+
 			# Option 1 - do this iteratively - not ideal, but probably fine because this is not the bottleneck. 
 			# Option 2 - set using set_attr? - testing this out doesn't seem to work? Anyhow, set_attr iterates internally, so might as well do this ourselves. 
-			# 
-			for k in range(self.args.batch_size):
-				# self.vectorized_environments.envs[k].set_state_from_flattened()
-
 			
+			# for k in range(self.args.batch_size):
+			for k, environment in enumerate(self.vectorized_environment.envs):
+				self.visualizer.set_joint_pose(current_state, env=environment)
+			
+			####################
+			# (2) Preprocess action.
+			####################
+
+
+
+			####################
+			# (3) Step
+			####################
+
+			_, _, _, _ = self.vectorized_environment.step(actions_to_execute)
+
+
+
+		####################
+		# (4) Return State
+		####################
 			
 		else:
 			next_state = current_state + action
