@@ -677,8 +677,6 @@ class PolicyManager_BaseClass():
 		########################################
 
 		scaled_action = unnormalized_action*self.args.sim_viz_action_scale_factor
-		# Step repetition
-		number_of_step_repeats = self.args.sim_viz_step_repetition
 
 		########################################
 		# Second unnormalization to undo the visualizer environment normalization.... 
@@ -725,7 +723,7 @@ class PolicyManager_BaseClass():
 			# Repeat steps for K times.
 			########################################
 			
-			for k in range(number_of_step_repeats):
+			for k in range(self.args.sim_viz_step_repetition):
 				# Use environment to take step.
 				env_next_state_dict, _, _, _ = self.visualizer.environment.step(action_to_execute)
 				gripper_state = env_next_state_dict[self.visualizer.gripper_key]
@@ -3477,13 +3475,20 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			# (2) Preprocess action.
 			####################
 
-
+			action_to_execute = self.preprocess_action(action)
 
 			####################
 			# (3) Step
 			####################
-
-			_, _, _, _ = self.vectorized_environment.step(actions_to_execute)
+		
+			for k in range(self.args.sim_viz_step_repetition):
+				# Use environment to take step.
+				env_next_state_dict, _, _, _ = self.visualizer.environment.step(action_to_execute)
+				gripper_state = env_next_state_dict[self.visualizer.gripper_key]
+				if self.visualizer.new_robosuite:
+					joint_state = self.visualizer.environment.sim.get_state()[1][:7]
+				else:
+					joint_state = env_next_state_dict['joint_pos']
 
 
 
