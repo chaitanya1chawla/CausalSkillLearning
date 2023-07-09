@@ -457,13 +457,107 @@ class PolicyManager_BaseClass():
 
 	def batched_visualize_robot_data(self, load_sets=False, number_of_trajectories_to_visualize=None):
 
+		#####################
+		# Set number of trajectories to visualize.			
+		#####################
+
 		if number_of_trajectories_to_visualize is not None:
 			self.N = number_of_trajectories_to_visualize
 		else:
 			self.N = 400
 			# self.N = 100	
 			
+		#####################
+		# Set visualizer based on data / domain. 
+		#####################
+
 		self.set_visualizer_object()
+		np.random.seed(seed=self.args.seed)
+
+		#####################################################
+		# Get latent z sets.
+		#####################################################
+		
+		if not(load_sets):
+
+			#####################################################
+			# Select Z indices if necessary.
+			#####################################################
+
+			if self.args.split_stream_encoder:
+				if self.args.embedding_visualization_stream == 'robot':
+					stream_z_indices = np.arange(0,int(self.args.z_dimensions/2))
+				elif self.args.embedding_visualization_stream == 'env':
+					stream_z_indices = np.arange(int(self.args.z_dimensions/2),self.args.z_dimensions)
+				else:
+					stream_z_indices = np.arange(0,self.args.z_dimensions)	
+			else:
+				stream_z_indices = np.arange(0,self.args.z_dimensions)
+
+			#####################################################
+			# Initialize variables.
+			#####################################################
+
+			# self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
+			self.latent_z_set = np.zeros((self.N,len(stream_z_indices)))		
+			# These are lists because they're variable length individually.
+			self.indices = []
+			self.trajectory_set = []
+			self.trajectory_rollout_set = []		
+			self.rollout_gif_list = []
+			self.gt_gif_list = []
+
+			#####################################################
+			# Create folder for gifs.
+			#####################################################
+
+			model_epoch = int(os.path.split(self.args.model)[1].lstrip("Model_epoch"))
+			# Create save directory:
+			upper_dir_name = os.path.join(self.args.logdir,self.args.name,"MEval")
+
+			if not(os.path.isdir(upper_dir_name)):
+				os.mkdir(upper_dir_name)
+
+			self.dir_name = os.path.join(self.args.logdir,self.args.name,"MEval","m{0}".format(model_epoch))
+			if not(os.path.isdir(self.dir_name)):
+				os.mkdir(self.dir_name)
+
+			self.max_len = 0
+
+			#####################################################
+			# Initialize variables.
+			#####################################################
+
+			self.shuffle(len(self.dataset)-self.test_set_size, shuffle=True)
+		
+			#############################
+			# For appropriate number of batches: 
+			#############################
+
+			for j in range(self.N//self.args.batch_size):
+			
+				#############################		
+				# (1) Encode trajectory. 
+				#############################
+
+				if self.args.setting in ['learntsub','joint']:
+					print("Embed in viz robot data")
+					
+					input_dict, var_dict, eval_dict = self.run_iteration(0, j, return_dicts=True, train=False)
+					latent_z = var_dict['latent_z_indices']
+					sample_trajs = input_dict['sample_traj']
+				else:
+					print("Running iteration of segment in viz")
+					latent_z, sample_trajs, _, data_element = self.run_iteration(0, j, return_z=True, and_train=False)
+
+				#############################
+				# (2) 
+				#############################
+
+			# Get MIME embedding for rollout and GT trajectories, with same Z embedding. 
+			embedded_z = self.get_robot_embedding()
+
+
 
 	def visualize_robot_data(self, load_sets=False, number_of_trajectories_to_visualize=None):
 
@@ -940,7 +1034,12 @@ class PolicyManager_BaseClass():
 		print("Rollout length:", trajectory.shape[0])
 		self.visualizer.create_environment(task_id=env_name)
 
+
+		t1 = time.time()
 		trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq, original_trajectory=trajectory)
+		t2 = time.time()
+
+		print("Time for rollout robot trajectory: ", t2-t1)
 
 		########################################
 		# 3) Unnormalize data. 
@@ -1009,7 +1108,12 @@ class PolicyManager_BaseClass():
 			self.visualizer.visualize_prerendered_gif(self.rollout_gif, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_{1}Rollout.gif".format(i, gtsim_prefix))
 			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_{1}Rollout.png".format(i, gtsim_prefix)))		
 		else:
+
+			t3 = time.time()			
 			self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_Rollout.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+			t4 = time.time()
+			print("Time for visualizing rollout trajectory: ", t4-t3)
+			
 			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_Rollout.png".format(i)))
 
 		plt.close()
