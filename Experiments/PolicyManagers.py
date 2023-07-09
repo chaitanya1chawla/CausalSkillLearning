@@ -418,20 +418,8 @@ class PolicyManager_BaseClass():
 		# NOT RUNNING AUTO EVAL FOR NOW.
 		# subprocess.Popen([base_command],shell=True)
 
-	def visualize_robot_data(self, load_sets=False, number_of_trajectories_to_visualize=None):
+	def set_visualizer_object(self):
 
-		if number_of_trajectories_to_visualize is not None:
-			self.N = number_of_trajectories_to_visualize
-		else:
-
-			####################################
-			# TEMPORARILY SET N to 10
-			####################################
-			# self.N = 33
-			self.N = 100
-
-		self.rollout_timesteps = self.args.traj_length
-	
 		#####################################################
 		# Set visualizer object. 
 		#####################################################
@@ -467,11 +455,32 @@ class PolicyManager_BaseClass():
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
-		# print("Embed after setting visualizer")
-		# embed()
-		# SETTING SEED
-		np.random.seed(seed=self.args.seed)
+	def batched_visualize_robot_data(self, load_sets=False, number_of_trajectories_to_visualize=None):
 
+		if number_of_trajectories_to_visualize is not None:
+			self.N = number_of_trajectories_to_visualize
+		else:
+			self.N = 400
+			# self.N = 100	
+			
+		self.set_visualizer_object()
+
+	def visualize_robot_data(self, load_sets=False, number_of_trajectories_to_visualize=None):
+
+		if number_of_trajectories_to_visualize is not None:
+			self.N = number_of_trajectories_to_visualize
+		else:
+
+			####################################
+			# TEMPORARILY SET N to 10
+			####################################
+			# self.N = 33
+			self.N = 100
+
+		self.rollout_timesteps = self.args.traj_length
+	
+		self.set_visualizer_object()
+		np.random.seed(seed=self.args.seed)
 
 		#####################################################
 		# Get latent z sets.
@@ -2882,8 +2891,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		if self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 			self.visualize_embedding_space(suffix=suffix)
 
-		# if self.args.data=="MIME" or self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk' or self.args.data=='Mocap':
-		# if self.args.data in ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk','Mocap','OrigRoboMimic','RoboMimic']:	
+		print("EMBED IN EVAL")
+		embed()
 
 		if self.args.data in global_dataset_list:
 
@@ -3452,7 +3461,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		# Step. 
 		# Return state. 
 
-		if self.viz_sim_rollout:
+		if self.args.viz_sim_rollout:
 			
 			####################
 			# (0) Reset envs. 
