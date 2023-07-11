@@ -1042,19 +1042,8 @@ class PolicyManager_BaseClass():
 		# 2) Feed Z into policy, rollout trajectory.
 		########################################
 
-		print("Rollout length:", trajectory.shape[0])
-		
-		# t1 = time.time()
-		# self.visualizer.create_environment(task_id=env_name)
-		# t2 = time.time()
-		# print("Time for creating an env was:", t2-t1)
-
-
-		t1 = time.time()
+		print("Rollout length:", trajectory.shape[0])		
 		trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq, original_trajectory=trajectory)
-		t2 = time.time()
-
-		print("Time for rollout robot trajectory: ", t2-t1)
 
 		########################################
 		# 3) Unnormalize data. 
@@ -1123,11 +1112,7 @@ class PolicyManager_BaseClass():
 			self.visualizer.visualize_prerendered_gif(self.rollout_gif, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_{1}Rollout.gif".format(i, gtsim_prefix))
 			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_{1}Rollout.png".format(i, gtsim_prefix)))		
 		else:
-
-			t3 = time.time()			
 			self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_Rollout.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
-			t4 = time.time()
-			print("Time for visualizing rollout trajectory: ", t4-t3)
 			
 			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_Rollout.png".format(i)))
 
