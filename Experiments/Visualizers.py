@@ -158,23 +158,30 @@ class SawyerVisualizer(object):
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 
-		image_list = []
+		# Template. 
+		image_list = []			
+		self.environment.reset()
+		
+		# Recreate environment with new task ID potentially.
 		for t in range(trajectory.shape[0]):
+
+			# Check whether it's end effector or joint trajectory. 
+			# Calls joint pose function, but is really setting the object position
 			new_image = self.set_joint_pose_return_image(trajectory[t])
 			image_list.append(new_image)
 
-			# Insert white 
-			if segmentations is not None:
-				if t>0 and segmentations[t]==1:
-					image_list.append(255*np.ones_like(new_image)+new_image)
+		gif_file_name = os.path.join(gif_path,gif_name)
+		image_array = np.array(image_list)
 
 		if return_and_save:
-			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
+
 			return image_list
 		elif return_gif:
 			return image_list
 		else:
-			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)            
+			# imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
 
 	def visualize_prerendered_gif(self, image_list=None, gif_path=None, gif_name="Traj.gif"):
 		
@@ -415,8 +422,6 @@ class BaxterVisualizer(object):
 		# Apparently this needs to be called to set the positions correctly IN GENERAL
 		self.environment.sim.forward()
 
-		
-
 	def set_joint_pose_return_image(self, joint_pose, arm='both', gripper=False):
 
 		# Just use the set pose function..
@@ -429,10 +434,14 @@ class BaxterVisualizer(object):
 
 		image_list = []
 		previous_joint_positions = None
-
+		
+		self.environment.reset()
+		
+		# Recreate environment with new task ID potentially.
 		for t in range(trajectory.shape[0]):
 
 			# Check whether it's end effector or joint trajectory. 
+			# Calls joint pose function, but is really setting the object position
 			if end_effector: 
 				new_image, previous_joint_positions = self.set_ee_pose_return_image(trajectory[t], seed=previous_joint_positions)
 			else:
@@ -440,18 +449,18 @@ class BaxterVisualizer(object):
 
 			image_list.append(new_image)
 
-			# Insert white 
-			if segmentations is not None:
-				if t>0 and segmentations[t]==1:
-					image_list.append(255*np.ones_like(new_image)+new_image)
+		gif_file_name = os.path.join(gif_path,gif_name)
+		image_array = np.array(image_list)
 
 		if return_and_save:
-			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
+
 			return image_list
 		elif return_gif:
 			return image_list
 		else:
-			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			# imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
 
 class GRABVisualizer(object):
 
@@ -531,24 +540,28 @@ class GRABVisualizer(object):
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 
 		image_list = []
+		# Recreate environment with new task ID potentially.
 		for t in range(trajectory.shape[0]):
+
+			# Check whether it's end effector or joint trajectory. 
+			# Calls joint pose function, but is really setting the object position
+
 			new_image = self.set_joint_pose_return_image(trajectory[t], additional_info=additional_info)
 			image_list.append(new_image)
 
-			# Insert white 
-			if segmentations is not None:
-				if t>0 and segmentations[t]==1:
-					image_list.append(255*np.ones_like(new_image)+new_image)
-
-		print(gif_path, gif_name)
+		gif_file_name = os.path.join(gif_path,gif_name)
+		image_array = np.array(image_list)
 
 		if return_and_save:
-			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
+
 			return image_list
 		elif return_gif:
 			return image_list
 		else:
-			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			# imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
+
 
 	def create_environment(self, task_id=None):
 		pass
@@ -920,26 +933,32 @@ class DAPGVisualizer(SawyerVisualizer):
 		# self.env_name = "relocate-v0"
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
-		
-		self.create_environment(task_id)
-		
 		image_list = []
+		previous_joint_positions = None
+		
+		self.environment.reset()
+
+		# Recreate environment with new task ID potentially.
 		for t in range(trajectory.shape[0]):
+
+			# Check whether it's end effector or joint trajectory. 
+			# Calls joint pose function, but is really setting the object position
+
 			new_image = self.set_joint_pose_return_image(trajectory[t])
 			image_list.append(new_image)
 
-			# Insert white 
-			if segmentations is not None:
-				if t>0 and segmentations[t]==1:
-					image_list.append(255*np.ones_like(new_image)+new_image)
+		gif_file_name = os.path.join(gif_path,gif_name)
+		image_array = np.array(image_list)
 
 		if return_and_save:
-			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
+
 			return image_list
 		elif return_gif:
 			return image_list
 		else:
-			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)    
+			# imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
 
 	def create_environment(self, task_id=None):
 		# [:-6] drops "_demos" suffix
@@ -1019,25 +1038,32 @@ class DexMVVisualizer(SawyerVisualizer):
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 		
-		self.create_environment(task_id)
-		
 		image_list = []
+		previous_joint_positions = None
+		
+		self.environment.reset()
+
+		# Recreate environment with new task ID potentially.
 		for t in range(trajectory.shape[0]):
+
+			# Check whether it's end effector or joint trajectory. 
+			# Calls joint pose function, but is really setting the object position
+
 			new_image = self.set_joint_pose_return_image(trajectory[t])
 			image_list.append(new_image)
 
-			# Insert white 
-			if segmentations is not None:
-				if t>0 and segmentations[t]==1:
-					image_list.append(255*np.ones_like(new_image)+new_image)
+		gif_file_name = os.path.join(gif_path,gif_name)
+		image_array = np.array(image_list)
 
 		if return_and_save:
-			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
+
 			return image_list
 		elif return_gif:
 			return image_list
 		else:
-			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)    
+			# imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
 
 	def create_environment(self, task_id=None):
 		# [:-6] drops "_demos" suffix
@@ -1204,40 +1230,31 @@ class RoboturkObjectVisualizer(object):
 
 		image_list = []
 		previous_joint_positions = None
+		
+		self.environment.reset()
 
 		# Recreate environment with new task ID potentially.
-		self.create_environment(task_id=task_id)
-
-		backup_traj = copy.deepcopy(trajectory)
-
-		# print("Embedding in Viz Joint Traj of Viz")
-		# embed()
-
-		
-
 		for t in range(trajectory.shape[0]):
 
 			# Check whether it's end effector or joint trajectory. 
 			# Calls joint pose function, but is really setting the object position
+
 			new_image = self.set_joint_pose_return_image(trajectory[t])
-
-			# Temporarily print states to debug offsets..
-			# print(self.environment.observation_spec())
-
 			image_list.append(new_image)
 
-			# Insert white 
-			if segmentations is not None:
-				if t>0 and segmentations[t]==1:
-					image_list.append(255*np.ones_like(new_image)+new_image)
+		gif_file_name = os.path.join(gif_path,gif_name)
+		image_array = np.array(image_list)
 
 		if return_and_save:
-			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
+
 			return image_list
 		elif return_gif:
 			return image_list
 		else:
-			imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			# imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
+
 
 	def visualize_prerendered_gif(self, image_list=None, gif_path=None, gif_name="Traj.gif"):
 		
@@ -1372,7 +1389,7 @@ class RoboMimicObjectVisualizer(object):
 		previous_joint_positions = None
 		
 		self.environment.reset()
-		
+
 		# Recreate environment with new task ID potentially.
 		for t in range(trajectory.shape[0]):
 
