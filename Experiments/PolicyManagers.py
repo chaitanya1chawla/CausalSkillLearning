@@ -455,6 +455,14 @@ class PolicyManager_BaseClass():
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
+	def per_batch_env_management(self, indexed_data_element):
+		
+		task_id = indexed_data_element['task-id']
+		env_name = self.dataset.environment_names[task_id]
+		print("Visualizing a trajectory of task:", env_name)
+
+		self.visualizer.create_environment(task_id=env_name)
+
 	def batched_visualize_robot_data(self, load_sets=False, number_of_trajectories_to_visualize=None):
 
 		#####################
@@ -558,7 +566,6 @@ class PolicyManager_BaseClass():
 			embedded_z = self.get_robot_embedding()
 
 
-
 	def visualize_robot_data(self, load_sets=False, number_of_trajectories_to_visualize=None):
 
 		if number_of_trajectories_to_visualize is not None:
@@ -655,6 +662,10 @@ class PolicyManager_BaseClass():
 					if sample_trajs.shape[0]>self.max_len:
 						self.max_len = sample_trajs.shape[0]
 
+					#######################
+					# Create env for batch.
+					self.per_batch_env_management(data_element[0])
+
 					for b in range(self.args.batch_size):
 						
 						self.indices.append(j*self.args.batch_size+b)
@@ -717,8 +728,8 @@ class PolicyManager_BaseClass():
 			# Instead of computing latent sets, just load them from File path. 
 			self.load_latent_sets(self.args.latent_set_file_path)
 			
-			print("embedding after load")
-			embed()
+			# print("embedding after load")
+			# embed()
 
 			# Get embedded z based on what the perplexity is. 			
 			embedded_z = self.embedded_zs.item()["perp{0}".format(int(self.args.perplexity))]
@@ -1032,7 +1043,11 @@ class PolicyManager_BaseClass():
 		########################################
 
 		print("Rollout length:", trajectory.shape[0])
-		self.visualizer.create_environment(task_id=env_name)
+		
+		# t1 = time.time()
+		# self.visualizer.create_environment(task_id=env_name)
+		# t2 = time.time()
+		# print("Time for creating an env was:", t2-t1)
 
 
 		t1 = time.time()
