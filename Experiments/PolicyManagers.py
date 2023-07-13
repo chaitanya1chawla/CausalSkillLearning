@@ -536,8 +536,8 @@ class PolicyManager_BaseClass():
 
 			self.shuffle(len(self.dataset)-self.test_set_size, shuffle=True)
 
-			# print("Embedding before the robot visuals loop.s")
-			# embed()
+			print("Embedding before the robot visuals loop.s")
+			embed()
 
 			for j in range(self.N//self.args.batch_size):
 				# i = self.index_list[j]
@@ -1553,21 +1553,27 @@ class PolicyManager_BaseClass():
 			# self.trajectory_length_based_shuffling(extent=extent,shuffle=shuffle)
 			self.randomized_trajectory_length_based_shuffling(extent=extent, shuffle=shuffle)
 
-		# Task based shuffling.
-		elif self.args.task_discriminability or self.args.task_based_supervision or self.args.task_based_shuffling:
-			if isinstance(self, PolicyManager_BatchJoint):						
-				if not(self.already_shuffled):
-					self.task_based_shuffling(extent=extent,shuffle=shuffle)				
-					self.already_shuffled = 1				
+		# # Task based shuffling.
+		# elif self.args.task_discriminability or self.args.task_based_supervision or self.args.task_based_shuffling:
+		# 	if isinstance(self, PolicyManager_BatchJoint):						
+		# 		if not(self.already_shuffled):
+		# 			self.task_based_shuffling(extent=extent,shuffle=shuffle)				
+		# 			self.already_shuffled = 1				
 			
-			# if isinstance(self, PolicyManager_Transfer):
-			# Also create an index list to shuffle the order of blocks that we observe...
+		# 	# if isinstance(self, PolicyManager_Transfer):
+		# 	# Also create an index list to shuffle the order of blocks that we observe...
 
-			# 
-			# self.index_list = np.arange(0,extent)				
-			# np.random.shuffle(self.index_list)
-			self.random_shuffle(extent)
+		# 	# 
+		# 	# self.index_list = np.arange(0,extent)				
+		# 	# np.random.shuffle(self.index_list)
+		# 	self.random_shuffle(extent)
 
+		# Task based shuffling.
+		elif self.args.task_discriminability or self.args.task_based_supervision or self.args.task_based_shuffling:			
+			if not(self.already_shuffled):
+				self.task_based_shuffling(extent=extent,shuffle=shuffle)				
+				self.already_shuffled = 1				
+						
 		# Random shuffling.
 		else:
 
@@ -3665,14 +3671,25 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 				# (3) Rollout for each trajectory in batch.
 				#############################
 
-				diff_traj_batch, _, _, _ = self.differentiable_rollout(sample_trajs[0], latent_z)
+				trajectory_rollout, _, _, _ = self.differentiable_rollout(sample_trajs[0], latent_z)
 
 				# Need to add some stuff here to mimic get_robot_visuals' list management.
+
+				if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
+					unnorm_gt_trajectory = (sample_trajs*self.norm_denom_value)+self.norm_sub_value
+					unnorm_pred_trajectory = (trajectory_rollout*self.norm_denom_value) + self.norm_sub_value
+				else:
+					unnorm_gt_trajectory = sample_trajs
+					unnorm_pred_trajectory = trajectory_rollout
 
 				#############################
 				# (4) Visualize for every trajectory in batch. 
 				#############################
 
+				for b in range(self.args.batch_size):
+					
+					self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+					
 
 
 			# Get MIME embedding for rollout and GT trajectories, with same Z embedding. 
