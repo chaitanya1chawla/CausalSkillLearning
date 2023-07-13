@@ -1125,7 +1125,9 @@ class RoboturkObjectVisualizer(object):
 		self.has_display = has_display
 		self.just_objects = just_objects
 		default_task_id = "SawyerViz"
-		self.create_environment(task_id=default_task_id)
+		# self.create_environment(task_id=default_task_id)
+		self.create_env_set()
+		
 
 	def set_object_pose(self, position, orientation, env=None):
 
@@ -1200,38 +1202,64 @@ class RoboturkObjectVisualizer(object):
 		image = np.flipud(self.environment.sim.render(600, 600, camera_name='vizview1'))
 		return image
 
-	def create_environment(self, task_id=None):
+	def create_env_set(self):
 
-		print("Creating environment for task: ",task_id)
-		self.task_id = task_id
+		# self.environment_names = ['PickPlaceCan','Lift','NutAssemblySquare', 'ToolHang']
+		# self.environment_names = ["bins-Bread", "bins-Can", "bins-Cereal", "bins-Milk", "pegs-RoundNut", "pegs-SquareNut"]
+		self.environment_names = ["SawyerPickPlaceBread","SawyerPickPlaceCan","SawyerPickPlaceCereal","SawyerPickPlaceMilk","SawyerNutAssemblyRound","SawyerNutAssemblySquare"]
+		self.environment_dict = {}
 
+		import robosuite
 
-		import robosuite, threading
-		if float(robosuite.__version__[:3])<1.:
-			self.new_robosuite = 0
-			self.base_env = robosuite.make(task_id,has_renderer=self.has_display,camera_height=600,camera_width=600,camera_name='vizview1',just_objects=self.just_objects)
-			from robosuite.wrappers import IKWrapper					
-			self.sawyer_IK_object = IKWrapper(self.base_env)
-			self.environment = self.sawyer_IK_object.env
-			self.gripper_key = 'gripper_qpos'
-			self.image_key = 'image'
-		else:
+		for k, env_name in enumerate(self.environment_names):
 			self.controller_config = robosuite.load_controller_config(default_controller='JOINT_POSITION')
 			self.controller_config['kp'] = 20000
 			self.new_robosuite = 1
-			task_id_wo_robot_name = task_id.lstrip("Sawyer")
+			task_id_wo_robot_name = env_name.lstrip("Sawyer")
 			self.base_env = robosuite.make(task_id_wo_robot_name,robots=['Sawyer'],has_renderer=self.has_display,camera_heights=600,camera_widths=600,camera_names='vizview1',controller_configs=self.controller_config)
 			self.sawyer_IK_object = None
-			self.environment = self.base_env	
+			self.environment_dict[env_name] = self.base_env
 			self.gripper_key = 'robot0_gripper_qpos'
-			self.image_key = 'vizview1_image'						
+			self.image_key = 'vizview1_image'					
+
+	def create_environment(self, task_id=None):
+		self.task_id = task_id
+		self.environment = self.environment_dict[task_id]
+		self.environment.reset()
+
+	# def create_environment(self, task_id=None):
+
+	# 	print("Creating environment for task: ",task_id)
+	# 	self.task_id = task_id
+
+
+	# 	import robosuite, threading
+	# 	if float(robosuite.__version__[:3])<1.:
+	# 		self.new_robosuite = 0
+	# 		self.base_env = robosuite.make(task_id,has_renderer=self.has_display,camera_height=600,camera_width=600,camera_name='vizview1',just_objects=self.just_objects)
+	# 		from robosuite.wrappers import IKWrapper					
+	# 		self.sawyer_IK_object = IKWrapper(self.base_env)
+	# 		self.environment = self.sawyer_IK_object.env
+	# 		self.gripper_key = 'gripper_qpos'
+	# 		self.image_key = 'image'
+	# 	else:
+	# 		self.controller_config = robosuite.load_controller_config(default_controller='JOINT_POSITION')
+	# 		self.controller_config['kp'] = 20000
+	# 		self.new_robosuite = 1
+	# 		task_id_wo_robot_name = task_id.lstrip("Sawyer")
+	# 		self.base_env = robosuite.make(task_id_wo_robot_name,robots=['Sawyer'],has_renderer=self.has_display,camera_heights=600,camera_widths=600,camera_names='vizview1',controller_configs=self.controller_config)
+	# 		self.sawyer_IK_object = None
+	# 		self.environment = self.base_env	
+	# 		self.gripper_key = 'robot0_gripper_qpos'
+	# 		self.image_key = 'vizview1_image'						
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 
 		image_list = []
 		previous_joint_positions = None
 		
-		self.environment.reset()
+		# self.environment.reset()
+		self.create_environment(task_id=task_id)
 
 		# Recreate environment with new task ID potentially.
 		for t in range(trajectory.shape[0]):
@@ -1301,7 +1329,8 @@ class RoboMimicObjectVisualizer(object):
 		self.has_display = has_display
 		self.just_objects = just_objects
 		default_task_id = "Viz"
-		self.create_environment(task_id=default_task_id)
+		# self.create_environment(task_id=default_task_id)
+		self.create_env_set()
 		self.image_size = 600
 
 	def set_object_pose(self, position, orientation, env=None):
@@ -1357,38 +1386,64 @@ class RoboMimicObjectVisualizer(object):
 		image = np.flipud(self.environment.sim.render(self.image_size, self.image_size, camera_name='vizview1'))
 		return image
 
-	def create_environment(self, task_id=None):
+	def create_env_set(self):
 
-		print("Creating environment for task: ",task_id)
+		self.environment_names = ['PickPlaceCan','Lift','NutAssemblySquare', 'ToolHang']
+		# self.environment_names = ["bins-Bread", "bins-Can", "bins-Cereal", "bins-Milk", "pegs-RoundNut", "pegs-SquareNut"]
+		self.environment_dict = {}
 
-		self.task_id = task_id
-		import robosuite, threading
-		if float(robosuite.__version__[:3])<1.:
-			self.new_robosuite = 0
-			self.base_env = robosuite.make(task_id,has_renderer=self.has_display,camera_height=600,camera_width=600,camera_name='vizview1',just_objects=self.just_objects)
-			from robosuite.wrappers import IKWrapper					
-			self.sawyer_IK_object = IKWrapper(self.base_env)
-			self.environment = self.sawyer_IK_object.env
-			self.gripper_key = 'gripper_qpos'
-			self.image_key = 'image'
-		else:
+		import robosuite
+
+		for k, env_name in enumerate(self.environment_names):
 			self.controller_config = robosuite.load_controller_config(default_controller='JOINT_POSITION')
 			self.controller_config['kp'] = 20000
 			self.new_robosuite = 1
-			# task_id_wo_robot_name = task_id.lstrip("Sawyer")
-			task_id_wo_robot_name = task_id			
-			self.base_env = robosuite.make(task_id_wo_robot_name,robots=['Panda'],has_renderer=self.has_display,camera_heights=600,camera_widths=600,camera_names='vizview1',controller_configs=self.controller_config)
+			self.base_env = robosuite.make(env_name,robots=['Panda'],has_renderer=self.has_display,camera_heights=600,camera_widths=600,camera_names='vizview1',controller_configs=self.controller_config)
 			self.sawyer_IK_object = None
-			self.environment = self.base_env	
+			self.environment_dict[env_name] = self.base_env
 			self.gripper_key = 'robot0_gripper_qpos'
-			self.image_key = 'vizview1_image'						
+			self.image_key = 'vizview1_image'					
+				
+
+	def create_environment(self, task_id=None):
+		self.task_id = task_id
+		self.environment = self.environment_dict[task_id]
+		self.environment.reset()
+
+
+	# def create_environment(self, task_id=None):
+
+	# 	print("Creating environment for task: ",task_id)
+
+	# 	self.task_id = task_id
+	# 	import robosuite, threading
+	# 	if float(robosuite.__version__[:3])<1.:
+	# 		self.new_robosuite = 0
+	# 		self.base_env = robosuite.make(task_id,has_renderer=self.has_display,camera_height=600,camera_width=600,camera_name='vizview1',just_objects=self.just_objects)
+	# 		from robosuite.wrappers import IKWrapper					
+	# 		self.sawyer_IK_object = IKWrapper(self.base_env)
+	# 		self.environment = self.sawyer_IK_object.env
+	# 		self.gripper_key = 'gripper_qpos'
+	# 		self.image_key = 'image'
+	# 	else:
+	# 		self.controller_config = robosuite.load_controller_config(default_controller='JOINT_POSITION')
+	# 		self.controller_config['kp'] = 20000
+	# 		self.new_robosuite = 1
+	# 		# task_id_wo_robot_name = task_id.lstrip("Sawyer")
+	# 		task_id_wo_robot_name = task_id			
+	# 		self.base_env = robosuite.make(task_id_wo_robot_name,robots=['Panda'],has_renderer=self.has_display,camera_heights=600,camera_widths=600,camera_names='vizview1',controller_configs=self.controller_config)
+	# 		self.sawyer_IK_object = None
+	# 		self.environment = self.base_env	
+	# 		self.gripper_key = 'robot0_gripper_qpos'
+	# 		self.image_key = 'vizview1_image'						
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 
 		image_list = []
 		previous_joint_positions = None
 		
-		self.environment.reset()
+		self.create_environment(task_id=task_id)
+		# self.environment.reset()
 
 		# Recreate environment with new task ID potentially.
 		for t in range(trajectory.shape[0]):

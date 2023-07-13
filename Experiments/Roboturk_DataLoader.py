@@ -462,6 +462,7 @@ class Roboturk_NewSegmentedDataset(Dataset):
 		self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
 
 		self.bad_original_index_list = [4900,537]
+		# self.bad_original_index_list = []
 		
 		# Append -1 to the start of cummulative_num_demos. This has two purposes. 
 		# The first is that when we are at index 0 of the dataset, if we appended 0, np.searchsorted returns 0, rather than 1. 

@@ -536,8 +536,8 @@ class PolicyManager_BaseClass():
 
 			self.shuffle(len(self.dataset)-self.test_set_size, shuffle=True)
 
-			print("Embedding before the robot visuals loop.s")
-			embed()
+			# print("Embedding before the robot visuals loop.s")
+			# embed()
 
 			for j in range(self.N//self.args.batch_size):
 				# i = self.index_list[j]
@@ -939,7 +939,9 @@ class PolicyManager_BaseClass():
 		# 2) Feed Z into policy, rollout trajectory.
 		########################################
 
-		print("Rollout length:", trajectory.shape[0])		
+		print("Rollout length:", trajectory.shape[0])
+		self.visualizer.create_environment(task_id=env_name)
+
 		trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq, original_trajectory=trajectory)
 
 		########################################
@@ -1273,7 +1275,7 @@ class PolicyManager_BaseClass():
 		#######################################################################
 
 		# Initialize extent as self.extent
-		extent = self.extent
+		# extent = self.extent
 		index_range = np.arange(0,extent)
 
 		# print("Starting task based shuffling")
@@ -1569,10 +1571,8 @@ class PolicyManager_BaseClass():
 		# 	self.random_shuffle(extent)
 
 		# Task based shuffling.
-		elif self.args.task_discriminability or self.args.task_based_supervision or self.args.task_based_shuffling:			
-			if not(self.already_shuffled):
-				self.task_based_shuffling(extent=extent,shuffle=shuffle)				
-				self.already_shuffled = 1				
+		elif self.args.task_discriminability or self.args.task_based_supervision or self.args.task_based_shuffling:						
+			self.task_based_shuffling(extent=extent,shuffle=shuffle)							
 						
 		# Random shuffling.
 		else:
