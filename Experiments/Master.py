@@ -48,7 +48,11 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	elif args.data=='RoboturkObjects':
 		dataset = Roboturk_DataLoader.Roboturk_ObjectDataset(args)
 	elif args.data=='RoboturkRobotObjects':
-		dataset = Roboturk_DataLoader.Roboturk_RobotObjectDataset(args)		
+		dataset = Roboturk_DataLoader.Roboturk_RobotObjectDataset(args)	
+	elif args.data=='RoboturkMultiObjects':
+		dataset = Roboturk_DataLoader.Roboturk_MultiObjectDataset(args)	
+	elif args.data=='RoboturkRobotMultiObjects':
+		dataset = Roboturk_DataLoader.Roboturk_RobotMultiObjectDataset(args)	
 	############################
 	elif args.data=='Mocap':
 		dataset = Mocap_DataLoader.Mocap_Dataset(args)

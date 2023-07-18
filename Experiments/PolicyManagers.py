@@ -28,7 +28,8 @@ global global_dataset_list
 global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk', \
 			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', \
       		'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', 'DexMV', 'DexMVHand', 'DexMVObject', \
-			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects']
+			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects', \
+			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects']
 
 class PolicyManager_BaseClass():
 
@@ -2005,6 +2006,19 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# 	self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
 			# 	self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 
+		elif self.args.data in ['RoboturkRobotMultiObjects', 'RoboMimiRobotMultiObjects']:
+
+			# Set state size to 7 for now; because we're not using the relative pose.
+			self.state_size = 22
+			self.state_dim = 22
+
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 50			
+
 		# Training parameters. 		
 		self.baseline_value = 0.
 		self.beta_decay = 0.9
@@ -3687,9 +3701,16 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 				#############################
 
 				for b in range(self.args.batch_size):
-					
+
+					# First visualize ground truth gif. 					
 					self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 					
+					# Now visualize rollout. 
+					
+
+					# Copy it to global lists.
+					self.gt_gif_list.append(copy.deepcopy(self.ground_truth_gif))
+					self.rollout_gif_list.append(copy.deepcopy(self.rollout_gif))
 
 
 			# Get MIME embedding for rollout and GT trajectories, with same Z embedding. 

@@ -459,6 +459,10 @@ class Robomimic_ObjectDataset(Robomimic_Dataset):
 
 		super(Robomimic_ObjectDataset, self).__init__(args)
 
+	def super_getitem(self, index):
+
+		return super().__getitem__(index)
+
 	def __getitem__(self, index):
 		
 		data_element = copy.deepcopy(super().__getitem__(index))
@@ -480,14 +484,16 @@ class Robomimic_RobotObjectDataset(Robomimic_Dataset):
 
 		super(Robomimic_RobotObjectDataset, self).__init__(args)
 
+	def super_getitem(self, index):
+
+		return super().__getitem__(index)
+
 	def __getitem__(self, index):
 
 		data_element = copy.deepcopy(super().__getitem__(index))
 
 		# Now concatenate the robot and object states. 
 		# if data_element['demo'].shape[-1]==15:
-		# 	print("embedding in dataset getitem")
-		# 	embed()
 
 		# print("######################")
 		# print(data_element['task-id'])

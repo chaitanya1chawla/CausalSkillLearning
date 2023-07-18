@@ -1227,31 +1227,6 @@ class RoboturkObjectVisualizer(object):
 		self.environment = self.environment_dict[task_id]
 		self.environment.reset()
 
-	# def create_environment(self, task_id=None):
-
-	# 	print("Creating environment for task: ",task_id)
-	# 	self.task_id = task_id
-
-
-	# 	import robosuite, threading
-	# 	if float(robosuite.__version__[:3])<1.:
-	# 		self.new_robosuite = 0
-	# 		self.base_env = robosuite.make(task_id,has_renderer=self.has_display,camera_height=600,camera_width=600,camera_name='vizview1',just_objects=self.just_objects)
-	# 		from robosuite.wrappers import IKWrapper					
-	# 		self.sawyer_IK_object = IKWrapper(self.base_env)
-	# 		self.environment = self.sawyer_IK_object.env
-	# 		self.gripper_key = 'gripper_qpos'
-	# 		self.image_key = 'image'
-	# 	else:
-	# 		self.controller_config = robosuite.load_controller_config(default_controller='JOINT_POSITION')
-	# 		self.controller_config['kp'] = 20000
-	# 		self.new_robosuite = 1
-	# 		task_id_wo_robot_name = task_id.lstrip("Sawyer")
-	# 		self.base_env = robosuite.make(task_id_wo_robot_name,robots=['Sawyer'],has_renderer=self.has_display,camera_heights=600,camera_widths=600,camera_names='vizview1',controller_configs=self.controller_config)
-	# 		self.sawyer_IK_object = None
-	# 		self.environment = self.base_env	
-	# 		self.gripper_key = 'robot0_gripper_qpos'
-	# 		self.image_key = 'vizview1_image'						
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 
@@ -1320,7 +1295,40 @@ class RoboturkRobotObjectVisualizer(RoboturkObjectVisualizer):
 			env.set_robot_joint_positions(pose[:7])
 		else:
 			env.robots[0].set_robot_joint_positions(pose[:7])
-	
+
+class RoboturkRobotMultiObjectvisualizer(RoboturkRobotObjectVisualizer):
+
+	def __init__(self, has_display=False, args=None):
+
+		super(RoboturkRobotMultiObjectVisualizer, self).__init__(has_display=has_display, args=args, just_objects=False)
+
+	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
+
+		############################
+		# Set object pose.
+		############################
+
+		# Assume last seven elements of pose are the actual pose.
+		# object_position = pose[8:]
+		# object_orientation = pose[-4:]
+
+		self.set_object_pose(object_position, object_orientation, env=env)
+		
+
+		############################
+		# Set robot pose.
+		############################
+
+		if env is None:
+			env = self.environment
+
+		# Assumes the  first seven elements are the robot pose.
+		if self.new_robosuite==0:
+			env.set_robot_joint_positions(pose[:7])
+		else:
+			env.robots[0].set_robot_joint_positions(pose[:7])
+
+
 class RoboMimicObjectVisualizer(object):
 
 	def __init__(self, has_display=False, args=None, just_objects=True):
@@ -1402,8 +1410,7 @@ class RoboMimicObjectVisualizer(object):
 			self.sawyer_IK_object = None
 			self.environment_dict[env_name] = self.base_env
 			self.gripper_key = 'robot0_gripper_qpos'
-			self.image_key = 'vizview1_image'					
-				
+			self.image_key = 'vizview1_image'								
 
 	def create_environment(self, task_id=None):
 		self.task_id = task_id
