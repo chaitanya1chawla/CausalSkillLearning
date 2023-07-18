@@ -474,7 +474,12 @@ class Robomimic_ObjectDataset(Robomimic_Dataset):
 		# Also try ignoring the relative positions for now.
 		# print("Embedding in get el")
 		# embed()
-		data_element['demo'] = data_element['object-state'][:,:7]
+		if self.args.object_pure_relative_state:
+			start_index = 7
+		else:
+			start_index = 0
+
+		data_element['demo'] = data_element['object-state'][:,start_index:start_index+7]
 
 		return data_element
 
@@ -499,7 +504,12 @@ class Robomimic_RobotObjectDataset(Robomimic_Dataset):
 		# print(data_element['task-id'])
 		# print("SHAPE OF 1st DEMO",data_element['demo'].shape)
 		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
-		demo = np.concatenate([data_element['demo'],data_element['object-state'][:,:7]],axis=-1)
+		if self.args.object_pure_relative_state:
+			start_index = 7
+		else:
+			start_index = 0
+		
+		demo = np.concatenate([data_element['demo'],data_element['object-state'][:,start_index:start_index+7]],axis=-1)
 		data_element['demo'] = copy.deepcopy(demo)
 
 		# print("SHAPE OF 2nd DEMO",data_element['demo'].shape)

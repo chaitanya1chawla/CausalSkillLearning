@@ -669,7 +669,13 @@ class Roboturk_ObjectDataset(Roboturk_NewSegmentedDataset):
 		# Also try ignoring the relative positions for now.
 		# print("Embedding in get el")
 		# embed()
-		data_element['demo'] = data_element['object-state'][:,:7]
+
+		if self.args.object_pure_relative_state:
+			start_index = 7
+		else:
+			start_index = 0
+
+		data_element['demo'] = data_element['object-state'][:,start_index:start_index+7]
 
 		return data_element
 
@@ -693,56 +699,18 @@ class Roboturk_RobotObjectDataset(Roboturk_NewSegmentedDataset):
 		# print(data_element['task-id'])
 		# print("SHAPE OF 1st DEMO",data_element['demo'].shape)
 		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
-		demo = np.concatenate([data_element['demo'],data_element['object-state'][:,:7]],axis=-1)
+
+		if self.args.object_pure_relative_state:
+			start_index = 7
+		else:
+			start_index = 0
+		
+		demo = np.concatenate([data_element['demo'],data_element['object-state'][:,start_index:start_index+7]],axis=-1)
 		data_element['demo'] = copy.deepcopy(demo)
 
 		# print("SHAPE OF 2nd DEMO",data_element['demo'].shape)
 
 		return data_element
-
-class Roboturk_MultiObjectDataset(Roboturk_NewSegmentedDataset):
-
-	def __init__(self, args):
-
-		super(Roboturk_MultiObjectDataset, self).__init__(args)
-
-	def __getitem__(self, index):
-
-		data_element = copy.deepcopy(super().__getitem__(index))
-
-		# Copy over the demo to the robot-demo key.
-		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
-
-		# Pad the object-state to max dimension across tasks. 
-		# turns out everything is the same size in Rturk.
-		# Set demo to padded object-state trajectory. 
-		data_element['demo'] = data_element['object-state']
-
-		return data_element
-
-class Roboturk_RobotMultiObjectDataset(Roboturk_RobotObjectDataset):
-
-	def __init__(self, args):
-
-		super(Roboturk_RobotMultiObjectDataset, self).__init__(args)
-
-	def __getitem__(self, index):
-
-		data_element = copy.deepcopy(super().__getitem__(index))
-
-		# Now concatenate the robot and object states. 
-		# if data_element['demo'].shape[-1]==15:
-		# print("######################")
-		# print(data_element['task-id'])
-		# print("SHAPE OF 1st DEMO",data_element['demo'].shape)
-		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
-		demo = np.concatenate([data_element['demo'],data_element['object-state']],axis=-1)
-		data_element['demo'] = copy.deepcopy(demo)
-
-		# print("SHAPE OF 2nd DEMO",data_element['demo'].shape)
-
-		return data_element
-
 
 class Roboturk_Dataloader_Tester(unittest.TestCase):
 	

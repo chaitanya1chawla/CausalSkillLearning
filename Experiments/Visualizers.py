@@ -1127,10 +1127,35 @@ class RoboturkObjectVisualizer(object):
 		default_task_id = "SawyerViz"
 		# self.create_environment(task_id=default_task_id)
 		self.create_env_set()
+	
+	def retrieve_absolute_object_state(self, relative_pose=None):
+
+		import robosuite.utils.transform_utils as RTU
 		
+		# Construct homogenous pose matrix for relative state. 
+		relative_pose_matrix = RTU.pose2mat(relative_pose)
+
+		# Construct eef pose. 
+		# Get robot eef state first. 
+		obs = self.environment._get_observations()
+		robot_eef_pose = (robot_eef_pos = obs['robot0_eef_pos'], robot_eef_quat = obs['robot0_eef_quat'])
+		# Construct homogenous pose matrix for robot eef state. 
+		robot_eef_pose_matrix = RTU.pose2mat(robot_eef_pose)
+
+		# Get absolute object state matrix. 
+		object_pose_matrix = RTU.pose_in_A_to_pose_in_B(relative_pose_matrix, robot_eef_pose_matrix)
+		# Get absolute object pose. 
+		object_pose = RTU.mat2pose(object_pose_matrix)
+		
+		return object_pose	
 
 	def set_object_pose(self, position, orientation, env=None):
 
+		if self.args.object_pure_relative_state:
+			
+			absolute_object_pose = self.retrieve_absolute_object_state(relative_pose=(position, orientation))
+			position, orientation = absolute_object_pose
+			
 		if self.new_robosuite:
 			joint_name_suffix = "_joint0"
 			if "PickPlace" in self.task_id:
@@ -1152,6 +1177,7 @@ class RoboturkObjectVisualizer(object):
 
 		# Reorient. 
 		new_orientation = np.roll(orientation,1)
+
 		# Rebuild pose. 
 		pose = np.concatenate((position, new_orientation))
 		
@@ -1227,7 +1253,6 @@ class RoboturkObjectVisualizer(object):
 		self.environment = self.environment_dict[task_id]
 		self.environment.reset()
 
-
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 
 		image_list = []
@@ -1258,7 +1283,6 @@ class RoboturkObjectVisualizer(object):
 			# imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
 			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
 
-
 	def visualize_prerendered_gif(self, image_list=None, gif_path=None, gif_name="Traj.gif"):
 		
 		for k,v in enumerate(image_list):
@@ -1274,6 +1298,19 @@ class RoboturkRobotObjectVisualizer(RoboturkObjectVisualizer):
 	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
 
 		############################
+		# Set robot pose.
+		############################
+
+		if env is None:
+			env = self.environment
+
+		# Assumes the  first seven elements are the robot pose.
+		if self.new_robosuite==0:
+			env.set_robot_joint_positions(pose[:7])
+		else:
+			env.robots[0].set_robot_joint_positions(pose[:7])
+
+		############################
 		# Set object pose.
 		############################
 
@@ -1283,50 +1320,6 @@ class RoboturkRobotObjectVisualizer(RoboturkObjectVisualizer):
 
 		self.set_object_pose(object_position, object_orientation, env=env)
 		
-		############################
-		# Set robot pose.
-		############################
-
-		if env is None:
-			env = self.environment
-
-		# Assumes the  first seven elements are the robot pose.
-		if self.new_robosuite==0:
-			env.set_robot_joint_positions(pose[:7])
-		else:
-			env.robots[0].set_robot_joint_positions(pose[:7])
-
-class RoboturkRobotMultiObjectvisualizer(RoboturkRobotObjectVisualizer):
-
-	def __init__(self, has_display=False, args=None):
-
-		super(RoboturkRobotMultiObjectVisualizer, self).__init__(has_display=has_display, args=args, just_objects=False)
-
-	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
-
-		############################
-		# Set object pose.
-		############################
-
-		# Assume last seven elements of pose are the actual pose.
-		# object_position = pose[8:]
-		# object_orientation = pose[-4:]
-
-		self.set_object_pose(object_position, object_orientation, env=env)
-		
-
-		############################
-		# Set robot pose.
-		############################
-
-		if env is None:
-			env = self.environment
-
-		# Assumes the  first seven elements are the robot pose.
-		if self.new_robosuite==0:
-			env.set_robot_joint_positions(pose[:7])
-		else:
-			env.robots[0].set_robot_joint_positions(pose[:7])
 
 
 class RoboMimicObjectVisualizer(object):
@@ -1341,7 +1334,36 @@ class RoboMimicObjectVisualizer(object):
 		self.create_env_set()
 		self.image_size = 600
 
+	def retrieve_absolute_object_state(self, relative_pose=None):
+
+		import robosuite.utils.transform_utils as RTU
+		
+		# Construct homogenous pose matrix for relative state. 
+		relative_pose_matrix = RTU.pose2mat(relative_pose)
+
+		# Construct eef pose. 
+		# Get robot eef state first. 
+		obs = self.environment._get_observations()
+
+		# ASSUMES THAT THE ROBOT POSE IS SET BEFORE OBJECT POSE.
+		robot_eef_pose = (robot_eef_pos = obs['robot0_eef_pos'], robot_eef_quat = obs['robot0_eef_quat'])
+		# Construct homogenous pose matrix for robot eef state. 
+		robot_eef_pose_matrix = RTU.pose2mat(robot_eef_pose)
+
+		# Get absolute object state matrix. 
+		object_pose_matrix = RTU.pose_in_A_to_pose_in_B(relative_pose_matrix, robot_eef_pose_matrix)
+		# Get absolute object pose. 
+		object_pose = RTU.mat2pose(object_pose_matrix)
+		
+		return object_pose	
+
 	def set_object_pose(self, position, orientation, env=None):
+
+		if self.args.object_pure_relative_state:
+			
+			absolute_object_pose = self.retrieve_absolute_object_state(relative_pose=(position, orientation))
+			position, orientation = absolute_object_pose
+			
 
 		joint_name_suffix = "_joint0"
 
@@ -1416,34 +1438,7 @@ class RoboMimicObjectVisualizer(object):
 		self.task_id = task_id
 		self.environment = self.environment_dict[task_id]
 		self.environment.reset()
-
-
-	# def create_environment(self, task_id=None):
-
-	# 	print("Creating environment for task: ",task_id)
-
-	# 	self.task_id = task_id
-	# 	import robosuite, threading
-	# 	if float(robosuite.__version__[:3])<1.:
-	# 		self.new_robosuite = 0
-	# 		self.base_env = robosuite.make(task_id,has_renderer=self.has_display,camera_height=600,camera_width=600,camera_name='vizview1',just_objects=self.just_objects)
-	# 		from robosuite.wrappers import IKWrapper					
-	# 		self.sawyer_IK_object = IKWrapper(self.base_env)
-	# 		self.environment = self.sawyer_IK_object.env
-	# 		self.gripper_key = 'gripper_qpos'
-	# 		self.image_key = 'image'
-	# 	else:
-	# 		self.controller_config = robosuite.load_controller_config(default_controller='JOINT_POSITION')
-	# 		self.controller_config['kp'] = 20000
-	# 		self.new_robosuite = 1
-	# 		# task_id_wo_robot_name = task_id.lstrip("Sawyer")
-	# 		task_id_wo_robot_name = task_id			
-	# 		self.base_env = robosuite.make(task_id_wo_robot_name,robots=['Panda'],has_renderer=self.has_display,camera_heights=600,camera_widths=600,camera_names='vizview1',controller_configs=self.controller_config)
-	# 		self.sawyer_IK_object = None
-	# 		self.environment = self.base_env	
-	# 		self.gripper_key = 'robot0_gripper_qpos'
-	# 		self.image_key = 'vizview1_image'						
-
+				
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
 
 		image_list = []
@@ -1489,16 +1484,6 @@ class RoboMimicRobotObjectVisualizer(RoboMimicObjectVisualizer):
 	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
 
 		############################
-		# Set object pose.
-		############################
-
-		# Assume last seven elements of pose are the actual pose.
-		object_position = pose[-7:-4]
-		object_orientation = pose[-4:]
-
-		self.set_object_pose(object_position, object_orientation, env=env)
-		
-		############################
 		# Set robot pose.
 		############################
 
@@ -1511,6 +1496,15 @@ class RoboMimicRobotObjectVisualizer(RoboMimicObjectVisualizer):
 		else:
 			env.robots[0].set_robot_joint_positions(pose[:7])
 
+		############################
+		# Set object pose.
+		############################
+
+		# Assume last seven elements of pose are the actual pose.
+		object_position = pose[-7:-4]
+		object_orientation = pose[-4:]
+
+		self.set_object_pose(object_position, object_orientation, env=env)	
 
 class ToyDataVisualizer():
 
