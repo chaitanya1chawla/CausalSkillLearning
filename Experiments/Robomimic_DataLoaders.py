@@ -537,39 +537,6 @@ class Robomimic_RobotObjectDataset(Robomimic_Dataset):
 
 		return super().__getitem__(index)
 
-	def compute_relative_object_state(self, data_element):
-
-		############################################
-		# Now add our own computed relative quaterion if the ENV is Lift.
-		############################################
-				
-		import robosuite
-		import robosuite.utils.transform_utils as RTU			
-		env = robosuite.make("Lift", robots=['Panda'], has_renderer=False)
-		env.reset()
-		object_quat_traj = np.zeros((data_element['robot-demo'].shape[0],4))
-
-		print("Generating relative state quat.")
-		for k in range(data_element['robot-demo'].shape[0]):				
-			# Set pose.
-			# env.reset()
-			env.robots[0].set_robot_joint_positions(data_element['robot-demo'][k,:7])
-			env.sim.forward()
-			obs = env._get_observations()
-			
-			# Get eef pose. 
-			robot_eef_quat = obs['robot0_eef_quat']
-			
-			# Get obj pose. 
-			abs_object_quat = data_element['object-state'][k,3:7]
-			
-			# Get relative quat. 					
-			object_quat_traj[k] = RTU.quat_multiply(robot_eef_quat, abs_object_quat)
-
-		return object_quat_traj
-			
-		############################################
-		############################################
 
 	def __getitem__(self, index):
 
@@ -587,18 +554,6 @@ class Robomimic_RobotObjectDataset(Robomimic_Dataset):
 
 		object_traj = data_element['object-state'][:,start_index:start_index+7]
 		
-		############################################		
-		if self.args.object_pure_relative_state and data_element['environment-name'] in ['Lift']:
-			print("Embedding before quat gen")
-			embed()
-
-			object_quat_traj = self.compute_relative_object_state(data_element)
-			
-			object_traj = np.concatenate([object_traj, object_quat_traj], axis=-1)
-
-		############################################
-
-
 		demo = np.concatenate([data_element['demo'],object_traj],axis=-1)
 		data_element['demo'] = copy.deepcopy(demo)
 

@@ -113,10 +113,7 @@ class Master():
 		if self.args.setting not in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 			print("Creating Datasets")			
 			self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)			
-			
-			print("Embed after create dataset")
-			embed()	
-			
+
 		# Now define policy manager.
 		if self.args.setting=='learntsub' or self.args.setting=='joint':
 			# self.policy_manager = PolicyManager_BatchJoint(self.args.number_policies, self.dataset, self.args)
