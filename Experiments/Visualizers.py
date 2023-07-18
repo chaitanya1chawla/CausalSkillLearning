@@ -1138,7 +1138,7 @@ class RoboturkObjectVisualizer(object):
 		# Construct eef pose. 
 		# Get robot eef state first. 
 		obs = self.environment._get_observations()
-		robot_eef_pose = (robot_eef_pos = obs['robot0_eef_pos'], robot_eef_quat = obs['robot0_eef_quat'])
+		robot_eef_pose = (obs['robot0_eef_pos'], obs['robot0_eef_quat'])
 		# Construct homogenous pose matrix for robot eef state. 
 		robot_eef_pose_matrix = RTU.pose2mat(robot_eef_pose)
 
@@ -1346,7 +1346,7 @@ class RoboMimicObjectVisualizer(object):
 		obs = self.environment._get_observations()
 
 		# ASSUMES THAT THE ROBOT POSE IS SET BEFORE OBJECT POSE.
-		robot_eef_pose = (robot_eef_pos = obs['robot0_eef_pos'], robot_eef_quat = obs['robot0_eef_quat'])
+		robot_eef_pose = (obs['robot0_eef_pos'], obs['robot0_eef_quat'])
 		# Construct homogenous pose matrix for robot eef state. 
 		robot_eef_pose_matrix = RTU.pose2mat(robot_eef_pose)
 

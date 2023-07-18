@@ -87,7 +87,7 @@ class OrigRobomimic_Dataset(Dataset):
 		for i in range(len(self.task_list)):
 			# Changing file name.
 			# self.files.append(h5py.File("{0}/{1}/demo.hdf5".format(self.dataset_directory,self.task_list[i]),'r'))
-			self.files.append(h5py.File("{0}/{1}/ph/low_dim.hdf5".format(self.dataset_directory,self.task_list[i]),'r'))
+			self.files.append(h5py.File("{0}/{1}/ph/low_dim.hdf5".format(self.dataset_directory,	self.task_list[i]),'r'))
 
 	def __len__(self):
 		return self.total_length
@@ -167,13 +167,49 @@ class OrigRobomimic_Dataset(Dataset):
 		# return data_element
 
 		return {}
+	
+	def create_env(self):
+		import robosuite
 		
+		self.env = robosuite.make("Lift", robots=['Panda'], has_renderer=False)
+		self.env.reset()
+
+	def compute_relative_object_state(self, robot_state_sequence, object_state_sequence):
+
+		############################################
+		# Now add our own computed relative quaterion if the ENV is Lift.
+		############################################
+		import robosuite.utils.transform_utils as RTU					
+
+		object_quat_traj = np.zeros((object_state_sequence.shape[0],4))
+
+		print("Generating relative state quat.")
+		for k in range(robot_state_sequence.shape[0]):				
+			# Set pose.
+			# env.reset()
+			self.env.robots[0].set_robot_joint_positions(robot_state_sequence[k,:7])
+			self.env.sim.forward()
+			obs = self.env._get_observations()
+			
+			# Get eef pose. 
+			robot_eef_quat = obs['robot0_eef_quat']
+			
+			# Get obj pose. 
+			abs_object_quat = object_state_sequence[k,3:7]
+			
+			# Get relative quat. 					
+			object_quat_traj[k] = RTU.quat_multiply(robot_eef_quat, abs_object_quat)
+
+		return object_quat_traj
+
 	def preprocess_dataset(self):
 
 		min_lengths = np.ones((4))*1000
 		max_lengths = np.zeros((4))
 
 		for task_index in range(len(self.task_list)):
+		# for task_index in [1]:
+
 
 			print("#######################################")
 			print("Preprocessing task index: ", task_index)
@@ -192,9 +228,13 @@ class OrigRobomimic_Dataset(Dataset):
 			# robot_state_size = obs['robot-state'].shape[0]
 			# object_state_size = obs['object-state'].shape[0]	
 
+			
 			# Just get robot state size and object state size, from the demonstration of this task. 
 			object_state_size = self.files[task_index]['data/demo_0/obs/object'].shape[1]
 			robot_state_size = self.files[task_index]['data/demo_0/obs/robot0_joint_pos'].shape[1]
+		
+
+			self.create_env()
 
 			# Create list of files for this task. 
 			task_demo_list = []		
@@ -242,6 +282,9 @@ class OrigRobomimic_Dataset(Dataset):
 				concatenated_demonstration = np.concatenate([robot_state_sequence,gripper_values.reshape((-1,1))],axis=1)
 				concatenated_actions = np.concatenate([joint_action_sequence,gripper_action_sequence],axis=1)
 
+				# object_quat_traj = self.compute_relative_object_state(robot_state_sequence, object_state_sequence)
+				# object_state_sequence = np.concatenate([object_state_sequence, object_quat_traj],axis=-1)
+
 				# Put both lists in a dictionary.
 				datapoint['flat-state'] = flattened_state_sequence
 				datapoint['robot-state'] = robot_state_sequence
@@ -257,6 +300,7 @@ class OrigRobomimic_Dataset(Dataset):
 
 			# Now save this file_demo_list. 
 			np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array.npy"),task_demo_array)
+			# np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array_LiftObjectQuat.npy"),task_demo_array)
 
 		for j in range(4):
 			print("Lengths:", j, min_lengths[j], max_lengths[j])
@@ -493,23 +537,69 @@ class Robomimic_RobotObjectDataset(Robomimic_Dataset):
 
 		return super().__getitem__(index)
 
+	def compute_relative_object_state(self, data_element):
+
+		############################################
+		# Now add our own computed relative quaterion if the ENV is Lift.
+		############################################
+				
+		import robosuite
+		import robosuite.utils.transform_utils as RTU			
+		env = robosuite.make("Lift", robots=['Panda'], has_renderer=False)
+		env.reset()
+		object_quat_traj = np.zeros((data_element['robot-demo'].shape[0],4))
+
+		print("Generating relative state quat.")
+		for k in range(data_element['robot-demo'].shape[0]):				
+			# Set pose.
+			# env.reset()
+			env.robots[0].set_robot_joint_positions(data_element['robot-demo'][k,:7])
+			env.sim.forward()
+			obs = env._get_observations()
+			
+			# Get eef pose. 
+			robot_eef_quat = obs['robot0_eef_quat']
+			
+			# Get obj pose. 
+			abs_object_quat = data_element['object-state'][k,3:7]
+			
+			# Get relative quat. 					
+			object_quat_traj[k] = RTU.quat_multiply(robot_eef_quat, abs_object_quat)
+
+		return object_quat_traj
+			
+		############################################
+		############################################
+
 	def __getitem__(self, index):
 
 		data_element = copy.deepcopy(super().__getitem__(index))
 
-		# Now concatenate the robot and object states. 
-		# if data_element['demo'].shape[-1]==15:
-
 		# print("######################")
-		# print(data_element['task-id'])
-		# print("SHAPE OF 1st DEMO",data_element['demo'].shape)
+		# print("Embed in GI")
+		# embed()
+
 		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
 		if self.args.object_pure_relative_state:
 			start_index = 7
 		else:
 			start_index = 0
+
+		object_traj = data_element['object-state'][:,start_index:start_index+7]
 		
-		demo = np.concatenate([data_element['demo'],data_element['object-state'][:,start_index:start_index+7]],axis=-1)
+		############################################		
+		if self.args.object_pure_relative_state and data_element['environment-name'] in ['Lift']:
+			print("Embedding before quat gen")
+			embed()
+
+			object_quat_traj = self.compute_relative_object_state(data_element)
+			
+			object_traj = np.concatenate([object_traj, object_quat_traj], axis=-1)
+
+		############################################
+
+
+		demo = np.concatenate([data_element['demo'],object_traj],axis=-1)
 		data_element['demo'] = copy.deepcopy(demo)
 
 		# print("SHAPE OF 2nd DEMO",data_element['demo'].shape)
