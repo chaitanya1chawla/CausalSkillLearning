@@ -1319,8 +1319,6 @@ class RoboturkRobotObjectVisualizer(RoboturkObjectVisualizer):
 		object_orientation = pose[-4:]
 
 		self.set_object_pose(object_position, object_orientation, env=env)
-		
-
 
 class RoboMimicObjectVisualizer(object):
 
@@ -1364,7 +1362,6 @@ class RoboMimicObjectVisualizer(object):
 			absolute_object_pose = self.retrieve_absolute_object_state(relative_pose=(position, orientation))
 			position, orientation = absolute_object_pose
 			
-
 		joint_name_suffix = "_joint0"
 
 		if env is None:
