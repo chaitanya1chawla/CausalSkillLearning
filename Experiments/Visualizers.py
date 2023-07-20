@@ -1137,10 +1137,19 @@ class RoboturkObjectVisualizer(object):
 
 		# Construct eef pose. 
 		# Get robot eef state first. 
-		obs = self.environment._get_observations()
-		robot_eef_pose = (obs['robot0_eef_pos'], obs['robot0_eef_quat'])
+		if self.new_robosuite:
+			obs = self.environment._get_observations()			
+			robot_eef_pose = (obs['robot0_eef_pos'], obs['robot0_eef_quat'])
+		else:
+			obs = self.environment.observation_spec()
+			robot_eef_pose = (obs['eef_pos'], obs['eef_quat'])
+			
+		
 		# Construct homogenous pose matrix for robot eef state. 
 		robot_eef_pose_matrix = RTU.pose2mat(robot_eef_pose)
+
+		# Because this is new robosuite, this is already offset.
+		# The relative state is doesn't need to be offset... 
 
 		# Get absolute object state matrix. 
 		object_pose_matrix = RTU.pose_in_A_to_pose_in_B(relative_pose_matrix, robot_eef_pose_matrix)
@@ -1155,16 +1164,18 @@ class RoboturkObjectVisualizer(object):
 			
 			absolute_object_pose = self.retrieve_absolute_object_state(relative_pose=(position, orientation))
 			position, orientation = absolute_object_pose
-			
+	
 		if self.new_robosuite:
 			joint_name_suffix = "_joint0"
-			if "PickPlace" in self.task_id:
-				position[0] -= 0.5
-				position[1] -= 0.1
-			elif "NutAssembly" in self.task_id:
-				# position[1] -= 0.15
-				position[0] -= 0.55
-				position[1] -= 0.0
+
+			if not(self.args.object_pure_relative_state):
+				if "PickPlace" in self.task_id:
+					position[0] -= 0.5
+					position[1] -= 0.1
+				elif "NutAssembly" in self.task_id:
+					# position[1] -= 0.15
+					position[0] -= 0.55
+					position[1] -= 0.0
 		else:
 			joint_name_suffix = ""
 
@@ -1238,15 +1249,46 @@ class RoboturkObjectVisualizer(object):
 		import robosuite
 
 		for k, env_name in enumerate(self.environment_names):
-			self.controller_config = robosuite.load_controller_config(default_controller='JOINT_POSITION')
-			self.controller_config['kp'] = 20000
-			self.new_robosuite = 1
-			task_id_wo_robot_name = env_name.lstrip("Sawyer")
-			self.base_env = robosuite.make(task_id_wo_robot_name,robots=['Sawyer'],has_renderer=self.has_display,camera_heights=600,camera_widths=600,camera_names='vizview1',controller_configs=self.controller_config)
-			self.sawyer_IK_object = None
-			self.environment_dict[env_name] = self.base_env
-			self.gripper_key = 'robot0_gripper_qpos'
-			self.image_key = 'vizview1_image'					
+
+
+			if float(robosuite.__version__[:3])<1.:
+				self.new_robosuite = 0
+				self.base_env = robosuite.make(env_name,has_renderer=self.has_display,camera_height=600,camera_width=600,camera_name='vizview1',just_objects=self.just_objects)
+				from robosuite.wrappers import IKWrapper					
+				self.sawyer_IK_object = IKWrapper(self.base_env)
+				self.environment_dict[env_name] = self.sawyer_IK_object.env
+				self.gripper_key = 'gripper_qpos'
+				self.image_key = 'image'
+			else:
+				self.controller_config = robosuite.load_controller_config(default_controller='JOINT_POSITION')
+				self.controller_config['kp'] = 20000
+				self.new_robosuite = 1
+				task_id_wo_robot_name = env_name.lstrip("Sawyer")
+				self.base_env = robosuite.make(task_id_wo_robot_name,robots=['Sawyer'],has_renderer=self.has_display,camera_heights=600,camera_widths=600,camera_names='vizview1',controller_configs=self.controller_config)
+				self.sawyer_IK_object = None
+				self.environment_dict[env_name] = self.base_env
+				self.gripper_key = 'robot0_gripper_qpos'
+				self.image_key = 'vizview1_image'					
+
+			# import robosuite, threading
+			# if float(robosuite.__version__[:3])<1.:
+			# 	self.new_robosuite = 0
+			# 	self.base_env = robosuite.make(task_id,has_renderer=self.has_display,camera_height=600,camera_width=600,camera_name='vizview1',just_objects=self.just_objects)
+			# 	from robosuite.wrappers import IKWrapper					
+			# 	self.sawyer_IK_object = IKWrapper(self.base_env)
+			# 	self.environment = self.sawyer_IK_object.env
+			# 	self.gripper_key = 'gripper_qpos'
+			# 	self.image_key = 'image'
+			# else:
+			# 	self.controller_config = robosuite.load_controller_config(default_controller='JOINT_POSITION')
+			# 	self.controller_config['kp'] = 20000
+			# 	self.new_robosuite = 1
+			# 	task_id_wo_robot_name = task_id.lstrip("Sawyer")
+			# 	self.base_env = robosuite.make(task_id_wo_robot_name,robots=['Sawyer'],has_renderer=self.has_display,camera_heights=600,camera_widths=600,camera_names='vizview1',controller_configs=self.controller_config)
+			# 	self.sawyer_IK_object = None
+			# 	self.environment = self.base_env	
+			# 	self.gripper_key = 'robot0_gripper_qpos'
+			# 	self.image_key = 'vizview1_image'
 
 	def create_environment(self, task_id=None):
 		self.task_id = task_id
