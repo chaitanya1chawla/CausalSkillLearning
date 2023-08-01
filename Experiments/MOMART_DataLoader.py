@@ -43,8 +43,27 @@ class OrigMOMART_Dataset(Dataset):
 		# ('time','right_j0', 'head_pan', 'right_j1', 'right_j2', 'right_j3', 'right_j4', 'right_j5', 'right_j6', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint', 'Milk0', 'Bread0', 'Cereal0', 'Can0').
 		# Extract these into... 
 
-		self.ds_freq = np.array([ 2.4, 2.4, 2.4, 3.5])
-		# self.ds_freq = 20
+		# Notes about lengths and number of skills. 
+		
+		# Task 1 - setup table from dishwasher. 
+		# Lengths between 656 and 781. 
+		# About 11-12 skills. 
+
+		# Task 2 - Setup table from dresser. 
+		# Lengths between 464 and 604. 
+		# About 14 skills. 
+		
+		# Task 3 - Table cleanup to dishwasher. 
+		# Lengths between 366 and 515. 
+		# About 17 skills. 
+
+		# Task 4 - Table cleanup to sink. 
+		# Lengths between 387 and 633. 
+		# About 13 skills. 
+		# On average, about 15 skills? 
+
+		# self.ds_freq = np.array([ 2.4, 2.4, 2.4, 3.5])		
+		self.ds_freq = 40*np.ones((40))
 
 		# Set files. 
 		self.setup()
@@ -62,156 +81,102 @@ class OrigMOMART_Dataset(Dataset):
 			self.files.append(h5py.File(file,'r'))
 			# self.files.append(h5py.File("{0}/{1}/ph/low_dim.hdf5".format(self.dataset_directory,	self.task_list[i]),'r'))
 
+		self.set_relevant_indices()
+
 	def __len__(self):
 		return self.total_length
 	
 	def __getitem__(self, index):
 
-
-		# if index>=self.total_length:
-		# 	print("Out of bounds of dataset.")
-		# 	return None
-
-		# # Get bucket that index falls into based on num_demos array. 
-		# task_index = np.searchsorted(self.cummulative_num_demos, index, side='right')-1
-		
-		# if index==self.total_length-1:
-		# 	task_index-=1
-
-		# # Decide task ID, and new index modulo num_demos.
-		# # Subtract number of demonstrations in cumsum until then, and then 				
-		# new_index = index-self.cummulative_num_demos[max(task_index,0)]+1
-		
-		# try:
-		# 	# Get raw state sequence. 
-		# 	state_sequence = self.files[task_index]['data/demo_{0}/states'.format(new_index)].value
-
-		# 	##############  
-		# 	##############
-		# 	# TO CHANGE
-		# 	##############
-		# 	# Use self.files[task_index]['data/demo_{0}/obs/robot0_joint_pos']
-		# except:
-		# 	# If this failed, return invalid. 
-		# 	data_element = {}
-		# 	data_element['is_valid'] = False
-
-		# 	return data_element
-
-		# # Performing another check that makes sure data element actually has states.
-		# if state_sequence.shape[0]==0:
-		# 	data_element = {}
-		# 	data_element['is_valid'] = False
-		# 	return data_element
-
-		# # If we are here, the data element is presumably valid till now.
-		# # Get joint angles from this state sequence.
-		# joint_values = state_sequence[:,self.joint_angle_indices]
-		# # Get gripper values from state sequence. 
-		# gripper_finger_values = state_sequence[:,self.gripper_indices]
-
-		# # Normalize gripper values. 
-
-		# # 1 is right finger. 0 is left finger. 
-		# # 1-0 is right-left. 
-		
-		# gripper_values = gripper_finger_values[:,1]-gripper_finger_values[:,0]
-		# gripper_values = (gripper_values-gripper_values.min()) / (gripper_values.max()-gripper_values.min())
-		# gripper_values = 2*gripper_values-1
-
-		# concatenated_demonstration = np.concatenate([joint_values,gripper_values.reshape((-1,1))],axis=1)
-		# downsampled_demonstration = resample(concatenated_demonstration, concatenated_demonstration.shape[0]//self.ds_freq)
-
-		# # Performing another check that makes sure data element actually has states.
-		# if downsampled_demonstration.shape[0]==0:
-		# 	data_element = {}
-		# 	data_element['is_valid'] = False
-		# 	return data_element
-
-		# data_element = {}
-
-		# if self.args.smoothen:
-		# 	data_element['demo'] = gaussian_filter1d(downsampled_demonstration,self.args.smoothing_kernel_bandwidth,axis=0,mode='nearest')
-		# else:
-		# 	data_element['demo'] = downsampled_demonstration
-		# # Trivially setting is valid to true until we come up wiuth a better strategy. 
-		# data_element['is_valid'] = True
-
-		# return data_element
-
 		return {}
 	
-	def create_env(self, task_index):
-		import robosuite
+	# def create_env(self, task_index):
+	# 	import robosuite
 		
-		self.env = robosuite.make(self.environment_names[task_index], robots=['Panda'], has_renderer=False)
-		self.env.reset()
+	# 	self.env = robosuite.make(self.environment_names[task_index], robots=['Panda'], has_renderer=False)
+	# 	self.env.reset()
 
-	def compute_relative_object_state_quat(self, robot_state_sequence, object_state_sequence):
+	# def compute_relative_object_state_quat(self, robot_state_sequence, object_state_sequence):
 
-		############################################
-		# Now add our own computed relative quaterion if the ENV is Lift.
-		############################################
-		import robosuite.utils.transform_utils as RTU					
+	# 	############################################
+	# 	# Now add our own computed relative quaterion if the ENV is Lift.
+	# 	############################################
+	# 	import robosuite.utils.transform_utils as RTU					
 
-		object_quat_traj = np.zeros((object_state_sequence.shape[0],4))
+	# 	object_quat_traj = np.zeros((object_state_sequence.shape[0],4))
 
-		print("Generating relative state quat.")
-		for k in range(robot_state_sequence.shape[0]):				
-			# Set pose.
-			# env.reset()
-			self.env.robots[0].set_robot_joint_positions(robot_state_sequence[k,:7])
-			self.env.sim.forward()
-			obs = self.env._get_observations()
+	# 	print("Generating relative state quat.")
+	# 	for k in range(robot_state_sequence.shape[0]):				
+	# 		# Set pose.
+	# 		# env.reset()
+	# 		self.env.robots[0].set_robot_joint_positions(robot_state_sequence[k,:7])
+	# 		self.env.sim.forward()
+	# 		obs = self.env._get_observations()
 			
-			# Get eef pose. 
-			robot_eef_quat = obs['robot0_eef_quat']
+	# 		# Get eef pose. 
+	# 		robot_eef_quat = obs['robot0_eef_quat']
 			
-			# Get obj pose. 
-			abs_object_quat = object_state_sequence[k,3:7]
+	# 		# Get obj pose. 
+	# 		abs_object_quat = object_state_sequence[k,3:7]
 			
-			# Get relative quat. 					
-			object_quat_traj[k] = RTU.quat_multiply(robot_eef_quat, abs_object_quat)
+	# 		# Get relative quat. 					
+	# 		object_quat_traj[k] = RTU.quat_multiply(robot_eef_quat, abs_object_quat)
 
-		return object_quat_traj
+	# 	return object_quat_traj
 
-	def compute_relative_object_state(self, robot_state_sequence, object_state_sequence):
+	# def compute_relative_object_state(self, robot_state_sequence, object_state_sequence):
 
-		############################################
-		# Now add our own computed relative quaterion if the ENV is Lift.
-		############################################
-		import robosuite.utils.transform_utils as RTU					
+	# 	############################################
+	# 	# Now add our own computed relative quaterion if the ENV is Lift.
+	# 	############################################
+	# 	import robosuite.utils.transform_utils as RTU					
 
-		object_rel_traj = np.zeros((object_state_sequence.shape[0],7))
+	# 	object_rel_traj = np.zeros((object_state_sequence.shape[0],7))
 
-		print("Generating relative state quat.")
-		for k in range(robot_state_sequence.shape[0]):				
-			# Set pose.
-			# env.reset()
-			self.env.robots[0].set_robot_joint_positions(robot_state_sequence[k,:7])
-			self.env.sim.forward()
-			obs = self.env._get_observations()
+	# 	print("Generating relative state quat.")
+	# 	for k in range(robot_state_sequence.shape[0]):				
+	# 		# Set pose.
+	# 		# env.reset()
+	# 		self.env.robots[0].set_robot_joint_positions(robot_state_sequence[k,:7])
+	# 		self.env.sim.forward()
+	# 		obs = self.env._get_observations()
 			
-			# Get eef pose. 
-			robot_eef_quat = obs['robot0_eef_quat']
-			robot_eef_pos = obs['robot0_eef_pos']
-			robot_eef_pose_mat = RTU.pose2mat((robot_eef_pos, robot_eef_quat))
+	# 		# Get eef pose. 
+	# 		robot_eef_quat = obs['robot0_eef_quat']
+	# 		robot_eef_pos = obs['robot0_eef_pos']
+	# 		robot_eef_pose_mat = RTU.pose2mat((robot_eef_pos, robot_eef_quat))
 						
-			# Get obj pose. 
-			abs_object_quat = object_state_sequence[k,3:7]
-			abs_object_pos = object_state_sequence[k,:3]
-			abs_object_pose_mat = RTU.pose2mat((abs_object_pos, abs_object_quat))
+	# 		# Get obj pose. 
+	# 		abs_object_quat = object_state_sequence[k,3:7]
+	# 		abs_object_pos = object_state_sequence[k,:3]
+	# 		abs_object_pose_mat = RTU.pose2mat((abs_object_pos, abs_object_quat))
 
-			# Get relative state.
-			robot_pose_inv = RTU.pose_inv(robot_eef_pose_mat)
-			relative_object_pose_mat = RTU.pose_in_A_to_pose_in_B(abs_object_pose_mat, robot_pose_inv)
-			relative_object_pos, relative_object_quat = RTU.mat2pose(relative_object_pose_mat)
+	# 		# Get relative state.
+	# 		robot_pose_inv = RTU.pose_inv(robot_eef_pose_mat)
+	# 		relative_object_pose_mat = RTU.pose_in_A_to_pose_in_B(abs_object_pose_mat, robot_pose_inv)
+	# 		relative_object_pos, relative_object_quat = RTU.mat2pose(relative_object_pose_mat)
 				
-			# Get relative quat. 					
-			object_rel_traj[k,:3] = relative_object_pos
-			object_rel_traj[k,3:] = relative_object_quat
+	# 		# Get relative quat. 					
+	# 		object_rel_traj[k,:3] = relative_object_pos
+	# 		object_rel_traj[k,3:] = relative_object_quat
 
-		return object_rel_traj
+	# 	return object_rel_traj
+
+	def set_relevant_indices(self):
+
+		# Robot state in state. 
+		# Lets say X is full state ['data/demo_#/states'][t]
+		# Base_pos is X[-66:-63]
+		# Base_quad is X[-63:-59]
+		# Some 6D stuff in the middle, dunno what this is. 
+		# Robot joints is X[-53:-39]
+		# This includes gripper, dunno what some middle stuff is. 
+		# Object pos is X[-39:-36].
+		# Object pos is X[-36:-32], but is just normalized quat 0 0 1 1.
+		
+		self.robot_pose_indices = np.concatenate([ np.arange(440,447),
+				    						np.arange(453,467) ])
+		self.object_pose_indices = np.arange(467,474)		
 
 	def preprocess_dataset(self):
 
@@ -225,27 +190,10 @@ class OrigMOMART_Dataset(Dataset):
 			print("#######################################")
 			print("Preprocessing task index: ", task_index)
 			print("#######################################")
-
-			# # Get the name of environment.
-			# import json
-			# environment_meta_dict = json.loads(self.files[task_index]['data'].attrs['env_args'])
-			# environment_name = environment_meta_dict['env_name']
-
-			# # Create an actual robo-suite environment. 
-			# self.env = robosuite.make(environment_name)
-
-			# # Get sizes. 
-			# obs = self.env._get_observation()
-			# robot_state_size = obs['robot-state'].shape[0]
-			# object_state_size = obs['object-state'].shape[0]	
-
-			
-			# Just get robot state size and object state size, from the demonstration of this task. 
-			object_state_size = self.files[task_index]['data/demo_0/obs/object'].shape[1]
-			robot_state_size = self.files[task_index]['data/demo_0/obs/robot0_joint_pos'].shape[1]
-		
-
-			self.create_env(task_index=task_index)
+	
+			# # Just get robot state size and object state size, from the demonstration of this task. 			
+			# object_state_size = self.files[task_index]['data/demo_0/obs/object'].shape[1]
+			# robot_state_size = self.files[task_index]['data/demo_0/obs/robot0_joint_pos'].shape[1]	
 
 			# Create list of files for this task. 
 			task_demo_list = []		
@@ -259,13 +207,13 @@ class OrigMOMART_Dataset(Dataset):
 				# Create list of datapoints for this demonstrations. 
 				datapoint = {}
 				
+				print("Embed in preproc")
+				embed()
+				
 				# Get SEQUENCE of flattened states.
 				flattened_state_sequence = np.array(self.files[task_index]['data/demo_{0}/states'.format(i)])
-				robot_state_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/robot0_joint_pos'.format(i)])
-				gripper_state_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/robot0_gripper_qpos'.format(i)])
-				joint_action_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/robot0_joint_vel'.format(i)])
-				gripper_action_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/robot0_gripper_qvel'.format(i)])
-				object_state_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/object'.format(i)]) 
+				robot_state_sequence = np.array(self.files[task_index]['data/demo_{0}/states'.format(i)][self.robot_pose_indices])
+				object_state_sequence = np.array(self.files[task_index]['data/demo_{0}/states'.format(i)][self.object_pose_indices])
 
 				# Downsample. 
 				number_timesteps = flattened_state_sequence.shape[0]
@@ -279,32 +227,14 @@ class OrigMOMART_Dataset(Dataset):
 
 				flattened_state_sequence = resample(flattened_state_sequence, number_timesteps)
 				robot_state_sequence = resample(robot_state_sequence, number_timesteps)
-				gripper_state_sequence = resample(gripper_state_sequence, number_timesteps)
 				object_state_sequence = resample(object_state_sequence, number_timesteps)
-				joint_action_sequence = resample(joint_action_sequence, number_timesteps)
-				gripper_action_sequence = resample(gripper_action_sequence, number_timesteps)
-
-				# Normalize gripper values. 
-				# 1 is right finger. 0 is left finger.  # 1-0 is right-left. 						
-				gripper_values = gripper_state_sequence[:,1]-gripper_state_sequence[:,0]
-				gripper_values = (gripper_values-gripper_values.min()) / (gripper_values.max()-gripper_values.min())
-				gripper_values = 2*gripper_values-1
-
-				# print("EDC:")
-				# embed()				
-				concatenated_demonstration = np.concatenate([robot_state_sequence,gripper_values.reshape((-1,1))],axis=1)
-				concatenated_actions = np.concatenate([joint_action_sequence,gripper_action_sequence],axis=1)
-				
-				object_rel_traj = self.compute_relative_object_state(robot_state_sequence, object_state_sequence)
-				intermediate_obj_state_seq = np.concatenate([object_state_sequence[:,:7], object_rel_traj, object_state_sequence[:,7:]],axis=-1)
-				object_state_sequence = intermediate_obj_state_seq
+				concatenated_demonstration = np.concatenate([robot_state_sequence, object_state_sequence], axis=-1)
 
 				# Put both lists in a dictionary.
 				datapoint['flat-state'] = flattened_state_sequence
 				datapoint['robot-state'] = robot_state_sequence
 				datapoint['object-state'] = object_state_sequence
-				datapoint['demo'] = concatenated_demonstration			
-				datapoint['demonstrated_actions'] = concatenated_actions
+				datapoint['demo'] = concatenated_demonstration
 
 				# Add this dictionary to the file_demo_list. 
 				task_demo_list.append(datapoint)
@@ -313,10 +243,7 @@ class OrigMOMART_Dataset(Dataset):
 			task_demo_array = np.array(task_demo_list)
 
 			# Now save this file_demo_list. 
-			# np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array.npy"),task_demo_array)
-			np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array_RelObjState.npy"),task_demo_array)
-			# np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array_LiftRelObjState.npy"),task_demo_array)
-			# np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array_LiftObjectQuat.npy"),task_demo_array)
+			np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array.npy"),task_demo_array)
 
 		for j in range(4):
 			print("Lengths:", j, min_lengths[j], max_lengths[j])
