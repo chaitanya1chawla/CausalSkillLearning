@@ -30,7 +30,7 @@ class OrigMOMART_Dataset(Dataset):
 		# Require a task list. 
 		# The task name is needed for setting the environment, rendering. 		
 
-		self.task_list = ['table_cleanup_to_dishwasher', "table_cleanup_to_sink", "table_setup_to_dishwasher", "table_setup_from_dresser"]
+		self.task_list = ['table_cleanup_to_dishwasher', "table_cleanup_to_sink", "table_setup_from_dishwasher", "table_setup_from_dresser"]
 		# self.task_list = ["can","lift","square","tool_hang"]
 		# self.environment_names = ['PickPlaceCan','Lift','NutAssemblySquare', 'ToolHang']
 						
@@ -63,7 +63,7 @@ class OrigMOMART_Dataset(Dataset):
 		# On average, about 15 skills? 
 
 		# self.ds_freq = np.array([ 2.4, 2.4, 2.4, 3.5])		
-		self.ds_freq = 40*np.ones((40))
+		self.ds_freq = 2.5*np.ones((4))
 
 		# Set files. 
 		self.setup()
@@ -90,78 +90,6 @@ class OrigMOMART_Dataset(Dataset):
 
 		return {}
 	
-	# def create_env(self, task_index):
-	# 	import robosuite
-		
-	# 	self.env = robosuite.make(self.environment_names[task_index], robots=['Panda'], has_renderer=False)
-	# 	self.env.reset()
-
-	# def compute_relative_object_state_quat(self, robot_state_sequence, object_state_sequence):
-
-	# 	############################################
-	# 	# Now add our own computed relative quaterion if the ENV is Lift.
-	# 	############################################
-	# 	import robosuite.utils.transform_utils as RTU					
-
-	# 	object_quat_traj = np.zeros((object_state_sequence.shape[0],4))
-
-	# 	print("Generating relative state quat.")
-	# 	for k in range(robot_state_sequence.shape[0]):				
-	# 		# Set pose.
-	# 		# env.reset()
-	# 		self.env.robots[0].set_robot_joint_positions(robot_state_sequence[k,:7])
-	# 		self.env.sim.forward()
-	# 		obs = self.env._get_observations()
-			
-	# 		# Get eef pose. 
-	# 		robot_eef_quat = obs['robot0_eef_quat']
-			
-	# 		# Get obj pose. 
-	# 		abs_object_quat = object_state_sequence[k,3:7]
-			
-	# 		# Get relative quat. 					
-	# 		object_quat_traj[k] = RTU.quat_multiply(robot_eef_quat, abs_object_quat)
-
-	# 	return object_quat_traj
-
-	# def compute_relative_object_state(self, robot_state_sequence, object_state_sequence):
-
-	# 	############################################
-	# 	# Now add our own computed relative quaterion if the ENV is Lift.
-	# 	############################################
-	# 	import robosuite.utils.transform_utils as RTU					
-
-	# 	object_rel_traj = np.zeros((object_state_sequence.shape[0],7))
-
-	# 	print("Generating relative state quat.")
-	# 	for k in range(robot_state_sequence.shape[0]):				
-	# 		# Set pose.
-	# 		# env.reset()
-	# 		self.env.robots[0].set_robot_joint_positions(robot_state_sequence[k,:7])
-	# 		self.env.sim.forward()
-	# 		obs = self.env._get_observations()
-			
-	# 		# Get eef pose. 
-	# 		robot_eef_quat = obs['robot0_eef_quat']
-	# 		robot_eef_pos = obs['robot0_eef_pos']
-	# 		robot_eef_pose_mat = RTU.pose2mat((robot_eef_pos, robot_eef_quat))
-						
-	# 		# Get obj pose. 
-	# 		abs_object_quat = object_state_sequence[k,3:7]
-	# 		abs_object_pos = object_state_sequence[k,:3]
-	# 		abs_object_pose_mat = RTU.pose2mat((abs_object_pos, abs_object_quat))
-
-	# 		# Get relative state.
-	# 		robot_pose_inv = RTU.pose_inv(robot_eef_pose_mat)
-	# 		relative_object_pose_mat = RTU.pose_in_A_to_pose_in_B(abs_object_pose_mat, robot_pose_inv)
-	# 		relative_object_pos, relative_object_quat = RTU.mat2pose(relative_object_pose_mat)
-				
-	# 		# Get relative quat. 					
-	# 		object_rel_traj[k,:3] = relative_object_pos
-	# 		object_rel_traj[k,3:] = relative_object_quat
-
-	# 	return object_rel_traj
-
 	def set_relevant_indices(self):
 
 		# Robot state in state. 
@@ -207,13 +135,13 @@ class OrigMOMART_Dataset(Dataset):
 				# Create list of datapoints for this demonstrations. 
 				datapoint = {}
 				
-				print("Embed in preproc")
-				embed()
-				
+				# print("Embed in preproc")
+				# embed()
+
 				# Get SEQUENCE of flattened states.
 				flattened_state_sequence = np.array(self.files[task_index]['data/demo_{0}/states'.format(i)])
-				robot_state_sequence = np.array(self.files[task_index]['data/demo_{0}/states'.format(i)][self.robot_pose_indices])
-				object_state_sequence = np.array(self.files[task_index]['data/demo_{0}/states'.format(i)][self.object_pose_indices])
+				robot_state_sequence = np.array(self.files[task_index]['data/demo_{0}/states'.format(i)][...,self.robot_pose_indices])
+				object_state_sequence = np.array(self.files[task_index]['data/demo_{0}/states'.format(i)][...,self.object_pose_indices])
 
 				# Downsample. 
 				number_timesteps = flattened_state_sequence.shape[0]
@@ -248,11 +176,11 @@ class OrigMOMART_Dataset(Dataset):
 		for j in range(4):
 			print("Lengths:", j, min_lengths[j], max_lengths[j])
 
-class Robomimic_Dataset(OrigRobomimic_Dataset):
+class MOMART_Dataset(OrigMOMART_Dataset):
 	
 	def __init__(self, args):
 		
-		super(Robomimic_Dataset, self).__init__(args)	
+		super(MOMART_Dataset, self).__init__(args)	
 
 		# Now that we've run setup, compute dataset_trajectory_lengths for smart batching.
 		self.dataset_trajectory_lengths = np.zeros(self.total_length)
@@ -323,8 +251,7 @@ class Robomimic_Dataset(OrigRobomimic_Dataset):
 			for t in range(len(self.task_list)):
 				self.files[t] = np.array(self.files[t])
 
-			# By popping element from files / dataset_traj_lengths, we now don't need to change indexing.
-		
+			# By popping element from files / dataset_traj_lengths, we now don't need to change indexing.	
 
 	def setup(self):
 		self.files = []
@@ -352,7 +279,7 @@ class Robomimic_Dataset(OrigRobomimic_Dataset):
 		
 		# Trivially adding task ID to data element.
 		data_element['task-id'] = task_index
-		data_element['environment-name'] = self.environment_names[task_index]
+		# data_element['environment-name'] = self.environment_names[task_index]
 
 		if resample_length<=1 or data_element['robot-state'].shape[0]<=1:
 			data_element['is_valid'] = False			
@@ -438,7 +365,7 @@ class Robomimic_Dataset(OrigRobomimic_Dataset):
 		np.save("Robomimic_Vel_Min.npy", vel_min_value)
 		np.save("Robomimic_Vel_Max.npy", vel_max_value)
 
-class Robomimic_ObjectDataset(Robomimic_Dataset):
+class MOMART_ObjectDataset(MOMART_Dataset):
 
 	def __init__(self, args):
 
@@ -455,15 +382,6 @@ class Robomimic_ObjectDataset(Robomimic_Dataset):
 		# Copy over the demo to the robot-demo key.
 		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
 		# Set demo to object-state trajectory. 
-
-		# Also try ignoring the relative positions for now.
-		# print("Embedding in get el")
-		# embed()
-		if self.args.object_pure_relative_state:
-			start_index = 7
-		else:
-			start_index = 0
-
 		data_element['demo'] = data_element['object-state'][:,start_index:start_index+7]
 
 		return data_element
@@ -474,7 +392,7 @@ class Robomimic_ObjectDataset(Robomimic_Dataset):
 			self.files.append(np.load("{0}/{1}/New_Task_Demo_Array_RelObjState.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
 
 
-class Robomimic_RobotObjectDataset(Robomimic_Dataset):
+class MOMART_RobotObjectDataset(MOMART_Dataset):
 
 	def __init__(self, args):
 
@@ -488,16 +406,8 @@ class Robomimic_RobotObjectDataset(Robomimic_Dataset):
 
 		data_element = copy.deepcopy(super().__getitem__(index))
 
-		# print("######################")
-		# print("Embed in GI")
-		# embed()
-
 		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
-		if self.args.object_pure_relative_state:
-			start_index = 7
-		else:
-			start_index = 0
-
+		start_index = 0
 		object_traj = data_element['object-state'][:,start_index:start_index+7]
 		
 		demo = np.concatenate([data_element['demo'],object_traj],axis=-1)
