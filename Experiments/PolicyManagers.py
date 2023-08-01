@@ -29,7 +29,7 @@ global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk'
 			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', \
       		'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', 'DexMV', 'DexMVHand', 'DexMVObject', \
 			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects', \
-			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects']
+			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects', 'MOMARTPreproc']
 
 class PolicyManager_BaseClass():
 

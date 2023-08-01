@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 from headers import *
-import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders, GRAB_DataLoader, DAPG_DataLoader, DexMV_DataLoader
+import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders, GRAB_DataLoader, DAPG_DataLoader, DexMV_DataLoader, MOMART_DataLoader
 from PolicyManagers import *
 import TestClass
 import faulthandler
@@ -86,6 +86,7 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = GRAB_DataLoader.GRABObject_PreDataset(args)
 	elif args.data=='GRABObject':
 		dataset = GRAB_DataLoader.GRABObject_Dataset(args)
+	############################
 	elif args.data in ['DAPGPreproc', 'DAPGHandPreproc', 'DAPGObjectPreproc']:
 		dataset = DAPG_DataLoader.DAPG_PreDataset(args)
 	elif args.data=='DAPG':
@@ -94,6 +95,7 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = DAPG_DataLoader.DAPGHand_Dataset(args)
 	elif args.data=='DAPGObject':
 		dataset = DAPG_DataLoader.DAPGObject_Dataset(args)
+	############################
 	elif args.data in ['DexMVPreproc', 'DexMVHandPreproc', 'DexMVObjectPreproc']:
 		dataset = DexMV_DataLoader.DexMV_PreDataset(args)
 	elif args.data=='DexMV':
@@ -102,6 +104,9 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = DexMV_DataLoader.DexMVHand_Dataset(args)
 	elif args.data=='DexMVObject':
 		dataset = DexMV_DataLoader.DexMV_ObjectDataset(args)
+	############################
+	elif args.data=='MOMARTPreproc':
+		dataset = MOMART_DataLoader.OrigMOMART_Dataset(args)
 
 	return dataset
 
@@ -114,8 +119,8 @@ class Master():
 			print("Creating Datasets")			
 			self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)			
 
-		# print("Embed after dataset creation")
-		# embed()
+		print("Embed after dataset creation")
+		embed()
 
 		# Now define policy manager.
 		if self.args.setting=='learntsub' or self.args.setting=='joint':
