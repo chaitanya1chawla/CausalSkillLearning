@@ -120,6 +120,10 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	############################
 	elif args.data=='FrankaKitchenPreproc':
 		dataset = FrankaKitchen_DataLoader.OrigFrankaKitchen_Dataset(args)
+	elif args.data=='FrankaKitchen':
+		dataset = FrankaKitchen_DataLoader.FrankaKitchen_Dataset(args)
+	elif args.data=='FrankaKitchenObject':
+		dataset = FrankaKitchen_DataLoader.FrankaKitchen_ObjectDataset(args)
 	elif args.data=='FrankaKitchenRobotObject':
 		dataset = FrankaKitchen_DataLoader.FrankaKitchen_RobotObjectDataset(args)
 	

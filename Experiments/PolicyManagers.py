@@ -29,7 +29,9 @@ global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk'
 			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', \
       		'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', 'DexMV', 'DexMVHand', 'DexMVObject', \
 			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects', \
-			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects', 'MOMARTPreproc', 'MOMART', 'MOMARTObject', 'MOMARTRobotObject']
+			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects', \
+			'MOMARTPreproc', 'MOMART', 'MOMARTObject', 'MOMARTRobotObject', \
+			'FrankaKitchenPreproc', 'FrankaKitchen', 'FrankaKitchenObject', 'FrankaKitchenRobotObject']
 
 class PolicyManager_BaseClass():
 
@@ -2031,7 +2033,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.conditional_info_size = 0
 			self.test_set_size = 50			
 
-
 		elif self.args.data in ['MOMARTRobotObject']:
 
 			self.state_size = 21
@@ -2046,6 +2047,30 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 			self.test_set_size = 50	
+
+		elif self.args.data in ['FrankaKitchen']:
+
+			self.state_size = 30
+			self.state_dim = 30
+
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 50			
+
+		elif self.args.data in ['FrankaKitchenRobotObject']:
+
+			self.state_size = 30
+			self.state_dim = 30
+
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 50			
 
 		# Training parameters. 		
 		self.baseline_value = 0.
