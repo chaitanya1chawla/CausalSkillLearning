@@ -221,7 +221,8 @@ class MOMART_Dataset(OrigMOMART_Dataset):
 				new_index = index-self.full_cummulative_num_demos[max(task_index,0)]
 
 				# Check the length of this particular trajectory and its validity. 
-				if (self.full_dataset_trajectory_lengths[index] < self.args.dataset_traj_length_limit) and (index not in self.bad_original_index_list):
+				if (self.full_dataset_trajectory_lengths[index] < self.args.dataset_traj_length_limit):
+					# and (index not in self.bad_original_index_list):
 					# Add from old list to new. 
 					self.files[task_index].append(self.full_files[task_index][new_index])
 					self.dataset_trajectory_lengths.append(self.full_dataset_trajectory_lengths[index])
@@ -369,7 +370,7 @@ class MOMART_ObjectDataset(MOMART_Dataset):
 
 	def __init__(self, args):
 
-		super(Robomimic_ObjectDataset, self).__init__(args)
+		super(MOMART_ObjectDataset, self).__init__(args)
 
 	def super_getitem(self, index):
 
@@ -386,17 +387,13 @@ class MOMART_ObjectDataset(MOMART_Dataset):
 
 		return data_element
 
-	def setup(self):
-		self.files = []
-		for i in range(len(self.task_list)):
-			self.files.append(np.load("{0}/{1}/New_Task_Demo_Array_RelObjState.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
 
 
 class MOMART_RobotObjectDataset(MOMART_Dataset):
 
 	def __init__(self, args):
 
-		super(Robomimic_RobotObjectDataset, self).__init__(args)
+		super(MOMART_RobotObjectDataset, self).__init__(args)
 
 	def super_getitem(self, index):
 
@@ -405,19 +402,17 @@ class MOMART_RobotObjectDataset(MOMART_Dataset):
 	def __getitem__(self, index):
 
 		data_element = copy.deepcopy(super().__getitem__(index))
-
-		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
-		start_index = 0
-		object_traj = data_element['object-state'][:,start_index:start_index+7]
 		
-		demo = np.concatenate([data_element['demo'],object_traj],axis=-1)
-		data_element['demo'] = copy.deepcopy(demo)
+		data_element['demo'] = data_element['demo'][...,7:]
 
-		# print("SHAPE OF 2nd DEMO",data_element['demo'].shape)
+
+		# data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
+		# start_index = 0
+		# object_traj = data_element['object-state'][:,start_index:start_index+7]
+		
+		# demo = np.concatenate([data_element['demo'],object_traj],axis=-1)
+		# data_element['demo'] = copy.deepcopy(demo)
+
+		# # print("SHAPE OF 2nd DEMO",data_element['demo'].shape)
 
 		return data_element
-
-	def setup(self):
-		self.files = []
-		for i in range(len(self.task_list)):
-			self.files.append(np.load("{0}/{1}/New_Task_Demo_Array_RelObjState.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))

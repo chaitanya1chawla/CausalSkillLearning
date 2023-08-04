@@ -29,7 +29,7 @@ global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk'
 			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', \
       		'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', 'DexMV', 'DexMVHand', 'DexMVObject', \
 			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects', \
-			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects', 'MOMARTPreproc']
+			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects', 'MOMARTPreproc', 'MOMART', 'MOMARTObject', 'MOMARTRobotObject']
 
 class PolicyManager_BaseClass():
 
@@ -1956,7 +1956,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.norm_denom_value = self.norm_denom_value[:self.state_dim]
 
 
-		elif self.args.data in ['RoboturkObjects','RoboMimicObjects']:
+		elif self.args.data in ['RoboturkObjects','RoboMimicObjects','MOMARTObject']:
 			# self.state_size = 14
 			# self.state_dim = 14
 
@@ -2019,6 +2019,34 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.conditional_info_size = 0
 			self.test_set_size = 50			
 
+		elif self.args.data in ['MOMART']:
+
+			self.state_size = 21
+			self.state_dim = 21
+
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 50			
+
+
+		elif self.args.data in ['MOMARTRobotObject']:
+
+			self.state_size = 21
+			self.state_dim = 21
+
+			# self.state_size = 28
+			# self.state_dim = 28
+
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 50	
+
 		# Training parameters. 		
 		self.baseline_value = 0.
 		self.beta_decay = 0.9
@@ -2030,11 +2058,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.decay_counter = self.decay_epochs*len(self.dataset)
 		if self.args.kl_schedule:
 			self.kl_increment_epochs = self.args.kl_increment_epochs
-			self.kl_increment_counter = self.kl_increment_epochs*len(self.dataset)
+			self.kl_increment_counter = self.kl_increment_epochs*len(self.dataset)/self.args.batch_size
 			self.kl_begin_increment_epochs = self.args.kl_begin_increment_epochs
-			self.kl_begin_increment_counter = self.kl_begin_increment_epochs*len(self.dataset)
+			self.kl_begin_increment_counter = self.kl_begin_increment_epochs*len(self.dataset)/self.args.batch_size
 			self.kl_increment_rate = (self.args.final_kl_weight-self.args.initial_kl_weight)/(self.kl_increment_counter)
-			self.kl_phase_length_counter = self.args.kl_cyclic_phase_epochs*len(self.dataset)
+			self.kl_phase_length_counter = self.args.kl_cyclic_phase_epochs*len(self.dataset)/self.args.batch_size
 		# Log-likelihood penalty.
 		self.lambda_likelihood_penalty = self.args.likelihood_penalty
 		self.baseline = None

@@ -1,3 +1,6 @@
+# KABOOM
+
+
 # Copyright (c) Facebook, Inc. and its affiliates.
 # All rights reserved.
 
@@ -5,7 +8,8 @@
 # LICENSE file in the root directory of this source tree.
 
 from headers import *
-import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders, GRAB_DataLoader, DAPG_DataLoader, DexMV_DataLoader, MOMART_DataLoader
+import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders, \
+	  GRAB_DataLoader, DAPG_DataLoader, DexMV_DataLoader, MOMART_DataLoader, FrankaKitchen_DataLoader
 from PolicyManagers import *
 import TestClass
 import faulthandler
@@ -107,6 +111,18 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	############################
 	elif args.data=='MOMARTPreproc':
 		dataset = MOMART_DataLoader.OrigMOMART_Dataset(args)
+	elif args.data=='MOMART':
+		dataset = MOMART_DataLoader.MOMART_Dataset(args)
+	elif args.data=='MOMARTObject':
+		dataset = MOMART_DataLoader.MOMART_ObjectDataset(args)
+	elif args.data=='MOMARTRobotObject':
+		dataset = MOMART_DataLoader.MOMART_RobotObjectDataset(args)
+	############################
+	elif args.data=='FrankaKitchenPreproc':
+		dataset = FrankaKitchen_DataLoader.OrigFrankaKitchen_Dataset(args)
+	elif args.data=='FrankaKitchenRobotObject':
+		dataset = FrankaKitchen_DataLoader.FrankaKitchen_RobotObjectDataset(args)
+	
 
 	return dataset
 
