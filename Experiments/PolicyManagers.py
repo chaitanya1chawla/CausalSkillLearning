@@ -28,7 +28,7 @@ torch.set_printoptions(sci_mode=False, precision=2)
 global global_dataset_list 
 global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk', \
 			'Mocap','OrigRoboMimic','RoboMimic','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', \
-      		'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', 'DexMV', 'DexMVHand', 'DexMVObject', \
+	  		'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', 'DexMV', 'DexMVHand', 'DexMVObject', \
 			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects', \
 			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects', \
 			'MOMARTPreproc', 'MOMART', 'MOMARTObject', 'MOMARTRobotObject', \
@@ -2077,6 +2077,13 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.traj_length = self.args.traj_length			
 			self.conditional_info_size = 0
 			self.test_set_size = 50			
+
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/FrankaKitchen/FrankaKitchenRO_Orig_Mean.npy")
+				self.norm_denom_value = np.load("Statistics/FrankaKitchen/FrankaKitchenRO_Orig_Var.npy")
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/FrankaKitchen/FrankaKitchenRO_Orig_Min.npy")
+				self.norm_denom_value = np.load("Statistics/FrankaKitchen/FrankaKitchenRO_Orig_Max.npy") - self.norm_sub_value
 
 		# Training parameters. 		
 		self.baseline_value = 0.

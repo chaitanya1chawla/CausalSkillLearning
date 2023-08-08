@@ -220,7 +220,7 @@ class FrankaKitchen_Dataset(OrigFrankaKitchen_Dataset):
 	
 	def compute_statistics(self):
 
-		self.state_size = 8
+		self.state_size = 30
 		self.total_length = self.__len__()
 		mean = np.zeros((self.state_size))
 		variance = np.zeros((self.state_size))
@@ -239,17 +239,17 @@ class FrankaKitchen_Dataset(OrigFrankaKitchen_Dataset):
 			print("Phase 1: DP: ",i)
 			data_element = self.__getitem__(i)
 
-			if data_element['is_valid']:
-				demo = data_element['demo']
-				vel = np.diff(demo,axis=0)
-				mins[i] = demo.min(axis=0)
-				maxs[i] = demo.max(axis=0)
-				mean += demo.sum(axis=0)
-				lens[i] = demo.shape[0]
 
-				vel_mins[i] = abs(vel).min(axis=0)
-				vel_maxs[i] = abs(vel).max(axis=0)
-				vel_mean += vel.sum(axis=0)			
+			demo = data_element['demo']
+			vel = np.diff(demo,axis=0)
+			mins[i] = demo.min(axis=0)
+			maxs[i] = demo.max(axis=0)
+			mean += demo.sum(axis=0)
+			lens[i] = demo.shape[0]
+
+			vel_mins[i] = abs(vel).min(axis=0)
+			vel_maxs[i] = abs(vel).max(axis=0)
+			vel_mean += vel.sum(axis=0)			
 
 		mean /= lens.sum()
 		vel_mean /= lens.sum()
@@ -260,11 +260,11 @@ class FrankaKitchen_Dataset(OrigFrankaKitchen_Dataset):
 			data_element = self.__getitem__(i)
 			
 			# Just need to normalize the demonstration. Not the rest. 
-			if data_element['is_valid']:
-				demo = data_element['demo']
-				vel = np.diff(demo,axis=0)
-				variance += ((demo-mean)**2).sum(axis=0)
-				vel_variance += ((vel-vel_mean)**2).sum(axis=0)
+
+			demo = data_element['demo']
+			vel = np.diff(demo,axis=0)
+			variance += ((demo-mean)**2).sum(axis=0)
+			vel_variance += ((vel-vel_mean)**2).sum(axis=0)
 
 		variance /= lens.sum()
 		variance = np.sqrt(variance)
@@ -278,14 +278,14 @@ class FrankaKitchen_Dataset(OrigFrankaKitchen_Dataset):
 		vel_max_value = vel_maxs.max(axis=0)
 		vel_min_value = vel_mins.min(axis=0)
 
-		np.save("Robomimic_Mean.npy", mean)
-		np.save("Robomimic_Var.npy", variance)
-		np.save("Robomimic_Min.npy", min_value)
-		np.save("Robomimic_Max.npy", max_value)
-		np.save("Robomimic_Vel_Mean.npy", vel_mean)
-		np.save("Robomimic_Vel_Var.npy", vel_variance)
-		np.save("Robomimic_Vel_Min.npy", vel_min_value)
-		np.save("Robomimic_Vel_Max.npy", vel_max_value)
+		np.save("FrankaKitchenRO_Mean.npy", mean)
+		np.save("FrankaKitchenRO_Var.npy", variance)
+		np.save("FrankaKitchenRO_Min.npy", min_value)
+		np.save("FrankaKitchenRO_Max.npy", max_value)
+		np.save("FrankaKitchenRO_Vel_Mean.npy", vel_mean)
+		np.save("FrankaKitchenRO_Vel_Var.npy", vel_variance)
+		np.save("FrankaKitchenRO_Vel_Min.npy", vel_min_value)
+		np.save("FrankaKitchenRO_Vel_Max.npy", vel_max_value)
 
 class FrankaKitchen_ObjectDataset(FrankaKitchen_Dataset):
 
