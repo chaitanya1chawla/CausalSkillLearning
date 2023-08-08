@@ -1545,6 +1545,78 @@ class RoboMimicRobotObjectVisualizer(RoboMimicObjectVisualizer):
 
 		self.set_object_pose(object_position, object_orientation, env=env)	
 
+class FrankaKitchenVisualizer(object):
+
+	def __init__(self, has_display=False, args=None, just_objects=True):
+		
+		self.args = args
+		self.has_display = has_display
+		self.just_objects = just_objects
+		default_task_id = "Viz"
+		# self.create_environment(task_id=default_task_id)
+		self.create_environment()
+		self.image_size = 600
+	
+	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
+
+		# First parse object and robot state.
+		# Robot State:
+		robot_state = pose[:9]		
+		# Object State:
+		object_state = pose[9:30]
+	
+
+		full_state = self.environment.sim.get_state()		
+		full_state[:9] = robot_state
+		full_state[9:30] = object_state
+
+		self.environment.sim.set_state(full_state)
+		self.environment.sim.forward()		
+
+	def set_joint_pose_return_image(self, pose, arm='both', gripper=False):
+
+		self.set_joint_pose(pose)
+
+		image = self.environment.sim.render(self.image_size, self.image_size, camera_id=2)
+		return image
+
+	def create_environment(self, task_id=None):
+
+		import d4rl, gym
+		self.environment = gym.make("kitchen-partial-v0")
+		self.environment.reset()
+				
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
+
+		image_list = []
+		previous_joint_positions = None
+		
+		self.create_environment()
+		# self.environment.reset()
+
+		# Recreate environment with new task ID potentially.
+		for t in range(trajectory.shape[0]):
+
+			# Check whether it's end effector or joint trajectory. 
+			# Calls joint pose function, but is really setting the object position
+
+			new_image = self.set_joint_pose_return_image(trajectory[t])
+			image_list.append(new_image)
+
+		gif_file_name = os.path.join(gif_path,gif_name)
+		image_array = np.array(image_list)
+
+		if return_and_save:
+			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
+
+			return image_list
+		elif return_gif:
+			return image_list
+		else:
+			# imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
+
+
 class ToyDataVisualizer():
 
 	def __init__(self):

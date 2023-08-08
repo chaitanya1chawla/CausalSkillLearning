@@ -13,7 +13,8 @@ from PPO_Utilities import PPOBuffer
 from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, \
 	GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, DAPGVisualizer, \
 	RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer,\
-	RoboMimicObjectVisualizer, RoboMimicRobotObjectVisualizer, DexMVVisualizer #, MocapVisualizer
+	RoboMimicObjectVisualizer, RoboMimicRobotObjectVisualizer, DexMVVisualizer, \
+	FrankaKitchenVisualizer #, MocapVisualizer
 
 # from Visualizers import *
 import TFLogger, DMP, RLUtils
@@ -125,6 +126,8 @@ class PolicyManager_BaseClass():
 			self.visualizer = RoboMimicObjectVisualizer(args=self.args)
 		elif self.args.data in ['RoboMimicRobotObjects']:
 			self.visualizer = RoboMimicRobotObjectVisualizer(args=self.args)
+		elif self.args.data in ['FrankaKitchenRobotObject']:
+			self.visualizer = FrankaKitchenVisualizer(args=self.args)
 		else:
 			self.visualizer = ToyDataVisualizer()
 		
@@ -455,6 +458,9 @@ class PolicyManager_BaseClass():
 			self.visualizer = RoboMimicObjectVisualizer(args=self.args)
 		elif self.args.data in ['RoboMimicRobotObjects']:
 			self.visualizer = RoboMimicRobotObjectVisualizer(args=self.args)			
+		elif self.args.data in ['FrankaKitchenRobotObject']:
+			self.visualizer = FrankaKitchenVisualizer(args=self.args)
+
 		else: 
 			self.visualizer = ToyDataVisualizer()
 

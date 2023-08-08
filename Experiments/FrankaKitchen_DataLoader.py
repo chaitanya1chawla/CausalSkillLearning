@@ -167,7 +167,7 @@ class FrankaKitchen_Dataset(OrigFrankaKitchen_Dataset):
 			self.files = []
 			self.full_dataset_trajectory_lengths = copy.deepcopy(self.dataset_trajectory_lengths)
 			self.dataset_trajectory_lengths = []
-			self.num_demos = 0.
+			self.num_demos = 0
 
 			for index in range(self.full_length):
 
@@ -201,6 +201,10 @@ class FrankaKitchen_Dataset(OrigFrankaKitchen_Dataset):
 		data_element = self.files[index]		
 		self.kernel_bandwidth = self.args.smoothing_kernel_bandwidth
 
+		# Dummy task ID. 
+		data_element['task-id'] = 0
+		data_element['task_id'] = 0
+		
 		if self.args.smoothen: 
 			data_element['demo'] = gaussian_filter1d(data_element['demo'],self.kernel_bandwidth,axis=0,mode='nearest')
 			data_element['robot-state'] = gaussian_filter1d(data_element['robot-state'],self.kernel_bandwidth,axis=0,mode='nearest')
@@ -209,6 +213,7 @@ class FrankaKitchen_Dataset(OrigFrankaKitchen_Dataset):
 			data_element['goal-state'] = gaussian_filter1d(data_element['goal-state'],self.kernel_bandwidth,axis=0,mode='nearest')
 			data_element['actions'] = gaussian_filter1d(data_element['actions'],self.kernel_bandwidth,axis=0,mode='nearest')
 
+		
 			# data_element['environment-name'] = self.environment_names[task_index]
 
 		return data_element
