@@ -17,7 +17,7 @@ def resample(original_trajectory, desired_number_timepoints):
 
 class OrigMOMART_Dataset(Dataset): 
 
-	# Class implementing instance of Robomimic dataset. 
+	# Class implementing instance of Robomimic dataset. 	
 	def __init__(self, args):		
 		
 		self.args = args
@@ -182,6 +182,7 @@ class MOMART_Dataset(OrigMOMART_Dataset):
 		
 		super(MOMART_Dataset, self).__init__(args)	
 
+		self.stat_dir_name = 'MOMART'
 		# Now that we've run setup, compute dataset_trajectory_lengths for smart batching.
 		self.dataset_trajectory_lengths = np.zeros(self.total_length)
 		for index in range(self.total_length):
@@ -299,7 +300,7 @@ class MOMART_Dataset(OrigMOMART_Dataset):
 	
 	def compute_statistics(self):
 
-		self.state_size = 8
+		self.state_size = 28
 		self.total_length = self.__len__()
 		mean = np.zeros((self.state_size))
 		variance = np.zeros((self.state_size))
@@ -357,14 +358,14 @@ class MOMART_Dataset(OrigMOMART_Dataset):
 		vel_max_value = vel_maxs.max(axis=0)
 		vel_min_value = vel_mins.min(axis=0)
 
-		np.save("Robomimic_Mean.npy", mean)
-		np.save("Robomimic_Var.npy", variance)
-		np.save("Robomimic_Min.npy", min_value)
-		np.save("Robomimic_Max.npy", max_value)
-		np.save("Robomimic_Vel_Mean.npy", vel_mean)
-		np.save("Robomimic_Vel_Var.npy", vel_variance)
-		np.save("Robomimic_Vel_Min.npy", vel_min_value)
-		np.save("Robomimic_Vel_Max.npy", vel_max_value)
+		np.save("MOMART_Mean.npy", mean)
+		np.save("MOMART_Var.npy", variance)
+		np.save("MOMART_Min.npy", min_value)
+		np.save("MOMART_Max.npy", max_value)
+		np.save("MOMART_Vel_Mean.npy", vel_mean)
+		np.save("MOMART_Vel_Var.npy", vel_variance)
+		np.save("MOMART_Vel_Min.npy", vel_min_value)
+		np.save("MOMART_Vel_Max.npy", vel_max_value)
 
 class MOMART_ObjectDataset(MOMART_Dataset):
 
@@ -399,20 +400,20 @@ class MOMART_RobotObjectDataset(MOMART_Dataset):
 
 		return super().__getitem__(index)
 
-	def __getitem__(self, index):
+	# def __getitem__(self, index):
 
-		data_element = copy.deepcopy(super().__getitem__(index))
+	# 	data_element = copy.deepcopy(super().__getitem__(index))
 		
-		data_element['demo'] = data_element['demo'][...,7:]
+	# 	# data_element['demo'] = data_element['demo'][...,7:]
 
 
-		# data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
-		# start_index = 0
-		# object_traj = data_element['object-state'][:,start_index:start_index+7]
+	# 	# data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
+	# 	# start_index = 0
+	# 	# object_traj = data_element['object-state'][:,start_index:start_index+7]
 		
-		# demo = np.concatenate([data_element['demo'],object_traj],axis=-1)
-		# data_element['demo'] = copy.deepcopy(demo)
+	# 	# demo = np.concatenate([data_element['demo'],object_traj],axis=-1)
+	# 	# data_element['demo'] = copy.deepcopy(demo)
 
-		# # print("SHAPE OF 2nd DEMO",data_element['demo'].shape)
+	# 	# # print("SHAPE OF 2nd DEMO",data_element['demo'].shape)
 
-		return data_element
+	# 	return data_element

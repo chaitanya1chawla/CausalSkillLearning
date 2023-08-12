@@ -1033,7 +1033,7 @@ class DexMVVisualizer(SawyerVisualizer):
 		super().__init__()
 		self.args = args
 		self.environment = YCBRelocate(has_renderer=False, object_name="foam_brick", friction=(1, 0.5, 0.01),
-                          object_scale=0.8, version="v2")
+						  object_scale=0.8, version="v2")
 		self.env_name = "relocate-v2"
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
@@ -1616,6 +1616,84 @@ class FrankaKitchenVisualizer(object):
 			# imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
 			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
 
+class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
+
+	def __init__(self, has_display=False, args=None, just_objects=True):
+		
+		self.args = args
+		self.has_display = has_display
+		self.just_objects = just_objects
+		default_task_id = "Viz"
+		self.create_environment()
+		self.image_size = 600
+	
+	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
+
+		# First parse object and robot state.
+		# Robot State:
+		robot_state = pose[:21]		
+		# Object State:
+		object_state = pose[21:]
+
+		# Get current obs
+		# observation = self.environment.get_observation()
+
+		# Get current state
+		current_state = self.environment.get_state()
+				
+		# Modify current obs. 
+		modified_state = copy.deepcopy(current_state)
+
+		# Set robot state.
+		modified_state['states'][440:447] = robot_state[:7]
+		modified_state['states'][453:467] = robot_state[7:]
+
+		# Set object state. 
+		modified_state['states'][467:474] = object_state
+
+		# State dict
+		state_dict = {}
+		state_dict['state'] = modified_state
+
+		self.environment.reset_to(state_dict)
+		self.environment.sync_state()
+
+	def set_joint_pose_return_image(self, pose, arm='both', gripper=False):
+
+		self.set_joint_pose(pose)
+
+		image = self.environment.render(mode='rgb', camera_name='rgb', self.image_size, self.image_size)
+		return image
+
+	def create_environment(self, task_id=None):
+
+		import robomimic
+		import robomimic.utils.obs_utils as ObsUtils
+		import robomimic.utils.env_utils as EnvUtils
+		import robomimic.utils.file_utils as FileUtils
+		from robomimic.envs.env_base import EnvBase, EnvType
+
+		# Define default cameras to use for each env type
+		DEFAULT_CAMERAS = {
+			EnvType.ROBOSUITE_TYPE: ["agentview"],
+			EnvType.IG_MOMART_TYPE: ["rgb"],
+			EnvType.GYM_TYPE: ValueError("No camera names supported for gym type env!"),
+		}
+
+		dummy_spec = dict(
+			obs=dict(
+					low_dim=["robot0_eef_pos"],
+					rgb=[],
+				),
+		)
+		ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_specs=dummy_spec)
+
+
+		dataset_file = "/data/tanmayshankar/Datasets/MOMART/table_cleanup_to_dishwasher/expert/table_cleanup_to_dishwasher.hdf5"
+
+		env_meta = FileUtils.get_env_metadata_from_dataset(dataset_path=dataset_file)
+		self.environment = EnvUtils.create_env_from_metadata(env_meta=env_meta, render=False, render_offscreen=True)
+
 
 class ToyDataVisualizer():
 
@@ -1623,27 +1701,6 @@ class ToyDataVisualizer():
 
 		pass
 
-	# CREATING DUPLICATE
-	# @profile
-	# def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False):
-
-	# 	fig = plt.figure()		
-	# 	ax = fig.gca()
-	# 	ax.scatter(trajectory[:,0],trajectory[:,1],c=range(len(trajectory)),cmap='jet')
-	# 	plt.xlim(-10,10)
-	# 	plt.ylim(-10,10)
-
-	# 	fig.canvas.draw()
-
-	# 	width, height = fig.get_size_inches() * fig.get_dpi()
-	# 	image = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(int(height), int(width), 3)
-	# 	image = np.transpose(image, axes=[2,0,1])
-
-	# 	ax.clear()
-	# 	fig.clear()
-	# 	plt.close(fig)
-
-	# 	return image
 
 	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, end_effector=False):
 

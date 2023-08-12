@@ -346,7 +346,8 @@ class PolicyManager_BaseClass():
 
 			t1 = time.time()
 			# self.coverage = np.zeros(len(self.dataset))
-		
+
+			# For all data points in the dataset. 
 			for i in range(0,self.training_extent,self.args.batch_size):				
 			# for i in range(0,extent-self.args.batch_size,self.args.batch_size):
 				
@@ -2029,8 +2030,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		elif self.args.data in ['MOMART']:
 
-			self.state_size = 21
-			self.state_dim = 21
+			self.state_size = 28
+			self.state_dim = 28
 
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
@@ -2041,8 +2042,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		elif self.args.data in ['MOMARTRobotObject']:
 
-			self.state_size = 21
-			self.state_dim = 21
+			self.state_size = 28
+			self.state_dim = 28
 
 			# self.state_size = 28
 			# self.state_dim = 28
@@ -2078,13 +2079,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.conditional_info_size = 0
 			self.test_set_size = 50			
 
-			if self.args.normalization=='meanvar':
-				self.norm_sub_value = np.load("Statistics/FrankaKitchen/FrankaKitchenRO_Orig_Mean.npy")
-				self.norm_denom_value = np.load("Statistics/FrankaKitchen/FrankaKitchenRO_Orig_Var.npy")
-			elif self.args.normalization=='minmax':
-				self.norm_sub_value = np.load("Statistics/FrankaKitchen/FrankaKitchenRO_Orig_Min.npy")
-				self.norm_denom_value = np.load("Statistics/FrankaKitchen/FrankaKitchenRO_Orig_Max.npy") - self.norm_sub_value
-
+			# print("FK Embed")
+			# embed()
+			
 		# Training parameters. 		
 		self.baseline_value = 0.
 		self.beta_decay = 0.9

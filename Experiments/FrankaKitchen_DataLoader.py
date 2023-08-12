@@ -143,7 +143,8 @@ class FrankaKitchen_Dataset(OrigFrankaKitchen_Dataset):
 	def __init__(self, args):
 		
 		super(FrankaKitchen_Dataset, self).__init__(args)	
-	
+
+		
 		# Now that we've run setup, compute dataset_trajectory_lengths for smart batching.
 		self.dataset_trajectory_lengths = np.zeros(self.total_length)
 
@@ -314,7 +315,8 @@ class FrankaKitchen_RobotObjectDataset(FrankaKitchen_Dataset):
 	def __init__(self, args):
 
 		super(FrankaKitchen_RobotObjectDataset, self).__init__(args)
-
+		self.stat_dir_name = 'FrankaKitchenRO'
+		
 	def super_getitem(self, index):
 
 		return super().__getitem__(index)
