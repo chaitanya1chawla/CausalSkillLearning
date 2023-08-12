@@ -1689,7 +1689,7 @@ class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 		ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_specs=dummy_spec)
 
 
-		dataset_file = "/data/tanmayshankar/Datasets/MOMART/table_cleanup_to_dishwasher/expert/table_cleanup_to_dishwasher.hdf5"
+		dataset_file = "/data/tanmayshankar/Datasets/MOMART/table_cleanup_to_dishwasher/expert/table_cleanup_to_dishwasher_expert.hdf5"
 
 		env_meta = FileUtils.get_env_metadata_from_dataset(dataset_path=dataset_file)
 		self.environment = EnvUtils.create_env_from_metadata(env_meta=env_meta, render=False, render_offscreen=True)
