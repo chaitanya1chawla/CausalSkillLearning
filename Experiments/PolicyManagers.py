@@ -14,7 +14,7 @@ from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, To
 	GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, DAPGVisualizer, \
 	RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer,\
 	RoboMimicObjectVisualizer, RoboMimicRobotObjectVisualizer, DexMVVisualizer, \
-	FrankaKitchenVisualizer #, MocapVisualizer
+	FrankaKitchenVisualizer, FetchMOMARTVisualizer #, MocapVisualizer
 
 # from Visualizers import *
 import TFLogger, DMP, RLUtils
@@ -128,6 +128,8 @@ class PolicyManager_BaseClass():
 			self.visualizer = RoboMimicRobotObjectVisualizer(args=self.args)
 		elif self.args.data in ['FrankaKitchenRobotObject']:
 			self.visualizer = FrankaKitchenVisualizer(args=self.args)
+		elif self.args.data in ['MOMARTRobotObject']:
+			self.visualizer = FetchMOMARTVisualizer(args=self.args)
 		else:
 			self.visualizer = ToyDataVisualizer()
 		

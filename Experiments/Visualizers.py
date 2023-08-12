@@ -1662,7 +1662,7 @@ class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 
 		self.set_joint_pose(pose)
 
-		image = self.environment.render(mode='rgb', camera_name='rgb', self.image_size, self.image_size)
+		image = self.environment.render(mode='rgb', camera_name='rgb', height=self.image_size, width=self.image_size)
 		return image
 
 	def create_environment(self, task_id=None):
