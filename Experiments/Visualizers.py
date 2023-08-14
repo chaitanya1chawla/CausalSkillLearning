@@ -1631,38 +1631,48 @@ class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 		self.just_objects = just_objects
 		default_task_id = "Viz"		
 		self.create_initial_environment()	
-		self.image_size = 600
+		self.image_size = 300
 	
-	# def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
+	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
 
-	# 	# First parse object and robot state.
-	# 	# Robot State:
-	# 	robot_state = pose[:21]		
-	# 	# Object State:
-	# 	object_state = pose[21:]
+		if self.args.data in ['MOMARTRobotObject']:
+			# First parse object and robot state.
+			if pose.shape[0]==21:
+				# Robot State:
+				robot_state = pose[:14]		
+				# Object State:
+				object_state = pose[14:]
+			elif pose.shape[0]==28:			
+				# Robot State:
+				robot_state = pose[:21]		
+				# Object State:
+				object_state = pose[21:]
 
-	# 	# Get current obs
-	# 	# observation = self.environment.get_observation()
+			# Get current obs
+			# observation = self.environment.get_observation()
 
-	# 	# Get current state
-	# 	current_state = self.environment.get_state()
-				
-	# 	# Modify current obs. 
-	# 	modified_state = copy.deepcopy(current_state)
+			# Get current state
+			current_state = self.environment.get_state()
+					
+			# Modify current obs. 
+			modified_state = copy.deepcopy(current_state)
 
-	# 	# Set robot state.
-	# 	modified_state['states'][440:447] = robot_state[:7]
-	# 	modified_state['states'][453:467] = robot_state[7:]
+			# Set robot state.
+			modified_state['states'][440:447] = robot_state[:7]
+			modified_state['states'][453:467] = robot_state[7:]
 
-	# 	# Set object state. 
-	# 	modified_state['states'][467:474] = object_state
+			# Set object state. 
+			modified_state['states'][467:474] = object_state
 
-	# 	# State dict
-	# 	state_dict = {}
-	# 	state_dict['states'] = modified_state
+		else:
+			modified_state = pose
 
-	# 	self.environment.reset_to(state_dict)
-	# 	self.environment.env.sync_state()
+		# State dict
+		state_dict = {}
+		state_dict['states'] = modified_state
+
+		self.environment.reset_to(state_dict)
+		self.environment.env.sync_state()
 
 	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
 
@@ -1670,7 +1680,12 @@ class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 		state_dict = {}
 		state_dict['states'] = pose
 
-		self.environment.reset_to(state_dict)
+		try:
+			self.environment.reset_to(state_dict)
+		except:
+			import pybullet as p
+			p.resetSimulation()
+			self.create_initial_environment()
 		# self.environment.env.sync_state()
 
 
@@ -1688,6 +1703,7 @@ class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 		import robomimic.utils.env_utils as EnvUtils
 		import robomimic.utils.file_utils as FileUtils
 		from robomimic.envs.env_base import EnvBase, EnvType
+
 
 		# Define default cameras to use for each env type
 		DEFAULT_CAMERAS = {
@@ -1708,7 +1724,10 @@ class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 		dataset_file = "/data/tanmayshankar/Datasets/MOMART/table_cleanup_to_dishwasher/expert/table_cleanup_to_dishwasher_expert.hdf5"
 
 		env_meta = FileUtils.get_env_metadata_from_dataset(dataset_path=dataset_file)
+
+		
 		self.environment = EnvUtils.create_env_from_metadata(env_meta=env_meta, render=False, render_offscreen=True)
+		already_environment = True
 
 	def create_environment(self, task_id=None):
 

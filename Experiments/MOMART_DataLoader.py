@@ -407,8 +407,9 @@ class MOMART_RobotObjectDataset(MOMART_Dataset):
 		data_element = copy.deepcopy(super().__getitem__(index))
 		
 
-		data_element['old-demo'] = copy.deepcopy(data_element['demo'])
-		data_element['demo'] = data_element['flat-state']
+		if self.args.data is in ['MOMARTRobotObjectFlat']:
+			data_element['old-demo'] = copy.deepcopy(data_element['demo'])
+			data_element['demo'] = data_element['flat-state']
 		# data_element['demo'] = data_element['demo'][...,7:]
 
 
@@ -422,3 +423,4 @@ class MOMART_RobotObjectDataset(MOMART_Dataset):
 		# # print("SHAPE OF 2nd DEMO",data_element['demo'].shape)
 
 		return data_element
+	
