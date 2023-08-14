@@ -1549,6 +1549,7 @@ class FrankaKitchenVisualizer(object):
 
 	def __init__(self, has_display=False, args=None, just_objects=True):
 		
+		super(FrankaKitchenVisualizer, self).__init__()
 		self.args = args
 		self.has_display = has_display
 		self.just_objects = just_objects
@@ -1592,19 +1593,22 @@ class FrankaKitchenVisualizer(object):
 		previous_joint_positions = None
 		
 		self.create_environment()
-		# self.environment.reset()
+		
 
 		# Recreate environment with new task ID potentially.
 		for t in range(trajectory.shape[0]):
 
 			# Check whether it's end effector or joint trajectory. 
 			# Calls joint pose function, but is really setting the object position
-
+			# self.environment.reset()
 			new_image = self.set_joint_pose_return_image(trajectory[t])
-			image_list.append(new_image)
+
+			self.environment.reset()
+			image_list.append(copy.deepcopy(new_image))
 
 		gif_file_name = os.path.join(gif_path,gif_name)
 		image_array = np.array(image_list)
+
 
 		if return_and_save:
 			imageio.v3.imwrite(gif_file_name, image_array, loop=0)
@@ -1620,43 +1624,55 @@ class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 
 	def __init__(self, has_display=False, args=None, just_objects=True):
 		
+		
+		# super(FetchMOMARTVisualizer, self).__init__(has_display=has_display, args=args, just_objects=False)
 		self.args = args
 		self.has_display = has_display
 		self.just_objects = just_objects
-		default_task_id = "Viz"
-		self.create_environment()
+		default_task_id = "Viz"		
+		self.create_initial_environment()	
 		self.image_size = 600
 	
-	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
+	# def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
 
-		# First parse object and robot state.
-		# Robot State:
-		robot_state = pose[:21]		
-		# Object State:
-		object_state = pose[21:]
+	# 	# First parse object and robot state.
+	# 	# Robot State:
+	# 	robot_state = pose[:21]		
+	# 	# Object State:
+	# 	object_state = pose[21:]
 
-		# Get current obs
-		# observation = self.environment.get_observation()
+	# 	# Get current obs
+	# 	# observation = self.environment.get_observation()
 
-		# Get current state
-		current_state = self.environment.get_state()
+	# 	# Get current state
+	# 	current_state = self.environment.get_state()
 				
-		# Modify current obs. 
-		modified_state = copy.deepcopy(current_state)
+	# 	# Modify current obs. 
+	# 	modified_state = copy.deepcopy(current_state)
 
-		# Set robot state.
-		modified_state['states'][440:447] = robot_state[:7]
-		modified_state['states'][453:467] = robot_state[7:]
+	# 	# Set robot state.
+	# 	modified_state['states'][440:447] = robot_state[:7]
+	# 	modified_state['states'][453:467] = robot_state[7:]
 
-		# Set object state. 
-		modified_state['states'][467:474] = object_state
+	# 	# Set object state. 
+	# 	modified_state['states'][467:474] = object_state
+
+	# 	# State dict
+	# 	state_dict = {}
+	# 	state_dict['state'] = modified_state
+
+	# 	self.environment.reset_to(state_dict)
+	# 	self.environment.env.sync_state()
+
+	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
 
 		# State dict
 		state_dict = {}
-		state_dict['state'] = modified_state
+		state_dict['state'] = pose
 
 		self.environment.reset_to(state_dict)
-		self.environment.sync_state()
+		self.environment.env.sync_state()
+
 
 	def set_joint_pose_return_image(self, pose, arm='both', gripper=False):
 
@@ -1665,7 +1681,7 @@ class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 		image = self.environment.render(mode='rgb', camera_name='rgb', height=self.image_size, width=self.image_size)
 		return image
 
-	def create_environment(self, task_id=None):
+	def create_initial_environment(self, task_id=None):
 
 		import robomimic
 		import robomimic.utils.obs_utils as ObsUtils
@@ -1693,6 +1709,11 @@ class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 
 		env_meta = FileUtils.get_env_metadata_from_dataset(dataset_path=dataset_file)
 		self.environment = EnvUtils.create_env_from_metadata(env_meta=env_meta, render=False, render_offscreen=True)
+
+	def create_environment(self, task_id=None):
+
+		self.environment.reset()
+		
 
 
 class ToyDataVisualizer():

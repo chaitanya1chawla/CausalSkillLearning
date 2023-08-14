@@ -32,7 +32,7 @@ class OrigMOMART_Dataset(Dataset):
 
 		self.task_list = ['table_cleanup_to_dishwasher', "table_cleanup_to_sink", "table_setup_from_dishwasher", "table_setup_from_dresser"]
 		# self.task_list = ["can","lift","square","tool_hang"]
-		# self.environment_names = ['PickPlaceCan','Lift','NutAssemblySquare', 'ToolHang']
+		self.environment_names = ['table_cleanup_to_dishwasher', "table_cleanup_to_sink", "table_setup_from_dishwasher", "table_setup_from_dresser"]
 						
 		self.num_demos = np.array([111, 110, 111, 111])
 		self.cummulative_num_demos = self.num_demos.cumsum()
@@ -300,7 +300,9 @@ class MOMART_Dataset(OrigMOMART_Dataset):
 	
 	def compute_statistics(self):
 
-		self.state_size = 28
+		# self.state_size = 28
+		# temporarily set to 506
+		self.state_size = 506	
 		self.total_length = self.__len__()
 		mean = np.zeros((self.state_size))
 		variance = np.zeros((self.state_size))
@@ -400,20 +402,23 @@ class MOMART_RobotObjectDataset(MOMART_Dataset):
 
 		return super().__getitem__(index)
 
-	# def __getitem__(self, index):
+	def __getitem__(self, index):
 
-	# 	data_element = copy.deepcopy(super().__getitem__(index))
+		data_element = copy.deepcopy(super().__getitem__(index))
 		
-	# 	# data_element['demo'] = data_element['demo'][...,7:]
+
+		data_element['old-demo'] = copy.deepcopy(data_element['demo'])
+		data_element['demo'] = data_element['flat-state']
+		# data_element['demo'] = data_element['demo'][...,7:]
 
 
-	# 	# data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
-	# 	# start_index = 0
-	# 	# object_traj = data_element['object-state'][:,start_index:start_index+7]
+		# data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
+		# start_index = 0
+		# object_traj = data_element['object-state'][:,start_index:start_index+7]
 		
-	# 	# demo = np.concatenate([data_element['demo'],object_traj],axis=-1)
-	# 	# data_element['demo'] = copy.deepcopy(demo)
+		# demo = np.concatenate([data_element['demo'],object_traj],axis=-1)
+		# data_element['demo'] = copy.deepcopy(demo)
 
-	# 	# # print("SHAPE OF 2nd DEMO",data_element['demo'].shape)
+		# # print("SHAPE OF 2nd DEMO",data_element['demo'].shape)
 
-	# 	return data_element
+		return data_element

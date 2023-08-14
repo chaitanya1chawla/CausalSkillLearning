@@ -463,7 +463,8 @@ class PolicyManager_BaseClass():
 			self.visualizer = RoboMimicRobotObjectVisualizer(args=self.args)			
 		elif self.args.data in ['FrankaKitchenRobotObject']:
 			self.visualizer = FrankaKitchenVisualizer(args=self.args)
-
+		elif self.args.data in ['MOMARTRobotObject']:
+			self.visualizer = FetchMOMARTVisualizer(args=self.args)
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
@@ -2044,11 +2045,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		elif self.args.data in ['MOMARTRobotObject']:
 
-			self.state_size = 28
-			self.state_dim = 28
-
 			# self.state_size = 28
 			# self.state_dim = 28
+
+			self.state_size = 506
+			self.state_dim = 506
 
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
