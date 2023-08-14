@@ -95,3 +95,12 @@
 ############################################
 # Full flat state
 // CUDA_VISIBLE_DEVICES=1 python Master.py --train=1 --setting=pretrain_sub --name=MMROPFull_debug --data=MOMARTRobotObject --var_skill_length=1 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=10000 --datadir=/data/tanmayshankar/Datasets/MOMART/ --smoothen=0 --task_based_shuffling=0 --logdir=/data/tanmayshankar/TrainingLogs/ --z_dimensions=32 --kl_weight=0.001 --normalization=minmax
+
+# Full dim
+// CUDA_VISIBLE_DEVICES=1 python Master.py --train=1 --setting=pretrain_sub --name=MMROPFull_debug --data=MOMARTRobotObject --var_skill_length=1 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=10000 --datadir=/data/tanmayshankar/Datasets/MOMART/ --smoothen=0 --task_based_shuffling=0 --logdir=/data/tanmayshankar/TrainingLogs/ --z_dimensions=32 --kl_weight=0.001 --normalization=minmax
+
+# 
+// CUDA_VISIBLE_DEVICES=2 python Master.py --train=0 --setting=pretrain_sub --name=MMROPFull_debug_Eval --data=MOMARTRobotObject --var_skill_length=1 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=10000 --datadir=/data/tanmayshankar/Datasets/MOMART/ --smoothen=0 --task_based_shuffling=0 --logdir=/data/tanmayshankar/TrainingLogs/ --z_dimensions=32 --kl_weight=0.001 --normalization=minmax --model=/data/tanmayshankar/TrainingLogs/MMROPFull_debug/saved_models/Model_epoch0
+
+# 
+// CUDA_VISIBLE_DEVICES=2 python Master.py --train=0 --setting=pretrain_sub --name=MMROP_VizTrial2_Eval --data=MOMARTRobotObject --var_skill_length=1 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=10000 --datadir=/data/tanmayshankar/Datasets/MOMART/ --smoothen=0 --task_based_shuffling=0 --logdir=/data/tanmayshankar/TrainingLogs/ --z_dimensions=32 --kl_weight=0.001 --normalization=minmax --model=/data/tanmayshankar/TrainingLogs/MMROPFull_debug/saved_models/Model_epoch0

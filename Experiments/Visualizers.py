@@ -1603,7 +1603,7 @@ class FrankaKitchenVisualizer(object):
 			# self.environment.reset()
 			new_image = self.set_joint_pose_return_image(trajectory[t])
 
-			self.environment.reset()
+			# self.environment.reset()
 			image_list.append(copy.deepcopy(new_image))
 
 		gif_file_name = os.path.join(gif_path,gif_name)
@@ -1659,7 +1659,7 @@ class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 
 	# 	# State dict
 	# 	state_dict = {}
-	# 	state_dict['state'] = modified_state
+	# 	state_dict['states'] = modified_state
 
 	# 	self.environment.reset_to(state_dict)
 	# 	self.environment.env.sync_state()
@@ -1668,10 +1668,10 @@ class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 
 		# State dict
 		state_dict = {}
-		state_dict['state'] = pose
+		state_dict['states'] = pose
 
 		self.environment.reset_to(state_dict)
-		self.environment.env.sync_state()
+		# self.environment.env.sync_state()
 
 
 	def set_joint_pose_return_image(self, pose, arm='both', gripper=False):

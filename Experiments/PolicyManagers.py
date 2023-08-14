@@ -1640,6 +1640,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
 			self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
 
+			if self.args.data in ['MOMARTRobotObject']:
+				self.norm_denom_value[self.norm_denom_value==0.]=1.
 
 		if self.args.data in ['MIME','OldMIME']:
 			self.state_size = 16			
@@ -2049,7 +2051,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# self.state_dim = 28
 
 			self.state_size = 506
-			self.state_dim = 506
+			self.state_dim = 506			
 
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
