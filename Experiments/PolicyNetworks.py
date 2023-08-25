@@ -1589,7 +1589,6 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 
 # 	def __init__(self):
 
-
 class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNetwork_Batch):
 
 	def __init__(self, input_size, hidden_size, z_dimensions, args, number_layers=4):
@@ -2280,6 +2279,51 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 
 			return concatenated_latent_z, aggregated_logprobability, aggregated_entropy, aggregated_kl_divergence		
 
+class ContinuousSoftEncoderNetwork(ContinuousEncoderNetwork):
+
+	def __init__(self, input_size, hidden_size, output_size, args, batch_size=1):
+
+		# Ensures inheriting from torch.nn.Module goes nicely and cleanly. 	
+		super(ContinuousSoftEncoderNetwork, self).__init__()
+
+		sys.path.append('/home/tshankar/Research/Code/PointMAE')
+
+		self.define_soft_input_layer()
+
+	def define_soft_input_layer(self):
+
+		import deploy_model
+
+		self.PointMAE_model = deploy_model.return_model()
+
+	def forward(self, input, epsilon=0.001, network_dict=None, size_dict=None, z_sample_to_evaluate=None, artificial_batch_size=None):
+		return super().forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate, artificial_batch_size)
+	
+
+class ContinuousFactoredSoftEncoderNetwork(ContinuousFactoredEncoderNetwork):
+
+	def __init__(self, input_size, hidden_size, output_size, args, batch_size=1):
+
+		# Using its own init function.
+		super(ContinuousFactoredSoftEncoderNetwork, self).__init__(input_size, hidden_size, output_size, args)
+
+		sys.path.append('/home/tshankar/Research/Code/PointMAE')
+
+		self.define_soft_input_layer()
+
+	def define_soft_input_layer(self):
+
+		import deploy_model
+
+		self.PointMAE_model = deploy_model.return_model()
+
+	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
+		return super().forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate)
+	
+
+
+		
+
 class CriticNetwork(torch.nn.Module):
 
 	def __init__(self, input_size, hidden_size, output_size, args=None, number_layers=4):
@@ -2599,3 +2643,4 @@ class MLPGaussianActor(torch.nn.Module):
             log_prob = dist.log_prob(act)
 
         return dist, log_prob
+

@@ -353,3 +353,6 @@ from locale import normalize
 ##############################################
 # Run in Python38 Env
 / python Master.py --train=1 --setting=pretrain_sub --name=RTRO_debugpy38 --data=RoboturkRobotObjects --var_skill_length=1 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=1000 --datadir=/home/tshankar/Research/Code/Data/Datasets/Roboturk/ --smoothen=0 --task_based_shuffling=0 --logdir=/data/tanmayshankar/TrainingLogs/  --split_stream_encoder=1 --z_dimensions=16 --kl_weight=0. --relative_state_reconstruction_loss_weight=10. --object_pure_relative_state=1
+
+# Try abs run
+/ python CausalSkillLearning/Experiments/Master.py --train=1 --setting=pretrain_sub --name=RTRO_debugpy38 --data=RoboturkRobotObjects --var_skill_length=1 --number_layers=4 --hidden_size=48 --batch_size=32 --no_mujoco=1 --seed=0 --epsilon_from=0.3 --epsilon_to=0.1 --epsilon_over=100 --display_freq=2000 --epochs=1000 --datadir=/home/tshankar/Research/Code/Data/Datasets/Roboturk/ --smoothen=0 --task_based_shuffling=0 --logdir=/data/tanmayshankar/TrainingLogs/  --split_stream_encoder=1 --z_dimensions=16 --kl_weight=0. --relative_state_reconstruction_loss_weight=10. --object_pure_relative_state=1
