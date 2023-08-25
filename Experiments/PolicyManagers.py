@@ -95,7 +95,7 @@ class PolicyManager_BaseClass():
 				os.mkdir(logdir)
 			# # Create TF Logger. 
 			# self.tf_logger = TFLogger.Logger(logdir)
-		else:
+		# else:
 			# self.tf_logger = TFLogger.Logger()
 
 		if self.args.data in ['MIME','OldMIME'] and not(self.args.no_mujoco):
