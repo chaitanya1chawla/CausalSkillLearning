@@ -1623,15 +1623,14 @@ class FrankaKitchenVisualizer(object):
 class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 
 	def __init__(self, has_display=False, args=None, just_objects=True):
-		
-		
+				
 		# super(FetchMOMARTVisualizer, self).__init__(has_display=has_display, args=args, just_objects=False)
 		self.args = args
 		self.has_display = has_display
 		self.just_objects = just_objects
 		default_task_id = "Viz"		
 		self.create_initial_environment()	
-		self.image_size = 300
+		self.image_size = 600
 	
 	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
 
@@ -1665,28 +1664,17 @@ class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 			modified_state['states'][467:474] = object_state
 
 		else:
-			modified_state = pose
-
-		# State dict
-		state_dict = {}
-		state_dict['states'] = modified_state
-
-		self.environment.reset_to(state_dict)
-		self.environment.env.sync_state()
-
-	def set_joint_pose(self, pose, arm='both', gripper=False, env=None):
-
-		# State dict
-		state_dict = {}
-		state_dict['states'] = pose
+			modified_state = {}
+			modified_state['states'] = pose
 
 		try:
-			self.environment.reset_to(state_dict)
+			self.environment.reset_to(modified_state)
 		except:
+			print("Something went wrong. Help!")
 			import pybullet as p
 			p.resetSimulation()
-			self.create_initial_environment()
-		# self.environment.env.sync_state()
+			self.create_initial_environment()		
+
 
 
 	def set_joint_pose_return_image(self, pose, arm='both', gripper=False):

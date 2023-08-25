@@ -182,7 +182,11 @@ class MOMART_Dataset(OrigMOMART_Dataset):
 		
 		super(MOMART_Dataset, self).__init__(args)	
 
-		self.stat_dir_name = 'MOMART'
+		if self.args.data in ['MOMARTRobotObjectFlat']:
+			self.stat_dir_name = 'MOMARTFlat'	
+		else:
+			self.stat_dir_name = 'MOMART'
+
 		# Now that we've run setup, compute dataset_trajectory_lengths for smart batching.
 		self.dataset_trajectory_lengths = np.zeros(self.total_length)
 		for index in range(self.total_length):
@@ -407,7 +411,7 @@ class MOMART_RobotObjectDataset(MOMART_Dataset):
 		data_element = copy.deepcopy(super().__getitem__(index))
 		
 
-		if self.args.data is in ['MOMARTRobotObjectFlat']:
+		if self.args.data in ['MOMARTRobotObjectFlat']:
 			data_element['old-demo'] = copy.deepcopy(data_element['demo'])
 			data_element['demo'] = data_element['flat-state']
 		# data_element['demo'] = data_element['demo'][...,7:]

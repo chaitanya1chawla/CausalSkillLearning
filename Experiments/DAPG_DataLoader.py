@@ -260,7 +260,6 @@ class DAPG_PreDataset(Dataset):
 		np.save(os.path.join(statdir, self.getname() + "_Vel_Min.npy"), vel_min_value)
 		np.save(os.path.join(statdir, self.getname() + "_Vel_Max.npy"), vel_max_value)
 
-
 class DAPG_Dataset(Dataset):
 
 	def __init__(self, args):
