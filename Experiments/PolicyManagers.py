@@ -17,7 +17,8 @@ from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, To
 	FrankaKitchenVisualizer, FetchMOMARTVisualizer #, MocapVisualizer
 
 # from Visualizers import *
-import TFLogger, DMP, RLUtils
+# import TFLogger, DMP, RLUtils
+import DMP, RLUtils
 
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
 use_cuda = torch.cuda.is_available()
@@ -92,10 +93,10 @@ class PolicyManager_BaseClass():
 			logdir = os.path.join(logdir, "logs")
 			if not(os.path.isdir(logdir)):
 				os.mkdir(logdir)
-			# Create TF Logger. 
-			self.tf_logger = TFLogger.Logger(logdir)
+			# # Create TF Logger. 
+			# self.tf_logger = TFLogger.Logger(logdir)
 		else:
-			self.tf_logger = TFLogger.Logger()
+			# self.tf_logger = TFLogger.Logger()
 
 		if self.args.data in ['MIME','OldMIME'] and not(self.args.no_mujoco):
 			self.visualizer = BaxterVisualizer(args=self.args)
@@ -6694,10 +6695,10 @@ class PolicyManager_BaselineRL(PolicyManager_BaseClass):
 			self.update_networks()
 
 	def update_plots(self, counter):
-		self.tf_logger.scalar_summary('Total Episode Reward', copy.deepcopy(self.episode_reward_statistics), counter)
-		self.tf_logger.scalar_summary('Batch Rewards', self.batch_reward_statistics/self.batch_size, counter)
-		self.tf_logger.scalar_summary('Policy Loss', self.policy_loss_statistics/self.batch_size, counter)
-		self.tf_logger.scalar_summary('Critic Loss', self.critic_loss_statistics/self.batch_size, counter)
+		# self.tf_logger.scalar_summary('Total Episode Reward', copy.deepcopy(self.episode_reward_statistics), counter)
+		# self.tf_logger.scalar_summary('Batch Rewards', self.batch_reward_statistics/self.batch_size, counter)
+		# self.tf_logger.scalar_summary('Policy Loss', self.policy_loss_statistics/self.batch_size, counter)
+		# self.tf_logger.scalar_summary('Critic Loss', self.critic_loss_statistics/self.batch_size, counter)
 
 		if counter%self.args.display_freq==0:
 
@@ -6705,7 +6706,7 @@ class PolicyManager_BaselineRL(PolicyManager_BaseClass):
 			
 			# Rollout policy.
 			self.rollout(random=False, test=True, visualize=True)
-			self.tf_logger.gif_summary("Rollout Trajectory", [np.array(self.image_trajectory)], counter)
+			# self.tf_logger.gif_summary("Rollout Trajectory", [np.array(self.image_trajectory)], counter)
 
 		# Now that we've updated these into TB, reset stats. 
 		self.reset_statistics()
@@ -7416,7 +7417,7 @@ class PolicyManager_Imitation(PolicyManager_Pretrain, PolicyManager_BaselineRL):
 		self.optimizer.step()
 
 	def update_plots(self, counter, logprobabilities):
-		self.tf_logger.scalar_summary('Policy LogLikelihood', torch.mean(logprobabilities), counter)
+		# self.tf_logger.scalar_summary('Policy LogLikelihood', torch.mean(logprobabilities), counter)
 
 		if counter%self.args.display_freq==0:
 
@@ -7424,7 +7425,7 @@ class PolicyManager_Imitation(PolicyManager_Pretrain, PolicyManager_BaselineRL):
 			
 			# Rollout policy.
 			self.rollout(random=False, test=True, visualize=True)
-			self.tf_logger.gif_summary("Rollout Trajectory", [np.array(self.image_trajectory)], counter)
+			# self.tf_logger.gif_summary("Rollout Trajectory", [np.array(self.image_trajectory)], counter)
 
 	def run_iteration(self, counter, i):
 
@@ -7525,7 +7526,7 @@ class PolicyManager_Imitation(PolicyManager_Pretrain, PolicyManager_BaselineRL):
 		np.save(os.path.join(self.dir_name,"Mean_Reward_{0}.npy".format(self.args.name)),self.total_rewards.mean())
 
 		# Add average reward to tensorboard.
-		self.tf_logger.scalar_summary('Average Reward', self.total_rewards.mean(), model_epoch)
+		# self.tf_logger.scalar_summary('Average Reward', self.total_rewards.mean(), model_epoch)
 
 	def train(self, model=None):
 
@@ -10400,19 +10401,19 @@ class PolicyManager_CycleConsistencyTransfer(PolicyManager_Transfer):
 		super().update_plots(counter, viz_dict)
 		
 		# Adding additional summaries based on cycle reconstruction.
-		self.tf_logger.scalar_summary('Cycle Reconstructed Loglikelihood', self.cycle_reconstructed_loglikelihood.mean(), counter)
-		self.tf_logger.scalar_summary('Cycle Reconstruction Loss', self.cycle_reconstruction_loss, counter)
+		# self.tf_logger.scalar_summary('Cycle Reconstructed Loglikelihood', self.cycle_reconstructed_loglikelihood.mean(), counter)
+		# self.tf_logger.scalar_summary('Cycle Reconstruction Loss', self.cycle_reconstruction_loss, counter)
 
 		# Original trajectory. 
 		original_trajectory = viz_dict['source_subpolicy_inputs_original'][:,:,:self.source_manager.state_dim]
 		cycle_reconstructed_trajectory = viz_dict['source_subpolicy_inputs_crossdomain'][:,:,:self.source_manager.state_dim]
 
 		self.original_cycle_reconstructed_trajectory_diffs = copy.deepcopy((((original_trajectory - cycle_reconstructed_trajectory).detach().cpu().numpy())**2).mean())
-		self.tf_logger.scalar_summary('Cycle Reconstruction Error', self.original_cycle_reconstructed_trajectory_diffs, counter)
+		# self.tf_logger.scalar_summary('Cycle Reconstruction Error', self.original_cycle_reconstructed_trajectory_diffs, counter)
 
-		if self.args.real_translated_discriminator:
-			self.tf_logger.scalar_summary('Real Translated Discriminability Loss', self.weighted_real_translated_loss.mean(), counter)
-			self.tf_logger.scalar_summary('Real Translated Discriminator Loss', self.real_translated_discriminator_loss.mean(), counter)
+		# if self.args.real_translated_discriminator:
+			# self.tf_logger.scalar_summary('Real Translated Discriminability Loss', self.weighted_real_translated_loss.mean(), counter)
+			# self.tf_logger.scalar_summary('Real Translated Discriminator Loss', self.real_translated_discriminator_loss.mean(), counter)
 
 	def run_iteration(self, counter, i, skip_viz=False):
 
@@ -10816,9 +10817,9 @@ class PolicyManager_FixEmbedCycleTransfer(PolicyManager_CycleConsistencyTransfer
 		self.source_encoder_KL = 0.
 		self.source_reconstruction_loss = 0.
 		
-		self.tf_logger.scalar_summary('Real Translated Trajectory Discriminator Probability', self.traj_discriminator_prob.mean(), counter)
-		self.tf_logger.scalar_summary('Real Translated Trajectory Discriminator Logprobability', self.traj_discriminator_logprob.mean(), counter)
-		self.tf_logger.scalar_summary('Z Discriminator Logprobability', self.z_discriminator_logprob.mean(), counter)
+		# self.tf_logger.scalar_summary('Real Translated Trajectory Discriminator Probability', self.traj_discriminator_prob.mean(), counter)
+		# self.tf_logger.scalar_summary('Real Translated Trajectory Discriminator Logprobability', self.traj_discriminator_logprob.mean(), counter)
+		# self.tf_logger.scalar_summary('Z Discriminator Logprobability', self.z_discriminator_logprob.mean(), counter)
 
 		super().update_plots(counter, viz_dict)
 
@@ -10829,21 +10830,21 @@ class PolicyManager_FixEmbedCycleTransfer(PolicyManager_CycleConsistencyTransfer
 		if counter%self.args.display_freq==0:
 			self.set_translated_z_sets()
 
-			# Now actually add image plots.
-			self.tf_logger.image_summary("TSNE Combined Source and Translated Target Embeddings Perplexity 5", [self.translated_viz_dictionary['tsne_origsource_transtarget_p5']], counter)
-			self.tf_logger.image_summary("TSNE Combined Source and Translated Target Embeddings Perplexity 10", [self.translated_viz_dictionary['tsne_origsource_transtarget_p10']], counter)
-			self.tf_logger.image_summary("TSNE Combined Source and Translated Target Embeddings Perplexity 30", [self.translated_viz_dictionary['tsne_origsource_transtarget_p30']], counter)
+			# # Now actually add image plots.
+			# self.tf_logger.image_summary("TSNE Combined Source and Translated Target Embeddings Perplexity 5", [self.translated_viz_dictionary['tsne_origsource_transtarget_p5']], counter)
+			# self.tf_logger.image_summary("TSNE Combined Source and Translated Target Embeddings Perplexity 10", [self.translated_viz_dictionary['tsne_origsource_transtarget_p10']], counter)
+			# self.tf_logger.image_summary("TSNE Combined Source and Translated Target Embeddings Perplexity 30", [self.translated_viz_dictionary['tsne_origsource_transtarget_p30']], counter)
 
-			self.tf_logger.image_summary("TSNE Combined Translated Source and Target Embeddings Perplexity 5", [self.translated_viz_dictionary['tsne_transsource_origtarget_p5']], counter)
-			self.tf_logger.image_summary("TSNE Combined Translated Source and Target Embeddings Perplexity 10", [self.translated_viz_dictionary['tsne_transsource_origtarget_p10']], counter)
-			self.tf_logger.image_summary("TSNE Combined Translated Source and Target Embeddings Perplexity 30", [self.translated_viz_dictionary['tsne_transsource_origtarget_p30']], counter)
+			# self.tf_logger.image_summary("TSNE Combined Translated Source and Target Embeddings Perplexity 5", [self.translated_viz_dictionary['tsne_transsource_origtarget_p5']], counter)
+			# self.tf_logger.image_summary("TSNE Combined Translated Source and Target Embeddings Perplexity 10", [self.translated_viz_dictionary['tsne_transsource_origtarget_p10']], counter)
+			# self.tf_logger.image_summary("TSNE Combined Translated Source and Target Embeddings Perplexity 30", [self.translated_viz_dictionary['tsne_transsource_origtarget_p30']], counter)
 				
-			self.tf_logger.image_summary("TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 5", [self.translated_viz_dictionary['tsne_origsource_transtarget_traj_p5']], counter)
-			self.tf_logger.image_summary("TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 10", [self.translated_viz_dictionary['tsne_origsource_transtarget_traj_p10']], counter)
-			self.tf_logger.image_summary("TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 30", [self.translated_viz_dictionary['tsne_origsource_transtarget_traj_p30']], counter)
-			self.tf_logger.image_summary("TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 5", [self.translated_viz_dictionary['tsne_transsource_origtarget_traj_p5']], counter)
-			self.tf_logger.image_summary("TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10", [self.translated_viz_dictionary['tsne_transsource_origtarget_traj_p10']], counter)
-			self.tf_logger.image_summary("TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30", [self.translated_viz_dictionary['tsne_transsource_origtarget_traj_p30']], counter)
+			# self.tf_logger.image_summary("TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 5", [self.translated_viz_dictionary['tsne_origsource_transtarget_traj_p5']], counter)
+			# self.tf_logger.image_summary("TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 10", [self.translated_viz_dictionary['tsne_origsource_transtarget_traj_p10']], counter)
+			# self.tf_logger.image_summary("TSNE Combined Source and Translated Target Trajectory Embeddings Perplexity 30", [self.translated_viz_dictionary['tsne_origsource_transtarget_traj_p30']], counter)
+			# self.tf_logger.image_summary("TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 5", [self.translated_viz_dictionary['tsne_transsource_origtarget_traj_p5']], counter)
+			# self.tf_logger.image_summary("TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 10", [self.translated_viz_dictionary['tsne_transsource_origtarget_traj_p10']], counter)
+			# self.tf_logger.image_summary("TSNE Combined Translated Source and Target Trajectory Embeddings Perplexity 30", [self.translated_viz_dictionary['tsne_transsource_origtarget_traj_p30']], counter)
 
 	def run_iteration(self, counter, i, skip_viz=False):
 
