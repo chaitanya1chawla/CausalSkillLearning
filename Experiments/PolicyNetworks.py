@@ -2316,8 +2316,71 @@ class ContinuousFactoredSoftEncoderNetwork(ContinuousFactoredEncoderNetwork):
 		import deploy_model
 
 		self.PointMAE_model = deploy_model.return_model()
+		# Also get the unmasked encoder.
+		# self.PointMAE_unmasked_encoder = self.PointMAE_model.MAE_encoder.encoder
+		
+		self.n_patches = 26
+		self.pmae_representation_size = 384
+		self.hidden_size_1 = 64
+		self.hidden_size_2 = 16
+		self.maxpool_kernel_size = 6
+		self.representation_size = (self.n_patches//self.maxpool_kernel_size)*self.hidden_size_2
+		self.pc_linear_layer_1 = torch.nn.Linear(self.pmae_representation_size, self.hidden_size_1)		
+		self.pc_linear_layer_2 = torch.nn.Linear(self.hidden_size_1, self.hidden_size_2)		
+		# The max pool layer works on 4D. 
+		self.maxpoollayer_1 = torch.nn.MaxPool2d((self.maxpool_kernel_size,1))
+
+	# def post_process_linear_layer
+
+	def compute_point_cloud_representation(self, input_point_cloud)
+		
+		# For point cloud stream, run PointMAE model forward, get the representation.. 
+		# Assume we have element point_cloud.
+
+		# We have two options for the representation of the pointcloud. 
+		# Option #1: Find a representation of the all point patches.
+		# Option #2: Use representation of visible point patches.
+		# The Point-MAE paper has tested out reconstructing entire point clouds from the visible point clouds
+		# is perfectly successful, therefore is a useful representation. 
+		
+		# self.point_cloud_representation = self.PointMAE_unmasked_encoder(input_point_cloud)
+		# If 4Dimensional, reshape. 
+		if len(input_point_cloud.shape)>3:
+			reshaped_point_cloud = input_point_cloud.reshape(-1,input_point_cloud.shape[2],input_point_cloud.shape[3])
+			# Actually run representation. Reshaping is fine because it runs independently across batches.
+			reshaped_representation = self.PointMAE_model.encoder_forward(reshaped_point_cloud)
+			# Reshape representation back.
+			pointMAE_representation = reshaped_representation.reshape(input_point_cloud.shape[0], input_point_cloud.shape[1], self.n_patches, self.pmae_representation_size)
+		else:		
+			# Actually run representation. Reshaping is fine because it runs independently across batches.
+			pointMAE_representation = self.PointMAE_model.encoder_forward(input_point_cloud)
+
+		# # 
+		# reshaped_point_cloud = input_point_cloud.reshape(-1, input_point_cloud.shape[-2], input_point_cloud.shape[-1])
+		# reshaped_representation = self.PointMAE_model.encoder_forward(reshaped_point_cloud)
+		# pointMAE_representation = reshaped_representation.reshape()
+
+		# Linear transform 1. 
+		transformed_pmae_representation1 = self.pc_linear_layer_1(pointMAE_representation)
+		# MaxPool
+		maxpooled_representation = self.maxpoollayer_1(transformed_pmae_representation)
+		# Linear transform 2. 
+		pointcloud_representation = self.pc_linear_layer_2(maxpooled_representation).reshape(-1,self.representation_size)
+		
+		return pointcloud_representation
+			
 
 	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
+
+		# Need to think about how to handle the input being two streams now.. 
+		
+		# Get point cloud input. 
+		# input_point_cloud 
+
+		pointcloud_representation = self.compute_point_cloud_representation(input_point_cloud)
+
+		
+
 		return super().forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate)
 	
 
