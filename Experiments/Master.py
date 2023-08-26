@@ -399,6 +399,7 @@ def parse_arguments():
 	parser.add_argument('--robot_state_size',dest='robot_state_size',type=int,default=8,help='Default robot state size.')
 	parser.add_argument('--env_state_size',dest='env_state_size',type=int,default=7,help='Default environment state size.')
 	parser.add_argument('--object_pure_relative_state',dest='object_pure_relative_state',type=int,default=0,help='Whether or not to use pure relative state for env abstraction input. ')
+	parser.add_argument('--soft_object', dest='soft_object', type=int, default=0, elp='Whether or not we are learning with deformable objects.')
 
 	# Relative state reconstruction loss.
 	parser.add_argument('--relative_state_reconstruction_loss_weight', dest='relative_state_reconstruction_loss_weight', type=float, default=0., help='What weight to place on the relative state reconstruction loss in the robot-object setting..')	

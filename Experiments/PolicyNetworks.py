@@ -2209,6 +2209,11 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 
 		return super().forward(input, epsilon=epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=z_sample_to_evaluate, artificial_batch_size=artificial_batch_size)
 
+	def get_environment_input_representation(self, env_input)
+		
+		# Dummy function that we can override in the case of the soft object.
+		return env_input
+
 	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
 
 		# (1) Split input. 
@@ -2236,9 +2241,10 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 			# (2a) Run forward on robot stream.				
 			robot_latent_z, robot_logprob, robot_entropy, robot_kl_divergence = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample)
 
-			# (2b) Run forward on env stream.		
-			env_latent_z, env_logprob, env_entropy, env_kl_divergence = super().forward(env_input, epsilon, network_dict=self.env_network_dict, size_dict=self.env_size_dict, z_sample_to_evaluate=env_z_sample)
+			new_env_input = self.get_environment_input_representation(env_input)
 
+			# (2b) Run forward on env stream.							
+			env_latent_z, env_logprob, env_entropy, env_kl_divergence = super().forward(new_env_input, epsilon, network_dict=self.env_network_dict, size_dict=self.env_size_dict, z_sample_to_evaluate=env_z_sample)
 
 			##################################
 			# (3) Aggregate stream outputs. 
@@ -2331,8 +2337,8 @@ class ContinuousFactoredSoftEncoderNetwork(ContinuousFactoredEncoderNetwork):
 		self.maxpoollayer_1 = torch.nn.MaxPool2d((self.maxpool_kernel_size,1))
 
 	# def post_process_linear_layer
-
-	def compute_point_cloud_representation(self, input_point_cloud)
+	def get_environment_input_representation(self, input_point_cloud):
+	# def compute_point_cloud_representation(self, input_point_cloud):
 		
 		# For point cloud stream, run PointMAE model forward, get the representation.. 
 		# Assume we have element point_cloud.
@@ -2361,7 +2367,7 @@ class ContinuousFactoredSoftEncoderNetwork(ContinuousFactoredEncoderNetwork):
 		# pointMAE_representation = reshaped_representation.reshape()
 
 		# Linear transform 1. 
-		transformed_pmae_representation1 = self.pc_linear_layer_1(pointMAE_representation)
+		transformed_pmae_representation = self.pc_linear_layer_1(pointMAE_representation)
 		# MaxPool
 		maxpooled_representation = self.maxpoollayer_1(transformed_pmae_representation)
 		# Linear transform 2. 
@@ -2369,19 +2375,20 @@ class ContinuousFactoredSoftEncoderNetwork(ContinuousFactoredEncoderNetwork):
 		
 		return pointcloud_representation
 			
-
-	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
-
-		# Need to think about how to handle the input being two streams now.. 
+	# Now we don't have to overwrite forward of the factored encoder.
 		
-		# Get point cloud input. 
-		# input_point_cloud 
+	# def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
 
-		pointcloud_representation = self.compute_point_cloud_representation(input_point_cloud)
+	# 	# Need to think about how to handle the input being two streams now.. 
+		
+	# 	# Get point cloud input. 
+	# 	# input_point_cloud 
+
+	# 	pointcloud_representation = self.compute_point_cloud_representation(input_point_cloud)
 
 		
 
-		return super().forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate)
+	# 	return super().forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate)
 	
 
 
