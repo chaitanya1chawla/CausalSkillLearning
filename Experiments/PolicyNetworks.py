@@ -2313,12 +2313,11 @@ class ContinuousFactoredSoftEncoderNetwork(ContinuousFactoredEncoderNetwork):
 		# Using its own init function.
 		super(ContinuousFactoredSoftEncoderNetwork, self).__init__(input_size, hidden_size, output_size, args)
 
-		sys.path.append('/home/tshankar/Research/Code/PointMAE')
-
 		self.define_soft_input_layer()
 
 	def define_soft_input_layer(self):
 
+		sys.path.append('/home/tshankar/Research/Code/PointMAE')
 		import deploy_model
 
 		self.PointMAE_model = deploy_model.return_model()
@@ -2375,23 +2374,6 @@ class ContinuousFactoredSoftEncoderNetwork(ContinuousFactoredEncoderNetwork):
 		
 		return pointcloud_representation
 			
-	# Now we don't have to overwrite forward of the factored encoder.
-		
-	# def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
-
-	# 	# Need to think about how to handle the input being two streams now.. 
-		
-	# 	# Get point cloud input. 
-	# 	# input_point_cloud 
-
-	# 	pointcloud_representation = self.compute_point_cloud_representation(input_point_cloud)
-
-		
-
-	# 	return super().forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate)
-	
-
-
 		
 
 class CriticNetwork(torch.nn.Module):
