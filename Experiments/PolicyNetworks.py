@@ -2314,7 +2314,7 @@ class ContinuousSoftEncoderNetwork(ContinuousEncoderNetwork):
 
 # import deploy_model
 # import torch
-
+	
 # pmm = deploy_model.return_model()
 # device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
