@@ -2305,6 +2305,30 @@ class ContinuousSoftEncoderNetwork(ContinuousEncoderNetwork):
 	def forward(self, input, epsilon=0.001, network_dict=None, size_dict=None, z_sample_to_evaluate=None, artificial_batch_size=None):
 		return super().forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate, artificial_batch_size)
 	
+######################################
+# Backing up pattern
+######################################
+
+# import sys 
+# sys.path.append("/home/tshankar/Research/Code/PointMAE")
+
+# import deploy_model
+# import torch
+
+# pmm = deploy_model.return_model()
+# device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
+
+# bs = 8
+# ptz_size = 512
+# ptz = torch.randn(14,bs,ptz_size,3).to(device)
+
+# dpmm = torch.nn.DataParallel(pmm).to(device)
+
+# dpmm(ptz.reshape(-1,ptz_size,3))
+
+
+######################################
+######################################
 
 class ContinuousFactoredSoftEncoderNetwork(ContinuousFactoredEncoderNetwork):
 
