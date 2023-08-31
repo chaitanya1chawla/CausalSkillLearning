@@ -88,16 +88,17 @@ class RealWorldRigid_PreDataset(Dataset):
 		# Assumes pose_sequence is a dictionary with 3 keys: valid, position, and orientation. 
 		# valid is 1 when the pose stored is valid, and 0 otherwise. 
 
+		# Only interpolate if ther are invalid poses. Otherwise jsut return. 
+		if (pose_sequence['valid']==1).all():
+			return pose_sequence
+
 		# Pass all data until last valid pose. 
 		traj_length = pose_sequence['valid'].shape[0]
 		valid_indices = np.where(pose_sequence['valid'])[0]
 		first_valid_index = valid_indices[0]
 		last_valid_index = valid_indices[-1]
 
-		# This should really be in the parent function, that only calls this function if some poses are Not valid. 
-		if (pose_sequence['valid']==1).all():
-			return pose_sequence
-			
+
 		# Interpolate positions and orientations. 
 		interpolated_positions = self.interpolate_position(valid=pose_sequence['valid'][first_valid_index:last_valid_index+1], \
 						     position_sequence=pose_sequence['position'][first_valid_index:last_valid_index+1])
@@ -121,7 +122,17 @@ class RealWorldRigid_PreDataset(Dataset):
 
 		return pose_sequence
 
-	def process_demonstration(self, demonstration):
+	def compute_relative_poses(self, demonstration):
+		pass 
+
+	def downsample_data(self, demonstration):
+
+		# Downsample each stream.
+		number_timepoints = demonstration['js_pos'].shape[0] // self.ds_freq[demonstration['task_id']]
+
+
+
+	def process_demonstration(self, demonstration, task_index):
 
 		##########################################
 		# Structure of data. 
@@ -138,20 +149,43 @@ class RealWorldRigid_PreDataset(Dataset):
 		# Things to do within this function. 
 		##########################################
 
-		# 0) First select primary camera. 
-		# 1) For primary camerya
+		# 0) Collect all data relevant streams.
+		# 1) For primary camera, retrieve and interpolate tag poses for that camera. 
+		# 2) Compute relative poses. 
+		# 3) Downsample all relevant data streams. 
+		# 4) Return new demo file. 
 
-		# In this function, we are going to interpolate tag data, compute relative poses of tags, and downsample. 
+		#############
+		# 0) Pop irrelevant data from dictionary. 
+		#############
 
-		# Get data streams we care about. 
-		# Joint States, Robot States, Gripper States, Ground State, Object 1 State, Object 2 State. 
-		# Basically if we just use robot_states that's enough.. 
+		irrelevant_data = ['js_vel', 'js_eff', 'rs_angle']
+		for key in irrelevant_data:
+			demonstration.pop(key)
+		
+		# Add task ID to demo. 
+		demonstration['task_id'] = task_index
+		demonstration['task_name'] = self.task_list[task_index]
 
-		# Interpolate. 
+		#############
+		# 1) For primary camera, retrieve tag poses. 
+		#############
+		
+		demonstration['object0_absolute_pose'] = self.interpolate_pose( demonstration['tag0'][demonstration['cam{0}'.format(demonstration['primary_camera'])]] )
+		demonstration['object1_absolute_pose'] = self.interpolate_pose( demonstration['tag1'][demonstration['cam{0}'.format(demonstration['primary_camera'])]] )
+		demonstration['object2_absolute_pose'] = self.interpolate_pose( demonstration['tag2'][demonstration['cam{0}'.format(demonstration['primary_camera'])]] )
 
-		# Downsample each stream.
-		number_timepoints = demonstration.shape[0] // self.ds_freq[i]
+		#############
+		# 2) Compute relative poses.
+		#############
+		
+		self.compute_relative_poses(demonstration=demonstration)
 
+		#############
+		# 3) Downsample.
+		#############
+		
+		self.downsample_data(demonstration=demonstration)
 
 	
 		
@@ -181,39 +215,39 @@ class RealWorldRigid_PreDataset(Dataset):
 		print("###################################")
 		print("About to process real world dataset.")
 
-		for i in range(len(self.task_list)):
+		for task_index in range(len(self.task_list)):
 
 			self.task_demo_array = []
 
 			print("###################################")
-			print("Processing task: ", i, " of ", self.number_tasks)
+			print("Processing task: ", task_index, " of ", self.number_tasks)
 
 			# Set file path for this task.
-			task_file_path = os.path.join(self.dataset_directory, self.task_list[i], 'Numpy_Demos')
+			task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'Numpy_Demos')
 
 			#########################	
 			# For every demo in this task
 			#########################
 
-			for j in range(self.num_demos[i]):
+			for j in range(self.num_demos[task_index]):
 				
-				print("###################################")
-				print("Processing task: ", i, " of ", self.number_tasks)
+				print("####################")
+				print("Processing demo: ", j, " of ", self.num_demos[task_index], " from task ", task_index)
 
 				file = os.path.join(task_file_path, 'Demo_{0}.npy'.format(j+1))
-				demonstration = np.load(file, allow_pickle=True)
+				demonstration = np.load(file, allow_pickle=True).item()
 
 				#########################
 				# Now process in whatever way necessary. 
 				#########################
 
-				processed_demonstration = self.process_demonstration(demonstration)
+				processed_demonstration = self.process_demonstration(demonstration, task_index)
 
 				self.task_demo_array.append(processed_demonstration)
 
 
 			# For each task, save task_file_list to One numpy. 
-			task_numpy_path = os.path.join(self.dataset_directory, self.task_list[i], "New_Task_Demo_Array.npy")
+			task_numpy_path = os.path.join(self.dataset_directory, self.task_list[task_index], "New_Task_Demo_Array.npy")
 			np.save(self.task_demo_array, task_numpy_path)
 
 			# # Changing file name.
