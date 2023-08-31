@@ -120,10 +120,28 @@ class RealWorldRigid_PreDataset(Dataset):
 			pose_sequence['position'][last_valid_index+1:] = pose_sequence['position'][last_valid_index]
 			pose_sequence['orientation'][last_valid_index+1:] = pose_sequence['orientation'][last_valid_index]
 
+		# Pop validity. 
+		pose_sequence.pop('validity')
+
 		return pose_sequence
 
 	def compute_relative_poses(self, demonstration):
-		pass 
+		
+		from scipy.spatial.transform import Rotation as R
+
+		# Get poses of object1 and object2 with respect to ground. 
+		demonstration['object1_pose'] = {}
+		demonstration['object1_pose']['position'] = demonstration['object1_cam_frame_pose']['position'] - demonstration['ground_cam_frame_pose']['position']
+		demonstration['object2_pose']['position'] = demonstration['object2_cam_frame_pose']['position'] - demonstration['ground_cam_frame_pose']['position']
+
+		r_ground = R.from_quat(demonstration['ground_cam_frame_pose']['orientation'])
+		r_obj1 = R.from_quat(demonstration['object1_cam_frame_pose']['orientation'])
+		r_obj2 = R.from_quat(demonstration['object2_cam_frame_pose']['orientation'])
+
+		demonstration['object1_pose']['orientation'] = (r_ground.inv()*r_obj1).as_quat(canonical=True)
+		demonstration['object2_pose']['orientation'] = (r_ground.inv()*r_obj2).as_quat(canonical=True)
+
+		return demonstration
 
 	def downsample_data(self, demonstration):
 
@@ -149,17 +167,26 @@ class RealWorldRigid_PreDataset(Dataset):
 		# Things to do within this function. 
 		##########################################
 
-		# 0) Collect all data relevant streams.
-		# 1) For primary camera, retrieve and interpolate tag poses for that camera. 
+		
+		# 0) For primary camera, retrieve and interpolate tag poses for that camera. 
+		# 1) Remove irrelevant data streams.
 		# 2) Compute relative poses. 
 		# 3) Downsample all relevant data streams. 
 		# 4) Return new demo file. 
 
 		#############
+		# 1) For primary camera, retrieve tag poses. 
+		#############
+		
+		demonstration['ground_cam_frame_pose'] = self.interpolate_pose( demonstration['tag0'][demonstration['cam{0}'.format(demonstration['primary_camera'])]] )
+		demonstration['object1_cam_frame_pose'] = self.interpolate_pose( demonstration['tag1'][demonstration['cam{0}'.format(demonstration['primary_camera'])]] )
+		demonstration['object2_cam_frame_pose'] = self.interpolate_pose( demonstration['tag2'][demonstration['cam{0}'.format(demonstration['primary_camera'])]] )
+		
+		#############
 		# 0) Pop irrelevant data from dictionary. 
 		#############
 
-		irrelevant_data = ['js_vel', 'js_eff', 'rs_angle']
+		irrelevant_data = ['js_vel', 'js_eff', 'rs_angle', 'tag0', 'tag1', 'tag2', 'primary_camera']
 		for key in irrelevant_data:
 			demonstration.pop(key)
 		
@@ -168,18 +195,10 @@ class RealWorldRigid_PreDataset(Dataset):
 		demonstration['task_name'] = self.task_list[task_index]
 
 		#############
-		# 1) For primary camera, retrieve tag poses. 
-		#############
-		
-		demonstration['object0_absolute_pose'] = self.interpolate_pose( demonstration['tag0'][demonstration['cam{0}'.format(demonstration['primary_camera'])]] )
-		demonstration['object1_absolute_pose'] = self.interpolate_pose( demonstration['tag1'][demonstration['cam{0}'.format(demonstration['primary_camera'])]] )
-		demonstration['object2_absolute_pose'] = self.interpolate_pose( demonstration['tag2'][demonstration['cam{0}'.format(demonstration['primary_camera'])]] )
-
-		#############
 		# 2) Compute relative poses.
 		#############
 		
-		self.compute_relative_poses(demonstration=demonstration)
+		demonstration = self.compute_relative_poses(demonstration=demonstration)
 
 		#############
 		# 3) Downsample.
@@ -187,11 +206,10 @@ class RealWorldRigid_PreDataset(Dataset):
 		
 		self.downsample_data(demonstration=demonstration)
 
-	
-		
+
 		# Smoothen if necessary. 
 
-		# Compute relative pose..
+		return demonstration
 
 		
 	def setup(self):
