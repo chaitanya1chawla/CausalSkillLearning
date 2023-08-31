@@ -12,7 +12,7 @@ def resample(original_trajectory, desired_number_timepoints):
 class RealWorldRigid_PreDataset(Dataset): 
 
 	# Class implementing instance of RealWorld Rigid Body Dataset. 
-	def __init__(self, args):		
+	def __init__(self, args):
 		
 		self.args = args
 		if self.args.datadir is None:
@@ -40,6 +40,126 @@ class RealWorldRigid_PreDataset(Dataset):
 
 		self.stat_dir_name='Robomimic'
 
+		# Define quaternion normalization function.
+	def normalize_quaternion(self, q):
+		return q/np.linalg.norm(q)
+	
+	def interpolate_position(self, valid=None, position_sequence=None):
+		
+		from scipy import interpolate
+
+		# Interp1d from Scipy expects the last dimension to be the dimension we are ninterpolating over. 
+		valid_positions = np.swapaxes(position_sequence[valid==1], 1, 0)
+		valid_times = np.where(valid==1)[0]
+		query_times = np.arange(0, len(position_sequence))
+
+		# Create interpolating function. 
+		interpolating_function = interpolate.interp1d(valid_times, valid_positions)
+
+		# Query interpolating function. 
+		interpolated_positions = interpolating_function(query_times)
+
+		# Swap axes back and return. 
+		return np.swapaxes(interpolated_positions, 1, 0)
+	
+	def interpolate_orientation(self, valid=None, orientation_sequence=None):
+
+		from scipy.spatial.transform import Rotation as R
+		from scipy.spatial.transform import Slerp
+
+		valid_orientations = orientation_sequence[valid==1]
+		rotation_sequence = R.concatenate(R.from_quat(valid_orientations))
+		valid_times = np.where(valid==1)[0]
+		query_times = np.arange(0, len(orientation_sequence))
+
+		# Create slerp object. 
+		slerp_object = Slerp(valid_times, rotation_sequence)
+
+		# Query the slerp object. 
+		interpolated_rotations = slerp_object(query_times)
+
+		# Convert to quaternions.
+		interpolated_quaternion_sequence = interpolated_rotations.as_quat(canonical=True)
+		
+		return interpolated_quaternion_sequence
+
+	def interpolate_pose(self, pose_sequence):
+
+		# Assumes pose_sequence is a dictionary with 3 keys: valid, position, and orientation. 
+		# valid is 1 when the pose stored is valid, and 0 otherwise. 
+
+		# Pass all data until last valid pose. 
+		traj_length = pose_sequence['valid'].shape[0]
+		valid_indices = np.where(pose_sequence['valid'])[0]
+		first_valid_index = valid_indices[0]
+		last_valid_index = valid_indices[-1]
+
+		# This should really be in the parent function, that only calls this function if some poses are Not valid. 
+		if (pose_sequence['valid']==1).all():
+			return pose_sequence
+			
+		# Interpolate positions and orientations. 
+		interpolated_positions = self.interpolate_position(valid=pose_sequence['valid'][first_valid_index:last_valid_index+1], \
+						     position_sequence=pose_sequence['position'][first_valid_index:last_valid_index+1])
+		interpolated_orientations = self.interpolate_orientation(valid=pose_sequence['valid'][first_valid_index:last_valid_index+1], \
+							orientation_sequence=pose_sequence['orientation'][first_valid_index:last_valid_index+1])
+
+		# Copy interpolated position until last valid index. 
+		pose_sequence['position'][first_valid_index:last_valid_index] = interpolated_positions
+		pose_sequence['orientation'][first_valid_index:last_valid_index] = interpolated_orientations
+
+		# Copy over valid poses to start of trajectory and end of trajectory if invalid:
+		if first_valid_index>0:
+			# Until first valid index, these are all invalid. 
+			pose_sequence['position'][:first_valid_index] = pose_sequence['position'][first_valid_index]
+			pose_sequence['orientation'][:first_valid_index] = pose_sequence['orientation'][first_valid_index]
+		
+		# Check if last valid index is before the end of the trajectory, i.e. if there are invalid points at the end. 
+		if last_valid_index<(traj_length-1):
+			pose_sequence['position'][last_valid_index+1:] = pose_sequence['position'][last_valid_index]
+			pose_sequence['orientation'][last_valid_index+1:] = pose_sequence['orientation'][last_valid_index]
+
+		return pose_sequence
+
+	def process_demonstration(self, demonstration):
+
+		##########################################
+		# Structure of data. 
+		##########################################		
+		# Assumes demonstration is a dictionary. 
+		# Keys in the dictionary correspond to different data. The keys that we care about are: 
+		# rs_angle, rs_pose, gripper_state, js_pos, tag0, tag1, tag2, primary_camera. 
+		# Within tag#:
+		# 	camera#:
+		# 		valid, position, orientation. 
+		##########################################
+
+		##########################################
+		# Things to do within this function. 
+		##########################################
+
+		# 0) First select primary camera. 
+		# 1) For primary camerya
+
+		# In this function, we are going to interpolate tag data, compute relative poses of tags, and downsample. 
+
+		# Get data streams we care about. 
+		# Joint States, Robot States, Gripper States, Ground State, Object 1 State, Object 2 State. 
+		# Basically if we just use robot_states that's enough.. 
+
+		# Interpolate. 
+
+		# Downsample each stream.
+		number_timepoints = demonstration.shape[0] // self.ds_freq[i]
+
+
+	
+		
+		# Smoothen if necessary. 
+
+		# Compute relative pose..
+
+		
 	def setup(self):
 		# Load data from all tasks. 			
 		# numpy_data_path = os.path.join(self.dataset_directory, "*/Numpy_Files/*.npy")
@@ -87,19 +207,7 @@ class RealWorldRigid_PreDataset(Dataset):
 				# Now process in whatever way necessary. 
 				#########################
 
-
-				# Get data streams we care about. 
-				# Joint States, Robot States, Gripper States, Ground State, Object 1 State, Object 2 State. 
-				# Basically if we just use robot_states that's enough.. 
-
-				# Downsample each stream.
-				number_timepoints = demonstration.shape[0] // self.ds_freq[i]
-				# demonstration['']
-			
-				
-				# Smoothen if necessary. 
-
-				# Compute relative pose..
+				processed_demonstration = self.process_demonstration(demonstration)
 
 				self.task_demo_array.append(processed_demonstration)
 
