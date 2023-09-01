@@ -24,7 +24,7 @@ class RealWorldRigid_PreDataset(Dataset):
 		# The task name is needed for setting the environment, rendering. 
 		self.task_list = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']
 		# self.task_list = ['PickPlace']
-		# self.environment_names = ['']
+		self.environment_names = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']
 
 		# Each task has 200 demos according to RoboMimic.
 		self.number_tasks = len(self.task_list)
@@ -34,7 +34,8 @@ class RealWorldRigid_PreDataset(Dataset):
 		self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)		
 		self.total_length = self.num_demos.sum()		
 
-		self.ds_freq = 1*np.ones(self.number_tasks).astype(int)
+		# self.ds_freq = 1*np.ones(self.number_tasks).astype(int)
+		self.ds_freq = np.array([6, 6, 7, 8, 8])
 
 		# Set files. 
 		self.setup()
@@ -282,12 +283,13 @@ class RealWorldRigid_PreDataset(Dataset):
 
 				self.task_demo_array.append(processed_demonstration)
 
-			print("Embed after processing demos")
-			embed()
 
 			# For each task, save task_file_list to One numpy. 
 			task_numpy_path = os.path.join(self.dataset_directory, self.task_list[task_index], "New_Task_Demo_Array.npy")			
 			np.save(task_numpy_path, self.task_demo_array)
+
+	# def preprocess_dataset(self):
+	# 	self.setup()
 
 	def __len__(self):
 		return self.total_length
@@ -342,7 +344,7 @@ class RealWorldRigid_Dataset(RealWorldRigid_PreDataset):
 				new_index = index-self.full_cummulative_num_demos[max(task_index,0)]
 
 				# Check the length of this particular trajectory and its validity. 
-				if (self.full_dataset_trajectory_lengths[index] < self.args.dataset_traj_length_limit) and (index not in self.bad_original_index_list):
+				if (self.full_dataset_trajectory_lengths[index] < self.args.dataset_traj_length_limit):
 					# Add from old list to new. 
 					self.files[task_index].append(self.full_files[task_index][new_index])
 					self.dataset_trajectory_lengths.append(self.full_dataset_trajectory_lengths[index])

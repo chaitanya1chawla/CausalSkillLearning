@@ -130,6 +130,8 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	############################	
 	elif args.data=='RealWorldRigidPreproc':
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_PreDataset(args)
+	elif args.data=='RealWorldRigid':
+		dataset = RealWorldRigid_DataLoader.RealWorldRigid_Dataset(args)
 
 	return dataset
 
