@@ -34,7 +34,7 @@ class RealWorldRigid_PreDataset(Dataset):
 		self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)		
 		self.total_length = self.num_demos.sum()		
 
-		self.ds_freq = 1*np.ones(self.number_tasks)
+		self.ds_freq = 1*np.ones(self.number_tasks).astype(int)
 
 		# Set files. 
 		self.setup()
@@ -131,6 +131,7 @@ class RealWorldRigid_PreDataset(Dataset):
 
 		# Get poses of object1 and object2 with respect to ground. 
 		demonstration['object1_pose'] = {}
+		demonstration['object2_pose'] = {}
 		demonstration['object1_pose']['position'] = demonstration['object1_cam_frame_pose']['position'] - demonstration['ground_cam_frame_pose']['position']
 		demonstration['object2_pose']['position'] = demonstration['object2_cam_frame_pose']['position'] - demonstration['ground_cam_frame_pose']['position']
 
@@ -143,14 +144,36 @@ class RealWorldRigid_PreDataset(Dataset):
 
 		return demonstration
 
-	def downsample_data(self, demonstration):
+	def downsample_data(self, demonstration, task_index):
 
 		# Downsample each stream.
-		number_timepoints = demonstration['js_pos'].shape[0] // self.ds_freq[demonstration['task_id']]
+		number_timepoints = demonstration['demo'].shape[0] // self.ds_freq[task_index]
 
-		for k, v in enumerate(demonstration):
-			demonstration[k] = resample(v, number_timepoints)
+		# for k in demonstration.keys():
+		for k in ['robot-state', 'object-state', 'eef-state', 'demo']:
+			demonstration[k] = resample(demonstration[k], number_timepoints)
 		
+	def collate_states(self, demonstration):
+
+		# We're going to collate states, and remove irrelevant ones.  
+		# First collect object states.
+		new_demonstration = {}
+		demonstration['object1_state'] = np.concatenate([ demonstration['object1_pose']['position'], \
+														demonstration['object1_pose']['orientation']], axis=-1)
+		demonstration['object2_state'] = np.concatenate([ demonstration['object2_pose']['position'], \
+														demonstration['object2_pose']['orientation']], axis=-1)
+		new_demonstration['object-state'] = np.concatenate([ demonstration['object1_state'], \
+						  								demonstration['object2_state']], axis=-1)
+
+		# First collate robot states. 
+		new_demonstration['robot-state'] = np.concatenate( [demonstration['js_pos'], \
+						  						demonstration['gripper_data'].reshape(-1,1) ], axis=-1)
+		new_demonstration['eef-state'] = demonstration['rs_pose']
+		new_demonstration['demo'] = np.concatenate([ new_demonstration['robot-state'], \
+					  							new_demonstration['object-state']], axis=-1)
+
+		return new_demonstration
+
 	def process_demonstration(self, demonstration, task_index):
 
 		##########################################
@@ -167,16 +190,15 @@ class RealWorldRigid_PreDataset(Dataset):
 		##########################################
 		# Things to do within this function. 
 		##########################################
-
 		
 		# 0) For primary camera, retrieve and interpolate tag poses for that camera. 
-		# 1) Remove irrelevant data streams.
-		# 2) Compute relative poses. 
-		# 3) Downsample all relevant data streams. 
+		# 1) Compute relative poses. 
+		# 2) Collate all the relevant data streams, remove irrelevant data streams.
+		# 3) Downsample all relevant data streams. 		
 		# 4) Return new demo file. 
 
 		#############
-		# 1) For primary camera, retrieve tag poses. 
+		# 0) For primary camera, retrieve tag poses. 
 		#############
 		
 		demonstration['ground_cam_frame_pose'] = self.interpolate_pose( demonstration['tag0']['cam{0}'.format(demonstration['primary_camera'])] )
@@ -184,19 +206,16 @@ class RealWorldRigid_PreDataset(Dataset):
 		demonstration['object2_cam_frame_pose'] = self.interpolate_pose( demonstration['tag2']['cam{0}'.format(demonstration['primary_camera'])] )
 		
 		#############
-		# 0) Pop irrelevant data from dictionary. 
-		#############
-
-		irrelevant_data = ['js_vel', 'js_eff', 'rs_angle', 'tag0', 'tag1', 'tag2', 'primary_camera']
-		for key in irrelevant_data:
-			demonstration.pop(key)
-		
-
-		#############
-		# 2) Compute relative poses.
+		# 1) Compute relative poses.
 		#############
 		
 		demonstration = self.compute_relative_poses(demonstration=demonstration)
+
+		#############
+		# 2) Stack relevant data that we care about. 
+		#############
+
+		demonstration = self.collate_states(demonstration=demonstration)
 
 		#############
 		# 3) Downsample.
@@ -206,10 +225,10 @@ class RealWorldRigid_PreDataset(Dataset):
 		# Add task ID to demo. 
 		demonstration['task_id'] = task_index
 		demonstration['task_name'] = self.task_list[task_index]
-
-
+			
 		# Smoothen if necessary. 
 
+		# return demonstration
 		return demonstration
 		
 	def setup(self):
@@ -247,34 +266,28 @@ class RealWorldRigid_PreDataset(Dataset):
 			# For every demo in this task
 			#########################
 
-			print("Before Processing Demo, embed")
-			embed()
-
 			for j in range(self.num_demos[task_index]):			
 				
 				print("####################")
 				print("Processing demo: ", j, " of ", self.num_demos[task_index], " from task ", task_index)
-
-				file = os.path.join(task_file_path, 'Demo_{0}.npy'.format(j+1))
+				
+				file = os.path.join(task_file_path, 'demo{0}.npy'.format(j))
 				demonstration = np.load(file, allow_pickle=True).item()
 
 				#########################
 				# Now process in whatever way necessary. 
 				#########################
 
-
 				processed_demonstration = self.process_demonstration(demonstration, task_index)
 
 				self.task_demo_array.append(processed_demonstration)
 
+			print("Embed after processing demos")
+			embed()
 
 			# For each task, save task_file_list to One numpy. 
-			task_numpy_path = os.path.join(self.dataset_directory, self.task_list[task_index], "New_Task_Demo_Array.npy")
-			np.save(self.task_demo_array, task_numpy_path)
-
-			# # Changing file name.
-			# # self.files.append(h5py.File("{0}/{1}/demo.hdf5".format(self.dataset_directory,self.task_list[i]),'r'))
-			# self.files.append(h5py.File("{0}/{1}/ph/low_dim.hdf5".format(self.dataset_directory,	self.task_list[i]),'r'))
+			task_numpy_path = os.path.join(self.dataset_directory, self.task_list[task_index], "New_Task_Demo_Array.npy")			
+			np.save(task_numpy_path, self.task_demo_array)
 
 	def __len__(self):
 		return self.total_length
@@ -283,100 +296,6 @@ class RealWorldRigid_PreDataset(Dataset):
 
 		return {}	
 
-	# def preprocess_dataset(self):
-
-	# 	min_lengths = np.ones((self.number_tasks))*10000
-	# 	max_lengths = np.zeros((self.number_tasks))
-
-	# 	for task_index in range(self.number_tasks):
-	# 	# for task_index in [1]:
-
-
-	# 		print("#######################################")
-	# 		print("Preprocessing task index: ", task_index)
-	# 		print("#######################################")
-
-			
-	# 		# Just get robot state size and object state size, from the demonstration of this task. 
-	# 		object_state_size = self.files[task_index]['data/demo_0/obs/object'].shape[1]
-	# 		robot_state_size = self.files[task_index]['data/demo_0/obs/robot0_joint_pos'].shape[1]
-		
-
-	# 		self.create_env(task_index=task_index)
-
-	# 		# Create list of files for this task. 
-	# 		task_demo_list = []		
-
-	# 		# For every element in the filelist of the element,
-	# 		# for i in range(1,self.num_demos[task_index]+1):
-	# 		for i in range(self.num_demos[task_index]):
-
-	# 			print("Preprocessing task index: ", task_index, " Demo Index: ", i, " of: ", self.num_demos[task_index])
-			
-	# 			# Create list of datapoints for this demonstrations. 
-	# 			datapoint = {}
-				
-	# 			# Get SEQUENCE of flattened states.
-	# 			flattened_state_sequence = np.array(self.files[task_index]['data/demo_{0}/states'.format(i)])
-	# 			robot_state_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/robot0_joint_pos'.format(i)])
-	# 			gripper_state_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/robot0_gripper_qpos'.format(i)])
-	# 			joint_action_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/robot0_joint_vel'.format(i)])
-	# 			gripper_action_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/robot0_gripper_qvel'.format(i)])
-	# 			object_state_sequence = np.array(self.files[task_index]['data/demo_{0}/obs/object'.format(i)]) 
-
-	# 			# Downsample. 
-	# 			number_timesteps = flattened_state_sequence.shape[0]
-	# 			if number_timesteps<min_lengths[task_index]:
-	# 				min_lengths[task_index] = number_timesteps
-	# 			if number_timesteps>max_lengths[task_index]:
-	# 				max_lengths[task_index] = number_timesteps
-				
-	# 			# Number of timesteps to downsample to. 
-	# 			number_timesteps = int(flattened_state_sequence.shape[0]//self.ds_freq[task_index])
-
-	# 			flattened_state_sequence = resample(flattened_state_sequence, number_timesteps)
-	# 			robot_state_sequence = resample(robot_state_sequence, number_timesteps)
-	# 			gripper_state_sequence = resample(gripper_state_sequence, number_timesteps)
-	# 			object_state_sequence = resample(object_state_sequence, number_timesteps)
-	# 			joint_action_sequence = resample(joint_action_sequence, number_timesteps)
-	# 			gripper_action_sequence = resample(gripper_action_sequence, number_timesteps)
-
-	# 			# Normalize gripper values. 
-	# 			# 1 is right finger. 0 is left finger.  # 1-0 is right-left. 						
-	# 			gripper_values = gripper_state_sequence[:,1]-gripper_state_sequence[:,0]
-	# 			gripper_values = (gripper_values-gripper_values.min()) / (gripper_values.max()-gripper_values.min())
-	# 			gripper_values = 2*gripper_values-1
-
-	# 			# print("EDC:")
-	# 			# embed()				
-	# 			concatenated_demonstration = np.concatenate([robot_state_sequence,gripper_values.reshape((-1,1))],axis=1)
-	# 			concatenated_actions = np.concatenate([joint_action_sequence,gripper_action_sequence],axis=1)
-				
-	# 			object_rel_traj = self.compute_relative_object_state(robot_state_sequence, object_state_sequence)
-	# 			intermediate_obj_state_seq = np.concatenate([object_state_sequence[:,:7], object_rel_traj, object_state_sequence[:,7:]],axis=-1)
-	# 			object_state_sequence = intermediate_obj_state_seq
-
-	# 			# Put both lists in a dictionary.
-	# 			datapoint['flat-state'] = flattened_state_sequence
-	# 			datapoint['robot-state'] = robot_state_sequence
-	# 			datapoint['object-state'] = object_state_sequence
-	# 			datapoint['demo'] = concatenated_demonstration			
-	# 			datapoint['demonstrated_actions'] = concatenated_actions
-
-	# 			# Add this dictionary to the file_demo_list. 
-	# 			task_demo_list.append(datapoint)
-
-	# 		# Create array.
-	# 		task_demo_array = np.array(task_demo_list)
-
-	# 		# Now save this file_demo_list. 
-	# 		# np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array.npy"),task_demo_array)
-	# 		np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array_RelObjState.npy"),task_demo_array)
-	# 		# np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array_LiftRelObjState.npy"),task_demo_array)
-	# 		# np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array_LiftObjectQuat.npy"),task_demo_array)
-
-	# 	for j in range(4):
-	# 		print("Lengths:", j, min_lengths[j], max_lengths[j])
 
 class RealWorldRigid_Dataset(RealWorldRigid_PreDataset):
 	
@@ -455,7 +374,6 @@ class RealWorldRigid_Dataset(RealWorldRigid_PreDataset):
 
 			# By popping element from files / dataset_traj_lengths, we now don't need to change indexing.
 		
-
 	def setup(self):
 		self.files = []
 		for i in range(len(self.task_list)):
