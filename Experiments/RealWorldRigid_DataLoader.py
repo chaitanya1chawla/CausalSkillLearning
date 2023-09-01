@@ -288,9 +288,6 @@ class RealWorldRigid_PreDataset(Dataset):
 			task_numpy_path = os.path.join(self.dataset_directory, self.task_list[task_index], "New_Task_Demo_Array.npy")			
 			np.save(task_numpy_path, self.task_demo_array)
 
-	# def preprocess_dataset(self):
-	# 	self.setup()
-
 	def __len__(self):
 		return self.total_length
 	
