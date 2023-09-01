@@ -9,7 +9,8 @@
 
 from headers import *
 import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders, \
-	  GRAB_DataLoader, DAPG_DataLoader, DexMV_DataLoader, MOMART_DataLoader, FrankaKitchen_DataLoader
+	  GRAB_DataLoader, DAPG_DataLoader, DexMV_DataLoader, MOMART_DataLoader, FrankaKitchen_DataLoader, \
+		RealWorldRigid_DataLoader
 from PolicyManagers import *
 import TestClass
 import faulthandler
@@ -126,7 +127,9 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = FrankaKitchen_DataLoader.FrankaKitchen_ObjectDataset(args)
 	elif args.data=='FrankaKitchenRobotObject':
 		dataset = FrankaKitchen_DataLoader.FrankaKitchen_RobotObjectDataset(args)
-	
+	############################	
+	elif args.data=='RealWorldRigidPreproc':
+		dataset = RealWorldRigid_DataLoader.RealWorldRigid_PreDataset(args)
 
 	return dataset
 
@@ -139,8 +142,8 @@ class Master():
 			print("Creating Datasets")			
 			self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)			
 
-		# print("Embed after dataset creation")
-		# embed()
+		print("Embed after dataset creation")
+		embed()
 
 		# Now define policy manager.
 		if self.args.setting=='learntsub' or self.args.setting=='joint':
@@ -399,7 +402,7 @@ def parse_arguments():
 	parser.add_argument('--robot_state_size',dest='robot_state_size',type=int,default=8,help='Default robot state size.')
 	parser.add_argument('--env_state_size',dest='env_state_size',type=int,default=7,help='Default environment state size.')
 	parser.add_argument('--object_pure_relative_state',dest='object_pure_relative_state',type=int,default=0,help='Whether or not to use pure relative state for env abstraction input. ')
-	parser.add_argument('--soft_object', dest='soft_object', type=int, default=0, elp='Whether or not we are learning with deformable objects.')
+	parser.add_argument('--soft_object', dest='soft_object', type=int, default=0, help='Whether or not we are learning with deformable objects.')
 
 	# Relative state reconstruction loss.
 	parser.add_argument('--relative_state_reconstruction_loss_weight', dest='relative_state_reconstruction_loss_weight', type=float, default=0., help='What weight to place on the relative state reconstruction loss in the robot-object setting..')	

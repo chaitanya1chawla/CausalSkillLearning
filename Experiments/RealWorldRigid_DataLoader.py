@@ -23,6 +23,7 @@ class RealWorldRigid_PreDataset(Dataset):
 		# Require a task list. 
 		# The task name is needed for setting the environment, rendering. 
 		self.task_list = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']
+		# self.task_list = ['PickPlace']
 		# self.environment_names = ['']
 
 		# Each task has 200 demos according to RoboMimic.
@@ -38,10 +39,10 @@ class RealWorldRigid_PreDataset(Dataset):
 		# Set files. 
 		self.setup()
 
-		self.stat_dir_name='Robomimic'
-
-		# Define quaternion normalization function.
+		self.stat_dir_name='RealWorldRigid'
+				
 	def normalize_quaternion(self, q):
+		# Define quaternion normalization function.
 		return q/np.linalg.norm(q)
 	
 	def interpolate_position(self, valid=None, position_sequence=None):
@@ -79,7 +80,7 @@ class RealWorldRigid_PreDataset(Dataset):
 		interpolated_rotations = slerp_object(query_times)
 
 		# Convert to quaternions.
-		interpolated_quaternion_sequence = interpolated_rotations.as_quat(canonical=True)
+		interpolated_quaternion_sequence = interpolated_rotations.as_quat()
 		
 		return interpolated_quaternion_sequence
 
@@ -89,25 +90,24 @@ class RealWorldRigid_PreDataset(Dataset):
 		# valid is 1 when the pose stored is valid, and 0 otherwise. 
 
 		# Only interpolate if ther are invalid poses. Otherwise jsut return. 
-		if (pose_sequence['valid']==1).all():
+		if (pose_sequence['validity']==1).all():
 			return pose_sequence
 
 		# Pass all data until last valid pose. 
-		traj_length = pose_sequence['valid'].shape[0]
-		valid_indices = np.where(pose_sequence['valid'])[0]
+		traj_length = pose_sequence['validity'].shape[0]
+		valid_indices = np.where(pose_sequence['validity'])[0]
 		first_valid_index = valid_indices[0]
 		last_valid_index = valid_indices[-1]
 
-
 		# Interpolate positions and orientations. 
-		interpolated_positions = self.interpolate_position(valid=pose_sequence['valid'][first_valid_index:last_valid_index+1], \
+		interpolated_positions = self.interpolate_position(valid=pose_sequence['validity'][first_valid_index:last_valid_index+1], \
 						     position_sequence=pose_sequence['position'][first_valid_index:last_valid_index+1])
-		interpolated_orientations = self.interpolate_orientation(valid=pose_sequence['valid'][first_valid_index:last_valid_index+1], \
+		interpolated_orientations = self.interpolate_orientation(valid=pose_sequence['validity'][first_valid_index:last_valid_index+1], \
 							orientation_sequence=pose_sequence['orientation'][first_valid_index:last_valid_index+1])
 
 		# Copy interpolated position until last valid index. 
-		pose_sequence['position'][first_valid_index:last_valid_index] = interpolated_positions
-		pose_sequence['orientation'][first_valid_index:last_valid_index] = interpolated_orientations
+		pose_sequence['position'][first_valid_index:last_valid_index+1] = interpolated_positions
+		pose_sequence['orientation'][first_valid_index:last_valid_index+1] = interpolated_orientations
 
 		# Copy over valid poses to start of trajectory and end of trajectory if invalid:
 		if first_valid_index>0:
@@ -138,8 +138,8 @@ class RealWorldRigid_PreDataset(Dataset):
 		r_obj1 = R.from_quat(demonstration['object1_cam_frame_pose']['orientation'])
 		r_obj2 = R.from_quat(demonstration['object2_cam_frame_pose']['orientation'])
 
-		demonstration['object1_pose']['orientation'] = (r_ground.inv()*r_obj1).as_quat(canonical=True)
-		demonstration['object2_pose']['orientation'] = (r_ground.inv()*r_obj2).as_quat(canonical=True)
+		demonstration['object1_pose']['orientation'] = (r_ground.inv()*r_obj1).as_quat()
+		demonstration['object2_pose']['orientation'] = (r_ground.inv()*r_obj2).as_quat()
 
 		return demonstration
 
@@ -148,8 +148,9 @@ class RealWorldRigid_PreDataset(Dataset):
 		# Downsample each stream.
 		number_timepoints = demonstration['js_pos'].shape[0] // self.ds_freq[demonstration['task_id']]
 
-
-
+		for k, v in enumerate(demonstration):
+			demonstration[k] = resample(v, number_timepoints)
+		
 	def process_demonstration(self, demonstration, task_index):
 
 		##########################################
@@ -178,9 +179,9 @@ class RealWorldRigid_PreDataset(Dataset):
 		# 1) For primary camera, retrieve tag poses. 
 		#############
 		
-		demonstration['ground_cam_frame_pose'] = self.interpolate_pose( demonstration['tag0'][demonstration['cam{0}'.format(demonstration['primary_camera'])]] )
-		demonstration['object1_cam_frame_pose'] = self.interpolate_pose( demonstration['tag1'][demonstration['cam{0}'.format(demonstration['primary_camera'])]] )
-		demonstration['object2_cam_frame_pose'] = self.interpolate_pose( demonstration['tag2'][demonstration['cam{0}'.format(demonstration['primary_camera'])]] )
+		demonstration['ground_cam_frame_pose'] = self.interpolate_pose( demonstration['tag0']['cam{0}'.format(demonstration['primary_camera'])] )
+		demonstration['object1_cam_frame_pose'] = self.interpolate_pose( demonstration['tag1']['cam{0}'.format(demonstration['primary_camera'])] )
+		demonstration['object2_cam_frame_pose'] = self.interpolate_pose( demonstration['tag2']['cam{0}'.format(demonstration['primary_camera'])] )
 		
 		#############
 		# 0) Pop irrelevant data from dictionary. 
@@ -190,9 +191,6 @@ class RealWorldRigid_PreDataset(Dataset):
 		for key in irrelevant_data:
 			demonstration.pop(key)
 		
-		# Add task ID to demo. 
-		demonstration['task_id'] = task_index
-		demonstration['task_name'] = self.task_list[task_index]
 
 		#############
 		# 2) Compute relative poses.
@@ -204,13 +202,15 @@ class RealWorldRigid_PreDataset(Dataset):
 		# 3) Downsample.
 		#############
 		
-		self.downsample_data(demonstration=demonstration)
+		self.downsample_data(demonstration=demonstration, task_index=task_index)
+		# Add task ID to demo. 
+		demonstration['task_id'] = task_index
+		demonstration['task_name'] = self.task_list[task_index]
 
 
 		# Smoothen if necessary. 
 
 		return demonstration
-
 		
 	def setup(self):
 		# Load data from all tasks. 			
@@ -234,20 +234,23 @@ class RealWorldRigid_PreDataset(Dataset):
 		print("About to process real world dataset.")
 
 		for task_index in range(len(self.task_list)):
-
+		# for task_index in range(0):
 			self.task_demo_array = []
 
 			print("###################################")
 			print("Processing task: ", task_index, " of ", self.number_tasks)
 
 			# Set file path for this task.
-			task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'Numpy_Demos')
+			task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'NumpyDemos')
 
 			#########################	
 			# For every demo in this task
 			#########################
 
-			for j in range(self.num_demos[task_index]):
+			print("Before Processing Demo, embed")
+			embed()
+
+			for j in range(self.num_demos[task_index]):			
 				
 				print("####################")
 				print("Processing demo: ", j, " of ", self.num_demos[task_index], " from task ", task_index)
@@ -258,6 +261,7 @@ class RealWorldRigid_PreDataset(Dataset):
 				#########################
 				# Now process in whatever way necessary. 
 				#########################
+
 
 				processed_demonstration = self.process_demonstration(demonstration, task_index)
 

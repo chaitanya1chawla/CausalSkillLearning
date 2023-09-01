@@ -2209,7 +2209,8 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 
 		return super().forward(input, epsilon=epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=z_sample_to_evaluate, artificial_batch_size=artificial_batch_size)
 
-	def get_environment_input_representation(self, env_input)
+	def get_environment_input_representation(self, env_input):
+		
 		
 		# Dummy function that we can override in the case of the soft object.
 		return env_input
@@ -2314,7 +2315,7 @@ class ContinuousSoftEncoderNetwork(ContinuousEncoderNetwork):
 
 # import deploy_model
 # import torch
-	
+
 # pmm = deploy_model.return_model()
 # device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
