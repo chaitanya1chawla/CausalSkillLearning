@@ -266,7 +266,8 @@ class RealWorldRigid_PreDataset(object):
 			print("Processing task: ", task_index, " of ", self.number_tasks)
 
 			# Set file path for this task.
-			task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'NumpyDemos')
+			# task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'NumpyDemos')
+			task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'ImageData')
 
 			#########################	
 			# For every demo in this task
