@@ -287,9 +287,9 @@ class RealWorldRigid_PreDataset(object):
 				# Now process in whatever way necessary. 
 				#########################
 
-				# if j==1 and task_index==2: 
-				# 	print("Embedding")
-				# 	embed()
+				if j==1 and task_index==2: 
+					print("Embedding")
+					embed()
 				processed_demonstration = self.process_demonstration(demonstration, task_index)
 
 				self.task_demo_array.append(processed_demonstration)
