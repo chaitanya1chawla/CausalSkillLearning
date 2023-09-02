@@ -280,9 +280,7 @@ class RealWorldRigid_PreDataset(object):
 				
 				file = os.path.join(task_file_path, 'demo{0}.npy'.format(j))
 				demonstration = np.load(file, allow_pickle=True).item()
-
-				print("Embed in setup")
-				embed()
+				
 				#########################
 				# Now process in whatever way necessary. 
 				#########################
