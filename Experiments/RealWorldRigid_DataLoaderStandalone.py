@@ -266,8 +266,8 @@ class RealWorldRigid_PreDataset(object):
 			print("Processing task: ", task_index+1, " of ", self.number_tasks)
 
 			# Set file path for this task.
-			# task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'NumpyDemos')
-			task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'ImageData')
+			alt_task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'NumpyDemos')
+			task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'ImageData')			
 
 			#########################	
 			# For every demo in this task
@@ -280,14 +280,16 @@ class RealWorldRigid_PreDataset(object):
 				
 				file = os.path.join(task_file_path, 'demo{0}.npy'.format(j))
 				demonstration = np.load(file, allow_pickle=True).item()
+				alt_demonstration = np.load(file, allow_pickle=True).item()
+				demonstration['primary_camera'] = alt_demonstration['primary_camera']
 				
 				#########################
 				# Now process in whatever way necessary. 
 				#########################
 
-				if j==1 and task_index==2: 
-					print("Embedding")
-					embed()
+				# if j==1 and task_index==2: 
+				# 	print("Embedding")
+				# 	embed()
 				processed_demonstration = self.process_demonstration(demonstration, task_index)
 
 				self.task_demo_array.append(processed_demonstration)
