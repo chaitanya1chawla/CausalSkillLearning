@@ -100,7 +100,7 @@ class RealWorldRigid_PreDataset(object):
 
 		# Interpolate positions and orientations. 
 		interpolated_positions = self.interpolate_position(valid=pose_sequence['validity'][first_valid_index:last_valid_index+1], \
-						     position_sequence=pose_sequence['position'][first_valid_index:last_valid_index+1])
+							 position_sequence=pose_sequence['position'][first_valid_index:last_valid_index+1])
 		interpolated_orientations = self.interpolate_orientation(valid=pose_sequence['validity'][first_valid_index:last_valid_index+1], \
 							orientation_sequence=pose_sequence['orientation'][first_valid_index:last_valid_index+1])
 
@@ -280,8 +280,8 @@ class RealWorldRigid_PreDataset(object):
 				file = os.path.join(task_file_path, 'demo{0}.npy'.format(j))
 				demonstration = np.load(file, allow_pickle=True).item()
 
-                print("Embed in setup")
-                embed()
+				print("Embed in setup")
+				embed()
 				#########################
 				# Now process in whatever way necessary. 
 				#########################
@@ -495,4 +495,4 @@ class RealWorldRigid_Dataset(RealWorldRigid_PreDataset):
 
 if __name__=='__main__':
 	
-    rwr_ds = RealWorldRigid_PreDataset()
+	rwr_ds = RealWorldRigid_PreDataset()
