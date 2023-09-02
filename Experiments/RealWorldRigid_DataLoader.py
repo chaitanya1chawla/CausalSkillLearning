@@ -22,9 +22,9 @@ class RealWorldRigid_PreDataset(Dataset):
 		
 		# Require a task list. 
 		# The task name is needed for setting the environment, rendering. 
-		# self.task_list = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']
-		self.task_list = ['PickPlace']
-		# self.environment_names = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']
+		self.task_list = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']
+		# self.task_list = ['PickPlace']
+		self.environment_names = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']
 
 		# Each task has 200 demos according to RoboMimic.
 		self.number_tasks = len(self.task_list)
@@ -386,7 +386,8 @@ class RealWorldRigid_Dataset(RealWorldRigid_PreDataset):
 	def setup(self):
 		self.files = []
 		for i in range(len(self.task_list)):
-			self.files.append(np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
+			# self.files.append(np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
+			self.files.append(np.load("{0}/{1}/New_Task_Demo_Array_wImages.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
 
 	def __getitem__(self, index):
 
