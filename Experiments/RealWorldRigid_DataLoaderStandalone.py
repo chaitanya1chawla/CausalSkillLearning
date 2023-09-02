@@ -263,7 +263,7 @@ class RealWorldRigid_PreDataset(object):
 			self.task_demo_array = []
 
 			print("###################################")
-			print("Processing task: ", task_index, " of ", self.number_tasks)
+			print("Processing task: ", task_index+1, " of ", self.number_tasks)
 
 			# Set file path for this task.
 			# task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'NumpyDemos')
@@ -276,7 +276,7 @@ class RealWorldRigid_PreDataset(object):
 			for j in range(self.num_demos[task_index]):			
 				
 				print("####################")
-				print("Processing demo: ", j, " of ", self.num_demos[task_index], " from task ", task_index)
+				print("Processing demo: ", j+1, " of ", self.num_demos[task_index], " from task ", task_index+1)
 				
 				file = os.path.join(task_file_path, 'demo{0}.npy'.format(j))
 				demonstration = np.load(file, allow_pickle=True).item()
@@ -285,6 +285,9 @@ class RealWorldRigid_PreDataset(object):
 				# Now process in whatever way necessary. 
 				#########################
 
+				if j==2 and task_index==2: 
+					print("Embedding")
+					embed()
 				processed_demonstration = self.process_demonstration(demonstration, task_index)
 
 				self.task_demo_array.append(processed_demonstration)
