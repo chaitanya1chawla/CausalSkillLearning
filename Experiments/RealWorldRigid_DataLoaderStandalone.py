@@ -16,7 +16,7 @@ class RealWorldRigid_PreDataset(object):
 	# Class implementing instance of RealWorld Rigid Body Dataset. 
 	def __init__(self):
 		
-		self.dataset_directory = '/scatch/tshankar/RigidBodyData/'
+		self.dataset_directory = '/scratch/tshankar/RigidBodyData/'
 		
 		# Require a task list. 
 		# The task name is needed for setting the environment, rendering. 
