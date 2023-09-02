@@ -11,7 +11,7 @@ def resample(original_trajectory, desired_number_timepoints):
 	new_timepoints = np.linspace(0, original_traj_len-1, desired_number_timepoints, dtype=int)
 	return original_trajectory[new_timepoints]
 
-class RealWorldRigid_PreDataset(Dataset): 
+class RealWorldRigid_PreDataset(): 
 
 	# Class implementing instance of RealWorld Rigid Body Dataset. 
 	def __init__(self):
