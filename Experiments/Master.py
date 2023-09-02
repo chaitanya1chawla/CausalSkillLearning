@@ -144,8 +144,8 @@ class Master():
 			print("Creating Datasets")			
 			self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)			
 
-		print("Embed after dataset creation")
-		embed()
+		# print("Embed after dataset creation")
+		# embed()
 
 		# Now define policy manager.
 		if self.args.setting=='learntsub' or self.args.setting=='joint':
@@ -405,6 +405,7 @@ def parse_arguments():
 	parser.add_argument('--env_state_size',dest='env_state_size',type=int,default=7,help='Default environment state size.')
 	parser.add_argument('--object_pure_relative_state',dest='object_pure_relative_state',type=int,default=0,help='Whether or not to use pure relative state for env abstraction input. ')
 	parser.add_argument('--soft_object', dest='soft_object', type=int, default=0, help='Whether or not we are learning with deformable objects.')
+	parser.add_argument('--images_in_real_world_dataset', dest='images_in_real_world_dataset', type=int, default=0, help='Whether to dela with images in the realworld datasset.')
 
 	# Relative state reconstruction loss.
 	parser.add_argument('--relative_state_reconstruction_loss_weight', dest='relative_state_reconstruction_loss_weight', type=float, default=0., help='What weight to place on the relative state reconstruction loss in the robot-object setting..')	

@@ -1721,7 +1721,36 @@ class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 
 		self.environment.reset()
 		
+class RealWorldRigidDatasetImageVisualizer(object):
 
+	def __init__(self, has_display=False, args=None, just_objects=True):
+		
+		super(RealWorldRigidDatasetImageVisualizer, self).__init__()
+		self.args = args
+		self.has_display = has_display
+		# self.create_environment()
+		self.image_size = 200
+
+	def create_environment(self):
+
+		# Dummy function.. 
+		pass
+
+	def set_joint_pose(self):
+
+		pass
+
+	def set_object_pose(self):
+		pass
+
+	def set_joint_pose_return_image(self):
+
+		pass
+
+	def visualize_joint_trajectory(self, trajectory, return_gif=False, gif_path=None, gif_name="Traj.gif", segmentations=None, return_and_save=False, additional_info=None, end_effector=False, task_id=None):
+
+		# Basically this is going to retunr a dummy gif.. 
+		return np.zeros((trajectory.shape[0], self.image_size, self.image_size, 3))
 
 class ToyDataVisualizer():
 

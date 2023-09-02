@@ -2,7 +2,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from headers import *
+import import numpy as np
+import os, sys
+from IPython import embed
 
 def resample(original_trajectory, desired_number_timepoints):
 	original_traj_len = len(original_trajectory)
@@ -12,19 +14,15 @@ def resample(original_trajectory, desired_number_timepoints):
 class RealWorldRigid_PreDataset(Dataset): 
 
 	# Class implementing instance of RealWorld Rigid Body Dataset. 
-	def __init__(self, args):
+	def __init__(self):
 		
-		self.args = args
-		if self.args.datadir is None:
-			self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/RoboMimic/'
-		else:
-			self.dataset_directory = self.args.datadir			
+		self.dataset_directory = '/scatch/tshankar/RealWorldRigid/'
 		
 		# Require a task list. 
 		# The task name is needed for setting the environment, rendering. 
-		# self.task_list = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']
-		self.task_list = ['PickPlace']
-		# self.environment_names = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']
+		self.task_list = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']
+		# self.task_list = ['PickPlace']
+		self.environment_names = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']
 
 		# Each task has 200 demos according to RoboMimic.
 		self.number_tasks = len(self.task_list)
@@ -152,8 +150,8 @@ class RealWorldRigid_PreDataset(Dataset):
 
 		# for k in demonstration.keys():
 		key_list = ['robot-state', 'object-state', 'eef-state', 'demo']
-		if self.args.images_in_real_world_dataset:
-			key_list.append('images')
+		# if self.args.images_in_real_world_dataset:
+		key_list.append('images')
 		for k in key_list:
 			demonstration[k] = resample(demonstration[k], number_timepoints)
 		
@@ -176,9 +174,9 @@ class RealWorldRigid_PreDataset(Dataset):
 		new_demonstration['demo'] = np.concatenate([ new_demonstration['robot-state'], \
 					  							new_demonstration['object-state']], axis=-1)
 
-		if self.args.images_in_real_world_dataset:
-			# Put images of primary camera into separate topic.. 
-			new_demonstration['images'] = demonstration['images']['cam{0}'.format(demonstration['primary_camera'])]
+		# if self.args.images_in_real_world_dataset:
+		#  Put images of primary camera into separate topic.. 
+		new_demonstration['images'] = demonstration['images']['cam{0}'.format(demonstration['primary_camera'])]
 
 		return new_demonstration
 
@@ -293,8 +291,8 @@ class RealWorldRigid_PreDataset(Dataset):
 
 			# For each task, save task_file_list to One numpy. 
 			suffix = ""
-			if self.args.images_in_real_world_dataset:
-				suffix = "_wSingleImages"
+			# if self.args.images_in_real_world_dataset:
+			suffix = "_wSingleImages"
 			task_numpy_path = os.path.join(self.dataset_directory, self.task_list[task_index], "New_Task_Demo_Array{0}.npy".format(suffix))
 			np.save(task_numpy_path, self.task_demo_array)
 

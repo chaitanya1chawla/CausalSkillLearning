@@ -33,7 +33,8 @@ global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk'
 			'RoboturkObjects','RoboturkRobotObjects','RoboMimicObjects','RoboMimicRobotObjects', \
 			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects', \
 			'MOMARTPreproc', 'MOMART', 'MOMARTObject', 'MOMARTRobotObject', 'MOMARTRobotObjectFlat', \
-			'FrankaKitchenPreproc', 'FrankaKitchen', 'FrankaKitchenObject', 'FrankaKitchenRobotObject']
+			'FrankaKitchenPreproc', 'FrankaKitchen', 'FrankaKitchenObject', 'FrankaKitchenRobotObject', \
+			'RealWorldRigid']
 
 class PolicyManager_BaseClass():
 
@@ -601,6 +602,8 @@ class PolicyManager_BaseClass():
 							# Rollout each individual trajectory in this batch.
 							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b], indexed_data_element=data_element[b])
 
+							
+
 						# print("TRAJECTORY ANALYSIS")
 						# embed()
 						# Now append this particular sample traj and the rollout into trajectroy and rollout sets.
@@ -993,7 +996,17 @@ class PolicyManager_BaseClass():
 		# 4a) Run unnormalized ground truth trajectory in visualizer. 
 		########################################
 
-		self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+		##############################
+		# ADD CHECK FOR REAL WORLD DATA, and then use dataset image..
+		# For now
+		##############################
+
+		if self.args.data in ['RealWorldRigid'] and self.args.images_in_real_world_dataset:
+			print("Temporarily using real world images..")
+			# This should already be segmented to the right start and end point...
+			self.ground_truth_gif = indexed_data_element['images']
+		else:			
+			self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 
 		# Also plotting trajectory against time. 
 		plt.close()
@@ -1969,7 +1982,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.norm_sub_value = self.norm_sub_value[:self.state_dim]
 			self.norm_denom_value = self.norm_denom_value[:self.state_dim]
 
-
 		elif self.args.data in ['RoboturkObjects','RoboMimicObjects','MOMARTObject']:
 			# self.state_size = 14
 			# self.state_dim = 14
@@ -2069,7 +2081,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.conditional_info_size = 0
 			self.test_set_size = 50	
 
-
 		elif self.args.data in ['FrankaKitchen']:
 
 			self.state_size = 30
@@ -2097,6 +2108,19 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# print("FK Embed")
 			# embed()
 			
+		elif self.args.data in ['RealWorldRigid']:
+
+			self.state_size = 21
+			self.state_dim = 21
+
+			self.input_size = 2*self.state_size
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length			
+			self.conditional_info_size = 0
+			self.test_set_size = 0			
+
+
 		# Training parameters. 		
 		self.baseline_value = 0.
 		self.beta_decay = 0.9
@@ -2875,6 +2899,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# Sample trajectory segment from dataset.
 		input_dict = {}
+
+		# print("Embed in Pretrain PM RI")
+		# embed()
+
 		input_dict['state_action_trajectory'], input_dict['sample_action_seq'], input_dict['sample_traj'], input_dict['data_element'] = self.get_trajectory_segment(i)
 		# state_action_trajectory, sample_action_seq, sample_traj, data_element  = self.get_trajectory_segment(i)
 		# self.sample_traj_var = sample_traj
@@ -3295,23 +3323,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# 1) Create KD Trees.
 		self.create_z_kdtrees()	
 
-	# def evaluate_latent_space(self):
-
-	# 	# Paradigm for evaluating latent spaces. 
-	# 	# (0) For number of evaluate trajectories:
-	# 	# (1) 	Get trajectory from dataset.
-	# 	# (1a) 	Parse trajectory into robot and env trajectory T_r, T_e. 
-	# 	# (2) 	Encode trajectory into z_R, z_E via global / joint encoder. 
-	# 	# (3)	Find nearest neighbor of z_R / z_E in {Z}_R / {Z}_E i.e. z_R^* \ z_E^*.
-
-	# 	# Notes - we can evaluate both streams together. 
-	# 	# 0-2 is just run_iteration. 
-	# 	# 3 is query. 
-
-	# 	# Get latent z's for batch of trajectories. 
-	# 	iteration = 48
-	# 	latent_z, _, _, _ = self.run_iteration(0, iteration, return_z=True, and_train=False)
-
 	def evaluate_z_distances_for_batch(self, latent_z):
 
 		latent_z_sets = {}
@@ -3376,6 +3387,9 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		# Make data_element a list of dictionaries. 
 		data_element = []
 						
+		# print("Embed in PM GBE")
+		# embed()
+
 		for b in range(min(self.args.batch_size, len(self.index_list) - i)):
 
 			# Because of the new creation of index_list in random shuffling, this should be safe to index dataset with.
@@ -3477,6 +3491,12 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 							batch_trajectory[x] = data_element['endeffector_trajectory'][start_timepoint:end_timepoint,:-1]
 						else:
 							batch_trajectory[x] = data_element['demo'][start_timepoint:end_timepoint,:-1]
+
+					if self.args.data in ['RealWorldRigid']:
+
+						print("Subsampling image data.")
+						# Truncate the images to start and end timepoint. 
+						data_element[x]['images'] = data_element[x]['images'][start_timepoint:end_timepoint]
 
 			# If normalization is set to some value.
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
@@ -3803,7 +3823,6 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 		# Save webpage. 
 		self.write_results_HTML()
-
 
 class PolicyManager_Joint(PolicyManager_BaseClass):
 
