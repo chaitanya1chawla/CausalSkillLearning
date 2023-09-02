@@ -279,8 +279,9 @@ class RealWorldRigid_PreDataset(object):
 				print("Processing demo: ", j+1, " of ", self.num_demos[task_index], " from task ", task_index+1)
 				
 				file = os.path.join(task_file_path, 'demo{0}.npy'.format(j))
+				alt_file = os.path.join(alt_task_file_path, 'demo{0}.npy'.format(j))
 				demonstration = np.load(file, allow_pickle=True).item()
-				alt_demonstration = np.load(file, allow_pickle=True).item()
+				alt_demonstration = np.load(alt_file, allow_pickle=True).item()
 				demonstration['primary_camera'] = alt_demonstration['primary_camera']
 				
 				#########################
