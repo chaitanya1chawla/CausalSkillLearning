@@ -11,7 +11,7 @@ def resample(original_trajectory, desired_number_timepoints):
 	new_timepoints = np.linspace(0, original_traj_len-1, desired_number_timepoints, dtype=int)
 	return original_trajectory[new_timepoints]
 
-class RealWorldRigid_PreDataset(): 
+class RealWorldRigid_PreDataset(object): 
 
 	# Class implementing instance of RealWorld Rigid Body Dataset. 
 	def __init__(self):
@@ -280,6 +280,8 @@ class RealWorldRigid_PreDataset():
 				file = os.path.join(task_file_path, 'demo{0}.npy'.format(j))
 				demonstration = np.load(file, allow_pickle=True).item()
 
+                print("Embed in setup")
+                embed()
 				#########################
 				# Now process in whatever way necessary. 
 				#########################
@@ -490,3 +492,7 @@ class RealWorldRigid_Dataset(RealWorldRigid_PreDataset):
 		np.save("RealWorldRigid_Vel_Var.npy", vel_variance)
 		np.save("RealWorldRigid_Vel_Min.npy", vel_min_value)
 		np.save("RealWorldRigid_Vel_Max.npy", vel_max_value)
+
+if __name__=='__main__':
+	
+    rwr_ds = RealWorldRigid_PreDataset()
