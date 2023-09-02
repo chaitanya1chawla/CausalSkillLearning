@@ -1731,7 +1731,7 @@ class RealWorldRigidDatasetImageVisualizer(object):
 		# self.create_environment()
 		self.image_size = 200
 
-	def create_environment(self):
+	def create_environment(self, task_id):
 
 		# Dummy function.. 
 		pass
@@ -1751,6 +1751,11 @@ class RealWorldRigidDatasetImageVisualizer(object):
 
 		# Basically this is going to retunr a dummy gif.. 
 		return np.zeros((trajectory.shape[0], self.image_size, self.image_size, 3))
+
+	def visualize_prerendered_gif(self, image_list=None, gif_path=None, gif_name="Traj.gif"):
+		
+		imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
+
 
 class ToyDataVisualizer():
 

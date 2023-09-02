@@ -1007,9 +1007,8 @@ class PolicyManager_BaseClass():
 		##############################
 
 		if self.args.data in ['RealWorldRigid'] and self.args.images_in_real_world_dataset:
-			print("Temporarily using real world images..")
 			# This should already be segmented to the right start and end point...
-			self.ground_truth_gif = indexed_data_element['images']
+			self.ground_truth_gif = self.visualizer.visualize_prerendered_gif(indexed_data_element['images'], gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(i))
 		else:			
 			self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 
@@ -3499,7 +3498,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 					if self.args.data in ['RealWorldRigid']:
 
-						print("Subsampling image data.")
+						# print("Subsampling image data.")
 						# Truncate the images to start and end timepoint. 
 						data_element[x]['images'] = data_element[x]['images'][start_timepoint:end_timepoint]
 
