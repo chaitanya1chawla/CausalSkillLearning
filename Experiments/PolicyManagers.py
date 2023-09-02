@@ -14,7 +14,9 @@ from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, To
 	GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, DAPGVisualizer, \
 	RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer,\
 	RoboMimicObjectVisualizer, RoboMimicRobotObjectVisualizer, DexMVVisualizer, \
-	FrankaKitchenVisualizer, FetchMOMARTVisualizer #, MocapVisualizer
+	FrankaKitchenVisualizer, FetchMOMARTVisualizer, \
+	RealWorldRigidDatasetImageVisualizer
+	# MocapVisualizer 
 
 # from Visualizers import *
 # import TFLogger, DMP, RLUtils
@@ -129,6 +131,8 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['MOMARTRobotObject', 'MOMARTRobotObjectFlat']:			
 			if not hasattr(self, 'visualizer'):
 				self.visualizer = FetchMOMARTVisualizer(args=self.args)
+		elif self.args.data in ['RealWorldRigid']:
+			self.visualizer = RealWorldRigidDatasetImageVisualizer(args=self.args)
 		else:
 			self.visualizer = ToyDataVisualizer()
 		
@@ -465,7 +469,8 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['MOMARTRobotObject', 'MOMARTRobotObjectFlat']:
 			if not hasattr(self, 'visualizer'):
 				self.visualizer = FetchMOMARTVisualizer(args=self.args)
-
+		elif self.args.data in ['RealWorldRigid']:
+			self.visualizer = RealWorldRigidDatasetImageVisualizer(args=self.args)
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
