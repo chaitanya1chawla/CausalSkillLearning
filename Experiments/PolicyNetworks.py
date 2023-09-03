@@ -188,7 +188,9 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		else:
 			self.mean_outputs = self.mean_output_layer(lstm_outputs)
 		# variance_outputs = (self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
-		variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon
+		
+		# variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon
+		variance_outputs = self.args.variance_value*torch.ones_like(self.mean_outputs).to(device)
 
 		# Remember, because of Pytorch's dynamic construction, this distribution can have it's own batch size. 
 		# It doesn't matter if batch sizes changes over different forward passes of the LSTM, because we're only going
@@ -2108,7 +2110,8 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		##############################
 
 		mean_outputs = network_dict['mean_output_layer'](concatenated_outputs)
-		variance_outputs = self.variance_factor*(self.variance_activation_layer(network_dict['variances_output_layer'](concatenated_outputs))+self.variance_activation_bias) + epsilon
+		# variance_outputs = self.variance_factor*(self.variance_activation_layer(network_dict['variances_output_layer'](concatenated_outputs))+self.variance_activation_bias) + epsilon
+		variance_outputs = self.args.variance_value*torch.ones_like(self.mean_outputs).to(device)
 
 		dist = torch.distributions.MultivariateNormal(mean_outputs, torch.diag_embed(variance_outputs))
 		noise = torch.randn_like(variance_outputs)
