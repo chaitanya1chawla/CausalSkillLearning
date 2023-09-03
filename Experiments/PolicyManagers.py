@@ -307,7 +307,7 @@ class PolicyManager_BaseClass():
 		counter = self.args.initial_counter_value
 		epoch_time = 0.
 		cum_epoch_time = 0.		
-		# self.epoch_coverage = np.zeros(len(self.dataset))
+		self.epoch_coverage = np.zeros(len(self.dataset))
 
 		########################################
 		# (3) Outer loop over epochs. 
@@ -350,12 +350,12 @@ class PolicyManager_BaseClass():
 			########################################
 
 			t1 = time.time()
-			# self.coverage = np.zeros(len(self.dataset))
+			self.coverage = np.zeros(len(self.dataset))
 
 			# For all data points in the dataset. 
 			for i in range(0,self.training_extent,self.args.batch_size):				
 			# for i in range(0,extent-self.args.batch_size,self.args.batch_size):
-				
+				print("RUN TRAIN", i)
 				# Probably need to make run iteration handle batch of current index plus batch size.				
 				# with torch.autograd.set_detect_anomaly(True):
 				t2 = time.time()
@@ -401,7 +401,7 @@ class PolicyManager_BaseClass():
 			# (8) Debug
 			##############################################
 						
-			# self.epoch_coverage += self.coverage
+			self.epoch_coverage += self.coverage
 			# if e%100==0:
 			# 	print("Debugging dataset coverage")
 			# 	embed()
@@ -2907,13 +2907,14 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Sample trajectory segment from dataset.
 		input_dict = {}
 
-		# print("Embed in Pretrain PM RI")
-		# embed()
-
 		input_dict['state_action_trajectory'], input_dict['sample_action_seq'], input_dict['sample_traj'], input_dict['data_element'] = self.get_trajectory_segment(i)
 		# state_action_trajectory, sample_action_seq, sample_traj, data_element  = self.get_trajectory_segment(i)
 		# self.sample_traj_var = sample_traj
 		self.sample_traj_var = input_dict['sample_traj']
+
+		# print("Embed in Pretrain PM RI")
+		# embed()
+
 
 		####################################
 		############# (0a) #############
@@ -3134,7 +3135,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.task_id_set = []
 
 		# Use the dataset to get reasonable trajectories (because without the information bottleneck / KL between N(0,1), cannot just randomly sample.)
-		for i in range(self.N//self.args.batch_size+1):
+		# for i in range(self.N//self.args.batch_size+1):
+		# for i in range(self.N//self.args.batch_size+1, 32)
+		for i in range(0, self.N, self.args.batch_size):
 
 			########################################
 			# (1) Encoder trajectory. 
@@ -3400,6 +3403,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		for b in range(min(self.args.batch_size, len(self.index_list) - i)):
 
 			# Because of the new creation of index_list in random shuffling, this should be safe to index dataset with.
+			# print(b, i+b, self.index_list[i+b])
 			index = self.index_list[i+b]
 			# # data_element.append(self.dataset[self.index_list[i+b]])
 
@@ -3409,8 +3413,8 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			# # index = min( len(self.dataset)-1 , self.index_list[ min( i+b , len(self.index_list)-1)])
 
 			# print("i:", i, "b:", b, "datasetlim:", dataset_size_limit, "il_size_limit:", index_list_size_limit, "index:", index)
-			
-			# self.coverage[index] += 1
+			if self.args.train:
+				self.coverage[index] += 1
 			data_element.append(self.dataset[index])
 
 		return data_element
