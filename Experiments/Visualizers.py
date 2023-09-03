@@ -1753,10 +1753,9 @@ class RealWorldRigidDatasetImageVisualizer(object):
 		return np.zeros((trajectory.shape[0], self.image_size, self.image_size, 3))
 
 	def visualize_prerendered_gif(self, image_list=None, gif_path=None, gif_name="Traj.gif"):
-		
-		imageio.mimsave(os.path.join(gif_path,gif_name), image_list)
-
-
+				
+		imageio.mimsave(os.path.join(gif_path,gif_name), image_list[...,::-1])
+		return image_list[...,::-1]
 class ToyDataVisualizer():
 
 	def __init__(self):

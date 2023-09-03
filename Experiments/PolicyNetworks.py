@@ -159,7 +159,7 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		self.variance_activation_layer = torch.nn.Softplus()
 		self.variance_activation_bias = 0.
 
-		self.variance_factor = 0.01
+		self.variance_factor = self.args.variance_factor
 
 	def forward(self, input, action_sequence, epsilon=0.001, batch_size=None, debugging=False):
 		# Input is the trajectory sequence of shape: Sequence_Length x 1 x Input_Size. 
@@ -183,7 +183,8 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 
 		# Predict Gaussian means and variances. 
 		if self.args.mean_nonlinearity:
-			self.mean_outputs = self.activation_layer(self.mean_output_layer(lstm_outputs))
+			self.mean_outputs = self.activation_layer(self.mean_output_layer(lstm_outputs)) 
+			# + epsilon
 		else:
 			self.mean_outputs = self.mean_output_layer(lstm_outputs)
 		variance_outputs = (self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
@@ -2057,7 +2058,7 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		self.activation_layer = torch.nn.Tanh()
 		self.variance_activation_layer = torch.nn.Softplus()
 		self.variance_activation_bias = 0.
-		self.variance_factor = 0.01
+		self.variance_factor = self.args.variance_factor
 
 	def define_networks(self, input_size, output_size):
 		
@@ -2075,7 +2076,7 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		self.network_dict = torch.nn.ModuleDict()
 		self.network_dict['lstm'], self.network_dict['mean_output_layer'], self.network_dict['variances_output_layer'] = self.define_networks(self.size_dict['input_size'], self.size_dict['output_size'])
 
-	def forward(self, input, epsilon=0.001, network_dict=None, size_dict=None, z_sample_to_evaluate=None, artificial_batch_size=None):
+	def forward(self, input, epsilon=0.0001, network_dict=None, size_dict=None, z_sample_to_evaluate=None, artificial_batch_size=None):
 
 		##############################
 		# Set default inputs.

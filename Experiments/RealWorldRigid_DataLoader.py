@@ -22,13 +22,13 @@ class RealWorldRigid_PreDataset(Dataset):
 		
 		# Require a task list. 
 		# The task name is needed for setting the environment, rendering. 
-		# self.task_list = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']		
-		# self.environment_names = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']
-		# self.num_demos = np.array([10, 10, 6, 10, 10])
+		self.task_list = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']		
+		self.environment_names = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']
+		self.num_demos = np.array([10, 10, 6, 10, 10])
 
-		self.task_list = ['BoxOpening', 'DrawerOpening', 'PickPlace']
-		self.environment_names = ['BoxOpening', 'DrawerOpening', 'PickPlace']
-		self.num_demos = np.array([10, 6, 10])
+		# self.task_list = ['BoxOpening', 'DrawerOpening', 'PickPlace']
+		# self.environment_names = ['BoxOpening', 'DrawerOpening', 'PickPlace']
+		# self.num_demos = np.array([10, 6, 10])
 
 		# Each task has 200 demos according to RoboMimic.
 		self.number_tasks = len(self.task_list)
