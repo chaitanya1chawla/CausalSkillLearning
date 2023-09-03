@@ -187,8 +187,8 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 			# + epsilon
 		else:
 			self.mean_outputs = self.mean_output_layer(lstm_outputs)
-		variance_outputs = (self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
-		# variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon
+		# variance_outputs = (self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
+		variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon
 
 		# Remember, because of Pytorch's dynamic construction, this distribution can have it's own batch size. 
 		# It doesn't matter if batch sizes changes over different forward passes of the LSTM, because we're only going
