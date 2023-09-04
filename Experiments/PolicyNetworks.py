@@ -195,7 +195,6 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 			# variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon
 			variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
 		
-
 		# Remember, because of Pytorch's dynamic construction, this distribution can have it's own batch size. 
 		# It doesn't matter if batch sizes changes over different forward passes of the LSTM, because we're only going
 		# to evaluate this distribution (instance)'s log probability with the same sequence length. 
@@ -612,7 +611,8 @@ class ContinuousLatentPolicyNetwork_ConstrainedBPrior(ContinuousLatentPolicyNetw
 			# If allowing variable skill length, set length for this sample.				
 			if self.args.var_skill_length:
 				# Choose length of 12-16 with certain probabilities. 
-				lens = np.array([12,13,14,15,16])
+				# lens = np.array([12,13,14,15,16])
+				np.arange(self.min_skill_time, self.max_skill_time)
 				# probabilities = np.array([0.1,0.2,0.4,0.2,0.1])
 				prob_biases = np.array([[0.8,0.],[0.4,0.],[0.,0.],[0.,0.4]])				
 

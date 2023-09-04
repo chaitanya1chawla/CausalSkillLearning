@@ -2129,6 +2129,19 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				self.norm_sub_value = self.norm_sub_value[:self.state_size]
 				self.norm_denom_value = self.norm_denom_value[:self.state_size]
+			else:
+				#########################################
+				# Manually scale.
+				#########################################
+				
+				if self.args.normalization is not None:
+					# self.norm_sub_value will remain unmodified. 
+					# self.norm_denom_value will get divided by scale.
+					self.norm_denom_value /= self.args.state_scale_factor
+					# Manually make sure quaternion dims are unscaled.
+					self.norm_denom_value[10:14] = 1.
+					self.norm_denom_value[17:] = 1.
+
 
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
@@ -2328,6 +2341,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 			# Get latent_z set. 
 			self.get_trajectory_and_latent_sets(get_visuals=True)
+
+			print("EMBED IN PLOT")
+			embed()
 			log_dict['Average Reconstruction Error:'] = self.avg_reconstruction_error
 
 			# Get embeddings for perplexity=5,10,30, and then plot these.
@@ -2540,7 +2556,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 			if self.args.var_skill_length:
 				# Choose length of 12-16 with certain probabilities. 
-				self.current_traj_len = np.random.choice([12,13,14,15,16],p=[0.1,0.2,0.4,0.2,0.1])
+				# self.current_traj_len = np.random.choice([12,13,14,15,16],p=[0.1,0.2,0.4,0.2,0.1])
+				self.current_traj_len = np.random.choice(np.arange(12,17),p=[0.1,0.2,0.4,0.2,0.1])
 			else:
 				self.current_traj_len = self.traj_length
 
@@ -2943,6 +2960,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# Encode trajectory segment into latent z. 		
 						
 			latent_z, encoder_loglikelihood, encoder_entropy, kl_divergence = self.encoder_network.forward(torch_traj_seg, self.epsilon)
+			# latent_z, encoder_loglikelihood, encoder_entropy, kl_divergence = self.encoder_network.forward(torch_traj_seg)
 			
 			####################################
 			########## (2) & (3) ##########
@@ -3161,29 +3179,24 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 			for b in range(self.args.batch_size):
 
-				if i*self.args.batch_size+b>=self.N:
-					break 
-				# Copy z. 
-
-				self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+				# self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+				self.latent_z_set[i+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 				self.gt_trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
-
-				# print("Embed in latent set creation")
-				# embed()
 
 				self.task_id_set.append(data_element[b]['task-id'])
 
 				if get_visuals:
 					# (2) Now rollout policy.	
 					if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
-						self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
+						# self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
+						self.trajectory_set[i+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
 					elif self.args.setting=='pretrain_sub':							
 						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True, rollout_length=sample_trajs.shape[0]))
 					else:
 						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True))
 
-			if i*self.args.batch_size+b>=self.N:
-				break 
+			print("Embed in latent set creation")
+			embed()
 
 		# Compute average reconstruction error.
 		if get_visuals:

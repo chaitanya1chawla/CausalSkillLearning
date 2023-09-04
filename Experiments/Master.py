@@ -130,9 +130,7 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	############################	
 	elif args.data=='RealWorldRigidPreproc':
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_PreDataset(args)
-	elif args.data=='RealWorldRigid':
-		dataset = RealWorldRigid_DataLoader.RealWorldRigid_Dataset(args)
-	elif args.data=='RealWorldRigidRobot':
+	elif args.data in ['RealWorldRigid','RealWorldRigidRobot']:
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_Dataset(args)
 
 	return dataset
@@ -374,7 +372,8 @@ def parse_arguments():
 	
 	parser.add_argument('--pretrain_bias_sampling',type=float,default=0.) # Defines percentage of trajectory within which to sample trajectory segments for pretraining.
 	parser.add_argument('--pretrain_bias_sampling_prob',type=float,default=0.)
-	parser.add_argument('--action_scale_factor',type=float,default=1)	
+	parser.add_argument('--action_scale_factor',type=float,default=1.)	
+	parser.add_argument('--state_scale_factor',dest='state_scale_factor',type=float,default=1.)	
 
 	parser.add_argument('--z_exploration_bias',dest='z_exploration_bias',type=float,default=0.)
 	parser.add_argument('--b_exploration_bias',dest='b_exploration_bias',type=float,default=0.)
@@ -385,7 +384,7 @@ def parse_arguments():
 	parser.add_argument('--subpolicy_clamp_value',dest='subpolicy_clamp_value',type=float,default=-5)
 	parser.add_argument('--latent_clamp_value',dest='latent_clamp_value',type=float,default=-5)
 	parser.add_argument('--min_variance_bias',dest='min_variance_bias',type=float,default=0.01)
-	parser.add_argument('--normalization',dest='normalization',type=str,default='None')
+	parser.add_argument('--normalization',dest='normalization',type=str,default=None)
 	parser.add_argument('--regularization_weight',dest='regularization_weight',type=float,default=0.,help='Value of regularization weight to be added to the model.')
 
 	parser.add_argument('--likelihood_penalty',dest='likelihood_penalty',type=int,default=10)
