@@ -36,7 +36,7 @@ global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk'
 			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects', \
 			'MOMARTPreproc', 'MOMART', 'MOMARTObject', 'MOMARTRobotObject', 'MOMARTRobotObjectFlat', \
 			'FrankaKitchenPreproc', 'FrankaKitchen', 'FrankaKitchenObject', 'FrankaKitchenRobotObject', \
-			'RealWorldRigid']
+			'RealWorldRigid', 'RealWorldRigidRobot']
 
 class PolicyManager_BaseClass():
 
@@ -355,7 +355,7 @@ class PolicyManager_BaseClass():
 			# For all data points in the dataset. 
 			for i in range(0,self.training_extent,self.args.batch_size):				
 			# for i in range(0,extent-self.args.batch_size,self.args.batch_size):
-				print("RUN TRAIN", i)
+				# print("RUN TRAIN", i)
 				# Probably need to make run iteration handle batch of current index plus batch size.				
 				# with torch.autograd.set_detect_anomaly(True):
 				t2 = time.time()
@@ -492,7 +492,7 @@ class PolicyManager_BaseClass():
 			# TEMPORARILY SET N to 10
 			####################################
 			# self.N = 33
-			self.N = 100
+			self.N = self.args.N_trajectories_to_visualize
 
 		self.rollout_timesteps = self.args.traj_length
 	
@@ -1177,14 +1177,16 @@ class PolicyManager_BaseClass():
 		# zoom_factor = 0.04
 
 		# # Good low res parameters: 
-		# matplotlib.rcParams['figure.figsize'] = [8, 8]
-		# zoom_factor = 0.04
+		matplotlib.rcParams['figure.figsize'] = [8, 8]
+		zoom_factor = 0.04
 
-		# # # # Good spaced out highres parameters: 
-		matplotlib.rcParams['figure.figsize'] = [40, 40]			
+		# Good spaced out highres parameters: 
+		# matplotlib.rcParams['figure.figsize'] = [40, 40]			
+		# zoom_factor = 0.3
+
 		# Set this parameter to make sure we don't drop frames.
 		matplotlib.rcParams['animation.embed_limit'] = 2**128
-		zoom_factor = 0.3	
+			
 		
 		fig, ax = plt.subplots()
 
@@ -2115,10 +2117,18 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# print("FK Embed")
 			# embed()
 			
-		elif self.args.data in ['RealWorldRigid']:
+		elif self.args.data in ['RealWorldRigid', 'RealWorldRigidRobot']:
 
 			self.state_size = 21
 			self.state_dim = 21
+
+			if self.args.data in ['RealWorldRobotRobot']:
+				
+				self.state_size = 7
+				self.state_dim = 7
+
+				self.norm_sub_value = self.norm_sub_value[:self.state_size]
+				self.norm_denom_value = self.norm_denom_value[:self.state_size]
 
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
@@ -14915,3 +14925,4 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		self.evaluate_alignment()
 		
 		
+

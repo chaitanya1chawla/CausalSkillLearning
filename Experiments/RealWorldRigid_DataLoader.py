@@ -425,6 +425,8 @@ class RealWorldRigid_Dataset(RealWorldRigid_PreDataset):
 				data_element['object-state'] = gaussian_filter1d(data_element['object-state'],self.kernel_bandwidth,axis=0,mode='nearest')
 				data_element['flat-state'] = gaussian_filter1d(data_element['flat-state'],self.kernel_bandwidth,axis=0,mode='nearest')
 
+			if self.args.data in ['RealWorldRigidRobot']:
+				data_element['demo'] = data_element['robot-state']
 			# data_element['environment-name'] = self.environment_names[task_index]
 
 		return data_element

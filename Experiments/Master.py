@@ -132,6 +132,9 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_PreDataset(args)
 	elif args.data=='RealWorldRigid':
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_Dataset(args)
+	elif args.data=='RealWorldRigidRobot':
+		dataset = RealWorldRigid_DataLoader.RealWorldRigid_Dataset(args)
+
 	return dataset
 
 class Master():
@@ -355,6 +358,7 @@ def parse_arguments():
 	parser.add_argument('--save_freq',dest='save_freq',type=int,default=5)	
 	parser.add_argument('--eval_freq',dest='eval_freq',type=int,default=20)	
 	parser.add_argument('--metric_eval_freq',dest='metric_eval_freq',type=int,default=10000)	
+	parser.add_argument('--N_trajectories_to_visualize',dest='N_trajectories_to_visualize',type=int,default=100,help='How many trajectories to visualize during embedding visualization.')
 	parser.add_argument('--perplexity',dest='perplexity',type=float,default=30,help='Value of perplexity fed to TSNE.')
 	parser.add_argument('--latent_set_file_path',dest='latent_set_file_path',type=str,help='File path to pre-computed latent sets to visualize.')
 	parser.add_argument('--viz_latent_rollout',dest='viz_latent_rollout',type=int,default=0,help='Whether to visualize latent rollout or not.')
