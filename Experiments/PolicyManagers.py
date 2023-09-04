@@ -3182,16 +3182,17 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			########################################
 			# Iterate over items in the batch.
 			########################################
-			print("Embed in latent set creation")
-			embed()
+			# print("Embed in latent set creation")
+			# embed()
 
 			for b in range(self.args.batch_size):
+
+				if self.args.batch_size*i+b>=self.N:
+					break
 
 				self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 				# self.latent_z_set[i+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 				self.gt_trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
-
-
 				
 				self.task_id_set.append(data_element[b]['task-id'])
 
@@ -3204,7 +3205,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True, rollout_length=sample_trajs.shape[0]))
 					else:
 						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True))
-
+			
+			if self.args.batch_size*i+b>=self.N:
+				break
 			# print("Embed in latent set creation")
 			# embed()
 
