@@ -559,7 +559,9 @@ class PolicyManager_BaseClass():
 			# embed()
 
 			for j in range(self.N//self.args.batch_size):
-				# i = self.index_list[j]
+				
+				number_batches_for_dataset = (len(self.dataset)//self.args.batch_size)+1
+				i = j % number_batches_for_dataset
 
 				# (1) Encode trajectory. 
 				if self.args.setting in ['learntsub','joint']:
@@ -570,7 +572,7 @@ class PolicyManager_BaseClass():
 					sample_trajs = input_dict['sample_traj']
 				else:
 					print("Running iteration of segment in viz")
-					latent_z, sample_trajs, _, data_element = self.run_iteration(0, j, return_z=True, and_train=False)
+					latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
 
 				if self.args.batch_size>1:
 
@@ -3163,40 +3165,48 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.task_id_set = []
 
 		# Use the dataset to get reasonable trajectories (because without the information bottleneck / KL between N(0,1), cannot just randomly sample.)
-		# for i in range(self.N//self.args.batch_size+1):
-		# for i in range(self.N//self.args.batch_size+1, 32)
-		for i in range(0, self.N, self.args.batch_size):
+		for i in range(self.N//self.args.batch_size+1):
+		# # for i in range(self.N//self.args.batch_size+1, 32)
+		# for i in range(0, self.N, self.args.batch_size):
+
+			# Mapped index
+			number_batches_for_dataset = (len(self.dataset)//self.args.batch_size)+1
+			j = i % number_batches_for_dataset
 
 			########################################
 			# (1) Encoder trajectory. 
 			########################################
 
-			latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
+			latent_z, sample_trajs, _, data_element = self.run_iteration(0, j, return_z=True, and_train=False)
 
 			########################################
 			# Iterate over items in the batch.
 			########################################
+			print("Embed in latent set creation")
+			embed()
 
 			for b in range(self.args.batch_size):
 
-				# self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
-				self.latent_z_set[i+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+				self.latent_z_set[i*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
+				# self.latent_z_set[i+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 				self.gt_trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
 
+
+				
 				self.task_id_set.append(data_element[b]['task-id'])
 
 				if get_visuals:
 					# (2) Now rollout policy.	
 					if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
-						# self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
-						self.trajectory_set[i+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
+						self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
+						# self.trajectory_set[i+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
 					elif self.args.setting=='pretrain_sub':							
 						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True, rollout_length=sample_trajs.shape[0]))
 					else:
 						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True))
 
-			print("Embed in latent set creation")
-			embed()
+			# print("Embed in latent set creation")
+			# embed()
 
 		# Compute average reconstruction error.
 		if get_visuals:
