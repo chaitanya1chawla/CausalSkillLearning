@@ -192,7 +192,7 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		if self.args.constant_variance:
 			variance_outputs = self.args.variance_value*torch.ones_like(self.mean_outputs).to(device) + epsilon
 		else:
-			# variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon
+			# variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon/self.args.epsilon_scale_factor
 			variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
 		
 		# Remember, because of Pytorch's dynamic construction, this distribution can have it's own batch size. 
@@ -2410,8 +2410,7 @@ class ContinuousFactoredSoftEncoderNetwork(ContinuousFactoredEncoderNetwork):
 		pointcloud_representation = self.pc_linear_layer_2(maxpooled_representation).reshape(-1,self.representation_size)
 		
 		return pointcloud_representation
-			
-		
+					
 
 class CriticNetwork(torch.nn.Module):
 

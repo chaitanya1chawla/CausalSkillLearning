@@ -319,6 +319,7 @@ def parse_arguments():
 	parser.add_argument('--variance_factor',dest='variance_factor',type=float,default=0.01,help='Factor by which to multiple variance value predicted by network.')
 	parser.add_argument('--constant_variance',dest='constant_variance',type=int,default=0,help='Whether to use constant variance')
 	parser.add_argument('--variance_value',dest='variance_value',type=float,default=0.1,help='Variance value for network distributions.')
+	parser.add_argument('--epsilon_scale_factor',dest='epsilon_scale_factor',type=float,default=100.,help='Factor by which to scale variance down.')
 
 	# Data parameters. 
 	parser.add_argument('--traj_segments',dest='traj_segments',type=int,default=1) # Defines whether to use trajectory segments for pretraining or entire trajectories. Useful for baseline implementation.

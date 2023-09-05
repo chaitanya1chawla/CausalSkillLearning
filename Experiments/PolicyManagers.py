@@ -939,6 +939,9 @@ class PolicyManager_BaseClass():
 
 			subpolicy_inputs = torch.cat([subpolicy_inputs,input_row],dim=0)
 
+		# print("Embedding in rollout")
+		# embed()
+		
 		trajectory = subpolicy_inputs[:,:self.state_dim].detach().cpu().numpy()
 		
 		return trajectory, rendered_rollout_trajectory
@@ -2300,9 +2303,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		fig = plt.figure()		
 		ax = fig.gca()
-		ax.scatter(traj[:,0],traj[:,1],c=range(len(traj)),cmap='jet')
-		plt.xlim(-10,10)
-		plt.ylim(-10,10)
+		# ax.scatter(traj[:,0],traj[:,1],c=range(len(traj)),cmap='jet')
+		plt.plot(traj)
+		# plt.xlim(-10,10)
+		# plt.ylim(-10,10)
 
 		if no_axes:
 			plt.axis('off')
@@ -2344,8 +2348,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# Get latent_z set. 
 			self.get_trajectory_and_latent_sets(get_visuals=True)
 
-			print("EMBED IN PLOT")
-			embed()
 			log_dict['Average Reconstruction Error:'] = self.avg_reconstruction_error
 
 			# Get embeddings for perplexity=5,10,30, and then plot these.
@@ -2365,7 +2367,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			image_perp30 = self.plot_embedding(self.embedded_z_dict['perp30'], title="Z Space {0} Perp 30".format(statistics_line))
 			
 			# Now adding image visuals to the wandb logs.
-			log_dict["GT Trajectory"] = self.return_wandb_image(self.visualize_trajectory(sample_traj))
+			# log_dict["GT Trajectory"] = self.return_wandb_image(self.visualize_trajectory(sample_traj))
 			log_dict["Embedded Z Space Perplexity 5"] = self.return_wandb_image(image_perp5)
 			log_dict["Embedded Z Space Perplexity 10"] =  self.return_wandb_image(image_perp10)
 			log_dict["Embedded Z Space Perplexity 30"] =  self.return_wandb_image(image_perp30)
@@ -2808,7 +2810,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.total_loss.backward()
 		self.optimizer.step()
 
-	def rollout_visuals(self, i, latent_z=None, return_traj=False, rollout_length=None):
+	def rollout_visuals(self, i, latent_z=None, return_traj=False, rollout_length=None, traj_start=None):
 
 		# Initialize states and latent_z, etc. 
 		# For t in range(number timesteps):
@@ -2870,7 +2872,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		if rollout_length is not None:
 			self.rollout_timesteps = rollout_length
 	
-		start_state = torch.zeros((self.state_dim))
+		if traj_start is None:
+			start_state = torch.zeros((self.state_dim))
+		else:
+			start_state = torch.from_numpy(traj_start)
+		
 
 		if self.args.discrete_z:
 			# Assuming 4 discrete subpolicies, just set subpolicy input to 1 at the latent_z index == i. 
@@ -3199,17 +3205,19 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				if get_visuals:
 					# (2) Now rollout policy.	
 					if self.args.setting=='transfer' or self.args.setting=='cycle_transfer' or self.args.setting=='fixembed':
-						self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
+						self.trajectory_set[i*self.args.batch_size+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True, traj_start=sample_trajs[0,b])
 						# self.trajectory_set[i+b] = self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True)
 					elif self.args.setting=='pretrain_sub':							
-						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True, rollout_length=sample_trajs.shape[0]))
+						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True, traj_start=sample_trajs[0,b], rollout_length=sample_trajs.shape[0]))
 					else:
-						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True))
+						self.trajectory_set.append(self.rollout_visuals(i, latent_z=latent_z[0,b], return_traj=True, traj_start=sample_trajs[0,b]))
 			
 			if self.args.batch_size*i+b>=self.N:
 				break
-			# print("Embed in latent set creation")
-			# embed()
+
+
+		# print("Embed in latent set creation before trajectory error evaluation.")
+		# embed()
 
 		# Compute average reconstruction error.
 		if get_visuals:
