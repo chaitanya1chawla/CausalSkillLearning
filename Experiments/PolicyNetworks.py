@@ -190,11 +190,14 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		# variance_outputs = (self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
 		
 		if self.args.constant_variance:
-			variance_outputs = self.args.variance_value*torch.ones_like(self.mean_outputs).to(device) + epsilon
+			variance_outputs = self.args.variance_value*torch.ones_like(self.mean_outputs).to(device)
 		else:
 			# variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon/self.args.epsilon_scale_factor
 			variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
 		
+		# print(variance_outputs)
+		# print("Embed after print var")
+		# embed()
 		# Remember, because of Pytorch's dynamic construction, this distribution can have it's own batch size. 
 		# It doesn't matter if batch sizes changes over different forward passes of the LSTM, because we're only going
 		# to evaluate this distribution (instance)'s log probability with the same sequence length. 
@@ -2115,10 +2118,10 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 
 		mean_outputs = network_dict['mean_output_layer'](concatenated_outputs)
 
-		if self.args.constant_variance:
-			variance_outputs = self.args.variance_value*torch.ones_like(mean_outputs).to(device) + epsilon
-		else:
-			variance_outputs = self.variance_factor*(self.variance_activation_layer(network_dict['variances_output_layer'](concatenated_outputs))+self.variance_activation_bias) + epsilon
+		# if self.args.constant_variance:
+		# 	variance_outputs = self.args.variance_value*torch.ones_like(mean_outputs).to(device) + epsilon
+		# else:
+		variance_outputs = self.variance_factor*(self.variance_activation_layer(network_dict['variances_output_layer'](concatenated_outputs))+self.variance_activation_bias) + epsilon
 		
 
 		dist = torch.distributions.MultivariateNormal(mean_outputs, torch.diag_embed(variance_outputs))

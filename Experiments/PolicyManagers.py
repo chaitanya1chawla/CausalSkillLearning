@@ -3183,7 +3183,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# (1) Encoder trajectory. 
 			########################################
 
-			latent_z, sample_trajs, _, data_element = self.run_iteration(0, j, return_z=True, and_train=False)
+			latent_z, sample_trajs, _, data_element = self.run_iteration(0, j*self.args.batch_size, return_z=True, and_train=False)
 
 			########################################
 			# Iterate over items in the batch.
@@ -3214,7 +3214,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			
 			if self.args.batch_size*i+b>=self.N:
 				break
-
 
 		# print("Embed in latent set creation before trajectory error evaluation.")
 		# embed()
@@ -3443,9 +3442,10 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 						
 		# print("Embed in PM GBE")
 		# embed()
+		# print("STATE OF INDEX LIST:", self.index_list)
 
 		for b in range(min(self.args.batch_size, len(self.index_list) - i)):
-
+			# print("Index that the get_batch_element is using: b:",b," i+b: ",i+b, self.index_list[i+b])
 			# Because of the new creation of index_list in random shuffling, this should be safe to index dataset with.
 			# print(b, i+b, self.index_list[i+b])
 			index = self.index_list[i+b]
