@@ -189,10 +189,12 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 			self.mean_outputs = self.mean_output_layer(lstm_outputs)
 		# variance_outputs = (self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
 		
-		if self.args.constant_variance:
+		if self.args.variance_mode=='Constant':
 			variance_outputs = self.args.variance_value*torch.ones_like(self.mean_outputs).to(device)
-		else:
-			# variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon/self.args.epsilon_scale_factor
+		elif self.args.variance_mode=='Annealed':
+			variance_outputs = (epsilon/self.args.epsilon_scale_factor) * torch.ones_like(self.mean_outputs).to(device)
+		elif self.args.variance_mode=='Learned':
+			# variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon/self.args.epsilon_scale_factor			
 			variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
 		
 		# print(variance_outputs)
