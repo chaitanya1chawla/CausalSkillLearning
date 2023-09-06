@@ -161,7 +161,7 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 
 		self.variance_factor = self.args.variance_factor
 
-	def forward(self, input, action_sequence, epsilon=0.001, batch_size=None, debugging=False):
+	def forward(self, input, action_sequence, variance_value=0.001, batch_size=None, debugging=False):
 		# Input is the trajectory sequence of shape: Sequence_Length x 1 x Input_Size. 
 		# Here, we also need the continuous actions as input to evaluate their logprobability / probability. 		
 		# format_input = torch.tensor(input).view(input.shape[0], self.batch_size, self.input_size).float().to(device)
@@ -181,23 +181,36 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		# format_action_seq = torch.from_numpy(action_sequence).to(device).float().view(action_sequence.shape[0],1,self.output_size)
 		lstm_outputs, hidden = self.lstm(format_input)
 
-		# Predict Gaussian means and variances. 
+		########################################
+		# Predict Gaussian Mean.
+		########################################
 		if self.args.mean_nonlinearity:
 			self.mean_outputs = self.activation_layer(self.mean_output_layer(lstm_outputs)) 
 			# + epsilon
 		else:
 			self.mean_outputs = self.mean_output_layer(lstm_outputs)
-		# variance_outputs = (self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
+
+		########################################
+		# Predict Gaussian Variance.
+		########################################
 		
 		if self.args.variance_mode=='Constant':
 			variance_outputs = self.args.variance_value*torch.ones_like(self.mean_outputs).to(device)
-		elif self.args.variance_mode=='Annealed':
-			variance_outputs = (epsilon/self.args.epsilon_scale_factor) * torch.ones_like(self.mean_outputs).to(device)
-		elif self.args.variance_mode=='QuadraticAnnealed':
-			variance_outputs = ((epsilon**2)/self.args.epsilon_scale_factor) * torch.ones_like(self.mean_outputs).to(device)
 		elif self.args.variance_mode=='Learned':
 			# variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon/self.args.epsilon_scale_factor			
 			variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
+		else: # If the variance_mode is linearly or quadratically annealed,
+			variance_outputs = variance_value
+
+
+		# OLD VARIANCE MODE USED FOR RWRP_263.. 
+		# elif self.args.variance_mode=='Annealed':
+		# 	variance_outputs = (epsilon/self.args.epsilon_scale_factor) * torch.ones_like(self.mean_outputs).to(device)
+		# elif self.args.variance_mode=='QuadraticAnnealed':
+		# 	variance_outputs = ((epsilon**2)/self.args.epsilon_scale_factor) * torch.ones_like(self.mean_outputs).to(device)
+
+		# elif self.args.variance_mode in 'LinearAnnealed':
+		# elif self.args.variance_mode=='QuadraticAnnealed':
 		
 		# print(variance_outputs)
 		# print("Embed after print var")
@@ -210,7 +223,10 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 			# embed()		
 		covariance_matrix = torch.diag_embed(variance_outputs)
 
+		########################################
 		# Executing distribution creation on CPU and then copying back to GPU.
+		########################################
+		
 		dist = torch.distributions.MultivariateNormal(self.mean_outputs.cpu(), covariance_matrix.cpu())
 		log_probabilities = dist.log_prob(format_action_seq.cpu()).to(device)
 

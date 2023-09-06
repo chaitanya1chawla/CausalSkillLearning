@@ -2166,6 +2166,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.final_epsilon = self.args.epsilon_to
 		self.decay_epochs = self.args.epsilon_over
 		self.decay_counter = self.decay_epochs*len(self.dataset)
+		self.variance_decay_counter = self.args.policy_variance_decay_over*len(self.dataset)
+		
 		if self.args.kl_schedule:
 			self.kl_increment_epochs = self.args.kl_increment_epochs
 			self.kl_increment_counter = self.kl_increment_epochs*len(self.dataset)/self.args.batch_size
@@ -2179,6 +2181,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# Per step decay. 
 		self.decay_rate = (self.initial_epsilon-self.final_epsilon)/(self.decay_counter)	
+		self.linear_variance_decay_rate = (self.args.initial_policy_variance - self.args.final_policy_variance)/(self.variance_decay_counter)
+		self.quadratic_variance_decay_rate = (self.args.initial_policy_variance - self.args.final_policy_variance)/(self.variance_decay_counter**2)
 
 	def create_networks(self):
 		# Create K Policy Networks. 
@@ -2249,12 +2253,30 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 	def set_epoch(self, counter):
 		if self.args.train:
+
+			# Annealing epsilon and policy variance.
 			if counter<self.decay_counter:
 				self.epsilon = self.initial_epsilon-self.decay_rate*counter
+				
+				if self.args.variance_mode in ['Constant']:
+					self.policy_variance_value = self.args.variance_value
+				elif self.args.variance_mode in ['LinearAnnealed']:
+					self.policy_variance_value = self.args.initial_policy_variance - self.linear_variance_decay_rate*counter
+				elif self.args.variance_mode in ['QuadraticAnnealed']:
+					self.policy_variance_value = self.args.final_policy_variance + self.quadratic_variance_decay_rate*((counter-self.variance_decay_counter)**2)				
+
 			else:
-				self.epsilon = self.final_epsilon		
+				self.epsilon = self.final_epsilon
+				if self.args.variance_mode in ['Constant']:
+					self.policy_variance_value = self.args.variance_value
+				elif self.args.variance_mode in ['LinearAnnealed', 'QuadraticAnnealed']:
+					self.policy_variance_value = self.args.final_policy_variance
 		else:
 			self.epsilon = self.final_epsilon
+			# self.policy_variance_value = self.args.final_policy_variance
+			
+			# Default variance value, but this shouldn't really matter... because it's in test / eval mode.
+			self.policy_variance_value = self.args.variance_value
 
 		# Set KL weight. 
 		self.set_kl_weight(counter)		
@@ -2986,7 +3008,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			
 			############# (3b) #############
 			# Policy net doesn't use the decay epislon. (Because we never sample from it in training, only rollouts.)
-			loglikelihoods, _ = self.policy_network.forward(subpolicy_inputs, sample_action_seq, self.epsilon)
+			loglikelihoods, _ = self.policy_network.forward(subpolicy_inputs, sample_action_seq, self.policy_variance_value)
 			loglikelihood = loglikelihoods[:-1].mean()
 			 
 			if self.args.debug:
