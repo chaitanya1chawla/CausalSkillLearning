@@ -1182,12 +1182,13 @@ class PolicyManager_BaseClass():
 		# zoom_factor = 0.04
 
 		# # Good low res parameters: 
-		matplotlib.rcParams['figure.figsize'] = [8, 8]
-		zoom_factor = 0.04
+		# matplotlib.rcParams['figure.figsize'] = [8, 8]
+		# zoom_factor = 0.04
 
 		# Good spaced out highres parameters: 
-		# matplotlib.rcParams['figure.figsize'] = [40, 40]			
+		matplotlib.rcParams['figure.figsize'] = [40, 40]			
 		# zoom_factor = 0.3
+		zoom_factor=0.25
 
 		# Set this parameter to make sure we don't drop frames.
 		matplotlib.rcParams['animation.embed_limit'] = 2**128
