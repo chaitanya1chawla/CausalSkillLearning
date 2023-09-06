@@ -316,11 +316,18 @@ def parse_arguments():
 	parser.add_argument('--leaky_relu',dest='leaky_relu',type=int,default=0,help='Whether to use leaky relu (or just vanilla relu).')
 	parser.add_argument('--environment',dest='environment',type=str,default='SawyerLift') # Defines robosuite environment for RL.
 	parser.add_argument('--target_environment',dest='target_environment',type=str,default='SawyerLift') # Defines robosuite environment for RL.
+	
+	# Variance parameters. 
 	parser.add_argument('--variance_factor',dest='variance_factor',type=float,default=0.01,help='Factor by which to multiple variance value predicted by network.')
 	# parser.add_argument('--constant_variance',dest='constant_variance',type=int,default=0,help='Whether to use constant variance')
 	parser.add_argument('--variance_mode',dest='variance_mode',type=str,default='Learned',choices=['Learned','Constant','Annealed','QuadraticAnnealed'],help='What mode to set variance of policy network')	
 	parser.add_argument('--variance_value',dest='variance_value',type=float,default=0.1,help='Variance value for network distributions.')
 	parser.add_argument('--epsilon_scale_factor',dest='epsilon_scale_factor',type=float,default=100.,help='Factor by which to scale variance down for variance.')
+	# Setting parameters for linear annealing of variance.
+	parser.add_argument('--initial_policy_variance',dest='initial_policy_variance',type=float,default=0.1)
+	parser.add_argument('--final_policy_variance',dest='final_policy_variance',type=float,default=0.0001)
+	parser.add_argument('--policy_variance_decay_over',dest='policy_variance_decay_over',type=int,default=200)
+
 
 	# Data parameters. 
 	parser.add_argument('--traj_segments',dest='traj_segments',type=int,default=1) # Defines whether to use trajectory segments for pretraining or entire trajectories. Useful for baseline implementation.
