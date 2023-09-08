@@ -78,9 +78,9 @@ class RealWorldRigid_PreDataset(object):
 		self.ds_freq = np.array([6, 6, 7, 8, 8])
 
 		# Set files. 
-		self.setup()
 		self.set_ground_tag_pose_dict()
-
+		self.setup()
+		
 		self.stat_dir_name='RealWorldRigid'
 				
 	def normalize_quaternion(self, q):

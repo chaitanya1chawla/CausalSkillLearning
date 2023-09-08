@@ -81,8 +81,9 @@ class RealWorldRigid_PreDataset(Dataset):
 		self.ds_freq = np.array([6, 6, 7, 8, 8])
 
 		# Set files. 
+		self.set_ground_tag_pose_dict()
 		self.setup()
-		self.set_ground_tag_pose()
+		
 
 		self.stat_dir_name='RealWorldRigid'
 				
