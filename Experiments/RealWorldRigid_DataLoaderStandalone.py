@@ -5,6 +5,7 @@ from __future__ import print_function
 import numpy as np
 import os, sys
 from IPython import embed
+from scipy.spatial.transform import Rotation as R
 
 def resample(original_trajectory, desired_number_timepoints):
 	original_traj_len = len(original_trajectory)
@@ -12,8 +13,7 @@ def resample(original_trajectory, desired_number_timepoints):
 	return original_trajectory[new_timepoints]
 
 def invert(homogenous_matrix):
-	
-	from scipy.spatial.transform import Rotation as R
+		
 	inverse = np.zeros((4,4))
 	rotation = R.from_matrix(homogenous_matrix[:3,:3])
 	inverse[:3, :3] = rotation.inv().as_matrix()
@@ -23,8 +23,7 @@ def invert(homogenous_matrix):
 	return inverse
 
 def invert_batch_matrix(homogenous_matrix):
-
-	from scipy.spatial.transform import Rotation as R
+	
 	inverse = np.zeros((homogenous_matrix.shape[0], 4,4))
 	rotation = R.from_matrix(homogenous_matrix[:,:3,:3])
 	inverse[:, :3, :3] = rotation.inv().as_matrix()
@@ -187,8 +186,6 @@ class RealWorldRigid_PreDataset(object):
 	# 	return demonstration
 
 	def compute_relative_poses(self, demonstration):
-
-		from scipy.spatial.transform import Rotation as R
 
 		# Get poses of object1 and object2 with respect to ground. 
 		demonstration['object1_pose'] = {}
