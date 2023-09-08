@@ -82,6 +82,7 @@ class RealWorldRigid_PreDataset(Dataset):
 
 		# Set files. 
 		self.setup()
+		self.set_ground_tag_pose()
 
 		self.stat_dir_name='RealWorldRigid'
 				
@@ -255,6 +256,30 @@ class RealWorldRigid_PreDataset(Dataset):
 
 		return new_demonstration
 
+	def set_ground_tag_pose_dict(self):
+
+		self.ground_pose_dict = {}
+		self.ground_pose_dict['0'] = {}
+		self.ground_pose_dict['1'] = {}
+		
+		# Manually set pose, so we don't have to deal with arbitrary flips in the data. 
+		self.ground_pose_dict['0']['position'] = np.array([0.13983876, 0.09984951, 0.64977687])
+		self.ground_pose_dict['0']['orientation'] = np.array([-0.5428623 ,  0.6971846 , -0.42725178, -0.19154654])
+
+		self.ground_pose_dict['1']['position'] = np.array([0.04871597, 0.07525627, 0.66383035])
+		self.ground_pose_dict['1']['orientation'] = np.array([ 0.78081735, -0.42594218,  0.19169668,  0.41490953])		
+
+	def set_ground_tag_pose(self, length=None, primary_camera=None):
+
+		pose_dictionary = {}
+		pos = self.ground_pose_dict[primary_camera]['position']
+		orient = self.ground_pose_dict[primary_camera]['orientation']
+
+		pose_dictionary['position'] = np.repeat(pos[np.newaxis, :], length, axis=0)
+		pose_dictionary['orientation'] = np.repeat(orient[np.newaxis, :], length, axis=0)
+		
+		return pose_dictionary
+
 	def process_demonstration(self, demonstration, task_index):
 
 		##########################################
@@ -282,7 +307,11 @@ class RealWorldRigid_PreDataset(Dataset):
 		# 0) For primary camera, retrieve tag poses. 
 		#############
 		
-		demonstration['ground_cam_frame_pose'] = self.interpolate_pose( demonstration['tag0']['cam{0}'.format(demonstration['primary_camera'])] )
+		# Now, instead of interpolating the ground tag detection from the camera frame, set it to constant value. 
+		# demonstration['ground_cam_frame_pose'] = self.interpolate_pose( demonstration['tag0']['cam{0}'.format(demonstration['primary_camera'])] )				
+
+		demo_length = demonstration['js_pos'].shape[0]
+		demonstration['ground_cam_frame_pose'] = self.set_ground_tag_pose( length=demo_length, primary_camera=demonstration['primary_camera'] )
 		demonstration['object1_cam_frame_pose'] = self.interpolate_pose( demonstration['tag1']['cam{0}'.format(demonstration['primary_camera'])] )
 		demonstration['object2_cam_frame_pose'] = self.interpolate_pose( demonstration['tag2']['cam{0}'.format(demonstration['primary_camera'])] )
 		
@@ -341,7 +370,8 @@ class RealWorldRigid_PreDataset(Dataset):
 			print("Processing task: ", task_index, " of ", self.number_tasks)
 
 			# Set file path for this task.
-			task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'NumpyDemos')
+			alt_task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'NumpyDemos')
+			task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'ImageData')			
 
 			#########################	
 			# For every demo in this task
@@ -352,8 +382,14 @@ class RealWorldRigid_PreDataset(Dataset):
 				print("####################")
 				print("Processing demo: ", j, " of ", self.num_demos[task_index], " from task ", task_index)
 				
+				# file = os.path.join(task_file_path, 'demo{0}.npy'.format(j))
+				# demonstration = np.load(file, allow_pickle=True).item()
+				
 				file = os.path.join(task_file_path, 'demo{0}.npy'.format(j))
+				alt_file = os.path.join(alt_task_file_path, 'demo{0}.npy'.format(j))
 				demonstration = np.load(file, allow_pickle=True).item()
+				alt_demonstration = np.load(alt_file, allow_pickle=True).item()
+				demonstration['primary_camera'] = alt_demonstration['primary_camera']
 
 				#########################
 				# Now process in whatever way necessary. 
