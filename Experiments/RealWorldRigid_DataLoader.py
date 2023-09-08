@@ -273,8 +273,8 @@ class RealWorldRigid_PreDataset(Dataset):
 	def set_ground_tag_pose(self, length=None, primary_camera=None):
 
 		pose_dictionary = {}
-		pos = self.ground_pose_dict[primary_camera]['position']
-		orient = self.ground_pose_dict[primary_camera]['orientation']
+		pos = self.ground_pose_dict[str(primary_camera)]['position']
+		orient = self.ground_pose_dict[str(primary_camera)]['orientation']
 
 		pose_dictionary['position'] = np.repeat(pos[np.newaxis, :], length, axis=0)
 		pose_dictionary['orientation'] = np.repeat(orient[np.newaxis, :], length, axis=0)
