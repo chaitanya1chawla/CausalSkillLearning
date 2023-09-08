@@ -9,6 +9,47 @@ def resample(original_trajectory, desired_number_timepoints):
 	new_timepoints = np.linspace(0, original_traj_len-1, desired_number_timepoints, dtype=int)
 	return original_trajectory[new_timepoints]
 
+def invert(homogenous_matrix):
+	
+	from scipy.spatial.transform import Rotation as R
+	inverse = np.zeros((4,4))
+	rotation = R.from_matrix(homogenous_matrix[:3,:3])
+	inverse[:3, :3] = rotation.inv().as_matrix()
+	inverse[:3, -1] = -rotation.inv().apply(homogenous_matrix[:3,-1])
+	inverse[-1, -1] = 1.
+
+	return inverse
+
+def invert_batch_matrix(homogenous_matrix):
+
+	from scipy.spatial.transform import Rotation as R
+	inverse = np.zeros((homogenous_matrix.shape[0], 4,4))
+	rotation = R.from_matrix(homogenous_matrix[:,:3,:3])
+	inverse[:, :3, :3] = rotation.inv().as_matrix()
+	inverse[:, :3, -1] = -rotation.inv().apply(homogenous_matrix[:, :3,-1])
+	inverse[:, -1, -1] = 1.
+
+	return inverse
+
+def create_matrix(position, orientation):
+
+	homogenous_matrix = np.zeros((4,4))
+	homogenous_matrix[:3,-1] = position
+	homogenous_matrix[:3,:3] = R.from_quat(orientation).as_matrix()
+	homogenous_matrix[-1,-1] = 1.
+
+	return homogenous_matrix
+
+def create_batch_matrix(position, orientation):
+
+	traj_length = position.shape[0]
+	homogenous_matrix = np.zeros((traj_length, 4,4))
+	homogenous_matrix[:, :3,-1] = position
+	homogenous_matrix[:, :3,:3] = R.from_quat(orientation).as_matrix()
+	homogenous_matrix[:,-1,-1] = 1.
+
+	return homogenous_matrix
+
 class RealWorldRigid_PreDataset(Dataset): 
 
 	# Class implementing instance of RealWorld Rigid Body Dataset. 
@@ -104,7 +145,7 @@ class RealWorldRigid_PreDataset(Dataset):
 
 		# Interpolate positions and orientations. 
 		interpolated_positions = self.interpolate_position(valid=pose_sequence['validity'][first_valid_index:last_valid_index+1], \
-						     position_sequence=pose_sequence['position'][first_valid_index:last_valid_index+1])
+							 position_sequence=pose_sequence['position'][first_valid_index:last_valid_index+1])
 		interpolated_orientations = self.interpolate_orientation(valid=pose_sequence['validity'][first_valid_index:last_valid_index+1], \
 							orientation_sequence=pose_sequence['orientation'][first_valid_index:last_valid_index+1])
 
@@ -128,22 +169,50 @@ class RealWorldRigid_PreDataset(Dataset):
 
 		return pose_sequence
 
-	def compute_relative_poses(self, demonstration):
+	# def compute_relative_poses(self, demonstration):
 		
+	# 	from scipy.spatial.transform import Rotation as R
+
+	# 	# Get poses of object1 and object2 with respect to ground. 
+	# 	demonstration['object1_pose'] = {}
+	# 	demonstration['object2_pose'] = {}
+	# 	demonstration['object1_pose']['position'] = demonstration['object1_cam_frame_pose']['position'] - demonstration['ground_cam_frame_pose']['position']
+	# 	demonstration['object2_pose']['position'] = demonstration['object2_cam_frame_pose']['position'] - demonstration['ground_cam_frame_pose']['position']
+
+	# 	r_ground = R.from_quat(demonstration['ground_cam_frame_pose']['orientation'])
+	# 	r_obj1 = R.from_quat(demonstration['object1_cam_frame_pose']['orientation'])
+	# 	r_obj2 = R.from_quat(demonstration['object2_cam_frame_pose']['orientation'])
+
+	# 	demonstration['object1_pose']['orientation'] = (r_ground.inv()*r_obj1).as_quat()
+	# 	demonstration['object2_pose']['orientation'] = (r_ground.inv()*r_obj2).as_quat()		
+
+	# 	return demonstration
+
+	def compute_relative_poses(self, demonstration):
+
 		from scipy.spatial.transform import Rotation as R
 
 		# Get poses of object1 and object2 with respect to ground. 
 		demonstration['object1_pose'] = {}
 		demonstration['object2_pose'] = {}
-		demonstration['object1_pose']['position'] = demonstration['object1_cam_frame_pose']['position'] - demonstration['ground_cam_frame_pose']['position']
-		demonstration['object2_pose']['position'] = demonstration['object2_cam_frame_pose']['position'] - demonstration['ground_cam_frame_pose']['position']
 
-		r_ground = R.from_quat(demonstration['ground_cam_frame_pose']['orientation'])
-		r_obj1 = R.from_quat(demonstration['object1_cam_frame_pose']['orientation'])
-		r_obj2 = R.from_quat(demonstration['object2_cam_frame_pose']['orientation'])
+		# Construct homogenous transformation matrices. 
+		ground_in_camera_homogenous_matrices = create_batch_matrix(demonstration['ground_cam_frame_pose']['position'], demonstration['ground_cam_frame_pose']['orientation'])
+		object1_in_camera_homogenous_matrices = create_batch_matrix(demonstration['object1_cam_frame_pose']['position'], demonstration['object1_cam_frame_pose']['orientation'])
+		object2_in_camera_homogenous_matrices = create_batch_matrix(demonstration['object2_cam_frame_pose']['position'], demonstration['object2_cam_frame_pose']['orientation'])
 
-		demonstration['object1_pose']['orientation'] = (r_ground.inv()*r_obj1).as_quat()
-		demonstration['object2_pose']['orientation'] = (r_ground.inv()*r_obj2).as_quat()
+		# Inverse of the ground in camera.
+		camera_in_ground_homogenous_matrices = invert_batch_matrix(ground_in_camera_homogenous_matrices)
+
+		# Now transform with batch multiplication. 
+		object1_in_ground_homogenous_matrices = np.matmul(camera_in_ground_homogenous_matrices, object1_in_camera_homogenous_matrices)
+		object2_in_ground_homogenous_matrices = np.matmul(camera_in_ground_homogenous_matrices, object2_in_camera_homogenous_matrices)
+
+		# Now retieve poses.
+		demonstration['object1_pose']['position'] = object1_in_ground_homogenous_matrices[:,:3,-1]
+		demonstration['object2_pose']['position'] = object2_in_ground_homogenous_matrices[:,:3,-1]
+		demonstration['object1_pose']['orientation'] = R.from_matrix(object1_in_ground_homogenous_matrices[:,:3,:3]).as_quat()
+		demonstration['object2_pose']['orientation'] = R.from_matrix(object2_in_ground_homogenous_matrices[:,:3,:3]).as_quat()
 
 		return demonstration
 

@@ -546,6 +546,13 @@ class PolicyManager_BaseClass():
 			self.dir_name = os.path.join(self.args.logdir,self.args.name,"MEval","m{0}".format(model_epoch))
 			if not(os.path.isdir(self.dir_name)):
 				os.mkdir(self.dir_name)
+			self.traj_dir_name = os.path.join(self.dir_name, "NumpyTrajs")
+			if not(os.path.isdir(self.traj_dir_name)):
+				os.mkdir(self.traj_dir_name)
+			self.z_dir_name = os.path.join(self.dir_name, "NumpyZs")
+			if not(os.path.isdir(self.z_dir_name)):
+				os.mkdir(self.z_dir_name)
+
 
 			self.max_len = 0
 
@@ -592,7 +599,6 @@ class PolicyManager_BaseClass():
 						# print("Getting visuals for trajectory:")
 						# print("j:", j, "b:", b, "j*bs+b:", j*self.args.batch_size+b, "il[j*bs+b]:", self.index_list[j*self.args.batch_size+b], "env:", self.dataset[self.index_list[j*self.args.batch_size+b]]['file'])
 
-
 						if self.args.setting in ['learntsub','joint']:
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 				
@@ -602,21 +608,34 @@ class PolicyManager_BaseClass():
 							# self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b,stream_z_indices].detach().cpu().numpy())
 			
-							# # # Set. 
-							# print("Embed in Pretrain Viz")
-							# embed()
-
 							# Rollout each individual trajectory in this batch.
 							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b], indexed_data_element=data_element[b])
-
 							
-
-						# print("TRAJECTORY ANALYSIS")
-						# embed()
 						# Now append this particular sample traj and the rollout into trajectroy and rollout sets.
 						self.trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
 						self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))
-					
+
+						#######################
+						# Save the GT trajectory, the rollout, and Z into numpy files. 
+
+						#####################################################
+						# Save trajectories and Zs
+						#####################################################
+
+						k = j*self.args.batch_size+b	
+
+						print("Before unnorm")
+						embed()
+						if self.args.normalization is not None:
+							gt_traj = (self.trajectory_set[k] *self.norm_denom_value) + self.norm_sub_value
+							rollout_traj = (self.trajectory_rollout_set[k]*self.norm_denom_value) + self.norm_sub_value
+
+						# (trajectory_start * self.norm_denom_value ) + self.norm_sub_value
+						np.save(os.path.join(self.traj_dir_name, "GT_Traj{0}.npy".format(k)), gt_traj)
+						np.save(os.path.join(self.traj_dir_name, "Rollout_Traj{0}.npy".format(k)), rollout_traj)
+						np.save(os.path.join(self.z_dir_name, "Latent_Z{0}.npy".format(k)), self.latent_z_set[k])
+
+
 				else:
 
 					print("#########################################")	
@@ -667,6 +686,7 @@ class PolicyManager_BaseClass():
 
 			self.indices = range(self.N)
 
+
 		#####################################################
 		# Save the embeddings in HTML files.
 		#####################################################
@@ -679,11 +699,15 @@ class PolicyManager_BaseClass():
 		gt_animation_object = self.visualize_robot_embedding(embedded_z, gt=True)
 		rollout_animation_object = self.visualize_robot_embedding(embedded_z, gt=False)
 
-		self.write_embedding_HTML(gt_animation_object,prefix="GT")
-		self.write_embedding_HTML(rollout_animation_object,prefix="Rollout")
 
 		# Save webpage. 
 		self.write_results_HTML()
+		
+		# Save webpage with plots. 
+		self.write_results_HTML(plots_or_gif='Plot')
+		
+		self.write_embedding_HTML(gt_animation_object,prefix="GT")
+		self.write_embedding_HTML(rollout_animation_object,prefix="Rollout")
 
 	def preprocess_action(self, action=None):
 
@@ -1075,18 +1099,22 @@ class PolicyManager_BaseClass():
 		else:
 			return unnorm_pred_trajectory
 
-	def write_results_HTML(self):
+	def write_results_HTML(self, plots_or_gif='GIF'):
 		# Retrieve, append, and print images from datapoints across different models. 
 
 		print("Writing HTML File.")
 		# Open Results HTML file. 	    
-		with open(os.path.join(self.dir_name,'Results_{}.html'.format(self.args.name)),'w') as html_file:
+		with open(os.path.join(self.dir_name,'Results_{0}_{1}.html'.format(self.args.name, plots_or_gif)),'w') as html_file:
 			
 			# Start HTML doc. 
 			html_file.write('<html>')
 			html_file.write('<body>')
 			html_file.write('<p> Model: {0}</p>'.format(self.args.name))						
 			# html_file.write('<p> Average Trajectory Distance: {0}</p>'.format(self.mean_distance))
+
+			extension_dict = {}
+			extension_dict['GIF'] = 'gif'
+			extension_dict['Plot'] = 'png'
 
 			for i in range(self.N):
 				
@@ -1098,7 +1126,10 @@ class PolicyManager_BaseClass():
 
 				# Create gif_list by prefixing base_gif_list with file prefix.
 				# html_file.write('<div style="display: flex; justify-content: row;">  <img src="Traj_{0}_GT.gif"/>  <img src="Traj_{0}_Rollout.gif"/> </div>'.format(i))
-				html_file.write('<div style="display: flex; justify-content: row;">  <img src="Traj_{0}_GIF_GT.gif"/>  <img src="Traj_{0}_GIF_Rollout.gif"/> </div>'.format(i))
+				
+				# html_file.write('<div style="display: flex; justify-content: row;">  <img src="Traj_{0}_GIF_GT.gif"/>  <img src="Traj_{0}_GIF_Rollout.gif"/> </div>'.format(i))
+
+				html_file.write('<div style="display: flex; justify-content: row;">  <img src="Traj_{0}_{1}_GT.{2}"/>  <img src="Traj_{0}_{1}_Rollout.{2}"/> </div>'.format(i, plots_or_gif, extension_dict[plots_or_gif]))
 					
 				# Add gap space.
 				html_file.write('<p> </p>')
@@ -2165,16 +2196,16 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.initial_epsilon = self.args.epsilon_from
 		self.final_epsilon = self.args.epsilon_to
 		self.decay_epochs = self.args.epsilon_over
-		self.decay_counter = self.decay_epochs*len(self.dataset)
-		self.variance_decay_counter = self.args.policy_variance_decay_over*len(self.dataset)
+		self.decay_counter = self.decay_epochs*(len(self.dataset)//self.args.batch_size+1)
+		self.variance_decay_counter = self.args.policy_variance_decay_over*(len(self.dataset)//self.args.batch_size+1)
 		
 		if self.args.kl_schedule:
 			self.kl_increment_epochs = self.args.kl_increment_epochs
-			self.kl_increment_counter = self.kl_increment_epochs*len(self.dataset)/self.args.batch_size
+			self.kl_increment_counter = self.kl_increment_epochs*(len(self.dataset)//self.args.batch_size+1)
 			self.kl_begin_increment_epochs = self.args.kl_begin_increment_epochs
-			self.kl_begin_increment_counter = self.kl_begin_increment_epochs*len(self.dataset)/self.args.batch_size
+			self.kl_begin_increment_counter = self.kl_begin_increment_epochs*(len(self.dataset)//self.args.batch_size+1)
 			self.kl_increment_rate = (self.args.final_kl_weight-self.args.initial_kl_weight)/(self.kl_increment_counter)
-			self.kl_phase_length_counter = self.args.kl_cyclic_phase_epochs*len(self.dataset)/self.args.batch_size
+			self.kl_phase_length_counter = self.args.kl_cyclic_phase_epochs*(len(self.dataset)//self.args.batch_size+1)
 		# Log-likelihood penalty.
 		self.lambda_likelihood_penalty = self.args.likelihood_penalty
 		self.baseline = None
@@ -2277,6 +2308,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			
 			# Default variance value, but this shouldn't really matter... because it's in test / eval mode.
 			self.policy_variance_value = self.args.variance_value
+		
+		# print("embed in set epoch")
+		# embed()
 
 		# Set KL weight. 
 		self.set_kl_weight(counter)		
@@ -3905,11 +3939,13 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		gt_animation_object = self.visualize_robot_embedding(embedded_z, gt=True)
 		rollout_animation_object = self.visualize_robot_embedding(embedded_z, gt=False)
 
+		# Save webpage
+		self.write_results_HTML()
+		# Save webpage plots
+		self.write_results_HTML('Plot')
+
 		self.write_embedding_HTML(gt_animation_object,prefix="GT")
 		self.write_embedding_HTML(rollout_animation_object,prefix="Rollout")
-
-		# Save webpage. 
-		self.write_results_HTML()
 
 class PolicyManager_Joint(PolicyManager_BaseClass):
 
@@ -14982,4 +15018,5 @@ class PolicyManager_DownstreamTaskTransfer(PolicyManager_DensityJointFixEmbedTra
 		self.evaluate_alignment()
 		
 		
+
 

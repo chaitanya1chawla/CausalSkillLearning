@@ -1614,9 +1614,14 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 	def get_probabilities(self, input, epsilon, precomputed_b=None, evaluate_value=None):
 		return self.forward(input, epsilon, precomputed_b=precomputed_b, evaluate_z_probability=evaluate_value)
 
-# class ContinuousVariationalPolicyNetwork_Factored(ContinuousVariationalPolicyNetwork_Batch):
+class ContinuousVariationalPolicyNetwork_Factored(ContinuousVariationalPolicyNetwork_Batch):
 
-# 	def __init__(self):
+	def __init__(self, input_size, hidden_size, z_dimensions, args, number_layers=4, translation_network=False):
+
+		super(ContinuousVariationalPolicyNetwork_Factored, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)
+
+	
+
 
 class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNetwork_Batch):
 
