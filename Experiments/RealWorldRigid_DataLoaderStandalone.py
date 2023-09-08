@@ -79,6 +79,7 @@ class RealWorldRigid_PreDataset(object):
 
 		# Set files. 
 		self.setup()
+		self.set_ground_tag_pose_dict()
 
 		self.stat_dir_name='RealWorldRigid'
 				
@@ -399,7 +400,7 @@ class RealWorldRigid_PreDataset(object):
 			# For each task, save task_file_list to One numpy. 
 			suffix = ""
 			# if self.args.images_in_real_world_dataset:
-			suffix = "_wImages"
+			suffix = "_NewRelPose"
 			task_numpy_path = os.path.join(self.dataset_directory, self.task_list[task_index], "New_Task_Demo_Array{0}.npy".format(suffix))
 			np.save(task_numpy_path, self.task_demo_array)
 
