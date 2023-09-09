@@ -497,7 +497,8 @@ class RealWorldRigid_Dataset(RealWorldRigid_PreDataset):
 		self.files = []
 		for i in range(len(self.task_list)):
 			# self.files.append(np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
-			self.files.append(np.load("{0}/{1}/New_Task_Demo_Array_wImages.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
+			# self.files.append(np.load("{0}/{1}/New_Task_Demo_Array_wImages.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
+			self.files.append(np.load("{0}/{1}/New_Task_Demo_Array_NewRelPose.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
 
 	def __getitem__(self, index):
 

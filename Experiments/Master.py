@@ -238,9 +238,11 @@ class Master():
 					self.policy_manager.train(self.args.model)
 				else:
 					self.policy_manager.train()
-			else:				
+			else:			
 				if self.args.setting=='pretrain_prior':
 					self.policy_manager.train(self.args.model)
+				elif self.args.setting=='query':
+					self.policy_manager.query_mode(model=self.args.model)
 				else:														
 					self.policy_manager.evaluate(model=self.args.model)		
 				

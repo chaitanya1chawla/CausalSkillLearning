@@ -624,17 +624,26 @@ class PolicyManager_BaseClass():
 
 						k = j*self.args.batch_size+b	
 
-						print("Before unnorm")
-						embed()
+						# print("Before unnorm")
+						# embed()
 						if self.args.normalization is not None:
+							
 							gt_traj = (self.trajectory_set[k] *self.norm_denom_value) + self.norm_sub_value
-							rollout_traj = (self.trajectory_rollout_set[k]*self.norm_denom_value) + self.norm_sub_value
+							gt_traj_tuple = (data_element[b]['environment-name'], gt_traj)
+							
+							# Don't unnormalize, we already did in get robot visuals. 
+							rollout_traj = self.trajectory_rollout_set[k]
+							rollout_traj_tuple = (data_element[b]['environment-name'], rollout_traj)
+							# rollout_traj = (self.trajectory_rollout_set[k]*self.norm_denom_value) + self.norm_sub_value
 
 						# (trajectory_start * self.norm_denom_value ) + self.norm_sub_value
-						np.save(os.path.join(self.traj_dir_name, "GT_Traj{0}.npy".format(k)), gt_traj)
-						np.save(os.path.join(self.traj_dir_name, "Rollout_Traj{0}.npy".format(k)), rollout_traj)
-						np.save(os.path.join(self.z_dir_name, "Latent_Z{0}.npy".format(k)), self.latent_z_set[k])
-
+						# np.save(os.path.join(self.traj_dir_name, "GT_Traj{0}.npy".format(k)), gt_traj)
+						# np.save(os.path.join(self.traj_dir_name, "Rollout_Traj{0}.npy".format(k)), rollout_traj)
+						# np.save(os.path.join(self.z_dir_name, "Latent_Z{0}.npy".format(k)), self.latent_z_set[k])
+												
+						np.save(os.path.join(self.traj_dir_name, "Traj{0}_GT.npy".format(k)), gt_traj_tuple)
+						np.save(os.path.join(self.traj_dir_name, "Traj{0}_Rollout.npy".format(k)), rollout_traj_tuple)
+						np.save(os.path.join(self.z_dir_name, "Traj{0}_Latent_Z.npy".format(k)), self.latent_z_set[k])						
 
 				else:
 
@@ -706,8 +715,13 @@ class PolicyManager_BaseClass():
 		# Save webpage with plots. 
 		self.write_results_HTML(plots_or_gif='Plot')
 		
-		self.write_embedding_HTML(gt_animation_object,prefix="GT")
-		self.write_embedding_HTML(rollout_animation_object,prefix="Rollout")
+		viz_embeddings = True
+		if (self.args.data in ['RealWorldRigid', 'RealWorldRigidRobot']) and (self.args.images_in_real_world_dataset==0):
+			viz_embeddings = False
+
+		if viz_embeddings:
+			self.write_embedding_HTML(gt_animation_object,prefix="GT")
+			self.write_embedding_HTML(rollout_animation_object,prefix="Rollout")
 
 	def preprocess_action(self, action=None):
 
@@ -2178,7 +2192,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 					# Manually make sure quaternion dims are unscaled.
 					self.norm_denom_value[10:14] = 1.
 					self.norm_denom_value[17:] = 1.
-
+					self.norm_sub_value[10:14] = 0.
+					self.norm_sub_value[17:] = 0.
 
 			self.input_size = 2*self.state_size
 			self.hidden_size = self.args.hidden_size
@@ -3109,6 +3124,16 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		self.mean_distance = self.distances[self.distances>0].mean()
 
+	def query_mode(self, model=None, suffix=None):
+
+		if model:
+			self.load_all_models(model)
+
+		np.set_printoptions(suppress=True,precision=2)
+
+		print("Embedding in query mode.")
+		embed()
+
 	def evaluate(self, model=None, suffix=None):
 
 		if model:
@@ -3735,8 +3760,6 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 					joint_state = self.visualizer.environment.sim.get_state()[1][:7]
 				else:
 					joint_state = env_next_state_dict['joint_pos']
-
-
 
 		####################
 		# (4) Return State
