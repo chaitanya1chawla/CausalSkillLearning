@@ -1621,6 +1621,7 @@ class ContinuousVariationalPolicyNetwork_Factored(ContinuousVariationalPolicyNet
 		super(ContinuousVariationalPolicyNetwork_Factored, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)
 
 	
+	
 
 
 class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNetwork_Batch):

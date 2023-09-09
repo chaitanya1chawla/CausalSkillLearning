@@ -3297,8 +3297,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			if self.args.batch_size*i+b>=self.N:
 				break
 
-		# print("Embed in latent set creation before trajectory error evaluation.")
-		# embed()
+		print("Embed in latent set creation before trajectory error evaluation.")
+		embed()
 
 		# Compute average reconstruction error.
 		if get_visuals:
