@@ -984,7 +984,17 @@ class PolicyManager_BaseClass():
 		trajectory = subpolicy_inputs[:,:self.state_dim].detach().cpu().numpy()
 		
 		return trajectory, rendered_rollout_trajectory
-		
+
+	def retrieve_unnormalized_robot_trajectory(self, trajectory_start, latent_z, rollout_length=None, z_seq=False, original_trajectory=None):
+
+		trajectory, _ = self.rollout_robot_trajectory(trajectory_start, latent_z, rollout_length=rollout_length, z_seq=z_seq, original_trajectory=original_trajectory)
+
+		# Unnormalize. 
+		if self.args.normalization is not None:
+			unnormalized_trajectory = (trajectory*self.norm_denom_value) + self.norm_sub_value
+
+		return trajectory
+
 	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None):
 
 		########################################
@@ -3147,11 +3157,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				# self.visualize_robot_data(load_sets=True)
 				whether_load_z_set = self.args.latent_set_file_path is not None
 
-				print("###############################################")
-				print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-				print("Temporarily not visualizing.")
-				print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-				print("###############################################")
+				# print("###############################################")
+				# print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+				# print("Temporarily not visualizing.")
+				# print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+				# print("###############################################")
 				self.visualize_robot_data(load_sets=whether_load_z_set)
 
 				# Get reconstruction error... 
