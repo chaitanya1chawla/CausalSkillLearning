@@ -223,7 +223,7 @@ class RealWorldRigid_PreDataset(Dataset):
 		if ds_freq is None:
 			ds_freq = self.ds_freq[task_index]
 		# Downsample each stream.
-		number_timepoints = demonstration['demo'].shape[0] // ds_freq
+		number_timepoints = int(demonstration['demo'].shape[0] // ds_freq)
 
 		# for k in demonstration.keys():
 		key_list = ['robot-state', 'object-state', 'eef-state', 'demo']
@@ -532,6 +532,7 @@ class RealWorldRigid_Dataset(RealWorldRigid_PreDataset):
 			# If we have additional downsampling, do it here. 
 			if self.args.ds_freq>1.:				
 				self.downsample_data(data_element, data_element['task-id'], self.args.ds_freq)
+				# data_element = 
 			
 			if self.args.smoothen: 
 				data_element['demo'] = gaussian_filter1d(data_element['demo'],self.kernel_bandwidth,axis=0,mode='nearest')

@@ -144,8 +144,8 @@ class Master():
 			print("Creating Datasets")			
 			self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)			
 
-		# print("Embed after dataset creation")
-		# embed()
+		print("Embed after dataset creation")
+		embed()
 
 		# Now define policy manager.
 		if self.args.setting=='learntsub' or self.args.setting=='joint':
@@ -241,9 +241,7 @@ class Master():
 			else:			
 				if self.args.setting=='pretrain_prior':
 					self.policy_manager.train(self.args.model)
-				elif self.args.setting=='query':
-					self.policy_manager.query_mode(model=self.args.model)
-				else:														
+				else:
 					self.policy_manager.evaluate(model=self.args.model)		
 				
 		# elif self.args.setting=='learntsub' or self.args.setting=='joint' or self.args.setting=='context':
@@ -336,7 +334,7 @@ def parse_arguments():
 	parser.add_argument('--gripper',dest='gripper',type=int,default=1) # Whether to use gripper training in roboturk.
 	parser.add_argument('--ee_trajectories',dest='ee_trajectories',type=int,default=0,help='Whether to learn a skill space from end effector trajectories rather than joint space.')
 	parser.add_argument('--single_hand',dest='single_hand',type=str,default=None,help='Whether to use a single hand, if so, which hand. Only for MIME dataset.')
-	parser.add_argument('--ds_freq',dest='ds_freq',type=int,default=1) # Additional downsample frequency.
+	parser.add_argument('--ds_freq',dest='ds_freq',type=float,default=1.) # Additional downsample frequency.
 	parser.add_argument('--condition_size',dest='condition_size',type=int,default=4)
 	parser.add_argument('--smoothen', dest='smoothen',type=int,default=0) # Whether to smoothen the original dataset. 
 	parser.add_argument('--smoothing_kernel_bandwidth', dest='smoothing_kernel_bandwidth',type=float,default=3.5) # The smoothing bandwidth that is applied to data loader trajectories. 
