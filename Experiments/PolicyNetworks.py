@@ -2394,7 +2394,7 @@ class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork
 	 	# variational_z_logprobabilities, variational_b_probabilities.squeeze(1), variational_z_probabilities, kl_divergence, prior_loglikelihood
 
 		# Need 
-		collated_zs = 
+		# collated_zs = 
 
 
 class ContinuousSoftEncoderNetwork(ContinuousEncoderNetwork):
