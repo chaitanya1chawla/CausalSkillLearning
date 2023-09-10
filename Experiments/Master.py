@@ -1,3 +1,6 @@
+# KABOOM
+
+
 # Copyright (c) Facebook, Inc. and its affiliates.
 # All rights reserved.
 
@@ -5,7 +8,9 @@
 # LICENSE file in the root directory of this source tree.
 
 from headers import *
-import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders, GRAB_DataLoader
+import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders, \
+	  GRAB_DataLoader, DAPG_DataLoader, DexMV_DataLoader, MOMART_DataLoader, FrankaKitchen_DataLoader, \
+		RealWorldRigid_DataLoader
 from PolicyManagers import *
 import TestClass
 import faulthandler
@@ -21,6 +26,7 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		args.data = data
 
 	# Define Data Loader.
+	############################
 	if args.data=='ContinuousNonZero':
 		dataset = DataLoaders.ContinuousNonZeroToyDataset(args.datadir, create_dataset_variation=create_dataset_variation)
 	elif args.data=='DeterGoal':
@@ -29,30 +35,103 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = DataLoaders.ContinuousDirectedNonZeroToyDataset(args.datadir)
 	elif args.data=='ToyContext':
 		dataset = DataLoaders.ToyContextDataset(args.datadir)
-	elif args.data=='OldMIME':
-		
+	############################
+	elif args.data=='OldMIME':		
 		dataset = MIME_DataLoader.MIME_NewDataset(args, short_traj=args.short_trajectories)
 	elif args.data=='MIME':
 		if args.single_hand is None:
 			dataset = MIME_DataLoader.MIME_NewMetaDataset(args, short_traj=args.short_trajectories, traj_length_threshold=args.dataset_traj_length_limit)
 		else:
 			dataset = MIME_DataLoader.MIME_OneHandedDataset(args, short_traj=args.short_trajectories, traj_length_threshold=args.dataset_traj_length_limit)
+	############################			
 	elif args.data=='Roboturk':		
 		dataset = Roboturk_DataLoader.Roboturk_NewSegmentedDataset(args)
 	elif args.data=='OrigRoboturk':
 		dataset = Roboturk_DataLoader.Roboturk_Dataset(args)
 	elif args.data=='FullRoboturk':
 		dataset = Roboturk_DataLoader.Roboturk_FullDataset(args)
+	elif args.data=='RoboturkObjects':
+		dataset = Roboturk_DataLoader.Roboturk_ObjectDataset(args)
+	elif args.data=='RoboturkRobotObjects':
+		dataset = Roboturk_DataLoader.Roboturk_RobotObjectDataset(args)	
+	elif args.data=='RoboturkMultiObjects':
+		dataset = Roboturk_DataLoader.Roboturk_MultiObjectDataset(args)	
+	elif args.data=='RoboturkRobotMultiObjects':
+		dataset = Roboturk_DataLoader.Roboturk_RobotMultiObjectDataset(args)	
+	############################
 	elif args.data=='Mocap':
 		dataset = Mocap_DataLoader.Mocap_Dataset(args)
+	############################		
 	elif args.data=='OrigRoboMimic':
 		dataset = Robomimic_DataLoaders.OrigRobomimic_Dataset(args)
 	elif args.data=='RoboMimic':
 		dataset = Robomimic_DataLoaders.Robomimic_Dataset(args)
+	elif args.data=='RoboMimicObjects':
+		dataset = Robomimic_DataLoaders.Robomimic_ObjectDataset(args)
+	elif args.data=='RoboMimicRobotObjects':
+		dataset = Robomimic_DataLoaders.Robomimic_RobotObjectDataset(args)
+	############################
 	elif args.data=='GRABPreproc':
 		dataset = GRAB_DataLoader.GRAB_PreDataset(args)
 	elif args.data=='GRAB':
 		dataset = GRAB_DataLoader.GRAB_Dataset(args)
+	elif args.data=='GRABArmHandPreproc':
+		dataset = GRAB_DataLoader.GRABArmHand_PreDataset(args)
+	elif args.data=='GRABArmHand':
+		dataset = GRAB_DataLoader.GRABArmHand_Dataset(args)
+	elif args.data=='GRABHandPreproc':
+		dataset = GRAB_DataLoader.GRABHand_PreDataset(args)
+	elif args.data=='GRABHand':
+		dataset = GRAB_DataLoader.GRABHand_Dataset(args)
+	elif args.data=='GRABArmHandObjectPreproc':
+		dataset = GRAB_DataLoader.GRABArmHandObject_PreDataset(args)
+	elif args.data=='GRABArmHandObject':
+		dataset = GRAB_DataLoader.GRABArmHandObject_Dataset(args)
+	elif args.data=='GRABObjectPreproc':
+		dataset = GRAB_DataLoader.GRABObject_PreDataset(args)
+	elif args.data=='GRABObject':
+		dataset = GRAB_DataLoader.GRABObject_Dataset(args)
+	############################
+	elif args.data in ['DAPGPreproc', 'DAPGHandPreproc', 'DAPGObjectPreproc']:
+		dataset = DAPG_DataLoader.DAPG_PreDataset(args)
+	elif args.data=='DAPG':
+		dataset = DAPG_DataLoader.DAPG_Dataset(args)
+	elif args.data=='DAPGHand':
+		dataset = DAPG_DataLoader.DAPGHand_Dataset(args)
+	elif args.data=='DAPGObject':
+		dataset = DAPG_DataLoader.DAPGObject_Dataset(args)
+	############################
+	elif args.data in ['DexMVPreproc', 'DexMVHandPreproc', 'DexMVObjectPreproc']:
+		dataset = DexMV_DataLoader.DexMV_PreDataset(args)
+	elif args.data=='DexMV':
+		dataset = DexMV_DataLoader.DexMV_Dataset(args)
+	elif args.data=='DexMVHand':
+		dataset = DexMV_DataLoader.DexMVHand_Dataset(args)
+	elif args.data=='DexMVObject':
+		dataset = DexMV_DataLoader.DexMV_ObjectDataset(args)
+	############################
+	elif args.data=='MOMARTPreproc':
+		dataset = MOMART_DataLoader.OrigMOMART_Dataset(args)
+	elif args.data=='MOMART':
+		dataset = MOMART_DataLoader.MOMART_Dataset(args)
+	elif args.data=='MOMARTObject':
+		dataset = MOMART_DataLoader.MOMART_ObjectDataset(args)
+	elif args.data=='MOMARTRobotObject':
+		dataset = MOMART_DataLoader.MOMART_RobotObjectDataset(args)
+	############################
+	elif args.data=='FrankaKitchenPreproc':
+		dataset = FrankaKitchen_DataLoader.OrigFrankaKitchen_Dataset(args)
+	elif args.data=='FrankaKitchen':
+		dataset = FrankaKitchen_DataLoader.FrankaKitchen_Dataset(args)
+	elif args.data=='FrankaKitchenObject':
+		dataset = FrankaKitchen_DataLoader.FrankaKitchen_ObjectDataset(args)
+	elif args.data=='FrankaKitchenRobotObject':
+		dataset = FrankaKitchen_DataLoader.FrankaKitchen_RobotObjectDataset(args)
+	############################	
+	elif args.data=='RealWorldRigidPreproc':
+		dataset = RealWorldRigid_DataLoader.RealWorldRigid_PreDataset(args)
+	elif args.data in ['RealWorldRigid','RealWorldRigidRobot']:
+		dataset = RealWorldRigid_DataLoader.RealWorldRigid_Dataset(args)
 
 	return dataset
 
@@ -61,13 +140,13 @@ class Master():
 	def __init__(self, arguments):
 		self.args = arguments 
 
-
 		if self.args.setting not in ['transfer','cycle_transfer','fixembed','jointtransfer','jointcycletransfer','jointfixembed','jointfixcycle','densityjointtransfer','densityjointfixembedtransfer']:
 			print("Creating Datasets")			
 			self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)			
-			# print("Embed after create dataset")
-			# embed()
-			
+
+		print("Embed after dataset creation")
+		embed()
+
 		# Now define policy manager.
 		if self.args.setting=='learntsub' or self.args.setting=='joint':
 			# self.policy_manager = PolicyManager_BatchJoint(self.args.number_policies, self.dataset, self.args)
@@ -159,10 +238,10 @@ class Master():
 					self.policy_manager.train(self.args.model)
 				else:
 					self.policy_manager.train()
-			else:				
+			else:			
 				if self.args.setting=='pretrain_prior':
 					self.policy_manager.train(self.args.model)
-				else:														
+				else:
 					self.policy_manager.evaluate(model=self.args.model)		
 				
 		# elif self.args.setting=='learntsub' or self.args.setting=='joint' or self.args.setting=='context':
@@ -221,6 +300,7 @@ def parse_arguments():
 	parser.add_argument('--epochs',dest='epochs',type=int,default=500) # Number of epochs to train for. Reduce for Mocap.
 	parser.add_argument('--debugging_datapoints',dest='debugging_datapoints',type=int,default=-1,help='How many data points to run training on. If greater than 0, only select that many datapoints for debugging.')
 	parser.add_argument('--seed',dest='seed',type=int,default=0,help='Seed value to initialize random processes.')
+	parser.add_argument('--replace_samples', dest='replace_samples',type=bool,default=False,help='Use replace=true when sampling trajectories for training.')
 
 	# Training setting. 
 	parser.add_argument('--discrete_z',dest='discrete_z',type=int,default=0)
@@ -237,15 +317,30 @@ def parse_arguments():
 	parser.add_argument('--environment',dest='environment',type=str,default='SawyerLift') # Defines robosuite environment for RL.
 	parser.add_argument('--target_environment',dest='target_environment',type=str,default='SawyerLift') # Defines robosuite environment for RL.
 	
+	# Variance parameters. 
+	parser.add_argument('--variance_factor',dest='variance_factor',type=float,default=0.01,help='Factor by which to multiple variance value predicted by network.')
+	# parser.add_argument('--constant_variance',dest='constant_variance',type=int,default=0,help='Whether to use constant variance')
+	parser.add_argument('--variance_mode',dest='variance_mode',type=str,default='Learned',choices=['Learned','Constant','LinearAnnealed','QuadraticAnnealed'],help='What mode to set variance of policy network')	
+	parser.add_argument('--variance_value',dest='variance_value',type=float,default=0.1,help='Variance value for network distributions.')
+	parser.add_argument('--epsilon_scale_factor',dest='epsilon_scale_factor',type=float,default=100.,help='Factor by which to scale variance down for variance.')
+	# Setting parameters for linear annealing of variance.
+	parser.add_argument('--initial_policy_variance',dest='initial_policy_variance',type=float,default=0.1)
+	parser.add_argument('--final_policy_variance',dest='final_policy_variance',type=float,default=0.0001)
+	parser.add_argument('--policy_variance_decay_over',dest='policy_variance_decay_over',type=int,default=200)
+
+
 	# Data parameters. 
 	parser.add_argument('--traj_segments',dest='traj_segments',type=int,default=1) # Defines whether to use trajectory segments for pretraining or entire trajectories. Useful for baseline implementation.
 	parser.add_argument('--gripper',dest='gripper',type=int,default=1) # Whether to use gripper training in roboturk.
 	parser.add_argument('--ee_trajectories',dest='ee_trajectories',type=int,default=0,help='Whether to learn a skill space from end effector trajectories rather than joint space.')
 	parser.add_argument('--single_hand',dest='single_hand',type=str,default=None,help='Whether to use a single hand, if so, which hand. Only for MIME dataset.')
-	parser.add_argument('--ds_freq',dest='ds_freq',type=int,default=1) # Additional downsample frequency.
+	parser.add_argument('--ds_freq',dest='ds_freq',type=float,default=1.) # Additional downsample frequency.
 	parser.add_argument('--condition_size',dest='condition_size',type=int,default=4)
 	parser.add_argument('--smoothen', dest='smoothen',type=int,default=0) # Whether to smoothen the original dataset. 
 	parser.add_argument('--smoothing_kernel_bandwidth', dest='smoothing_kernel_bandwidth',type=float,default=3.5) # The smoothing bandwidth that is applied to data loader trajectories. 
+	parser.add_argument('--human_pos_normalization', dest='position_normalization', type=str, default='none') # The position normalization for GRAB dataloader
+	parser.add_argument('--human_angular_data', dest='angular_data', type=bool, default=False) # Angular transformations for the GRABHand Dataset
+	parser.add_argument('--skip_wrist',dest='skip_wrist',type=int,default=0,help='Whether or not to skip the wrist joint.')
 
 	# Training paradigm parameters. 
 	parser.add_argument('--new_gradient',dest='new_gradient',type=int,default=1)
@@ -254,6 +349,7 @@ def parse_arguments():
 	parser.add_argument('--reparam',dest='reparam',type=int,default=1)	
 	parser.add_argument('--number_policies',dest='number_policies',type=int,default=4)
 	parser.add_argument('--fix_subpolicy',dest='fix_subpolicy',type=int,default=1)
+	parser.add_argument('--task_based_shuffling',dest='task_based_shuffling',type=int,default=0,help='Whether to use task based shuffling.')
 	parser.add_argument('--reset_training',dest='reset_training',type=int,default=0,help='Whether to reset subpolicy training for joint training, used mostly to learn contextual representations.')
 	parser.add_argument('--train_only_policy',dest='train_only_policy',type=int,default=0) # Train only the policy network and use a pretrained encoder. This is weird but whatever. 
 	parser.add_argument('--load_latent',dest='load_latent',type=int,default=1) # Whether to load latent policy from model or not.
@@ -269,9 +365,14 @@ def parse_arguments():
 	parser.add_argument('--save_freq',dest='save_freq',type=int,default=5)	
 	parser.add_argument('--eval_freq',dest='eval_freq',type=int,default=20)	
 	parser.add_argument('--metric_eval_freq',dest='metric_eval_freq',type=int,default=10000)	
+	parser.add_argument('--N_trajectories_to_visualize',dest='N_trajectories_to_visualize',type=int,default=100,help='How many trajectories to visualize during embedding visualization.')
 	parser.add_argument('--perplexity',dest='perplexity',type=float,default=30,help='Value of perplexity fed to TSNE.')
 	parser.add_argument('--latent_set_file_path',dest='latent_set_file_path',type=str,help='File path to pre-computed latent sets to visualize.')
 	parser.add_argument('--viz_latent_rollout',dest='viz_latent_rollout',type=int,default=0,help='Whether to visualize latent rollout or not.')
+	parser.add_argument('--viz_sim_rollout',dest='viz_sim_rollout',type=int,default=0,help='Whether to visualize rollout by magically setting state, or stepping in the environment.')
+	parser.add_argument('--viz_gt_sim_rollout',dest='viz_gt_sim_rollout',type=int,default=0,help='Whether or not to visualize the GT trajectory by replaying through the simulator.')
+	parser.add_argument('--sim_viz_action_scale_factor',dest='sim_viz_action_scale_factor',type=float,default=0.3,help='Factor by which to scale actions when visualizing in simulation env.')
+	parser.add_argument('--sim_viz_step_repetition',dest='sim_viz_step_repetition',type=int,default=20,help='Number of times to repeat simulation step of visualization of traj.')
 
 	parser.add_argument('--entropy',dest='entropy',type=int,default=0)
 	parser.add_argument('--var_entropy',dest='var_entropy',type=int,default=0)
@@ -280,7 +381,8 @@ def parse_arguments():
 	
 	parser.add_argument('--pretrain_bias_sampling',type=float,default=0.) # Defines percentage of trajectory within which to sample trajectory segments for pretraining.
 	parser.add_argument('--pretrain_bias_sampling_prob',type=float,default=0.)
-	parser.add_argument('--action_scale_factor',type=float,default=1)	
+	parser.add_argument('--action_scale_factor',type=float,default=1.)	
+	parser.add_argument('--state_scale_factor',dest='state_scale_factor',type=float,default=1.)	
 
 	parser.add_argument('--z_exploration_bias',dest='z_exploration_bias',type=float,default=0.)
 	parser.add_argument('--b_exploration_bias',dest='b_exploration_bias',type=float,default=0.)
@@ -291,7 +393,7 @@ def parse_arguments():
 	parser.add_argument('--subpolicy_clamp_value',dest='subpolicy_clamp_value',type=float,default=-5)
 	parser.add_argument('--latent_clamp_value',dest='latent_clamp_value',type=float,default=-5)
 	parser.add_argument('--min_variance_bias',dest='min_variance_bias',type=float,default=0.01)
-	parser.add_argument('--normalization',dest='normalization',type=str,default='None')
+	parser.add_argument('--normalization',dest='normalization',type=str,default=None)
 	parser.add_argument('--regularization_weight',dest='regularization_weight',type=float,default=0.,help='Value of regularization weight to be added to the model.')
 
 	parser.add_argument('--likelihood_penalty',dest='likelihood_penalty',type=int,default=10)
@@ -303,13 +405,29 @@ def parse_arguments():
 	parser.add_argument('--prior_weight',dest='prior_weight',type=float,default=0.00001)
 	# parser.add_argument('--context_loss_weight',dest='context_loss_weight',type=float,default=1.,help='Weight of context loss.')
 	parser.add_argument('--kl_weight',dest='kl_weight',type=float,default=0.01,help='KL weight when constant.')
-	parser.add_argument('--kl_schedule',dest='kl_schedule',type=int,default=0,help='Whether to schedule KL weight.')
+	parser.add_argument('--kl_schedule',dest='kl_schedule',type=str,default=None,choices=[None, 'Monotonic', 'Cyclic'],help='Whether to schedule KL weight.')
 	parser.add_argument('--initial_kl_weight',dest='initial_kl_weight',type=float,default=0.0,help='Initial KL weight.')
 	parser.add_argument('--final_kl_weight',dest='final_kl_weight',type=float,default=1.0,help='Initial KL weight.')
 	parser.add_argument('--kl_increment_epochs',dest='kl_increment_epochs',type=int,default=100,help='Number of epochs to increment KL over.')
 	parser.add_argument('--kl_begin_increment_epochs',dest='kl_begin_increment_epochs',type=int,default=100,help='Number of epochs after which to increment KL.')
+	parser.add_argument('--kl_cyclic_phase_epochs',dest='kl_cyclic_phase_epochs',type=int,default=100,help='Number of epochs to cycle KL weight over.')	
 
-	
+	# architecture
+	parser.add_argument('--split_stream_encoder',dest='split_stream_encoder',type=int,default=0,help='Whether to use split stream encoder or not.')
+	parser.add_argument('--embedding_visualization_stream',dest='embedding_visualization_stream',type=str,default=None,help='Which stream to use to embed and visualize Z space.')
+	parser.add_argument('--robot_state_size',dest='robot_state_size',type=int,default=8,help='Default robot state size.')
+	parser.add_argument('--env_state_size',dest='env_state_size',type=int,default=7,help='Default environment state size.')
+	parser.add_argument('--object_pure_relative_state',dest='object_pure_relative_state',type=int,default=0,help='Whether or not to use pure relative state for env abstraction input. ')
+	parser.add_argument('--soft_object', dest='soft_object', type=int, default=0, help='Whether or not we are learning with deformable objects.')
+	parser.add_argument('--images_in_real_world_dataset', dest='images_in_real_world_dataset', type=int, default=0, help='Whether to dela with images in the realworld datasset.')
+
+	# Relative state reconstruction loss.
+	parser.add_argument('--relative_state_reconstruction_loss_weight', dest='relative_state_reconstruction_loss_weight', type=float, default=0., help='What weight to place on the relative state reconstruction loss in the robot-object setting..')	
+	parser.add_argument('--relative_state_phase_aux_loss_weight', dest='relative_state_phase_aux_loss_weight', type=float, default=0., help='Weight to place on the relative state phase aux loss.')
+	parser.add_argument('--task_based_aux_loss_weight', dest='task_based_aux_loss_weight', type=float, default=0., help='Weight to place on task based auxillary loss.')
+	parser.add_argument('--negative_task_based_component_weight', dest='negative_task_based_component_weight', type=float, default=1., help='Weight to place on the negative component of the task based aux loss.')
+	parser.add_argument('--pairwise_z_distance_threshold', dest='pairwise_z_distance_threshold', type=float, default=2., help='Minimum distance to push apart different parts of latent space that are semantically different.')
+
 	# Cross Domain Skill Transfer parameters. 
 	parser.add_argument('--discriminability_weight',dest='discriminability_weight',type=float,default=1.,help='Weight of discriminability loss in cross domain skill transfer.') 
 	parser.add_argument('--discriminator_weight',dest='discriminator_weight',type=float,default=1.,help='Weight of z discriminator loss.')
@@ -327,11 +445,12 @@ def parse_arguments():
 	parser.add_argument('--max_viz_trajs',dest='max_viz_trajs',type=int,default=5,help='How many trajectories to visualize.')
 	parser.add_argument('--z_transform_or_tuple',dest='z_transform_or_tuple',type=int,default=0,help='Whether to use the z transform or z tuples.')	
 	parser.add_argument('--ignore_last_z_transform',dest='ignore_last_z_transform',type=int,default=0,help='Whether to ignore or last z transform.')
+	parser.add_argument('--number_of_visualized_translations',dest='number_of_visualized_translations',type=int,default=2, help='How many pairs of translations to visualize.')
 
 	# Exploration and learning rate parameters. 
 	parser.add_argument('--epsilon_from',dest='epsilon_from',type=float,default=0.3)
 	parser.add_argument('--epsilon_to',dest='epsilon_to',type=float,default=0.05)
-	parser.add_argument('--epsilon_over',dest='epsilon_over',type=int,default=30)
+	parser.add_argument('--epsilon_over',dest='epsilon_over',type=int,default=200)
 	parser.add_argument('--learning_rate',dest='learning_rate',type=float,default=1e-4)
 	parser.add_argument('--transfer_learning_rate',dest='transfer_learning_rate',type=float,default=1e-4)
 
@@ -375,6 +494,8 @@ def parse_arguments():
 	parser.add_argument('--small_translation_model',dest='small_translation_model',type=int,default=0,help='Whether to use a small model for translation or not. Restricts network capacity.')
 	parser.add_argument('--recurrent_translation',dest='recurrent_translation',type=int,default=0,help='Whether to implement a recurrent translation model.')
 	parser.add_argument('--input_corruption_noise',dest='input_corruption_noise',type=float,default=0.,help='How much noise to add to the input to corrupt it. Default no corruption.')
+	parser.add_argument('--subpolicy_input_dropout',dest='subpolicy_input_dropout',type=float,default=0.,help='What fraction to set subpolicy dropout to.') 
+
 	parser.add_argument('--equivariance',dest='equivariance',type=int,default=0,help='Whether to implement equivariance objective in (Joint) Fix Embed setting.')
 	parser.add_argument('--equivariance_loss_weight',dest='equivariance_loss_weight',type=float,default=1.,help='Weight associated with the equivariance loss.')
 	parser.add_argument('--cross_domain_supervision',dest='cross_domain_supervision',type=int,default=0,help='Whether to use cross domain supervision when operating in pair of same domains.')

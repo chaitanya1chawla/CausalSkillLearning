@@ -35,7 +35,7 @@ class MIME_Dataset(Dataset):
 	def __init__(self, split='all'):
 		self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'
 		self.ds_freq = 20
-
+		self.stat_dir_name='MIME'
 		# Default: /checkpoint/tanmayshankar/MIME/
 		self.fulltext = osp.join(self.dataset_directory, 'MIME_jointangles/*/*/joint_angles.txt')
 		self.filelist = glob.glob(self.fulltext)
@@ -123,6 +123,7 @@ class MIME_NewDataset(Dataset):
 
 		# 
 		self.args = args		
+		self.stat_dir_name='MIME'
 
 		if self.args.datadir is None:
 			# self.dataset_directory = '/checkpoint/tanmayshankar/MIME/'

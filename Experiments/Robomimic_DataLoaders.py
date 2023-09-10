@@ -79,13 +79,15 @@ class OrigRobomimic_Dataset(Dataset):
 		# Set files. 
 		self.setup()
 
+		self.stat_dir_name='Robomimic'
+
 	def setup(self):
 		# Load data from all tasks. 			
 		self.files = []
 		for i in range(len(self.task_list)):
 			# Changing file name.
 			# self.files.append(h5py.File("{0}/{1}/demo.hdf5".format(self.dataset_directory,self.task_list[i]),'r'))
-			self.files.append(h5py.File("{0}/{1}/ph/low_dim.hdf5".format(self.dataset_directory,self.task_list[i]),'r'))
+			self.files.append(h5py.File("{0}/{1}/ph/low_dim.hdf5".format(self.dataset_directory,	self.task_list[i]),'r'))
 
 	def __len__(self):
 		return self.total_length
@@ -165,13 +167,87 @@ class OrigRobomimic_Dataset(Dataset):
 		# return data_element
 
 		return {}
+	
+	def create_env(self, task_index):
+		import robosuite
 		
+		self.env = robosuite.make(self.environment_names[task_index], robots=['Panda'], has_renderer=False)
+		self.env.reset()
+
+	def compute_relative_object_state_quat(self, robot_state_sequence, object_state_sequence):
+
+		############################################
+		# Now add our own computed relative quaterion if the ENV is Lift.
+		############################################
+		import robosuite.utils.transform_utils as RTU					
+
+		object_quat_traj = np.zeros((object_state_sequence.shape[0],4))
+
+		print("Generating relative state quat.")
+		for k in range(robot_state_sequence.shape[0]):				
+			# Set pose.
+			# env.reset()
+			self.env.robots[0].set_robot_joint_positions(robot_state_sequence[k,:7])
+			self.env.sim.forward()
+			obs = self.env._get_observations()
+			
+			# Get eef pose. 
+			robot_eef_quat = obs['robot0_eef_quat']
+			
+			# Get obj pose. 
+			abs_object_quat = object_state_sequence[k,3:7]
+			
+			# Get relative quat. 					
+			object_quat_traj[k] = RTU.quat_multiply(robot_eef_quat, abs_object_quat)
+
+		return object_quat_traj
+
+	def compute_relative_object_state(self, robot_state_sequence, object_state_sequence):
+
+		############################################
+		# Now add our own computed relative quaterion if the ENV is Lift.
+		############################################
+		import robosuite.utils.transform_utils as RTU					
+
+		object_rel_traj = np.zeros((object_state_sequence.shape[0],7))
+
+		print("Generating relative state quat.")
+		for k in range(robot_state_sequence.shape[0]):				
+			# Set pose.
+			# env.reset()
+			self.env.robots[0].set_robot_joint_positions(robot_state_sequence[k,:7])
+			self.env.sim.forward()
+			obs = self.env._get_observations()
+			
+			# Get eef pose. 
+			robot_eef_quat = obs['robot0_eef_quat']
+			robot_eef_pos = obs['robot0_eef_pos']
+			robot_eef_pose_mat = RTU.pose2mat((robot_eef_pos, robot_eef_quat))
+						
+			# Get obj pose. 
+			abs_object_quat = object_state_sequence[k,3:7]
+			abs_object_pos = object_state_sequence[k,:3]
+			abs_object_pose_mat = RTU.pose2mat((abs_object_pos, abs_object_quat))
+
+			# Get relative state.
+			robot_pose_inv = RTU.pose_inv(robot_eef_pose_mat)
+			relative_object_pose_mat = RTU.pose_in_A_to_pose_in_B(abs_object_pose_mat, robot_pose_inv)
+			relative_object_pos, relative_object_quat = RTU.mat2pose(relative_object_pose_mat)
+				
+			# Get relative quat. 					
+			object_rel_traj[k,:3] = relative_object_pos
+			object_rel_traj[k,3:] = relative_object_quat
+
+		return object_rel_traj
+
 	def preprocess_dataset(self):
 
 		min_lengths = np.ones((4))*1000
 		max_lengths = np.zeros((4))
 
 		for task_index in range(len(self.task_list)):
+		# for task_index in [1]:
+
 
 			print("#######################################")
 			print("Preprocessing task index: ", task_index)
@@ -190,9 +266,13 @@ class OrigRobomimic_Dataset(Dataset):
 			# robot_state_size = obs['robot-state'].shape[0]
 			# object_state_size = obs['object-state'].shape[0]	
 
+			
 			# Just get robot state size and object state size, from the demonstration of this task. 
 			object_state_size = self.files[task_index]['data/demo_0/obs/object'].shape[1]
 			robot_state_size = self.files[task_index]['data/demo_0/obs/robot0_joint_pos'].shape[1]
+		
+
+			self.create_env(task_index=task_index)
 
 			# Create list of files for this task. 
 			task_demo_list = []		
@@ -237,8 +317,14 @@ class OrigRobomimic_Dataset(Dataset):
 				gripper_values = (gripper_values-gripper_values.min()) / (gripper_values.max()-gripper_values.min())
 				gripper_values = 2*gripper_values-1
 
+				# print("EDC:")
+				# embed()				
 				concatenated_demonstration = np.concatenate([robot_state_sequence,gripper_values.reshape((-1,1))],axis=1)
 				concatenated_actions = np.concatenate([joint_action_sequence,gripper_action_sequence],axis=1)
+				
+				object_rel_traj = self.compute_relative_object_state(robot_state_sequence, object_state_sequence)
+				intermediate_obj_state_seq = np.concatenate([object_state_sequence[:,:7], object_rel_traj, object_state_sequence[:,7:]],axis=-1)
+				object_state_sequence = intermediate_obj_state_seq
 
 				# Put both lists in a dictionary.
 				datapoint['flat-state'] = flattened_state_sequence
@@ -254,7 +340,10 @@ class OrigRobomimic_Dataset(Dataset):
 			task_demo_array = np.array(task_demo_list)
 
 			# Now save this file_demo_list. 
-			np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array.npy"),task_demo_array)
+			# np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array.npy"),task_demo_array)
+			np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array_RelObjState.npy"),task_demo_array)
+			# np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array_LiftRelObjState.npy"),task_demo_array)
+			# np.save(os.path.join(self.dataset_directory,self.task_list[task_index],"New_Task_Demo_Array_LiftObjectQuat.npy"),task_demo_array)
 
 		for j in range(4):
 			print("Lengths:", j, min_lengths[j], max_lengths[j])
@@ -263,7 +352,7 @@ class Robomimic_Dataset(OrigRobomimic_Dataset):
 	
 	def __init__(self, args):
 		
-		super(Robomimic_Dataset, self).__init__(args)
+		super(Robomimic_Dataset, self).__init__(args)	
 
 		# Now that we've run setup, compute dataset_trajectory_lengths for smart batching.
 		self.dataset_trajectory_lengths = np.zeros(self.total_length)
@@ -448,3 +537,77 @@ class Robomimic_Dataset(OrigRobomimic_Dataset):
 		np.save("Robomimic_Vel_Var.npy", vel_variance)
 		np.save("Robomimic_Vel_Min.npy", vel_min_value)
 		np.save("Robomimic_Vel_Max.npy", vel_max_value)
+
+class Robomimic_ObjectDataset(Robomimic_Dataset):
+
+	def __init__(self, args):
+
+		super(Robomimic_ObjectDataset, self).__init__(args)
+
+	def super_getitem(self, index):
+
+		return super().__getitem__(index)
+
+	def __getitem__(self, index):
+		
+		data_element = copy.deepcopy(super().__getitem__(index))
+
+		# Copy over the demo to the robot-demo key.
+		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
+		# Set demo to object-state trajectory. 
+
+		# Also try ignoring the relative positions for now.
+		# print("Embedding in get el")
+		# embed()
+		if self.args.object_pure_relative_state:
+			start_index = 7
+		else:
+			start_index = 0
+
+		data_element['demo'] = data_element['object-state'][:,start_index:start_index+7]
+
+		return data_element
+
+	def setup(self):
+		self.files = []
+		for i in range(len(self.task_list)):
+			self.files.append(np.load("{0}/{1}/New_Task_Demo_Array_RelObjState.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
+
+
+class Robomimic_RobotObjectDataset(Robomimic_Dataset):
+
+	def __init__(self, args):
+
+		super(Robomimic_RobotObjectDataset, self).__init__(args)
+
+	def super_getitem(self, index):
+
+		return super().__getitem__(index)
+
+	def __getitem__(self, index):
+
+		data_element = copy.deepcopy(super().__getitem__(index))
+
+		# print("######################")
+		# print("Embed in GI")
+		# embed()
+
+		data_element['robot-demo'] = copy.deepcopy(data_element['demo'])
+		if self.args.object_pure_relative_state:
+			start_index = 7
+		else:
+			start_index = 0
+
+		object_traj = data_element['object-state'][:,start_index:start_index+7]
+		
+		demo = np.concatenate([data_element['demo'],object_traj],axis=-1)
+		data_element['demo'] = copy.deepcopy(demo)
+
+		# print("SHAPE OF 2nd DEMO",data_element['demo'].shape)
+
+		return data_element
+
+	def setup(self):
+		self.files = []
+		for i in range(len(self.task_list)):
+			self.files.append(np.load("{0}/{1}/New_Task_Demo_Array_RelObjState.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))

@@ -16,7 +16,7 @@ matplotlib.use('Agg')
 # matplotlib.rcParams['animation.ffmpeg_args'] = '-report'
 matplotlib.rcParams['animation.bitrate'] = 2000
 import matplotlib.pyplot as plt
-import tensorboardX
+# import tensorboardX
 from scipy import stats
 from absl import flags
 from memory_profiler import profile as mprofile
@@ -35,7 +35,6 @@ from matplotlib.offsetbox import (TextArea, DrawingArea, OffsetImage,
                                   AnnotationBbox)
 from matplotlib.animation import FuncAnimation
 import mpl_toolkits
-# import tensorflow as tf
 import tempfile
 import moviepy.editor as mpy
 import subprocess

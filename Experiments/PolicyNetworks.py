@@ -5,11 +5,10 @@
 # LICENSE file in the root directory of this source tree.
 
 from headers import *
-
-
 # Check if CUDA is available, set device to GPU if it is, otherwise use CPU.
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
+
 # torch.cuda.set_device(torch.device('cuda:1'))
 # if use_cuda:
 # 	torch.cuda.set_device(2)
@@ -160,9 +159,9 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		self.variance_activation_layer = torch.nn.Softplus()
 		self.variance_activation_bias = 0.
 
-		self.variance_factor = 0.01
+		self.variance_factor = self.args.variance_factor
 
-	def forward(self, input, action_sequence, epsilon=0.001, batch_size=None, debugging=False):
+	def forward(self, input, action_sequence, variance_value=0.001, batch_size=None, debugging=False):
 		# Input is the trajectory sequence of shape: Sequence_Length x 1 x Input_Size. 
 		# Here, we also need the continuous actions as input to evaluate their logprobability / probability. 		
 		# format_input = torch.tensor(input).view(input.shape[0], self.batch_size, self.input_size).float().to(device)
@@ -182,14 +181,39 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		# format_action_seq = torch.from_numpy(action_sequence).to(device).float().view(action_sequence.shape[0],1,self.output_size)
 		lstm_outputs, hidden = self.lstm(format_input)
 
-		# Predict Gaussian means and variances. 
+		########################################
+		# Predict Gaussian Mean.
+		########################################
 		if self.args.mean_nonlinearity:
-			mean_outputs = self.activation_layer(self.mean_output_layer(lstm_outputs))
+			self.mean_outputs = self.activation_layer(self.mean_output_layer(lstm_outputs)) 
+			# + epsilon
 		else:
-			mean_outputs = self.mean_output_layer(lstm_outputs)
-		variance_outputs = (self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
-		# variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon
+			self.mean_outputs = self.mean_output_layer(lstm_outputs)
 
+		########################################
+		# Predict Gaussian Variance.
+		########################################
+		
+		if self.args.variance_mode=='Constant':
+			variance_outputs = self.args.variance_value*torch.ones_like(self.mean_outputs).to(device)
+		elif self.args.variance_mode=='Learned':
+			# variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon/self.args.epsilon_scale_factor			
+			variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
+		else: # If the variance_mode is linearly or quadratically annealed,
+			variance_outputs = variance_value*torch.ones_like(self.mean_outputs).to(device)
+
+		# OLD VARIANCE MODE USED FOR RWRP_263.. 
+		# elif self.args.variance_mode=='Annealed':
+		# 	variance_outputs = (epsilon/self.args.epsilon_scale_factor) * torch.ones_like(self.mean_outputs).to(device)
+		# elif self.args.variance_mode=='QuadraticAnnealed':
+		# 	variance_outputs = ((epsilon**2)/self.args.epsilon_scale_factor) * torch.ones_like(self.mean_outputs).to(device)
+
+		# elif self.args.variance_mode in 'LinearAnnealed':
+		# elif self.args.variance_mode=='QuadraticAnnealed':
+		
+		# print(variance_outputs)
+		# print("Embed after print var")
+		# embed()
 		# Remember, because of Pytorch's dynamic construction, this distribution can have it's own batch size. 
 		# It doesn't matter if batch sizes changes over different forward passes of the LSTM, because we're only going
 		# to evaluate this distribution (instance)'s log probability with the same sequence length. 
@@ -198,8 +222,11 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 			# embed()		
 		covariance_matrix = torch.diag_embed(variance_outputs)
 
+		########################################
 		# Executing distribution creation on CPU and then copying back to GPU.
-		dist = torch.distributions.MultivariateNormal(mean_outputs.cpu(), covariance_matrix.cpu())
+		########################################
+		
+		dist = torch.distributions.MultivariateNormal(self.mean_outputs.cpu(), covariance_matrix.cpu())
 		log_probabilities = dist.log_prob(format_action_seq.cpu()).to(device)
 
 		# dist = torch.distributions.MultivariateNormal(mean_outputs, covariance_matrix)
@@ -606,7 +633,8 @@ class ContinuousLatentPolicyNetwork_ConstrainedBPrior(ContinuousLatentPolicyNetw
 			# If allowing variable skill length, set length for this sample.				
 			if self.args.var_skill_length:
 				# Choose length of 12-16 with certain probabilities. 
-				lens = np.array([12,13,14,15,16])
+				# lens = np.array([12,13,14,15,16])
+				np.arange(self.min_skill_time, self.max_skill_time)
 				# probabilities = np.array([0.1,0.2,0.4,0.2,0.1])
 				prob_biases = np.array([[0.8,0.],[0.4,0.],[0.,0.],[0.,0.4]])				
 
@@ -1401,31 +1429,6 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 		# Now return prior value. 
 		return prior_value
 
-		####################################
-		####################################
-		# Unbatched prior computation. 
-		# # If at or over hard limit.
-		# if elapsed_t>=max_limit:
-		# 	prior_value[0,1]=1.
-
-		# # If at or more than typical, less than hard limit:
-		# elif elapsed_t>=skill_time_limit:
-	
-		# 	if self.args.var_skill_length:
-		# 		prior_value[0] = torch.tensor(prob_biases[elapsed_t-skill_time_limit]).to(device).float()
-		# 	else:
-		# 		# Random
-		# 		prior_value[0,1]=0. 
-
-		# # If less than typical. 
-		# else:
-		# 	# Continue.
-		# 	prior_value[0,0]=1.
-
-		# return prior_value
-		####################################
-		####################################
-	
 	# @gpu_profile
 	# @tprofile(immediate=True)
 	def forward(self, input, epsilon, new_z_selection=True, batch_size=None, batch_trajectory_lengths=None, precomputed_b=None, evaluate_z_probability=None):
@@ -1610,6 +1613,9 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 
 	def get_probabilities(self, input, epsilon, precomputed_b=None, evaluate_value=None):
 		return self.forward(input, epsilon, precomputed_b=precomputed_b, evaluate_z_probability=evaluate_value)
+
+
+
 
 class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNetwork_Batch):
 
@@ -1932,7 +1938,7 @@ class EncoderNetwork(PolicyNetwork_BaseClass):
 		# Return latentz_encoding as output layer of last outputs. 
 		return logprobabilities, probabilities
 
-class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
+class OldContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 
 	# Policy Network inherits from torch.nn.Module. 
 	# Now we overwrite the init, forward functions. And define anything else that we need. 
@@ -1940,7 +1946,7 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 	def __init__(self, input_size, hidden_size, output_size, args, batch_size=1):
 
 		# Ensures inheriting from torch.nn.Module goes nicely and cleanly. 	
-		super(ContinuousEncoderNetwork, self).__init__()
+		super(OldContinuousEncoderNetwork, self).__init__()
 
 		self.args = args
 		self.input_size = input_size
@@ -2023,11 +2029,468 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 			embed()
 
 		if z_sample_to_evaluate is None:
+
+			print("Embedding in forward of Old continuous encoder")
+			embed()
 			return latent_z, logprobability, entropy, kl_divergence
 
 		else:
 			logprobability = dist.log_prob(z_sample_to_evaluate)
 			return logprobability
+
+class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
+
+	# Policy Network inherits from torch.nn.Module. 
+	# Now we overwrite the init, forward functions. And define anything else that we need. 
+
+	def __init__(self, input_size, hidden_size, output_size, args, batch_size=1):
+
+		# Ensures inheriting from torch.nn.Module goes nicely and cleanly. 	
+		super(ContinuousEncoderNetwork, self).__init__()
+
+		# Define dimensions for both robot and environment streams. 
+		self.define_dimensions(input_size, hidden_size, output_size, args)		
+
+		# Define layers. 
+		self.define_layers()
+
+		# Instantiate networks. 
+		self.instantiate_networks()
+
+	def define_dimensions(self, input_size, hidden_size, output_size, args):
+
+		##############################
+		# Setup state sizes etc.
+		##############################
+
+		self.args = args
+
+		# Define state sizes for each partition of state space.
+		# Keep track of robot input and output state size. 
+		self.size_dict = {}
+		self.size_dict['state_size'] = int(input_size/2)
+		self.size_dict['input_size'] = input_size
+		self.size_dict['output_size'] = output_size
+
+		# Other layers.
+		self.num_layers = self.args.var_number_layers
+		self.hidden_size = hidden_size
+		self.batch_size = self.args.batch_size 
+
+	def define_layers(self):
+
+		# Defines layers shared across both streams.
+		self.batch_softmax_layer = torch.nn.Softmax(dim=2)
+		self.batch_logsoftmax_layer = torch.nn.LogSoftmax(dim=2)
+		self.activation_layer = torch.nn.Tanh()
+		self.variance_activation_layer = torch.nn.Softplus()
+		self.variance_activation_bias = 0.
+		self.variance_factor = self.args.variance_factor
+
+	def define_networks(self, input_size, output_size):
+		
+		# Define a bidirectional LSTM now.
+		lstm = torch.nn.LSTM(input_size=input_size, hidden_size=self.hidden_size, num_layers=self.num_layers, bidirectional=True).to(device)
+
+		# Define output layers for the LSTM, and activations for this output layer. 
+		mean_output_layer = torch.nn.Linear(2*self.hidden_size, output_size).to(device)
+		variances_output_layer = torch.nn.Linear(2*self.hidden_size, output_size).to(device)
+
+		return lstm, mean_output_layer, variances_output_layer
+
+	def instantiate_networks(self):
+
+		self.network_dict = torch.nn.ModuleDict()
+		self.network_dict['lstm'], self.network_dict['mean_output_layer'], self.network_dict['variances_output_layer'] = self.define_networks(self.size_dict['input_size'], self.size_dict['output_size'])
+
+	def forward(self, input, epsilon=0.0001, network_dict=None, size_dict=None, z_sample_to_evaluate=None, artificial_batch_size=None):
+
+		##############################
+		# Set default inputs.
+		##############################
+
+		if network_dict is None:
+			network_dict = self.network_dict
+		if size_dict is None:
+			size_dict = self.size_dict
+
+		##############################
+		# Format input to the appropriate size: Sequence_Length x Batch_Size x Input_Size. 
+		##############################
+
+		batch_size = self.batch_size
+		if artificial_batch_size is not None:
+			batch_size = artificial_batch_size
+		format_input = input.view((input.shape[0], batch_size, size_dict['input_size']))
+
+		##############################
+		# Forward pass through LSTM. 
+		##############################
+				
+		outputs, hidden = network_dict['lstm'](format_input)
+		concatenated_outputs = torch.cat([outputs[0,:,self.hidden_size:],outputs[-1,:,:self.hidden_size]],dim=-1).view((1,batch_size,-1))
+
+		##############################
+		# Predict Gaussian means and variances. 
+		##############################
+
+		mean_outputs = network_dict['mean_output_layer'](concatenated_outputs)
+
+		# if self.args.constant_variance:
+		# 	variance_outputs = self.args.variance_value*torch.ones_like(mean_outputs).to(device) + epsilon
+		# else:
+		variance_outputs = self.variance_factor*(self.variance_activation_layer(network_dict['variances_output_layer'](concatenated_outputs))+self.variance_activation_bias) + epsilon
+		
+
+		dist = torch.distributions.MultivariateNormal(mean_outputs, torch.diag_embed(variance_outputs))
+		noise = torch.randn_like(variance_outputs)
+
+		##############################
+		# Get Latent Z.
+		##############################
+		
+		# Instead of *sampling* the latent z from a distribution, construct using mu + sig * eps (random noise), can pass gradients through it. 
+		latent_z = mean_outputs + variance_outputs * noise 
+
+		# calculate entropy for training.
+		entropy = dist.entropy()
+		# Also retrieve log probability of the same.
+		logprobability = dist.log_prob(latent_z)
+
+		##############################
+		# Set standard distribution for KL. 
+		##############################
+
+		standard_distribution = torch.distributions.MultivariateNormal(torch.zeros((size_dict['output_size'])).to(device),torch.eye((size_dict['output_size'])).to(device))
+		kl_divergence = torch.distributions.kl_divergence(dist, standard_distribution)
+
+		if self.args.debug:
+			print("###############################")
+			print("Embedding in Encoder Network.")
+			embed()
+
+		if z_sample_to_evaluate is None:
+			return latent_z, logprobability, entropy, kl_divergence
+
+		else:
+			logprobability = dist.log_prob(z_sample_to_evaluate)
+			return logprobability
+
+class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
+
+	def __init__(self, input_size, hidden_size, output_size, args, batch_size=1):
+		
+		# Using its own init function.
+		super(ContinuousFactoredEncoderNetwork, self).__init__(input_size, hidden_size, output_size, args)
+
+		# Define indices. 
+		self.robot_indices = np.concatenate([np.arange(0,self.robot_size_dict['state_size']), \
+			np.arange(self.robot_size_dict['state_size']+self.env_size_dict['state_size'],2*self.robot_size_dict['state_size']+self.env_size_dict['state_size'])])
+	
+		self.env_indices = np.concatenate([ np.arange(self.robot_size_dict['state_size'],self.robot_size_dict['state_size']+self.env_size_dict['state_size']), \
+			np.arange( self.robot_size_dict['state_size']*2+self.env_size_dict['state_size'], self.robot_size_dict['state_size']*2+self.env_size_dict['state_size']*2) ])
+
+	def define_dimensions(self, input_size, hidden_size, output_size, args):
+
+		##############################
+		# Setup state sizes etc.
+		##############################
+
+		self.args = args
+
+
+		# Define state sizes for each partition of state space.
+		# Keep track of robot input and output state size. 
+		self.robot_size_dict = {}
+		self.robot_size_dict['state_size'] = self.args.robot_state_size
+		self.robot_size_dict['input_size'] = 2*self.robot_size_dict['state_size']
+		self.robot_size_dict['output_size'] = int(self.args.z_dimensions/2)
+
+		# Keep track of env. input and output state size. 
+		self.env_size_dict = {}
+		self.env_size_dict['state_size'] = self.args.env_state_size
+		self.env_size_dict['input_size'] = 2*self.env_size_dict['state_size']
+		self.env_size_dict['output_size'] = int(self.args.z_dimensions/2)
+
+		# Other layers.
+		self.num_layers = self.args.var_number_layers
+		self.hidden_size = hidden_size
+		self.batch_size = self.args.batch_size 
+
+	def instantiate_networks(self):		
+
+		# Define networks for robot stream.
+		self.robot_network_dict = torch.nn.ModuleDict()
+		self.robot_network_dict['lstm'], self.robot_network_dict['mean_output_layer'], self.robot_network_dict['variances_output_layer'] = self.define_networks(self.robot_size_dict['input_size'], self.robot_size_dict['output_size'])
+
+		# Define networks for environment stream.
+		self.env_network_dict = torch.nn.ModuleDict()
+		self.env_network_dict['lstm'], self.env_network_dict['mean_output_layer'], self.env_network_dict['variances_output_layer'] = self.define_networks(self.env_size_dict['input_size'], self.env_size_dict['output_size'])
+
+	def split_stream_inputs(self, input):
+
+		# Split input between robot and environment streams. 
+		# The joint stream input is of size: (Time Dimensions) x (Batch Size) x (Robot state size + Env state size + Robot action size + Env action size). 
+
+		robot_input = input[:,:,self.robot_indices]
+		env_input = input[:,:,self.env_indices]
+
+		return robot_input, env_input
+
+	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, artificial_batch_size=None):
+		# robot_latent_z, robot_logprob, robot_entropy, robot_kl_divergence = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample)
+
+		return super().forward(input, epsilon=epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=z_sample_to_evaluate, artificial_batch_size=artificial_batch_size)
+
+	def get_environment_input_representation(self, env_input):
+		
+		
+		# Dummy function that we can override in the case of the soft object.
+		return env_input
+
+	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
+
+		# (1) Split input. 
+		# (2) Run forward on each stream. 
+		#	# (2a) Run forward on robot stream. 
+		#	# (2b) Run forward on env stream. 
+		# (3) Aggregate stream outputs. 
+		# (4) Return. 
+
+		##################################
+		# (1) Split Inputs. 
+		##################################
+
+		robot_input, env_input = self.split_stream_inputs(input)
+		if z_sample_to_evaluate is not None:
+			robot_z_sample, env_z_sample = z_sample_to_evaluate[:self.robot_size_dict['output_size']], z_sample_to_evaluate[self.robot_size_dict['output_size']:]
+		else:
+			robot_z_sample, env_z_sample = None, None
+		
+		##################################
+		# (2) Run forward on each stream. 
+		##################################
+
+		if z_sample_to_evaluate is None:
+			# (2a) Run forward on robot stream.				
+			robot_latent_z, robot_logprob, robot_entropy, robot_kl_divergence = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample)
+
+			new_env_input = self.get_environment_input_representation(env_input)
+
+			# (2b) Run forward on env stream.							
+			env_latent_z, env_logprob, env_entropy, env_kl_divergence = super().forward(new_env_input, epsilon, network_dict=self.env_network_dict, size_dict=self.env_size_dict, z_sample_to_evaluate=env_z_sample)
+
+			##################################
+			# (3) Aggregate stream outputs. 
+			##################################
+					
+			# Remember, robot_z and env_z are both [1 x Batch_Size x (2 x Z_Dimensions)]. Concatenate across last dimension. 
+			concatenated_latent_z = torch.cat([robot_latent_z, env_latent_z],axis=-1)
+
+			# Aggregate log probabilities.
+			aggregated_logprobability = robot_logprob + env_logprob
+
+			# Aggregate KL Divergence
+			aggregated_kl_divergence = robot_kl_divergence + env_kl_divergence
+
+			# Aggregated entropy. 
+			aggregated_entropy = robot_entropy + env_entropy
+
+			##################################
+			# (4) Return. 
+			##################################
+
+			return concatenated_latent_z, aggregated_logprobability, aggregated_entropy, aggregated_kl_divergence		
+
+		else: 
+
+			# (2a) Run forward on robot stream.				
+			robot_logprob = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample)
+
+			# (2b) Run forward on env stream.		
+			env_logprob = super().forward(env_input, epsilon, network_dict=self.env_network_dict, size_dict=self.env_size_dict, z_sample_to_evaluate=env_z_sample)
+
+			# Aggregate log probabilities.
+			aggregated_logprobability = robot_logprob + env_logprob
+
+			##################################
+			# (4) Return. 
+			##################################
+
+			return concatenated_latent_z, aggregated_logprobability, aggregated_entropy, aggregated_kl_divergence		
+
+class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork):
+
+	def __init__(self, input_size, hidden_size, output_size, args, batch_size=1):	
+		# Using its own init function.
+		super(ContinuousSegmenterFactoredEncoderNetwork, self).__init__(input_size, hidden_size, output_size, args)
+
+	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, artificial_batch_size=None):
+		return super().run_super_forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate, artificial_batch_size)
+
+	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
+
+		################################
+		# Forward of this network needs to - 
+		# 	1) Segment the trajectory, equally, into N segments. 
+		# 	2) Individually encode each trajectory segment into individual z's. 
+		# 	3) Collate Z's and return them. 
+		# 	4) This doesn't really need to be computing likelihoods, etc., except wherever required by PM_Joint.
+		################################
+		
+		################################
+		# 1) Segment original trajectory into N segments. 	
+		################################
+
+		self.default_segment_size = 13
+		self.threshold = 5
+		segment_indices = np.arange(0, input.shape[0], self.default_segment_size)
+
+		# If we have fewer than threshold timesteps left to consider, add remainder to last segment. 
+		modulus = input.shape[0]%self.default_segment_size
+		if 0<modulus and modulus<self.threshold:
+			# Modify the last index to the end..
+			segment_indices[-1] = input.shape[0]	
+		# Otherwise just add a new segment. 
+		else:
+			segment_indices.append(input.shape[0])
+
+		# Create list of sizes to feed to torch, because torch.split expects sizes, not indices. 
+		segment_sizes = list(np.diff(segment_indices.astype(int)))
+
+		# Split the segments. 
+		state_action_trajectory_segments = torch.split(input, segment_sizes)
+		
+		################################
+		# 2) Individually encode each segment. 
+		################################
+
+		z_list = []
+		for k, trajectory_segment in enumerate(state_action_trajectory_segments):
+			segment_latent_z, segment_aggregated_logprobability, segment_aggregated_entropy, segment_aggregated_kl_divergence = self.run_super_forward(trajectory_segment, epsilon)
+			z_list.append(segment_latent_z)
+		
+		################################
+		# 3) Collate zs. 
+		################################
+
+		
+
+
+
+class ContinuousSoftEncoderNetwork(ContinuousEncoderNetwork):
+
+	def __init__(self, input_size, hidden_size, output_size, args, batch_size=1):
+
+		# Ensures inheriting from torch.nn.Module goes nicely and cleanly. 	
+		super(ContinuousSoftEncoderNetwork, self).__init__()
+
+		sys.path.append('/home/tshankar/Research/Code/PointMAE')
+
+		self.define_soft_input_layer()
+
+	def define_soft_input_layer(self):
+
+		import deploy_model
+
+		self.PointMAE_model = deploy_model.return_model()
+
+	def forward(self, input, epsilon=0.001, network_dict=None, size_dict=None, z_sample_to_evaluate=None, artificial_batch_size=None):
+		return super().forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate, artificial_batch_size)
+	
+######################################
+# Backing up pattern
+######################################
+
+# import sys 
+# sys.path.append("/home/tshankar/Research/Code/PointMAE")
+
+# import deploy_model
+# import torch
+
+# pmm = deploy_model.return_model()
+# device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
+
+# bs = 8
+# ptz_size = 512
+# ptz = torch.randn(14,bs,ptz_size,3).to(device)
+
+# dpmm = torch.nn.DataParallel(pmm).to(device)
+
+# dpmm(ptz.reshape(-1,ptz_size,3))
+
+
+######################################
+######################################
+
+class ContinuousFactoredSoftEncoderNetwork(ContinuousFactoredEncoderNetwork):
+
+	def __init__(self, input_size, hidden_size, output_size, args, batch_size=1):
+
+		# Using its own init function.
+		super(ContinuousFactoredSoftEncoderNetwork, self).__init__(input_size, hidden_size, output_size, args)
+
+		self.define_soft_input_layer()
+
+	def define_soft_input_layer(self):
+
+		sys.path.append('/home/tshankar/Research/Code/PointMAE')
+		import deploy_model
+
+		self.PointMAE_model = deploy_model.return_model()
+		# Also get the unmasked encoder.
+		# self.PointMAE_unmasked_encoder = self.PointMAE_model.MAE_encoder.encoder
+		
+		self.n_patches = 26
+		self.pmae_representation_size = 384
+		self.hidden_size_1 = 64
+		self.hidden_size_2 = 16
+		self.maxpool_kernel_size = 6
+		self.representation_size = (self.n_patches//self.maxpool_kernel_size)*self.hidden_size_2
+		self.pc_linear_layer_1 = torch.nn.Linear(self.pmae_representation_size, self.hidden_size_1)		
+		self.pc_linear_layer_2 = torch.nn.Linear(self.hidden_size_1, self.hidden_size_2)		
+		# The max pool layer works on 4D. 
+		self.maxpoollayer_1 = torch.nn.MaxPool2d((self.maxpool_kernel_size,1))
+
+	# def post_process_linear_layer
+	def get_environment_input_representation(self, input_point_cloud):
+	# def compute_point_cloud_representation(self, input_point_cloud):
+		
+		# For point cloud stream, run PointMAE model forward, get the representation.. 
+		# Assume we have element point_cloud.
+
+		# We have two options for the representation of the pointcloud. 
+		# Option #1: Find a representation of the all point patches.
+		# Option #2: Use representation of visible point patches.
+		# The Point-MAE paper has tested out reconstructing entire point clouds from the visible point clouds
+		# is perfectly successful, therefore is a useful representation. 
+		
+		# self.point_cloud_representation = self.PointMAE_unmasked_encoder(input_point_cloud)
+		# If 4Dimensional, reshape. 
+		if len(input_point_cloud.shape)>3:
+			reshaped_point_cloud = input_point_cloud.reshape(-1,input_point_cloud.shape[2],input_point_cloud.shape[3])
+			# Actually run representation. Reshaping is fine because it runs independently across batches.
+			reshaped_representation = self.PointMAE_model.encoder_forward(reshaped_point_cloud)
+			# Reshape representation back.
+			pointMAE_representation = reshaped_representation.reshape(input_point_cloud.shape[0], input_point_cloud.shape[1], self.n_patches, self.pmae_representation_size)
+		else:		
+			# Actually run representation. Reshaping is fine because it runs independently across batches.
+			pointMAE_representation = self.PointMAE_model.encoder_forward(input_point_cloud)
+
+		# # 
+		# reshaped_point_cloud = input_point_cloud.reshape(-1, input_point_cloud.shape[-2], input_point_cloud.shape[-1])
+		# reshaped_representation = self.PointMAE_model.encoder_forward(reshaped_point_cloud)
+		# pointMAE_representation = reshaped_representation.reshape()
+
+		# Linear transform 1. 
+		transformed_pmae_representation = self.pc_linear_layer_1(pointMAE_representation)
+		# MaxPool
+		maxpooled_representation = self.maxpoollayer_1(transformed_pmae_representation)
+		# Linear transform 2. 
+		pointcloud_representation = self.pc_linear_layer_2(maxpooled_representation).reshape(-1,self.representation_size)
+		
+		return pointcloud_representation
+					
 
 class CriticNetwork(torch.nn.Module):
 
@@ -2348,3 +2811,4 @@ class MLPGaussianActor(torch.nn.Module):
             log_prob = dist.log_prob(act)
 
         return dist, log_prob
+
