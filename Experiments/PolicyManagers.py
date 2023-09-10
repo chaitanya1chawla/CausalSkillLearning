@@ -2707,10 +2707,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 	def construct_dummy_latents(self, latent_z):
 
-
-		print("Embed in dummy latents")
-		embed()
-
 		if self.args.discrete_z:
 			latent_z_indices = latent_z.float()*torch.ones((self.traj_length)).to(device).float()			
 		else:
@@ -3707,6 +3703,11 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			return None, subpolicy_inputs, padded_action_seq
 
 	def construct_dummy_latents(self, latent_z):
+
+
+		print("Embed in dummy lat")
+		embed()
+
 
 		if not(self.args.discrete_z):
 			# This construction should work irrespective of reparam or not.
