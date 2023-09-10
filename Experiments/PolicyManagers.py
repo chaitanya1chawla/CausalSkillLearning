@@ -614,7 +614,7 @@ class PolicyManager_BaseClass():
 						# Now append this particular sample traj and the rollout into trajectroy and rollout sets.
 						self.trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
 						self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))
-
+						self.task_name_set.append(data_element[b]['environment-name'])
 						#######################
 						# Save the GT trajectory, the rollout, and Z into numpy files. 
 
