@@ -531,6 +531,7 @@ class PolicyManager_BaseClass():
 			self.trajectory_rollout_set = []		
 			self.rollout_gif_list = []
 			self.gt_gif_list = []
+			self.task_name_set = []
 
 			#####################################################
 			# Create folder for gifs.
