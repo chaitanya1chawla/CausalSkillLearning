@@ -3145,6 +3145,12 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				# self.visualize_robot_data(load_sets=True)
 				whether_load_z_set = self.args.latent_set_file_path is not None
+
+				print("###############################################")
+				print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+				print("Temporarily not visualizing.")
+				print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+				print("###############################################")
 				self.visualize_robot_data(load_sets=whether_load_z_set)
 
 				# Get reconstruction error... 

@@ -2328,6 +2328,19 @@ class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork
 	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, artificial_batch_size=None):
 		return super().run_super_forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate, artificial_batch_size)
 
+	def make_dummy_latents(self, latent_z, traj_len):
+
+		# This construction should work irrespective of reparam or not.
+		latent_z_indices = torch.cat([latent_z for i in range(traj_len)],dim=0)
+
+		# Setting latent_b's to 00001. 
+		# This is just a dummy value.
+		# latent_b = torch.ones((5)).to(device).float()
+		latent_b = torch.zeros((self.args.batch_size, traj_len)).to(device).float()
+		latent_b[:,0] = 1.
+
+		return latent_z_indices, latent_b
+
 	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
 
 		################################
@@ -2374,8 +2387,14 @@ class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork
 		# 3) Collate zs. 
 		################################
 
-		
+		# Create all of the variables that PolicyManagerJoint expects.
 
+		# Template variational policy return function. 
+		# return sampled_z_index, sampled_b, variational_b_logprobabilities.squeeze(1), \
+	 	# variational_z_logprobabilities, variational_b_probabilities.squeeze(1), variational_z_probabilities, kl_divergence, prior_loglikelihood
+
+		# Need 
+		collated_zs = 
 
 
 class ContinuousSoftEncoderNetwork(ContinuousEncoderNetwork):
