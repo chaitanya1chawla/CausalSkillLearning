@@ -2330,11 +2330,8 @@ class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork
 
 	def make_dummy_latents(self, latent_z, traj_len):
 
-		# This construction should work irrespective of reparam or not.
-		# latent_z_indices = torch.cat([latent_z for i in range(traj_len)],dim=0)
-
 		# Assume latent z is shape - 1 x B x |Z|.
-		latent_z_indices = torch.tile(latent_z, (1))
+		latent_z_indices = torch.tile(latent_z, (traj_len, 1, 1))
 
 		# Setting latent_b's to 00001. 
 		# This is just a dummy value.
@@ -2343,7 +2340,25 @@ class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork
 		latent_b[:,0] = 1.
 
 		return latent_z_indices, latent_b
+	
+	def collate_latents(self, latent_z_list, segmentation_indices):
 
+		# For each segment, get z, tile z, then concatenate them all. 
+		dummy_z_list = []
+		dummy_b_list = []
+		for k, z in latent_z_list:
+			# Get length of segment. 
+			traj_len = segmentation_indices[k+1] - segmentation_indices[k]
+			dummy_z, dummy_b = self.make_dummy_latents(z, traj_len)
+			dummy_z_list.append(dummy_z)
+			dummy_b_list.append(dummy_b)
+
+		# Now stack things. 
+		concatenated_zs = torch.cat(dummy_z_list, dim=0)
+		concatenated_bs = torch.cat(dummy_b, dim=0)			
+
+		return concatenated_zs, concatenated_bs
+			
 	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
 
 		################################
@@ -2396,8 +2411,10 @@ class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork
 		# return sampled_z_index, sampled_b, variational_b_logprobabilities.squeeze(1), \
 	 	# variational_z_logprobabilities, variational_b_probabilities.squeeze(1), variational_z_probabilities, kl_divergence, prior_loglikelihood
 
-		# Need 
-		collated_zs = z_list
+		concatenated_zs, concatenated_bs = self.collate_latents(latent_z_list=z_list, segmentation_indices=segment_indices)
+
+		return concatenated_zs, concatenated_bs, None, \
+		None, None, None, None, None
 
 
 

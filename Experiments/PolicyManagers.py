@@ -3704,11 +3704,6 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 	def construct_dummy_latents(self, latent_z):
 
-
-		print("Embed in dummy lat")
-		embed()
-
-
 		if not(self.args.discrete_z):
 			# This construction should work irrespective of reparam or not.
 			latent_z_indices = torch.cat([latent_z for i in range(self.current_traj_len)],dim=0)
@@ -5518,15 +5513,16 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				variational_dict['latent_z_indices'], variational_dict['latent_b'], variational_dict['variational_b_logprobabilities'], variational_dict['variational_z_logprobabilities'], \
 				variational_dict['variational_b_probabilities'], variational_dict['variational_z_probabilities'], variational_dict['kl_divergence'], variational_dict['prior_loglikelihood'] = \
 					self.variational_policy.forward(input_dictionary['old_concatenated_traj'], self.epsilon, batch_trajectory_lengths=self.batch_trajectory_lengths)
-						
-			####################################
-			# (4) Evaluate Log Likelihoods of actions and options as "Return" for Variational policy.
-			####################################
-			
-			eval_likelihood_dict = self.evaluate_loglikelihoods(input_dictionary, variational_dict)
-			
+
 			if self.args.train and train:
+
+				####################################
+				# (4) Evaluate Log Likelihoods of actions and options as "Return" for Variational policy.
+				####################################
 				
+				eval_likelihood_dict = self.evaluate_loglikelihoods(input_dictionary, variational_dict)				
+
+
 				####################################
 				# (5) Update policies. 
 				####################################
@@ -5547,7 +5543,10 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				embed()		
 
 		if return_dicts:
-			return input_dictionary, variational_dict, eval_likelihood_dict	
+			if self.args.train and train:
+				return input_dictionary, variational_dict, eval_likelihood_dict	
+			else:
+				return input_dictionary, variational_dict
 
 	def evaluate_metrics(self):
 		self.distances = -np.ones((self.test_set_size))
