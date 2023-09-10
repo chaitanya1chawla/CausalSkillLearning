@@ -623,6 +623,7 @@ class PolicyManager_BaseClass():
 						#####################################################
 
 						k = j*self.args.batch_size+b	
+						kstr = str(k).zfill(3)
 
 						# print("Before unnorm")
 						# embed()
@@ -641,9 +642,9 @@ class PolicyManager_BaseClass():
 						# np.save(os.path.join(self.traj_dir_name, "Rollout_Traj{0}.npy".format(k)), rollout_traj)
 						# np.save(os.path.join(self.z_dir_name, "Latent_Z{0}.npy".format(k)), self.latent_z_set[k])
 												
-						np.save(os.path.join(self.traj_dir_name, "Traj{0}_GT.npy".format(k)), gt_traj_tuple)
-						np.save(os.path.join(self.traj_dir_name, "Traj{0}_Rollout.npy".format(k)), rollout_traj_tuple)
-						np.save(os.path.join(self.z_dir_name, "Traj{0}_Latent_Z.npy".format(k)), self.latent_z_set[k])						
+						np.save(os.path.join(self.traj_dir_name, "Traj{0}_GT.npy".format(kstr)), gt_traj_tuple)
+						np.save(os.path.join(self.traj_dir_name, "Traj{0}_Rollout.npy".format(kstr)), rollout_traj_tuple)
+						np.save(os.path.join(self.z_dir_name, "Traj{0}_Latent_Z.npy".format(kstr)), self.latent_z_set[k])						
 
 				else:
 
@@ -1051,9 +1052,9 @@ class PolicyManager_BaseClass():
 
 		if self.args.data in ['RealWorldRigid'] and self.args.images_in_real_world_dataset:
 			# This should already be segmented to the right start and end point...		
-			self.ground_truth_gif = self.visualizer.visualize_prerendered_gif(indexed_data_element['subsampled_images'], gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(i))
+			self.ground_truth_gif = self.visualizer.visualize_prerendered_gif(indexed_data_element['subsampled_images'], gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(str(i).zfill(3)))
 		else:			
-			self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+			self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(str(i).zfill(3)), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 
 		# Also plotting trajectory against time. 
 		plt.close()
@@ -1061,7 +1062,7 @@ class PolicyManager_BaseClass():
 		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory)
 		ax = plt.gca()
 		ax.set_ylim([-3, 3])
-		plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_GT.png".format(i)))
+		plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_GT.png".format(str(i).zfill(3))))
 		plt.close()
 
 		########################################
@@ -1083,12 +1084,12 @@ class PolicyManager_BaseClass():
 			prefix_list = ['Sim','GTSim']
 			gtsim_prefix = prefix_list[self.args.viz_gt_sim_rollout]
 
-			self.visualizer.visualize_prerendered_gif(self.rollout_gif, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_{1}Rollout.gif".format(i, gtsim_prefix))
-			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_{1}Rollout.png".format(i, gtsim_prefix)))		
+			self.visualizer.visualize_prerendered_gif(self.rollout_gif, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_{1}Rollout.gif".format(str(i).zfill(3), gtsim_prefix))
+			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_{1}Rollout.png".format(str(i).zfill(3), gtsim_prefix)))		
 		else:
-			self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_Rollout.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+			self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_Rollout.gif".format(str(i).zfill(3)), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 			
-			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_Rollout.png".format(i)))
+			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_Rollout.png".format(str(i).zfill(3))))
 
 		plt.close()
 
