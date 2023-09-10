@@ -993,7 +993,7 @@ class PolicyManager_BaseClass():
 		if self.args.normalization is not None:
 			unnormalized_trajectory = (trajectory*self.norm_denom_value) + self.norm_sub_value
 
-		return trajectory
+		return unnormalized_trajectory
 
 	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None):
 
@@ -3164,12 +3164,19 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				# print("###############################################")
 				self.visualize_robot_data(load_sets=whether_load_z_set)
 
+
+				print("###############################################")
+				print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+				print("Query before we run get trajectory latent sets, so latent_z_set isn't overwritten..")
+				print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+				print("###############################################")				
+				embed()
+
+
 				# Get reconstruction error... 
 				self.get_trajectory_and_latent_sets(get_visuals=True)
 				print("The Average Reconstruction Error is: ", self.avg_reconstruction_error)
 
-				print("Now entering query phase.")
-				embed()
 
 			else:
 				# Create save directory:
