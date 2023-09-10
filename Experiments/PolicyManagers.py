@@ -3125,16 +3125,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		self.mean_distance = self.distances[self.distances>0].mean()
 
-	def query_mode(self, model=None, suffix=None):
-
-		if model:
-			self.load_all_models(model)
-
-		np.set_printoptions(suppress=True,precision=2)
-
-		print("Embedding in query mode.")
-		embed()
-
 	def evaluate(self, model=None, suffix=None):
 
 		if model:
@@ -3156,11 +3146,21 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				# self.visualize_robot_data(load_sets=True)
 				whether_load_z_set = self.args.latent_set_file_path is not None
+
+				print("###############################################")
+				print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+				print("Temporarily not visualizing.")
+				print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+				print("###############################################")
 				self.visualize_robot_data(load_sets=whether_load_z_set)
 
 				# Get reconstruction error... 
 				self.get_trajectory_and_latent_sets(get_visuals=True)
 				print("The Average Reconstruction Error is: ", self.avg_reconstruction_error)
+
+				print("Now entering query phase.")
+				embed()
+
 			else:
 				# Create save directory:
 				upper_dir_name = os.path.join(self.args.logdir,self.args.name,"MEval")
@@ -4406,6 +4406,31 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			# self.args.data in ['RoboturkObjects']:
 			self.visualizer = RoboturkRobotObjectVisualizer(args=self.args)
 
+		elif self.args.data in ['RealWorldRigid']:
+
+			self.state_size = 21
+			self.state_dim = 21
+			self.input_size = 2*self.state_size
+
+			#########################################
+			# Manually scale.
+			#########################################
+			
+			if self.args.normalization is not None:
+				# self.norm_sub_value will remain unmodified. 
+				# self.norm_denom_value will get divided by scale.
+				self.norm_denom_value /= self.args.state_scale_factor
+				# Manually make sure quaternion dims are unscaled.
+				self.norm_denom_value[10:14] = 1.
+				self.norm_denom_value[17:] = 1.
+				self.norm_sub_value[10:14] = 0.
+				self.norm_sub_value[17:] = 0.
+
+			self.hidden_size = self.args.hidden_size
+			self.output_size = self.state_size
+			self.traj_length = self.args.traj_length
+			self.conditional_info_size = 0
+			self.test_set_size = 0
 
 		self.training_phase_size = self.args.training_phase_size
 		self.number_epochs = self.args.epochs
@@ -5478,7 +5503,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				variational_dict['latent_z_indices'], variational_dict['latent_b'], variational_dict['variational_b_logprobabilities'], variational_dict['variational_z_logprobabilities'], \
 				variational_dict['variational_b_probabilities'], variational_dict['variational_z_probabilities'], variational_dict['kl_divergence'], variational_dict['prior_loglikelihood'] = \
 					self.variational_policy.forward(input_dictionary['old_concatenated_traj'], self.epsilon, batch_trajectory_lengths=self.batch_trajectory_lengths)
-			
+						
 			####################################
 			# (4) Evaluate Log Likelihoods of actions and options as "Return" for Variational policy.
 			####################################
@@ -6213,7 +6238,11 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			else:
 				self.variational_policy = ContinuousContextualVariationalPolicyNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.args.var_number_layers).to(device)
 		else:
-			self.variational_policy = ContinuousVariationalPolicyNetwork_Batch(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.args.var_number_layers).to(device)
+			if self.args.data in ['RealWorldRigid']:
+				self.variational_policy = ContinuousSegmenterFactoredEncoderNetwork(self.input_size, self.args.hidden_size, self.latent_z_dimensionality, self.args).to(device)
+				# self.variational_policy = ContinuousEncoderNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args).to(device)
+			else:
+				self.variational_policy = ContinuousVariationalPolicyNetwork_Batch(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.args.var_number_layers).to(device)
 		
 	# Batch concatenation functions. 
 	def concat_state_action(self, sample_traj, sample_action_seq):
@@ -6343,8 +6372,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			# If normalization is set to some value.
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 				self.norm_denom_value[np.where(self.norm_denom_value==0)] = 1
-				batch_trajectory = (batch_trajectory-self.norm_sub_value)/self.norm_denom_value
-				
+				batch_trajectory = (batch_trajectory-self.norm_sub_value)/self.norm_denom_value				
 
 			# Set condiitonal information. 
 			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject','DAPG', 'DAPGHand', 'DAPGObject','DexMV','DexMVHand','DexMVObject']:

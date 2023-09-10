@@ -1614,14 +1614,7 @@ class ContinuousVariationalPolicyNetwork_Batch(ContinuousVariationalPolicyNetwor
 	def get_probabilities(self, input, epsilon, precomputed_b=None, evaluate_value=None):
 		return self.forward(input, epsilon, precomputed_b=precomputed_b, evaluate_z_probability=evaluate_value)
 
-class ContinuousVariationalPolicyNetwork_Factored(ContinuousVariationalPolicyNetwork_Batch):
 
-	def __init__(self, input_size, hidden_size, z_dimensions, args, number_layers=4, translation_network=False):
-
-		super(ContinuousVariationalPolicyNetwork_Factored, self).__init__(input_size, hidden_size, z_dimensions, args, number_layers)
-
-	
-	
 
 
 class ContinuousContextualVariationalPolicyNetwork(ContinuousVariationalPolicyNetwork_Batch):
@@ -2325,6 +2318,84 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 			##################################
 
 			return concatenated_latent_z, aggregated_logprobability, aggregated_entropy, aggregated_kl_divergence		
+
+class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork):
+
+	def __init__(self, input_size, hidden_size, output_size, args, batch_size=1):	
+		# Using its own init function.
+		super(ContinuousSegmenterFactoredEncoderNetwork, self).__init__(input_size, hidden_size, output_size, args)
+
+	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, artificial_batch_size=None):
+		return super().run_super_forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate, artificial_batch_size)
+
+	def make_dummy_latents(self, latent_z, traj_len):
+
+		# This construction should work irrespective of reparam or not.
+		latent_z_indices = torch.cat([latent_z for i in range(traj_len)],dim=0)
+
+		# Setting latent_b's to 00001. 
+		# This is just a dummy value.
+		# latent_b = torch.ones((5)).to(device).float()
+		latent_b = torch.zeros((self.args.batch_size, traj_len)).to(device).float()
+		latent_b[:,0] = 1.
+
+		return latent_z_indices, latent_b
+
+	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
+
+		################################
+		# Forward of this network needs to - 
+		# 	1) Segment the trajectory, equally, into N segments. 
+		# 	2) Individually encode each trajectory segment into individual z's. 
+		# 	3) Collate Z's and return them. 
+		# 	4) This doesn't really need to be computing likelihoods, etc., except wherever required by PM_Joint.
+		################################
+		
+		################################
+		# 1) Segment original trajectory into N segments. 	
+		################################
+
+		self.default_segment_size = 13
+		self.threshold = 5
+		segment_indices = np.arange(0, input.shape[0], self.default_segment_size)
+
+		# If we have fewer than threshold timesteps left to consider, add remainder to last segment. 
+		modulus = input.shape[0]%self.default_segment_size
+		if 0<modulus and modulus<self.threshold:
+			# Modify the last index to the end..
+			segment_indices[-1] = input.shape[0]	
+		# Otherwise just add a new segment. 
+		else:
+			segment_indices.append(input.shape[0])
+
+		# Create list of sizes to feed to torch, because torch.split expects sizes, not indices. 
+		segment_sizes = list(np.diff(segment_indices.astype(int)))
+
+		# Split the segments. 
+		state_action_trajectory_segments = torch.split(input, segment_sizes)
+		
+		################################
+		# 2) Individually encode each segment. 
+		################################
+
+		z_list = []
+		for k, trajectory_segment in enumerate(state_action_trajectory_segments):
+			segment_latent_z, segment_aggregated_logprobability, segment_aggregated_entropy, segment_aggregated_kl_divergence = self.run_super_forward(trajectory_segment, epsilon)
+			z_list.append(segment_latent_z)
+		
+		################################
+		# 3) Collate zs. 
+		################################
+
+		# Create all of the variables that PolicyManagerJoint expects.
+
+		# Template variational policy return function. 
+		# return sampled_z_index, sampled_b, variational_b_logprobabilities.squeeze(1), \
+	 	# variational_z_logprobabilities, variational_b_probabilities.squeeze(1), variational_z_probabilities, kl_divergence, prior_loglikelihood
+
+		# Need 
+		collated_zs = 
+
 
 class ContinuousSoftEncoderNetwork(ContinuousEncoderNetwork):
 
