@@ -2331,7 +2331,10 @@ class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork
 	def make_dummy_latents(self, latent_z, traj_len):
 
 		# This construction should work irrespective of reparam or not.
-		latent_z_indices = torch.cat([latent_z for i in range(traj_len)],dim=0)
+		# latent_z_indices = torch.cat([latent_z for i in range(traj_len)],dim=0)
+
+		# Assume latent z is shape - 1 x B x |Z|.
+		latent_z_indices = torch.tile(latent_z, (1))
 
 		# Setting latent_b's to 00001. 
 		# This is just a dummy value.
@@ -2394,7 +2397,8 @@ class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork
 	 	# variational_z_logprobabilities, variational_b_probabilities.squeeze(1), variational_z_probabilities, kl_divergence, prior_loglikelihood
 
 		# Need 
-		# collated_zs = 
+		collated_zs = z_list
+
 
 
 class ContinuousSoftEncoderNetwork(ContinuousEncoderNetwork):

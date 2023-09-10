@@ -2707,6 +2707,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 	def construct_dummy_latents(self, latent_z):
 
+
+		print("Embed in dummy latents")
+		embed()
+
 		if self.args.discrete_z:
 			latent_z_indices = latent_z.float()*torch.ones((self.traj_length)).to(device).float()			
 		else:
