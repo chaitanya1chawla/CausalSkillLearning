@@ -5496,8 +5496,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				variational_dict['latent_z_indices'], variational_dict['latent_b'], variational_dict['variational_b_logprobabilities'], variational_dict['variational_z_logprobabilities'], \
 				variational_dict['variational_b_probabilities'], variational_dict['variational_z_probabilities'], variational_dict['kl_divergence'], variational_dict['prior_loglikelihood'] = \
 					self.variational_policy.forward(input_dictionary['old_concatenated_traj'], self.epsilon, batch_trajectory_lengths=self.batch_trajectory_lengths)
-			
-			
+						
 			####################################
 			# (4) Evaluate Log Likelihoods of actions and options as "Return" for Variational policy.
 			####################################
