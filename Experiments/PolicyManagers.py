@@ -599,7 +599,7 @@ class PolicyManager_BaseClass():
 						print("#########################################")	
 						print("Getting visuals for trajectory: ",j*self.args.batch_size+b)
 						# print("Getting visuals for trajectory:")
-						# print("j:", j, "b:", b, "j*bs+b:", j*self.args.batch_size+b, "il[j*bs+b]:", self.index_list[j*self.args.batch_size+b], "env:", self.dataset[self.index_list[j*self.args.batch_size+b]]['file'])
+						print("j:", j, "b:", b, "j*bs+b:", j*self.args.batch_size+b, "il[j*bs+b]:", self.index_list[j*self.args.batch_size+b], "env:", self.dataset[self.index_list[j*self.args.batch_size+b]]['file'])
 
 						if self.args.setting in ['learntsub','joint']:
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
