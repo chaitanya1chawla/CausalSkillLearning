@@ -6254,7 +6254,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 	def create_networks(self):
 
 		print("Embed in network creation")
-		
+		embed()
 		# Create instances of networks. 
 		self.policy_network = ContinuousPolicyNetwork(self.input_size, self.hidden_size, self.output_size, self.args, self.number_layers).to(device)
 		self.latent_policy = ContinuousLatentPolicyNetwork_ConstrainedBPrior(self.input_size+self.conditional_info_size, self.hidden_size, self.args, self.number_layers).to(device)
