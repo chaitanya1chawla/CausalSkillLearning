@@ -6402,7 +6402,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				else:					
 					batch_trajectory[x,:self.batch_trajectory_lengths[x]] = data_element[x]['demo']
 
-				if self.args.data in ['RealWorldRigid'] and self.images_in_real_world_dataset:
+				if self.args.data in ['RealWorldRigid'] and self.args.images_in_real_world_dataset:
 					data_element[x]['subsampled_images'] = data_element[x]['images']
 			
 			# If normalization is set to some value.
