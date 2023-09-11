@@ -262,8 +262,8 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		elif self.args.variance_mode=='Learned':
 			# variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon/self.args.epsilon_scale_factor			
 			variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
-		else: # If the variance_mode is linearly or quadratically annealed,
-			variance_outputs = variance_value*torch.ones_like(self.mean_outputs).to(device)
+		# else: # If the variance_mode is linearly or quadratically annealed,
+			# variance_outputs = variance_value*torch.ones_like(self.mean_outputs).to(device)
 
 		if greedy:
 			return mean_outputs
