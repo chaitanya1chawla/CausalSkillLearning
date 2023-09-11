@@ -482,6 +482,15 @@ class PolicyManager_BaseClass():
 
 		self.visualizer.create_environment(task_id=env_name)
 
+	def generate_segment_indices(self, batch_latent_b):
+		
+		self.batch_segment_index_list = []		
+		for b in range(self.args.batch_size):
+			segments = np.where(batch_latent_b[:self.batch_trajectory_lengths[b],b])[0]
+			# Add last index to segments
+			segments = np.concatenate([segments, self.batch_trajectory_lengths[b:b+1]])
+			self.batch_segment_index_list.append(segments)
+
 	def visualize_robot_data(self, load_sets=False, number_of_trajectories_to_visualize=None):
 
 		if number_of_trajectories_to_visualize is not None:
@@ -582,8 +591,8 @@ class PolicyManager_BaseClass():
 					data_element = input_dict['data_element']
 					latent_b = torch.swapaxes(var_dict['latent_b'], 1,0)
 
-					# print("EMBEDDING BEFORE MANIPULATING Bs")
-					# embed()
+					# Generate segment index list..
+					self.generate_segment_indices(latent_b)
 
 				else:
 					print("Running iteration of segment in viz, i: ", i, "j:", j)
@@ -617,11 +626,11 @@ class PolicyManager_BaseClass():
 							# trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:,b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True, indexed_data_element=input_dict['data_element'][b])
 							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:self.batch_trajectory_lengths[b],b], \
 												sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True, indexed_data_element=input_dict['data_element'][b], \
-												latent_bs=latent_b[:self.batch_trajectory_lengths[b],b].detach().cpu().numpy())
+												segment_indices=self.batch_segment_index_list[b])
 							
 							self.queryjoint_latent_z_set.append(copy.deepcopy(latent_z[:self.batch_trajectory_lengths[b],b].detach().cpu().numpy()))
 
-							self.queryjoint_latent_b_set.append(copy.deepcopy(latent_b[:self.batch_trajectory_lengths[b],b].detach().cpu().numpy()))
+							# self.queryjoint_latent_b_set.append(copy.deepcopy(latent_b[:self.batch_trajectory_lengths[b],b].detach().cpu().numpy()))
 
 						else:
 							# self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
@@ -1009,21 +1018,49 @@ class PolicyManager_BaseClass():
 
 		trajectory, _ = self.rollout_robot_trajectory(trajectory_start, latent_z, rollout_length=rollout_length, z_seq=z_seq, original_trajectory=original_trajectory)
 
+		return self.unnormalize_trajectory(trajectory)
+
+	def unnormalize_trajectory(self, trajectory):
 		# Unnormalize. 
 		if self.args.normalization is not None:
-			unnormalized_trajectory = (trajectory*self.norm_denom_value) + self.norm_sub_value
-
+			unnormalized_trajectory = (trajectory*self.norm_denom_value) + self.norm_sub_value			
 		return unnormalized_trajectory
 
-	def partitioned_rollout_robot_trajectory(self, trajectory_start, latent_z, rollout_length=None, z_seq=False, original_trajectory=None):
+	def partitioned_rollout_robot_trajectory(self, trajectory_start, latent_z, rollout_length=None, z_seq=False, original_trajectory=None, segment_indices=None):
 
 		# If we're running with a sequential factored encoder network, we have pretrain skill policy.
 		# This is only trained to rollout individual skills. 
 		# Therefore partition the rollout into components that each only run individual skills. 
 
-		pass
+		# Set initial start state. Overwrite this later. 
+		start_state = copy.deepcopy(trajectory_start)
+		rollout_trajectory_segment_list = []
 
-	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None, latent_bs=None):
+		print("Embed in partioned rollout.")
+		embed()
+		
+		# For each segment, callout rollout robot trajectory. 
+		for k in range(len(segment_indices)-1):
+
+			# Start and end indices are start_index = segment_indices[k], end_index = segment_indices[k+1]
+			segment_length = segment_indices[k+1] - segment_indices[k]
+
+			# Technically the latent z should be constant across the segment., so just set it to start value. 
+			segment_latent_z = latent_z[segment_indices[k]]
+
+			# Rollout. 
+			rollout_trajectory_segment, _ = self.rollout_robot_trajectory(start_state, segment_latent_z, rollout_length=segment_length)
+			rollout_trajectory_segment_list.append(copy.deepcopy(rollout_trajectory_segment))
+
+			# Set start state. 
+			start_state = copy.deepcopy(rollout_trajectory_segment[-1, :self.state_dim])
+
+		# After having rolled out each component, concatenated the trajectories. 
+		rollout_fulltrajectory = np.concatenate(rollout_trajectory_segment_list, dim=0)
+
+		return rollout_fulltrajectory, None
+
+	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None, segment_indices=None):
 
 		########################################
 		# 1) Get task ID. 
@@ -1044,7 +1081,11 @@ class PolicyManager_BaseClass():
 		
 		self.visualizer.create_environment(task_id=env_name)
 
-		trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq, original_trajectory=trajectory)
+		if self.args.setting is 'queryjoint':
+
+			trajectory_rollout, rendered_rollout_trajectory = self.partitioned_rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq, original_trajectory=trajectory)
+		else:
+			trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq, original_trajectory=trajectory)
 
 		########################################
 		# 3) Unnormalize data. 
