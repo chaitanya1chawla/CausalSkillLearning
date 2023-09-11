@@ -482,9 +482,12 @@ class PolicyManager_BaseClass():
 
 		self.visualizer.create_environment(task_id=env_name)
 
-	def generate_segment_indices(self, batch_latent_b):
+	def generate_segment_indices(self, batch_latent_b_torch):
 		
 		self.batch_segment_index_list = []		
+
+		batch_latent_b = batch_latent_b_torch.detach().cpu().numpy()
+		
 		for b in range(self.args.batch_size):
 			segments = np.where(batch_latent_b[:self.batch_trajectory_lengths[b],b])[0]
 			# Add last index to segments
@@ -1038,7 +1041,7 @@ class PolicyManager_BaseClass():
 
 		print("Embed in partioned rollout.")
 		embed()
-		
+
 		# For each segment, callout rollout robot trajectory. 
 		for k in range(len(segment_indices)-1):
 
