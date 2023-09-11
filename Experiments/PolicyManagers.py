@@ -6579,9 +6579,9 @@ class PolicyManager_BatchJointQueryMode(PolicyManager_BatchJoint):
 
 		if input_dictionary is None:
 			input_dictionary = {}
-			input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], input_dictionary['concatenated_traj'], \
-				 input_dictionary['old_concatenated_traj'], input_dictionary['data_element'] \
-					  = self.collect_inputs(i, special_indices=special_indices, called_from_train=True, bucket_index=bucket_index)
+			input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], \
+				input_dictionary['concatenated_traj'], input_dictionary['old_concatenated_traj'], \
+					input_dictionary['data_element'] = self.collect_inputs(i, special_indices=special_indices, called_from_train=True, bucket_index=bucket_index)
 			if self.args.task_discriminability or self.args.task_based_supervision:
 				input_dictionary['sample_task_id'] = self.input_task_id
 
