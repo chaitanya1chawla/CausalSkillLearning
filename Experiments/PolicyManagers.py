@@ -709,7 +709,8 @@ class PolicyManager_BaseClass():
 
 		gt_animation_object = self.visualize_robot_embedding(embedded_z, gt=True)
 		rollout_animation_object = self.visualize_robot_embedding(embedded_z, gt=False)
-
+		
+		self.task_name_set_array = np.array(self.task_name_set)
 
 		# Save webpage. 
 		self.write_results_HTML()
@@ -3165,7 +3166,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				# print("###############################################")
 				self.visualize_robot_data(load_sets=whether_load_z_set)
 
-
+				
 				print("###############################################")
 				print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
 				print("Query before we run get trajectory latent sets, so latent_z_set isn't overwritten..")
@@ -3548,10 +3549,13 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		# embed()
 		# print("STATE OF INDEX LIST:", self.index_list)
 
+		
+
 		for b in range(min(self.args.batch_size, len(self.index_list) - i)):
 			# print("Index that the get_batch_element is using: b:",b," i+b: ",i+b, self.index_list[i+b])
 			# Because of the new creation of index_list in random shuffling, this should be safe to index dataset with.
-			# print(b, i+b, self.index_list[i+b])
+
+			print("Getting data element, ", b, i+b, self.index_list[i+b])
 			index = self.index_list[i+b]
 			# # data_element.append(self.dataset[self.index_list[i+b]])
 
