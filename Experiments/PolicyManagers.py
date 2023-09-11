@@ -578,9 +578,8 @@ class PolicyManager_BaseClass():
 					input_dict, var_dict, eval_dict = self.run_iteration(0, j, return_dicts=True, train=False)
 					latent_z = var_dict['latent_z_indices']
 					sample_trajs = input_dict['sample_traj']
-
 					data_element = input_dict['data_element']
-					
+
 				else:
 					print("Running iteration of segment in viz, i: ", i, "j:", j)
 					latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
@@ -5643,16 +5642,17 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			# Run Pretrain Eval.
 			########################################
 
-			arg_copy = copy.deepcopy(self.args)
-			arg_copy.name += "_Eval_Pretrain"
-			if self.args.batch_size>1:
-				self.pretrain_policy_manager = PolicyManager_BatchPretrain(self.args.number_policies, self.dataset, arg_copy)
-			else:
-				self.pretrain_policy_manager = PolicyManager_Pretrain(self.args.number_policies, self.dataset, arg_copy)
+			if self.args.data not in ['RealWorldRigid']:
+				arg_copy = copy.deepcopy(self.args)
+				arg_copy.name += "_Eval_Pretrain"
+				if self.args.batch_size>1:
+					self.pretrain_policy_manager = PolicyManager_BatchPretrain(self.args.number_policies, self.dataset, arg_copy)
+				else:
+					self.pretrain_policy_manager = PolicyManager_Pretrain(self.args.number_policies, self.dataset, arg_copy)
 
-			self.pretrain_policy_manager.setup()
-			self.pretrain_policy_manager.load_all_models(model, only_policy=True)			
-			self.pretrain_policy_manager.visualize_robot_data()			
+				self.pretrain_policy_manager.setup()
+				self.pretrain_policy_manager.load_all_models(model, only_policy=True)			
+				self.pretrain_policy_manager.visualize_robot_data()			
 
 		elif self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 			print("Running visualization of embedding space.")
