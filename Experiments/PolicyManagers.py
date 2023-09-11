@@ -6394,12 +6394,16 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 			# Create batch object that stores trajectories. 
 			batch_trajectory = np.zeros((self.args.batch_size, self.max_batch_traj_length, self.state_size))
+			
 			# Copy over data elements into batch_trajectory array.
 			for x in range(self.args.batch_size):
 				if self.args.ee_trajectories:	
 					batch_trajectory[x,:self.batch_trajectory_lengths[x]] = data_element[x]['endeffector_trajectory']
 				else:					
 					batch_trajectory[x,:self.batch_trajectory_lengths[x]] = data_element[x]['demo']
+
+				if self.args.data in ['RealWorldRigid'] and self.images_in_real_world_dataset:
+					data_element[x]['subsampled_images'] = data_element[x]['images']
 			
 			# If normalization is set to some value.
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
@@ -6464,6 +6468,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			# Scaling action sequence by some factor.             
 			scaled_action_sequence = self.args.action_scale_factor*action_sequence
 			
+
 			# If trajectory length is set to something besides -1, restrict trajectory length to this.
 			if self.args.traj_length > -1 :			
 				batch_trajectory = batch_trajectory.transpose((1,0,2))[:self.args.traj_length]
@@ -6474,7 +6479,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				for x in range(self.args.batch_size):
 					if self.batch_trajectory_lengths[x] > self.args.traj_length:
 						self.batch_trajectory_lengths[x] = self.args.traj_length
-				self.max_batch_traj_length = self.batch_trajectory_lengths.max()
+				self.max_batch_traj_length = self.batch_trajectory_lengths.max()			
 
 				return batch_trajectory, scaled_action_sequence, concatenated_traj, old_concatenated_traj, data_element
 
