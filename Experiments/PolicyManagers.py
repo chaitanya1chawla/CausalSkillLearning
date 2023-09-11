@@ -6488,7 +6488,11 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				# Figure f we should be implementing.. same task ID stuff... probably more important to do smart batching of trjaectory lengths? 
 				# What will this need? Maybe... making references to the discriminators? And then calling forward on them? 
 
-			return batch_trajectory.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2)), data_element
+			print("Embed before return in Collect Input Batch")
+			embed()
+			return batch_trajectory.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), \
+				concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2)), \
+					data_element
 			
 	def assemble_inputs(self, input_trajectory, latent_z_indices, latent_b, sample_action_seq, conditional_information=None, batch_size=None):
 
