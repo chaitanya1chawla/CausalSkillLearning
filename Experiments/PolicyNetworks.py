@@ -2121,6 +2121,9 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		batch_size = self.batch_size
 		if artificial_batch_size is not None:
 			batch_size = artificial_batch_size
+
+		print("Embed in CEN")
+		embed()
 		format_input = input.view((input.shape[0], batch_size, size_dict['input_size']))
 
 		##############################
