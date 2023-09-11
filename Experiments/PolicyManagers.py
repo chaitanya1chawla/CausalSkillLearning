@@ -640,16 +640,19 @@ class PolicyManager_BaseClass():
 							self.queryjoint_latent_z_set.append(copy.deepcopy(latent_z[:self.batch_trajectory_lengths[b],b].detach().cpu().numpy()))
 
 							# self.queryjoint_latent_b_set.append(copy.deepcopy(latent_b[:self.batch_trajectory_lengths[b],b].detach().cpu().numpy()))
-
+							
+							gt_traj = sample_trajs[:self.batch_trajectory_lengths[b],b]
 						else:
 							# self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b,stream_z_indices].detach().cpu().numpy())
 			
 							# Rollout each individual trajectory in this batch.
-							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b], indexed_data_element=data_element[b])							
+							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b], indexed_data_element=data_element[b])
+							gt_traj = sample_trajs[:,b]
 							
+
 						# Now append this particular sample traj and the rollout into trajectroy and rollout sets.
-						self.trajectory_set.append(copy.deepcopy(sample_trajs[:self.batch_trajectory_lengths[b],b]))
+						self.trajectory_set.append(copy.deepcopy(gt_traj))
 						self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))
 						self.task_name_set.append(data_element[b]['environment-name'])
 						#######################
