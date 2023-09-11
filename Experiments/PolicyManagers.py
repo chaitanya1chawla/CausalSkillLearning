@@ -6608,7 +6608,7 @@ class PolicyManager_BatchJointQueryMode(PolicyManager_BatchJoint):
 				embed()		
 
 		if return_dicts:
-			return input_dictionary, variational_dict
+			return input_dictionary, variational_dict, None
 
 class PolicyManager_BaselineRL(PolicyManager_BaseClass):
 
