@@ -4425,7 +4425,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			# Manually scale.
 			#########################################
 			
-			stat_dir_name = self.stat_dir_name
+			stat_dir_name = self.dataset.stat_dir_name
 			if self.args.normalization=='meanvar':
 				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
 				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
