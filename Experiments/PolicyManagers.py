@@ -579,7 +579,7 @@ class PolicyManager_BaseClass():
 					latent_z = var_dict['latent_z_indices']
 					sample_trajs = input_dict['sample_traj']
 				else:
-					print("Running iteration of segment in viz")
+					print("Running iteration of segment in viz, i: ", i, "j:", j, "b: ", b)
 					latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
 
 				if self.args.batch_size>1:
