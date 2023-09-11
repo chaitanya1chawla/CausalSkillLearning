@@ -6271,7 +6271,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 		else:
 			if self.args.data in ['RealWorldRigid'] or self.args.split_stream_encoder==1:
 				print("Making a Factored Segmenter Network.")
-				self.variational_policy = ContinuousSegmenterFactoredEncoderNetwork(self.input_size, self.args.var_hidden_size, int(self.latent_z_dimensionality/2), self.args).to(device)
+				self.variational_policy = ContinuousSequentialFactoredEncoderNetwork(self.input_size, self.args.var_hidden_size, int(self.latent_z_dimensionality/2), self.args).to(device)
 				# self.variational_policy = ContinuousEncoderNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args).to(device)
 			else:
 				self.variational_policy = ContinuousVariationalPolicyNetwork_Batch(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.args.var_number_layers).to(device)

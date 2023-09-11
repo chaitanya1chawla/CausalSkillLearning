@@ -2319,11 +2319,11 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 
 			return concatenated_latent_z, aggregated_logprobability, aggregated_entropy, aggregated_kl_divergence		
 
-class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork):
+class ContinuousSequentialFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork):
 
 	def __init__(self, input_size, hidden_size, output_size, args, batch_size=1):	
 		# Using its own init function.
-		super(ContinuousSegmenterFactoredEncoderNetwork, self).__init__(input_size, hidden_size, output_size, args)
+		super(ContinuousSequentialFactoredEncoderNetwork, self).__init__(input_size, hidden_size, output_size, args)
 
 	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
 		return super().forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate)
@@ -2346,7 +2346,7 @@ class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork
 		# For each segment, get z, tile z, then concatenate them all. 
 		dummy_z_list = []
 		dummy_b_list = []
-		for k, z in latent_z_list:
+		for k, z in enumerate(latent_z_list):
 			# Get length of segment. 
 			traj_len = segmentation_indices[k+1] - segmentation_indices[k]
 			dummy_z, dummy_b = self.make_dummy_latents(z, traj_len)
