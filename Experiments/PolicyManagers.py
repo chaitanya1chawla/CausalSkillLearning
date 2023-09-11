@@ -1018,8 +1018,7 @@ class PolicyManager_BaseClass():
 		########################################
 		# 2) Feed Z into policy, rollout trajectory.
 		########################################
-
-		print("Rollout length:", trajectory.shape[0])
+		
 		self.visualizer.create_environment(task_id=env_name)
 
 		trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq, original_trajectory=trajectory)
@@ -1076,7 +1075,7 @@ class PolicyManager_BaseClass():
 		plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,:7])
 		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory)
 		ax = plt.gca()
-		ax.set_ylim([-3, 3])
+		ax.set_ylim([-5, 5])
 		plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_GT.png".format(str(i).zfill(3))))
 		plt.close()
 
@@ -1089,7 +1088,7 @@ class PolicyManager_BaseClass():
 		plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,:7])
 		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory)
 		ax = plt.gca()
-		ax.set_ylim([-3, 3])
+		ax.set_ylim([-5, 5])
 
 		if self.args.viz_sim_rollout:
 			# No call to visualizer here means we have to save things on our own. 
@@ -4426,6 +4425,13 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			# Manually scale.
 			#########################################
 			
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+							
 			if self.args.normalization is not None:
 				# self.norm_sub_value will remain unmodified. 
 				# self.norm_denom_value will get divided by scale.
