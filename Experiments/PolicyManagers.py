@@ -579,8 +579,9 @@ class PolicyManager_BaseClass():
 					latent_z = var_dict['latent_z_indices']
 					sample_trajs = input_dict['sample_traj']
 				else:
-					print("Running iteration of segment in viz, i: ", i, "j:", j)
-					latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
+					# print("Running iteration of segment in viz, i: ", i, "j:", j)
+					# latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
+					latent_z, sample_trajs, _, data_element = self.run_iteration(0, j*self.args.batch_size, return_z=True, and_train=False)
 
 				if self.args.batch_size>1:
 
@@ -610,7 +611,7 @@ class PolicyManager_BaseClass():
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b,stream_z_indices].detach().cpu().numpy())
 			
 							# Rollout each individual trajectory in this batch.
-							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b], indexed_data_element=data_element[b])
+							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b], indexed_data_element=data_element[b])							
 							
 						# Now append this particular sample traj and the rollout into trajectroy and rollout sets.
 						self.trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
