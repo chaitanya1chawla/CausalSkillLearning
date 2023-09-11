@@ -597,6 +597,9 @@ class PolicyManager_BaseClass():
 					# Generate segment index list..
 					self.generate_segment_indices(latent_b)
 
+					print("Embed to verify segment indices")
+					embed()
+
 				else:
 					print("Running iteration of segment in viz, i: ", i, "j:", j)
 					latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
