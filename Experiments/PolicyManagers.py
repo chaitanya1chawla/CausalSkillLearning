@@ -4494,6 +4494,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.variational_policy = VariationalPolicyNetwork(self.input_size, self.hidden_size, self.number_policies, self.args, number_layers=self.number_layers).to(device)
 
 		else:
+			
 			# self.policy_network = ContinuousPolicyNetwork(self.input_size,self.hidden_size,self.output_size,self.latent_z_dimensionality, self.number_layers).to(device)
 			self.policy_network = ContinuousPolicyNetwork(self.input_size, self.hidden_size, self.output_size, self.args, self.number_layers).to(device)
 
@@ -6252,6 +6253,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 	def create_networks(self):
 
+		print("Embed in network creation")
+		
 		# Create instances of networks. 
 		self.policy_network = ContinuousPolicyNetwork(self.input_size, self.hidden_size, self.output_size, self.args, self.number_layers).to(device)
 		self.latent_policy = ContinuousLatentPolicyNetwork_ConstrainedBPrior(self.input_size+self.conditional_info_size, self.hidden_size, self.args, self.number_layers).to(device)
