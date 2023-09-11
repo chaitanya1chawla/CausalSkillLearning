@@ -265,7 +265,6 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 		else: # If the variance_mode is linearly or quadratically annealed,
 			variance_outputs = variance_value*torch.ones_like(self.mean_outputs).to(device)
 
-
 		if greedy:
 			return mean_outputs
 		else:
@@ -2111,7 +2110,7 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		self.network_dict = torch.nn.ModuleDict()
 		self.network_dict['lstm'], self.network_dict['mean_output_layer'], self.network_dict['variances_output_layer'] = self.define_networks(self.size_dict['input_size'], self.size_dict['output_size'])
 
-	def forward(self, input, epsilon=0.0001, network_dict=None, size_dict=None, z_sample_to_evaluate=None, artificial_batch_size=None):
+	def forward(self, input, epsilon=0.0001, network_dict=None, size_dict=None, z_sample_to_evaluate=None, artificial_batch_size=None, greedy=False):
 
 		##############################
 		# Set default inputs.
@@ -2159,7 +2158,10 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		##############################
 		
 		# Instead of *sampling* the latent z from a distribution, construct using mu + sig * eps (random noise), can pass gradients through it. 
-		latent_z = mean_outputs + variance_outputs * noise 
+		if greedy: 
+			latent_z = mean_outputs
+		else:
+			latent_z = mean_outputs + variance_outputs * noise 
 
 		# calculate entropy for training.
 		entropy = dist.entropy()
@@ -2245,10 +2247,10 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 
 		return robot_input, env_input
 
-	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, artificial_batch_size=None):
+	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, artificial_batch_size=None, greedy=False):
 		# robot_latent_z, robot_logprob, robot_entropy, robot_kl_divergence = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample)
 
-		return super().forward(input, epsilon=epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=z_sample_to_evaluate, artificial_batch_size=artificial_batch_size)
+		return super().forward(input, epsilon=epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=z_sample_to_evaluate, artificial_batch_size=artificial_batch_size, greedy=greedy)
 
 	def get_environment_input_representation(self, env_input):
 		
@@ -2256,7 +2258,7 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 		# Dummy function that we can override in the case of the soft object.
 		return env_input
 
-	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
+	def forward(self, input, epsilon=0.00001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, greedy=False):
 
 		# (1) Split input. 
 		# (2) Run forward on each stream. 
@@ -2281,12 +2283,12 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 
 		if z_sample_to_evaluate is None:
 			# (2a) Run forward on robot stream.				
-			robot_latent_z, robot_logprob, robot_entropy, robot_kl_divergence = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample)
+			robot_latent_z, robot_logprob, robot_entropy, robot_kl_divergence = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample, greedy=greedy)
 
 			new_env_input = self.get_environment_input_representation(env_input)
 
 			# (2b) Run forward on env stream.							
-			env_latent_z, env_logprob, env_entropy, env_kl_divergence = super().forward(new_env_input, epsilon, network_dict=self.env_network_dict, size_dict=self.env_size_dict, z_sample_to_evaluate=env_z_sample)
+			env_latent_z, env_logprob, env_entropy, env_kl_divergence = super().forward(new_env_input, epsilon, network_dict=self.env_network_dict, size_dict=self.env_size_dict, z_sample_to_evaluate=env_z_sample, greedy=greedy)
 
 			##################################
 			# (3) Aggregate stream outputs. 
@@ -2333,8 +2335,8 @@ class ContinuousSequentialFactoredEncoderNetwork(ContinuousFactoredEncoderNetwor
 		# Using its own init function.
 		super(ContinuousSequentialFactoredEncoderNetwork, self).__init__(input_size, hidden_size, output_size, args)
 
-	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
-		return super().forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate)
+	def run_super_forward(self, input, epsilon=0.00001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, greedy=False):
+		return super().forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate, greedy)
 
 	def make_dummy_latents(self, latent_z, traj_len):
 
@@ -2369,7 +2371,7 @@ class ContinuousSequentialFactoredEncoderNetwork(ContinuousFactoredEncoderNetwor
 
 		return concatenated_zs, concatenated_bs
 			
-	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
+	def forward(self, input, epsilon=0.00001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
 
 		################################
 		# Forward of this network needs to - 
@@ -2409,7 +2411,7 @@ class ContinuousSequentialFactoredEncoderNetwork(ContinuousFactoredEncoderNetwor
 
 		z_list = []
 		for k, trajectory_segment in enumerate(state_action_trajectory_segments):
-			segment_latent_z, segment_aggregated_logprobability, segment_aggregated_entropy, segment_aggregated_kl_divergence = self.run_super_forward(trajectory_segment, epsilon)
+			segment_latent_z, _, _, _  = self.run_super_forward(trajectory_segment, epsilon, greedy=True)
 			z_list.append(segment_latent_z)
 		
 		################################
