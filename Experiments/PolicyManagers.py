@@ -525,6 +525,7 @@ class PolicyManager_BaseClass():
 
 			# self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
 			self.latent_z_set = np.zeros((self.N,len(stream_z_indices)))		
+			self.queryjoint_latent_z_set = []
 			# These are lists because they're variable length individually.
 			self.indices = []
 			self.trajectory_set = []
@@ -605,16 +606,13 @@ class PolicyManager_BaseClass():
 						# print("j:", j, "b:", b, "j*bs+b:", j*self.args.batch_size+b, "il[j*bs+b]:", self.index_list[j*self.args.batch_size+b] "env:", self.dataset[self.index_list[j*self.args.batch_size+b]]['file'])
 						# print("j:", j, "b:", b, "j*bs+b:", j*self.args.batch_size+b, "il[j*bs+b]:", self.index_list[j*self.args.batch_size+b])
 
-						if self.args.setting in ['learntsub','joint']:
+						if self.args.setting in ['learntsub','joint','queryjoint']:
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())													
 
 							# Rollout each individual trajectory in this batch.
 							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:,b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True, indexed_data_element=input_dict['data_element'][b])
-						elif self.args.setting in ['queryjoint']:
-							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[:,b].detach().cpu().numpy())
 
-							# Rollout each individual trajectory in this batch.
-							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:,b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True, indexed_data_element=input_dict['data_element'][b])
+							self.queryjoint_latent_z_set.append(copy.deepcopy(latent_z[:,b].detach().cpu().numpy()))
 
 						else:
 							# self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
