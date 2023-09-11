@@ -607,7 +607,7 @@ class PolicyManager_BaseClass():
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 				
 							# Rollout each individual trajectory in this batch.
-							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:,b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True)
+							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:,b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True, indexed_data_element=input_dict['data_element'][b])
 						else:
 							# self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b,stream_z_indices].detach().cpu().numpy())
@@ -6488,7 +6488,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				# Figure f we should be implementing.. same task ID stuff... probably more important to do smart batching of trjaectory lengths? 
 				# What will this need? Maybe... making references to the discriminators? And then calling forward on them? 
 
-			return batch_trajectory.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
+			return batch_trajectory.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2)), data_element
 			
 	def assemble_inputs(self, input_trajectory, latent_z_indices, latent_b, sample_action_seq, conditional_information=None, batch_size=None):
 
@@ -6579,7 +6579,9 @@ class PolicyManager_BatchJointQueryMode(PolicyManager_BatchJoint):
 
 		if input_dictionary is None:
 			input_dictionary = {}
-			input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], input_dictionary['concatenated_traj'], input_dictionary['old_concatenated_traj'] = self.collect_inputs(i, special_indices=special_indices, called_from_train=True, bucket_index=bucket_index)
+			input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], input_dictionary['concatenated_traj'], \
+				 input_dictionary['old_concatenated_traj'], input_dictionary['data_element'] \
+					  = self.collect_inputs(i, special_indices=special_indices, called_from_train=True, bucket_index=bucket_index)
 			if self.args.task_discriminability or self.args.task_based_supervision:
 				input_dictionary['sample_task_id'] = self.input_task_id
 
