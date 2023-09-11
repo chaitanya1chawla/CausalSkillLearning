@@ -2325,8 +2325,8 @@ class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork
 		# Using its own init function.
 		super(ContinuousSegmenterFactoredEncoderNetwork, self).__init__(input_size, hidden_size, output_size, args)
 
-	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, artificial_batch_size=None):
-		return super().forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate, artificial_batch_size)
+	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
+		return super().forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate)
 
 	def make_dummy_latents(self, latent_z, traj_len):
 
