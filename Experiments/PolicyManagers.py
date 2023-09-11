@@ -223,7 +223,7 @@ class PolicyManager_BaseClass():
 
 			self.current_traj_len = len(trajectory)
 
-			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', 'DexMV', 'DexMVHand', 'DexMVObject']:
+			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', 'DexMV', 'DexMVHand', 'DexMVObject', 'RealWorldRigid']:
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
 			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic',\
@@ -572,7 +572,7 @@ class PolicyManager_BaseClass():
 				i = j % number_batches_for_dataset
 
 				# (1) Encode trajectory. 
-				if self.args.setting in ['learntsub','joint']:
+				if self.args.setting in ['learntsub','joint', 'queryjoint']:
 					print("Embed in viz robot data")
 					
 					input_dict, var_dict, eval_dict = self.run_iteration(0, j, return_dicts=True, train=False)
@@ -603,7 +603,7 @@ class PolicyManager_BaseClass():
 						# print("j:", j, "b:", b, "j*bs+b:", j*self.args.batch_size+b, "il[j*bs+b]:", self.index_list[j*self.args.batch_size+b] "env:", self.dataset[self.index_list[j*self.args.batch_size+b]]['file'])
 						# print("j:", j, "b:", b, "j*bs+b:", j*self.args.batch_size+b, "il[j*bs+b]:", self.index_list[j*self.args.batch_size+b])
 
-						if self.args.setting in ['learntsub','joint']:
+						if self.args.setting in ['learntsub','joint','queryjoint']:
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 				
 							# Rollout each individual trajectory in this batch.
@@ -3923,7 +3923,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 				# (1) Encode trajectory. 
 				#############################
 
-				if self.args.setting in ['learntsub','joint']:
+				if self.args.setting in ['learntsub','joint', 'queryjoint']:
 					print("Embed in viz robot data")
 					
 					input_dict, var_dict, eval_dict = self.run_iteration(0, j, return_dicts=True, train=False)
@@ -5616,7 +5616,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		
 		np.set_printoptions(suppress=True,precision=2)
 		
-		if self.args.setting in ['context','joint','learntsub','jointtransfer']:
+		if self.args.setting in ['context','joint','learntsub','queryjoint','jointtransfer']:
 			self.initialize_training_batches()
 		else:
 			# print("Running Evaluation of State Distances on small test set.")
@@ -6550,6 +6550,65 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 		# Now run original training function.
 		super().train(model=model)
+
+class PolicyManager_BatchJointQueryMode(PolicyManager_BatchJoint):
+
+	def __init__(self, number_policies=4, dataset=None, args=None):
+
+		super(PolicyManager_BatchJointQueryMode, self).__init__(number_policies, dataset, args)		
+
+	def run_iteration(self, counter, i, skip_iteration=False, return_dicts=False, special_indices=None, train=True, input_dictionary=None, bucket_index=None):
+
+		# With learnt discrete subpolicy: 
+
+		####################################	
+		# OVERALL ALGORITHM:
+		####################################
+		# (1) For all epochs:
+		# (2)	# For all trajectories:
+		# (3)		# Sample z from variational network.
+		# (4)		# Evalute likelihood of latent policy, and subpolicy.
+		# (5)		# Update policies using likelihoods.		
+
+		self.set_epoch(counter)	
+		self.iter = counter
+
+		####################################
+		# (1) & (2) get sample from collect inputs function. 
+		####################################
+
+		if input_dictionary is None:
+			input_dictionary = {}
+			input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], input_dictionary['concatenated_traj'], input_dictionary['old_concatenated_traj'] = self.collect_inputs(i, special_indices=special_indices, called_from_train=True, bucket_index=bucket_index)
+			if self.args.task_discriminability or self.args.task_based_supervision:
+				input_dictionary['sample_task_id'] = self.input_task_id
+
+			# if not(torch.is_tensor(input_dictionary['old_concatenated_traj'])):
+			input_dictionary['old_concatenated_traj'] = torch.tensor(input_dictionary['old_concatenated_traj']).to(device).float()
+		else:
+			pass
+			# Things should already be set. 
+		# self.batch_indices_sizes = []
+		self.batch_indices_sizes.append({'batch_size': input_dictionary['sample_traj'].shape[0], 'i': i})
+
+		if (input_dictionary['sample_traj'] is not None) and not(skip_iteration):
+
+			####################################
+			# (3) Sample latent variables from variational network p(\zeta | \tau).
+			####################################
+
+			variational_dict = {}
+			profile_var_forward = 0
+			
+			variational_dict['latent_z_indices'], variational_dict['latent_b'] = \
+				self.variational_policy.forward(input_dictionary['old_concatenated_traj'], self.epsilon)
+
+			if self.args.debug:
+				print("Embedding in Run Iteration.")
+				embed()		
+
+		if return_dicts:
+			return input_dictionary, variational_dict
 
 class PolicyManager_BaselineRL(PolicyManager_BaseClass):
 

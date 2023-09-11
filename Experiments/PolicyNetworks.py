@@ -2413,8 +2413,7 @@ class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork
 
 		concatenated_zs, concatenated_bs = self.collate_latents(latent_z_list=z_list, segmentation_indices=segment_indices)
 
-		return concatenated_zs, concatenated_bs, None, \
-		None, None, None, None, None
+		return concatenated_zs, concatenated_bs
 
 
 

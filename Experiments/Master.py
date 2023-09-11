@@ -148,13 +148,15 @@ class Master():
 		# embed()
 
 		# Now define policy manager.
-		if self.args.setting=='learntsub' or self.args.setting=='joint':
+		if self.args.setting in ['learntsub', 'joint']:
 			# self.policy_manager = PolicyManager_BatchJoint(self.args.number_policies, self.dataset, self.args)
 			if self.args.batch_size > 1: 
 				self.policy_manager = PolicyManager_BatchJoint(self.args.number_policies, self.dataset, self.args)
 			else:
 				self.policy_manager = PolicyManager_Joint(self.args.number_policies, self.dataset, self.args)
-
+		elif self.args.setting in ['queryjoint']:
+			self.policy_manager = PolicyManager_BatchJointQueryMode(self.args.number_policies, self.dataset, self.args)
+			
 		elif self.args.setting=='context':
 			# Assume we're going to run with batch size > 1. 
 			self.policy_manager = PolicyManager_BatchJoint(self.args.number_policies, self.dataset, self.args)
@@ -245,7 +247,7 @@ class Master():
 					self.policy_manager.evaluate(model=self.args.model)		
 				
 		# elif self.args.setting=='learntsub' or self.args.setting=='joint' or self.args.setting=='context':
-		elif self.args.setting in ['learntsub','joint','context']:
+		elif self.args.setting in ['learntsub','joint','context','queryjoint']:
 			if self.args.train:
 				if self.args.model:
 					self.policy_manager.train(self.args.model)
