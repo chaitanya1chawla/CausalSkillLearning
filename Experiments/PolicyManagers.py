@@ -610,9 +610,9 @@ class PolicyManager_BaseClass():
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())													
 
 							# Rollout each individual trajectory in this batch.
-							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:,b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True, indexed_data_element=input_dict['data_element'][b])
-
-							self.queryjoint_latent_z_set.append(copy.deepcopy(latent_z[:,b].detach().cpu().numpy()))
+							# trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:,b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True, indexed_data_element=input_dict['data_element'][b])
+							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:self.batch_trajectory_lengths[b],b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True, indexed_data_element=input_dict['data_element'][b])
+							self.queryjoint_latent_z_set.append(copy.deepcopy(latent_z[:self.batch_trajectory_lengths[b],b].detach().cpu().numpy()))
 
 						else:
 							# self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
@@ -622,7 +622,7 @@ class PolicyManager_BaseClass():
 							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b], indexed_data_element=data_element[b])							
 							
 						# Now append this particular sample traj and the rollout into trajectroy and rollout sets.
-						self.trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
+						self.trajectory_set.append(copy.deepcopy(sample_trajs[:self.batch_trajectory_lengths[b],b]))
 						self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))
 						self.task_name_set.append(data_element[b]['environment-name'])
 						#######################
