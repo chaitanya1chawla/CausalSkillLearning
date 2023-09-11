@@ -3553,7 +3553,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			# print("Index that the get_batch_element is using: b:",b," i+b: ",i+b, self.index_list[i+b])
 			# Because of the new creation of index_list in random shuffling, this should be safe to index dataset with.
 
-			print("Getting data element, ", b, i+b, self.index_list[i+b])
+			print("Getting data element, b: ", b, "i+b ", i+b, "index_list[i+b]: ", self.index_list[i+b])
 			index = self.index_list[i+b]
 			# # data_element.append(self.dataset[self.index_list[i+b]])
 
