@@ -2246,6 +2246,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.quadratic_variance_decay_rate = (self.args.initial_policy_variance - self.args.final_policy_variance)/(self.variance_decay_counter**2)
 
 	def create_networks(self):
+		
+		print("Embed in create networks")
+		embed()
+		
 		# Create K Policy Networks. 
 		# This policy network automatically manages input size. 
 		if self.args.discrete_z:
