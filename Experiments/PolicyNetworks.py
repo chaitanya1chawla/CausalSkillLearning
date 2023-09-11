@@ -2355,7 +2355,7 @@ class ContinuousSequentialFactoredEncoderNetwork(ContinuousFactoredEncoderNetwor
 
 		# Now stack things. 
 		concatenated_zs = torch.cat(dummy_z_list, dim=0)
-		concatenated_bs = torch.cat(dummy_b, dim=0)			
+		concatenated_bs = torch.cat(dummy_b_list, dim=0)			
 
 		return concatenated_zs, concatenated_bs
 			
