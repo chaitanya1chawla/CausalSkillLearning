@@ -2384,7 +2384,8 @@ class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork
 			segment_indices[-1] = input.shape[0]	
 		# Otherwise just add a new segment. 
 		else:
-			segment_indices.append(input.shape[0])
+			# segment_indices.append()
+			segment_indices = np.append(segment_indices, input.shape[0])
 
 		# Create list of sizes to feed to torch, because torch.split expects sizes, not indices. 
 		segment_sizes = list(np.diff(segment_indices.astype(int)))
