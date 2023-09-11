@@ -578,6 +578,9 @@ class PolicyManager_BaseClass():
 					input_dict, var_dict, eval_dict = self.run_iteration(0, j, return_dicts=True, train=False)
 					latent_z = var_dict['latent_z_indices']
 					sample_trajs = input_dict['sample_traj']
+
+					data_element = input_dict['data_element']
+					
 				else:
 					print("Running iteration of segment in viz, i: ", i, "j:", j)
 					latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
@@ -1014,6 +1017,8 @@ class PolicyManager_BaseClass():
 			task_id = indexed_data_element['task-id']
 			env_name = self.dataset.environment_names[task_id]
 			print("Visualizing a trajectory of task:", env_name)
+
+
 
 		########################################
 		# 2) Feed Z into policy, rollout trajectory.
