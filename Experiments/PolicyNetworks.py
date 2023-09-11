@@ -2412,6 +2412,9 @@ class ContinuousSequentialFactoredEncoderNetwork(ContinuousFactoredEncoderNetwor
 		# return sampled_z_index, sampled_b, variational_b_logprobabilities.squeeze(1), \
 	 	# variational_z_logprobabilities, variational_b_probabilities.squeeze(1), variational_z_probabilities, kl_divergence, prior_loglikelihood
 
+		print("Embed before collating")
+		embed()
+
 		concatenated_zs, concatenated_bs = self.collate_latents(latent_z_list=z_list, segmentation_indices=segment_indices)
 
 		return concatenated_zs, concatenated_bs
