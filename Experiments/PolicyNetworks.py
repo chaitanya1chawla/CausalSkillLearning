@@ -2379,8 +2379,8 @@ class ContinuousSequentialFactoredEncoderNetwork(ContinuousFactoredEncoderNetwor
 		self.threshold = 5
 		segment_indices = np.arange(0, input.shape[0], self.default_segment_size)
 
-		# If we have fewer than threshold timesteps left to consider, add remainder to last segment. 
-		modulus = input.shape[0]%self.default_segment_size
+		# If we have fewer than threshold timesteps left to consider, add remainder to last segment. 		
+		modulus = input.shape[0]%self.default_segment_size		
 		if 0<modulus and modulus<self.threshold:
 			# Modify the last index to the end..
 			segment_indices[-1] = input.shape[0]	

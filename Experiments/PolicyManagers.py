@@ -486,13 +486,16 @@ class PolicyManager_BaseClass():
 		
 		self.batch_segment_index_list = []		
 
-		batch_latent_b = batch_latent_b_torch.detach().cpu().numpy()
+		batch_latent_b = batch_latent_b_torch.detach().cpu().numpy()		
 
 		for b in range(self.args.batch_size):
 			segments = np.where(batch_latent_b[:self.batch_trajectory_lengths[b],b])[0]
+
 			# Add last index to segments
 			segments = np.concatenate([segments, self.batch_trajectory_lengths[b:b+1]])
 			self.batch_segment_index_list.append(segments)
+
+		# Need to perform the same manipulation of segment indices that we did in the forward function call.		
 
 	def visualize_robot_data(self, load_sets=False, number_of_trajectories_to_visualize=None):
 
@@ -597,8 +600,8 @@ class PolicyManager_BaseClass():
 					# Generate segment index list..
 					self.generate_segment_indices(latent_b)
 
-					print("Embed to verify segment indices")
-					embed()
+					# print("Embed to verify segment indices")
+					# embed()
 
 				else:
 					print("Running iteration of segment in viz, i: ", i, "j:", j)
