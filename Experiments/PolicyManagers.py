@@ -3548,9 +3548,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		# print("Embed in PM GBE")
 		# embed()
 		# print("STATE OF INDEX LIST:", self.index_list)
-
-		
-
+	
 		for b in range(min(self.args.batch_size, len(self.index_list) - i)):
 			# print("Index that the get_batch_element is using: b:",b," i+b: ",i+b, self.index_list[i+b])
 			# Because of the new creation of index_list in random shuffling, this should be safe to index dataset with.
