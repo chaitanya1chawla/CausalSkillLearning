@@ -4527,7 +4527,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.save_object = {}
 		self.save_object['Latent_Policy'] = self.latent_policy.state_dict()
 		self.save_object['Policy_Network'] = self.policy_network.state_dict()
-		self.save_object['Variational_Policy'] = self.variational_policy.state_dict()
+		self.save_object['Encoder_Network'] = self.variational_policy.state_dict()
+		# self.save_object['Variational_Policy'] = self.variational_policy.state_dict()
 		torch.save(self.save_object,os.path.join(self.savedir,"Model_"+suffix))
 
 	def load_all_models(self, path, just_subpolicy=False):
@@ -4537,7 +4538,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		if not(just_subpolicy):
 			if self.args.load_latent:
 				self.latent_policy.load_state_dict(self.load_object['Latent_Policy'])		
-			self.variational_policy.load_state_dict(self.load_object['Variational_Policy'])
+				
+			# self.variational_policy.load_state_dict(self.load_object['Variational_Policy'])
+			self.variational_policy.load_state_dict(self.load_object['Encoder_Network'])
 
 	def load_model_from_transfer(self):
 
