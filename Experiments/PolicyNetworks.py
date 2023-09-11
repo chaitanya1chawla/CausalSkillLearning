@@ -2220,6 +2220,9 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 		self.hidden_size = hidden_size
 		self.batch_size = self.args.batch_size 
 
+		print("Embed in define dims")
+		embed()
+
 	def instantiate_networks(self):		
 
 		# Define networks for robot stream.
