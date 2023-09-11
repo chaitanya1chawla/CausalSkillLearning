@@ -2121,9 +2121,7 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		batch_size = self.batch_size
 		if artificial_batch_size is not None:
 			batch_size = artificial_batch_size
-
-		print("Embed in CEN")
-		embed()
+		
 		format_input = input.view((input.shape[0], batch_size, size_dict['input_size']))
 
 		##############################
@@ -2201,7 +2199,6 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 
 		self.args = args
 
-
 		# Define state sizes for each partition of state space.
 		# Keep track of robot input and output state size. 
 		self.robot_size_dict = {}
@@ -2219,9 +2216,6 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 		self.num_layers = self.args.var_number_layers
 		self.hidden_size = hidden_size
 		self.batch_size = self.args.batch_size 
-
-		print("Embed in define dims")
-		embed()
 
 	def instantiate_networks(self):		
 
@@ -2332,7 +2326,7 @@ class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork
 		super(ContinuousSegmenterFactoredEncoderNetwork, self).__init__(input_size, hidden_size, output_size, args)
 
 	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, artificial_batch_size=None):
-		return super().run_super_forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate, artificial_batch_size)
+		return super().forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate, artificial_batch_size)
 
 	def make_dummy_latents(self, latent_z, traj_len):
 
