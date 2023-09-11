@@ -580,6 +580,10 @@ class PolicyManager_BaseClass():
 					latent_z = var_dict['latent_z_indices']
 					sample_trajs = input_dict['sample_traj']
 					data_element = input_dict['data_element']
+					latent_b = var_dict['latent_b']
+
+					print("EMBEDDING BEFORE MANIPULATING Bs")
+					embed()
 
 				else:
 					print("Running iteration of segment in viz, i: ", i, "j:", j)
@@ -611,8 +615,10 @@ class PolicyManager_BaseClass():
 
 							# Rollout each individual trajectory in this batch.
 							# trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:,b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True, indexed_data_element=input_dict['data_element'][b])
-							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:self.batch_trajectory_lengths[b],b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True, indexed_data_element=input_dict['data_element'][b])
+							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:self.batch_trajectory_lengths[b],b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True, indexed_data_element=input_dict['data_element'][b], latent_bs=)
 							self.queryjoint_latent_z_set.append(copy.deepcopy(latent_z[:self.batch_trajectory_lengths[b],b].detach().cpu().numpy()))
+
+							self.queryjoint_latent_b_set.append(copy.deepcopy(latent_b[:self.batch_trajectory_lengths[b],b].detach().cpu().numpy()))
 
 						else:
 							# self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
@@ -1006,7 +1012,15 @@ class PolicyManager_BaseClass():
 
 		return unnormalized_trajectory
 
-	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None):
+	def partitioned_rollout_robot_trajectory(self, trajectory_start, latent_z, rollout_length=None, z_seq=False, original_trajectory=None):
+
+		# If we're running with a sequential factored encoder network, we have pretrain skill policy.
+		# This is only trained to rollout individual skills. 
+		# Therefore partition the rollout into components that each only run individual skills. 
+
+		pass
+	
+	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None, latent_bs=None):
 
 		########################################
 		# 1) Get task ID. 
@@ -1020,8 +1034,6 @@ class PolicyManager_BaseClass():
 			task_id = indexed_data_element['task-id']
 			env_name = self.dataset.environment_names[task_id]
 			print("Visualizing a trajectory of task:", env_name)
-
-
 
 		########################################
 		# 2) Feed Z into policy, rollout trajectory.
