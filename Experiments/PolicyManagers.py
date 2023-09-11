@@ -580,7 +580,7 @@ class PolicyManager_BaseClass():
 					latent_z = var_dict['latent_z_indices']
 					sample_trajs = input_dict['sample_traj']
 					data_element = input_dict['data_element']
-					latent_b = var_dict['latent_b']
+					latent_b = torch.swapaxes(var_dict['latent_b'], 1,0)
 
 					print("EMBEDDING BEFORE MANIPULATING Bs")
 					embed()
