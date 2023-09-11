@@ -5638,21 +5638,26 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			self.visualize_robot_data()
 
+			if self.args.data in ['RealWorldRigid']:
+				print("Entering Query Mode")
+				embed()
+				return 
+			
 			########################################
 			# Run Pretrain Eval.
 			########################################
 
-			if self.args.data not in ['RealWorldRigid']:
-				arg_copy = copy.deepcopy(self.args)
-				arg_copy.name += "_Eval_Pretrain"
-				if self.args.batch_size>1:
-					self.pretrain_policy_manager = PolicyManager_BatchPretrain(self.args.number_policies, self.dataset, arg_copy)
-				else:
-					self.pretrain_policy_manager = PolicyManager_Pretrain(self.args.number_policies, self.dataset, arg_copy)
+			
+			arg_copy = copy.deepcopy(self.args)
+			arg_copy.name += "_Eval_Pretrain"
+			if self.args.batch_size>1:
+				self.pretrain_policy_manager = PolicyManager_BatchPretrain(self.args.number_policies, self.dataset, arg_copy)
+			else:
+				self.pretrain_policy_manager = PolicyManager_Pretrain(self.args.number_policies, self.dataset, arg_copy)
 
-				self.pretrain_policy_manager.setup()
-				self.pretrain_policy_manager.load_all_models(model, only_policy=True)			
-				self.pretrain_policy_manager.visualize_robot_data()			
+			self.pretrain_policy_manager.setup()
+			self.pretrain_policy_manager.load_all_models(model, only_policy=True)			
+			self.pretrain_policy_manager.visualize_robot_data()			
 
 		elif self.args.data in ['ContinuousNonZero','DirContNonZero','ToyContext']:
 			print("Running visualization of embedding space.")
