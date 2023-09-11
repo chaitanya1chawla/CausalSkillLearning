@@ -579,9 +579,9 @@ class PolicyManager_BaseClass():
 					latent_z = var_dict['latent_z_indices']
 					sample_trajs = input_dict['sample_traj']
 				else:
-					# print("Running iteration of segment in viz, i: ", i, "j:", j)
-					# latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
-					latent_z, sample_trajs, _, data_element = self.run_iteration(0, j*self.args.batch_size, return_z=True, and_train=False)
+					print("Running iteration of segment in viz, i: ", i, "j:", j)
+					latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
+					# latent_z, sample_trajs, _, data_element = self.run_iteration(0, j*self.args.batch_size, return_z=True, and_train=False)
 
 				if self.args.batch_size>1:
 
@@ -3612,7 +3612,11 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			
 			batch_trajectory = np.zeros((self.args.batch_size, self.current_traj_len, self.state_size))
 
+			print("EMBED IN GET TRAJ SEGMENT")
+			embed()
 			for x in range(min(self.args.batch_size, len(self.index_list) - i)):
+
+				
 
 				# Select the trajectory for each instance in the batch. 
 				if self.args.ee_trajectories:
