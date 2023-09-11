@@ -2247,8 +2247,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 	def create_networks(self):
 		
-		print("Embed in create networks")
-		embed()
+		# print("Embed in create networks")
+		# embed()
 		
 		# Create K Policy Networks. 
 		# This policy network automatically manages input size. 
@@ -6257,8 +6257,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 	def create_networks(self):
 
-		print("Embed in network creation")
-		embed()
+		# print("Embed in network creation")
+		# embed()
 		# Create instances of networks. 
 		self.policy_network = ContinuousPolicyNetwork(self.input_size, self.hidden_size, self.output_size, self.args, self.number_layers).to(device)
 		self.latent_policy = ContinuousLatentPolicyNetwork_ConstrainedBPrior(self.input_size+self.conditional_info_size, self.hidden_size, self.args, self.number_layers).to(device)
@@ -6269,7 +6269,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			else:
 				self.variational_policy = ContinuousContextualVariationalPolicyNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.args.var_number_layers).to(device)
 		else:
-			if self.args.data in ['RealWorldRigid']:
+			if self.args.data in ['RealWorldRigid'] or self.args.split_stream_encoder==1:
+				print("Making a Factored Segmenter Network.")
 				self.variational_policy = ContinuousSegmenterFactoredEncoderNetwork(self.input_size, self.args.var_hidden_size, int(self.latent_z_dimensionality/2), self.args).to(device)
 				# self.variational_policy = ContinuousEncoderNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args).to(device)
 			else:
