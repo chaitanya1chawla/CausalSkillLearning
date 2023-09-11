@@ -1039,9 +1039,6 @@ class PolicyManager_BaseClass():
 		start_state = copy.deepcopy(trajectory_start)
 		rollout_trajectory_segment_list = []
 
-		print("Embed in partioned rollout.")
-		embed()
-
 		# For each segment, callout rollout robot trajectory. 
 		for k in range(len(segment_indices)-1):
 
@@ -1059,7 +1056,7 @@ class PolicyManager_BaseClass():
 			start_state = copy.deepcopy(rollout_trajectory_segment[-1, :self.state_dim])
 
 		# After having rolled out each component, concatenated the trajectories. 
-		rollout_fulltrajectory = np.concatenate(rollout_trajectory_segment_list, dim=0)
+		rollout_fulltrajectory = np.concatenate(rollout_trajectory_segment_list, axis=0)
 
 		return rollout_fulltrajectory, None
 
