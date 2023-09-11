@@ -3548,24 +3548,16 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		# Make data_element a list of dictionaries. 
 		data_element = []
 						
-		# print("Embed in PM GBE")
-		# embed()
-		# print("STATE OF INDEX LIST:", self.index_list)
-	
-		for b in range(min(self.args.batch_size, len(self.index_list) - i)):
+		# for b in range(min(self.args.batch_size, len(self.index_list) - i)):
+		# Changing this selection, assuming that the index_list is corrected to only have within dataset length indices.
+		for b in range(self.args.batch_size):
+
 			# print("Index that the get_batch_element is using: b:",b," i+b: ",i+b, self.index_list[i+b])
 			# Because of the new creation of index_list in random shuffling, this should be safe to index dataset with.
 
 			print("Getting data element, b: ", b, "i+b ", i+b, "index_list[i+b]: ", self.index_list[i+b])
 			index = self.index_list[i+b]
-			# # data_element.append(self.dataset[self.index_list[i+b]])
 
-			# dataset_size_limit = len(self.dataset)-1 
-			# index_list_size_limit = min(i+b, len(self.index_list)-1)
-			# index = min (dataset_size_limit, index_list_size_limit)						
-			# # index = min( len(self.dataset)-1 , self.index_list[ min( i+b , len(self.index_list)-1)])
-
-			# print("i:", i, "b:", b, "datasetlim:", dataset_size_limit, "il_size_limit:", index_list_size_limit, "index:", index)
 			if self.args.train:
 				self.coverage[index] += 1
 			data_element.append(self.dataset[index])
@@ -3612,11 +3604,15 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			
 			batch_trajectory = np.zeros((self.args.batch_size, self.current_traj_len, self.state_size))
 
-			print("EMBED IN GET TRAJ SEGMENT")
-			embed()
-			for x in range(min(self.args.batch_size, len(self.index_list) - i)):
+			# OLD
+			# for x in range(min(self.args.batch_size, len(self.index_list) - i)):
 
-				
+			# POTENTIAL:
+			# for x in range(min(self.args.batch_size, len(self.index_list) - 1)):
+
+			# Changing this selection, assuming that the index_list is corrected to only have within dataset length indices.
+			for x in range(self.args.batch_size):
+			
 
 				# Select the trajectory for each instance in the batch. 
 				if self.args.ee_trajectories:
@@ -3645,9 +3641,6 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 					end_timepoint = start_timepoint + self.current_traj_len
 
-					# if data_element[x]['demo'].shape[-1]>15:
-					# 	print("Embed in batch pretrain get traj")
-					# 	embed()
 
 					if self.args.ee_trajectories:
 						batch_trajectory[x] = data_element[x]['endeffector_trajectory'][start_timepoint:end_timepoint]
@@ -3660,19 +3653,9 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 						else:
 							batch_trajectory[x] = data_element['demo'][start_timepoint:end_timepoint,:-1]
 
-					# print("############################")
-					# print("Embed in subsample")
-					# embed()
-
 					if self.args.data in ['RealWorldRigid']:
 
 						# Truncate the images to start and end timepoint. 
-
-						# print("##########################")						
-						# duration = end_timepoint - start_timepoint
-						# dset_duration = data_element[x]['images'].shape[0]
-						# print("Traj Index:", x, "Traj Length:", dset_duration, "Start:", start_timepoint, "End:", end_timepoint, duration)
-
 						data_element[x]['subsampled_images'] = data_element[x]['images'][start_timepoint:end_timepoint]
 
 			# If normalization is set to some value.
