@@ -85,7 +85,7 @@ class RealWorldRigid_PreDataset(Dataset):
 		self.setup()
 		
 
-		self.stat_dir_name='RealWorldRigid'
+		self.stat_dir_name ='RealWorldRigid'
 				
 	def normalize_quaternion(self, q):
 		# Define quaternion normalization function.
