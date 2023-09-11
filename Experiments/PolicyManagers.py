@@ -1005,16 +1005,16 @@ class PolicyManager_BaseClass():
 
 			# New input row. 
 			input_row = torch.zeros((1,2*self.state_dim+self.latent_z_dimensionality)).to(device).float()
-			input_row[0,:self.state_dim] = new_state
+			input_row[0,:self.state_dim] = copy.deepcopy(new_state)
 			# Feed in the ORIGINAL prediction from the network as input. Not the downscaled thing. 
-			input_row[0,self.state_dim:2*self.state_dim] = action_to_execute
+			input_row[0,self.state_dim:2*self.state_dim] = copy.deepcopy(action_to_execute)
 
 			if z_seq:
 				input_row[0,2*self.state_dim:] = torch.tensor(latent_z[t+1]).to(device).float()
 			else:
 				input_row[0,2*self.state_dim:] = torch.tensor(latent_z).to(device).float()
 
-			subpolicy_inputs = torch.cat([subpolicy_inputs,input_row],dim=0)
+			subpolicy_inputs = torch.cat([subpolicy_inputs,copy.deepcopy(input_row)],dim=0)
 
 		# print("Embedding in rollout")
 		# embed()
@@ -3627,7 +3627,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			# print("Index that the get_batch_element is using: b:",b," i+b: ",i+b, self.index_list[i+b])
 			# Because of the new creation of index_list in random shuffling, this should be safe to index dataset with.
 
-			print("Getting data element, b: ", b, "i+b ", i+b, "index_list[i+b]: ", self.index_list[i+b])
+			# print("Getting data element, b: ", b, "i+b ", i+b, "index_list[i+b]: ", self.index_list[i+b])
 			index = self.index_list[i+b]
 
 			if self.args.train:
