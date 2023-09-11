@@ -487,7 +487,7 @@ class PolicyManager_BaseClass():
 		self.batch_segment_index_list = []		
 
 		batch_latent_b = batch_latent_b_torch.detach().cpu().numpy()
-		
+
 		for b in range(self.args.batch_size):
 			segments = np.where(batch_latent_b[:self.batch_trajectory_lengths[b],b])[0]
 			# Add last index to segments
@@ -586,7 +586,7 @@ class PolicyManager_BaseClass():
 
 				# (1) Encode trajectory. 
 				if self.args.setting in ['learntsub','joint', 'queryjoint']:
-					print("Embed in viz robot data")
+					
 					
 					input_dict, var_dict, eval_dict = self.run_iteration(0, j, return_dicts=True, train=False)
 					latent_z = var_dict['latent_z_indices']
@@ -1084,8 +1084,7 @@ class PolicyManager_BaseClass():
 		
 		self.visualizer.create_environment(task_id=env_name)
 
-		if self.args.setting is 'queryjoint':
-
+		if self.args.setting in ['queryjoint']:
 			trajectory_rollout, rendered_rollout_trajectory = self.partitioned_rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq, original_trajectory=trajectory)
 		else:
 			trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq, original_trajectory=trajectory)
