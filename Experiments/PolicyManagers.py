@@ -591,7 +591,8 @@ class PolicyManager_BaseClass():
 
 					#######################
 					# Create env for batch.
-					self.per_batch_env_management(data_element[0])
+					if not(self.args.data in ['RealWorldRigid']):
+						self.per_batch_env_management(data_element[0])
 
 					for b in range(self.args.batch_size):
 						
