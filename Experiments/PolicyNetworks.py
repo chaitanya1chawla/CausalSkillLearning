@@ -2355,7 +2355,9 @@ class ContinuousSequentialFactoredEncoderNetwork(ContinuousFactoredEncoderNetwor
 
 		# Now stack things. 
 		concatenated_zs = torch.cat(dummy_z_list, dim=0)
-		concatenated_bs = torch.cat(dummy_b_list, dim=0)			
+
+		# Should this be -1 or should we reshape and do 0?
+		concatenated_bs = torch.cat(dummy_b_list, dim=-1)			
 
 		return concatenated_zs, concatenated_bs
 			
@@ -2412,8 +2414,8 @@ class ContinuousSequentialFactoredEncoderNetwork(ContinuousFactoredEncoderNetwor
 		# return sampled_z_index, sampled_b, variational_b_logprobabilities.squeeze(1), \
 	 	# variational_z_logprobabilities, variational_b_probabilities.squeeze(1), variational_z_probabilities, kl_divergence, prior_loglikelihood
 
-		print("Embed before collating")
-		embed()
+		# print("Embed before collating")
+		# embed()
 
 		concatenated_zs, concatenated_bs = self.collate_latents(latent_z_list=z_list, segmentation_indices=segment_indices)
 
