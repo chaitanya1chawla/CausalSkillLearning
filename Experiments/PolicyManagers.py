@@ -2842,9 +2842,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Relative. 
 		if self.args.relative_state_phase_aux_loss_weight>0.:
 			self.compute_relative_state_phase_aux_loss(update_dict)
-		if self.args.absolute_state_phase_aux_loss_weight>0.:
-			self.compute_absolute_state_reconstruction_loss(update_dict)
-
 		if self.args.cummulative_computed_state_reconstruction_loss_weight>0. or self.args.teacher_forced_state_reconstruction_loss_weight>0.:
 			self.compute_absolute_state_reconstruction_loss()
 
@@ -3198,8 +3195,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				print("Embedding in Train.")
 				embed()
 
-			print("Embed in Pretrain PM RI")
-			embed()
+			# print("Embed in Pretrain PM RI")
+			# embed()
 
 			####################################
 			############# (4) #############
