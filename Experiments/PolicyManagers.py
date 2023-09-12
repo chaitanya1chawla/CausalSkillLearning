@@ -1230,7 +1230,7 @@ class PolicyManager_BaseClass():
 				
 				# html_file.write('<div style="display: flex; justify-content: row;">  <img src="Traj_{0}_GIF_GT.gif"/>  <img src="Traj_{0}_GIF_Rollout.gif"/> </div>'.format(i))
 
-				html_file.write('<div style="display: flex; justify-content: row;">  <img src="Traj_{0}_{1}_GT.{2}"/>  <img src="Traj_{0}_{1}_Rollout.{2}"/> </div>'.format(i, plots_or_gif, extension_dict[plots_or_gif]))
+				html_file.write('<div style="display: flex; justify-content: row;">  <img src="Traj_{0}_{1}_GT.{2}"/>  <img src="Traj_{0}_{1}_Rollout.{2}"/> </div>'.format(str(i).zfill(3), plots_or_gif, extension_dict[plots_or_gif]))
 					
 				# Add gap space.
 				html_file.write('<p> </p>')
