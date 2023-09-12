@@ -223,7 +223,7 @@ class PolicyManager_BaseClass():
 
 			self.current_traj_len = len(trajectory)
 
-			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', 'DexMV', 'DexMVHand', 'DexMVObject']:
+			if self.args.data in ['MIME','OldMIME','GRAB','GRABHand','GRABArmHand', 'GRABArmHandObject', 'GRABObject', 'DAPG', 'DAPGHand', 'DAPGObject', 'DexMV', 'DexMVHand', 'DexMVObject', 'RealWorldRigid']:
 				self.conditional_information = np.zeros((self.conditional_info_size))				
 			# elif self.args.data=='Roboturk' or self.args.data=='OrigRoboturk' or self.args.data=='FullRoboturk':
 			elif self.args.data in ['Roboturk','OrigRoboturk','FullRoboturk','OrigRoboMimic',\
@@ -482,6 +482,21 @@ class PolicyManager_BaseClass():
 
 		self.visualizer.create_environment(task_id=env_name)
 
+	def generate_segment_indices(self, batch_latent_b_torch):
+		
+		self.batch_segment_index_list = []		
+
+		batch_latent_b = batch_latent_b_torch.detach().cpu().numpy()		
+
+		for b in range(self.args.batch_size):
+			segments = np.where(batch_latent_b[:self.batch_trajectory_lengths[b],b])[0]
+
+			# Add last index to segments
+			segments = np.concatenate([segments, self.batch_trajectory_lengths[b:b+1]])
+			self.batch_segment_index_list.append(segments)
+
+		# Need to perform the same manipulation of segment indices that we did in the forward function call.		
+
 	def visualize_robot_data(self, load_sets=False, number_of_trajectories_to_visualize=None):
 
 		if number_of_trajectories_to_visualize is not None:
@@ -525,12 +540,14 @@ class PolicyManager_BaseClass():
 
 			# self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))		
 			self.latent_z_set = np.zeros((self.N,len(stream_z_indices)))		
+			self.queryjoint_latent_z_set = []
 			# These are lists because they're variable length individually.
 			self.indices = []
 			self.trajectory_set = []
 			self.trajectory_rollout_set = []		
 			self.rollout_gif_list = []
 			self.gt_gif_list = []
+			self.task_name_set = []
 
 			#####################################################
 			# Create folder for gifs.
@@ -571,15 +588,25 @@ class PolicyManager_BaseClass():
 				i = j % number_batches_for_dataset
 
 				# (1) Encode trajectory. 
-				if self.args.setting in ['learntsub','joint']:
-					print("Embed in viz robot data")
+				if self.args.setting in ['learntsub','joint', 'queryjoint']:
+					
 					
 					input_dict, var_dict, eval_dict = self.run_iteration(0, j, return_dicts=True, train=False)
 					latent_z = var_dict['latent_z_indices']
 					sample_trajs = input_dict['sample_traj']
+					data_element = input_dict['data_element']
+					latent_b = torch.swapaxes(var_dict['latent_b'], 1,0)
+
+					# Generate segment index list..
+					self.generate_segment_indices(latent_b)
+
+					# print("Embed to verify segment indices")
+					# embed()
+
 				else:
-					print("Running iteration of segment in viz")
+					print("Running iteration of segment in viz, i: ", i, "j:", j)
 					latent_z, sample_trajs, _, data_element = self.run_iteration(0, i, return_z=True, and_train=False)
+					# latent_z, sample_trajs, _, data_element = self.run_iteration(0, j*self.args.batch_size, return_z=True, and_train=False)
 
 				if self.args.batch_size>1:
 
@@ -589,7 +616,8 @@ class PolicyManager_BaseClass():
 
 					#######################
 					# Create env for batch.
-					self.per_batch_env_management(data_element[0])
+					if not(self.args.data in ['RealWorldRigid']):
+						self.per_batch_env_management(data_element[0])
 
 					for b in range(self.args.batch_size):
 						
@@ -597,24 +625,36 @@ class PolicyManager_BaseClass():
 						print("#########################################")	
 						print("Getting visuals for trajectory: ",j*self.args.batch_size+b)
 						# print("Getting visuals for trajectory:")
-						# print("j:", j, "b:", b, "j*bs+b:", j*self.args.batch_size+b, "il[j*bs+b]:", self.index_list[j*self.args.batch_size+b], "env:", self.dataset[self.index_list[j*self.args.batch_size+b]]['file'])
+						# print("j:", j, "b:", b, "j*bs+b:", j*self.args.batch_size+b, "il[j*bs+b]:", self.index_list[j*self.args.batch_size+b] "env:", self.dataset[self.index_list[j*self.args.batch_size+b]]['file'])
+						# print("j:", j, "b:", b, "j*bs+b:", j*self.args.batch_size+b, "il[j*bs+b]:", self.index_list[j*self.args.batch_size+b])
 
-						if self.args.setting in ['learntsub','joint']:
+						if self.args.setting in ['learntsub','joint','queryjoint']:
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
-				
+
 							# Rollout each individual trajectory in this batch.
-							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:,b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True)
+							# trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:,b], sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True, indexed_data_element=input_dict['data_element'][b])
+							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[:self.batch_trajectory_lengths[b],b], \
+												sample_trajs[:self.batch_trajectory_lengths[b],b], z_seq=True, indexed_data_element=input_dict['data_element'][b], \
+												segment_indices=self.batch_segment_index_list[b])
+							
+							self.queryjoint_latent_z_set.append(copy.deepcopy(latent_z[:self.batch_trajectory_lengths[b],b].detach().cpu().numpy()))
+
+							# self.queryjoint_latent_b_set.append(copy.deepcopy(latent_b[:self.batch_trajectory_lengths[b],b].detach().cpu().numpy()))
+							
+							gt_traj = sample_trajs[:self.batch_trajectory_lengths[b],b]
 						else:
 							# self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b].detach().cpu().numpy())
 							self.latent_z_set[j*self.args.batch_size+b] = copy.deepcopy(latent_z[0,b,stream_z_indices].detach().cpu().numpy())
 			
 							# Rollout each individual trajectory in this batch.
 							trajectory_rollout = self.get_robot_visuals(j*self.args.batch_size+b, latent_z[0,b], sample_trajs[:,b], indexed_data_element=data_element[b])
+							gt_traj = sample_trajs[:,b]
 							
-						# Now append this particular sample traj and the rollout into trajectroy and rollout sets.
-						self.trajectory_set.append(copy.deepcopy(sample_trajs[:,b]))
-						self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))
 
+						# Now append this particular sample traj and the rollout into trajectroy and rollout sets.
+						self.trajectory_set.append(copy.deepcopy(gt_traj))
+						self.trajectory_rollout_set.append(copy.deepcopy(trajectory_rollout))
+						self.task_name_set.append(data_element[b]['environment-name'])
 						#######################
 						# Save the GT trajectory, the rollout, and Z into numpy files. 
 
@@ -623,6 +663,7 @@ class PolicyManager_BaseClass():
 						#####################################################
 
 						k = j*self.args.batch_size+b	
+						kstr = str(k).zfill(3)
 
 						# print("Before unnorm")
 						# embed()
@@ -641,9 +682,9 @@ class PolicyManager_BaseClass():
 						# np.save(os.path.join(self.traj_dir_name, "Rollout_Traj{0}.npy".format(k)), rollout_traj)
 						# np.save(os.path.join(self.z_dir_name, "Latent_Z{0}.npy".format(k)), self.latent_z_set[k])
 												
-						np.save(os.path.join(self.traj_dir_name, "Traj{0}_GT.npy".format(k)), gt_traj_tuple)
-						np.save(os.path.join(self.traj_dir_name, "Traj{0}_Rollout.npy".format(k)), rollout_traj_tuple)
-						np.save(os.path.join(self.z_dir_name, "Traj{0}_Latent_Z.npy".format(k)), self.latent_z_set[k])						
+						np.save(os.path.join(self.traj_dir_name, "Traj{0}_GT.npy".format(kstr)), gt_traj_tuple)
+						np.save(os.path.join(self.traj_dir_name, "Traj{0}_Rollout.npy".format(kstr)), rollout_traj_tuple)
+						np.save(os.path.join(self.z_dir_name, "Traj{0}_Latent_Z.npy".format(kstr)), self.latent_z_set[k])						
 
 				else:
 
@@ -707,7 +748,8 @@ class PolicyManager_BaseClass():
 
 		gt_animation_object = self.visualize_robot_embedding(embedded_z, gt=True)
 		rollout_animation_object = self.visualize_robot_embedding(embedded_z, gt=False)
-
+		
+		self.task_name_set_array = np.array(self.task_name_set)
 
 		# Save webpage. 
 		self.write_results_HTML()
@@ -983,8 +1025,51 @@ class PolicyManager_BaseClass():
 		trajectory = subpolicy_inputs[:,:self.state_dim].detach().cpu().numpy()
 		
 		return trajectory, rendered_rollout_trajectory
-		
-	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None):
+
+	def retrieve_unnormalized_robot_trajectory(self, trajectory_start, latent_z, rollout_length=None, z_seq=False, original_trajectory=None):
+
+		trajectory, _ = self.rollout_robot_trajectory(trajectory_start, latent_z, rollout_length=rollout_length, z_seq=z_seq, original_trajectory=original_trajectory)
+
+		return self.unnormalize_trajectory(trajectory)
+
+	def unnormalize_trajectory(self, trajectory):
+		# Unnormalize. 
+		if self.args.normalization is not None:
+			unnormalized_trajectory = (trajectory*self.norm_denom_value) + self.norm_sub_value			
+		return unnormalized_trajectory
+
+	def partitioned_rollout_robot_trajectory(self, trajectory_start, latent_z, rollout_length=None, z_seq=False, original_trajectory=None, segment_indices=None):
+
+		# If we're running with a sequential factored encoder network, we have pretrain skill policy.
+		# This is only trained to rollout individual skills. 
+		# Therefore partition the rollout into components that each only run individual skills. 
+
+		# Set initial start state. Overwrite this later. 
+		start_state = copy.deepcopy(trajectory_start)
+		rollout_trajectory_segment_list = []
+
+		# For each segment, callout rollout robot trajectory. 
+		for k in range(len(segment_indices)-1):
+
+			# Start and end indices are start_index = segment_indices[k], end_index = segment_indices[k+1]
+			segment_length = segment_indices[k+1] - segment_indices[k]
+
+			# Technically the latent z should be constant across the segment., so just set it to start value. 
+			segment_latent_z = latent_z[segment_indices[k]]
+
+			# Rollout. 
+			rollout_trajectory_segment, _ = self.rollout_robot_trajectory(start_state, segment_latent_z, rollout_length=segment_length)
+			rollout_trajectory_segment_list.append(copy.deepcopy(rollout_trajectory_segment))
+
+			# Set start state. 
+			start_state = copy.deepcopy(rollout_trajectory_segment[-1, :self.state_dim])
+
+		# After having rolled out each component, concatenated the trajectories. 
+		rollout_fulltrajectory = np.concatenate(rollout_trajectory_segment_list, axis=0)
+
+		return rollout_fulltrajectory, None
+
+	def get_robot_visuals(self, i, latent_z, trajectory, return_image=False, return_numpy=False, z_seq=False, indexed_data_element=None, segment_indices=None):
 
 		########################################
 		# 1) Get task ID. 
@@ -1002,11 +1087,13 @@ class PolicyManager_BaseClass():
 		########################################
 		# 2) Feed Z into policy, rollout trajectory.
 		########################################
-
-		print("Rollout length:", trajectory.shape[0])
+		
 		self.visualizer.create_environment(task_id=env_name)
 
-		trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq, original_trajectory=trajectory)
+		if self.args.setting in ['queryjoint']:
+			trajectory_rollout, rendered_rollout_trajectory = self.partitioned_rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq, original_trajectory=trajectory, segment_indices=segment_indices)
+		else:
+			trajectory_rollout, rendered_rollout_trajectory = self.rollout_robot_trajectory(trajectory[0], latent_z, rollout_length=max(trajectory.shape[0],0), z_seq=z_seq, original_trajectory=trajectory)
 
 		########################################
 		# 3) Unnormalize data. 
@@ -1051,17 +1138,17 @@ class PolicyManager_BaseClass():
 
 		if self.args.data in ['RealWorldRigid'] and self.args.images_in_real_world_dataset:
 			# This should already be segmented to the right start and end point...		
-			self.ground_truth_gif = self.visualizer.visualize_prerendered_gif(indexed_data_element['subsampled_images'], gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(i))
+			self.ground_truth_gif = self.visualizer.visualize_prerendered_gif(indexed_data_element['subsampled_images'], gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(str(i).zfill(3)))
 		else:			
-			self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+			self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(str(i).zfill(3)), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 
 		# Also plotting trajectory against time. 
 		plt.close()
 		plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,:7])
 		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory)
 		ax = plt.gca()
-		ax.set_ylim([-3, 3])
-		plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_GT.png".format(i)))
+		ax.set_ylim([-5, 5])
+		plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_GT.png".format(str(i).zfill(3))))
 		plt.close()
 
 		########################################
@@ -1073,7 +1160,7 @@ class PolicyManager_BaseClass():
 		plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,:7])
 		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory)
 		ax = plt.gca()
-		ax.set_ylim([-3, 3])
+		ax.set_ylim([-5, 5])
 
 		if self.args.viz_sim_rollout:
 			# No call to visualizer here means we have to save things on our own. 
@@ -1083,12 +1170,12 @@ class PolicyManager_BaseClass():
 			prefix_list = ['Sim','GTSim']
 			gtsim_prefix = prefix_list[self.args.viz_gt_sim_rollout]
 
-			self.visualizer.visualize_prerendered_gif(self.rollout_gif, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_{1}Rollout.gif".format(i, gtsim_prefix))
-			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_{1}Rollout.png".format(i, gtsim_prefix)))		
+			self.visualizer.visualize_prerendered_gif(self.rollout_gif, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_{1}Rollout.gif".format(str(i).zfill(3), gtsim_prefix))
+			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_{1}Rollout.png".format(str(i).zfill(3), gtsim_prefix)))		
 		else:
-			self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_Rollout.gif".format(i), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
+			self.rollout_gif = self.visualizer.visualize_joint_trajectory(unnorm_pred_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_Rollout.gif".format(str(i).zfill(3)), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 			
-			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_Rollout.png".format(i)))
+			plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_Rollout.png".format(str(i).zfill(3))))
 
 		plt.close()
 
@@ -2231,6 +2318,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.quadratic_variance_decay_rate = (self.args.initial_policy_variance - self.args.final_policy_variance)/(self.variance_decay_counter**2)
 
 	def create_networks(self):
+		
+		# print("Embed in create networks")
+		# embed()
+		
 		# Create K Policy Networks. 
 		# This policy network automatically manages input size. 
 		if self.args.discrete_z:
@@ -3145,14 +3236,27 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 				# self.visualize_robot_data(load_sets=True)
 				whether_load_z_set = self.args.latent_set_file_path is not None
+
+				# print("###############################################")
+				# print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+				# print("Temporarily not visualizing.")
+				# print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+				# print("###############################################")
 				self.visualize_robot_data(load_sets=whether_load_z_set)
+
+				
+				print("###############################################")
+				print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+				print("Query before we run get trajectory latent sets, so latent_z_set isn't overwritten..")
+				print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+				print("###############################################")				
+				embed()
+
 
 				# Get reconstruction error... 
 				self.get_trajectory_and_latent_sets(get_visuals=True)
 				print("The Average Reconstruction Error is: ", self.avg_reconstruction_error)
 
-				print("Now entering query phase.")
-				embed()
 
 			else:
 				# Create save directory:
@@ -3519,23 +3623,16 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 		# Make data_element a list of dictionaries. 
 		data_element = []
 						
-		# print("Embed in PM GBE")
-		# embed()
-		# print("STATE OF INDEX LIST:", self.index_list)
+		# for b in range(min(self.args.batch_size, len(self.index_list) - i)):
+		# Changing this selection, assuming that the index_list is corrected to only have within dataset length indices.
+		for b in range(self.args.batch_size):
 
-		for b in range(min(self.args.batch_size, len(self.index_list) - i)):
 			# print("Index that the get_batch_element is using: b:",b," i+b: ",i+b, self.index_list[i+b])
 			# Because of the new creation of index_list in random shuffling, this should be safe to index dataset with.
-			# print(b, i+b, self.index_list[i+b])
+
+			# print("Getting data element, b: ", b, "i+b ", i+b, "index_list[i+b]: ", self.index_list[i+b])
 			index = self.index_list[i+b]
-			# # data_element.append(self.dataset[self.index_list[i+b]])
 
-			# dataset_size_limit = len(self.dataset)-1 
-			# index_list_size_limit = min(i+b, len(self.index_list)-1)
-			# index = min (dataset_size_limit, index_list_size_limit)						
-			# # index = min( len(self.dataset)-1 , self.index_list[ min( i+b , len(self.index_list)-1)])
-
-			# print("i:", i, "b:", b, "datasetlim:", dataset_size_limit, "il_size_limit:", index_list_size_limit, "index:", index)
 			if self.args.train:
 				self.coverage[index] += 1
 			data_element.append(self.dataset[index])
@@ -3582,7 +3679,15 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			
 			batch_trajectory = np.zeros((self.args.batch_size, self.current_traj_len, self.state_size))
 
-			for x in range(min(self.args.batch_size, len(self.index_list) - i)):
+			# OLD
+			# for x in range(min(self.args.batch_size, len(self.index_list) - i)):
+
+			# POTENTIAL:
+			# for x in range(min(self.args.batch_size, len(self.index_list) - 1)):
+
+			# Changing this selection, assuming that the index_list is corrected to only have within dataset length indices.
+			for x in range(self.args.batch_size):
+			
 
 				# Select the trajectory for each instance in the batch. 
 				if self.args.ee_trajectories:
@@ -3611,9 +3716,6 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 
 					end_timepoint = start_timepoint + self.current_traj_len
 
-					# if data_element[x]['demo'].shape[-1]>15:
-					# 	print("Embed in batch pretrain get traj")
-					# 	embed()
 
 					if self.args.ee_trajectories:
 						batch_trajectory[x] = data_element[x]['endeffector_trajectory'][start_timepoint:end_timepoint]
@@ -3626,19 +3728,9 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 						else:
 							batch_trajectory[x] = data_element['demo'][start_timepoint:end_timepoint,:-1]
 
-					# print("############################")
-					# print("Embed in subsample")
-					# embed()
-
 					if self.args.data in ['RealWorldRigid']:
 
 						# Truncate the images to start and end timepoint. 
-
-						# print("##########################")						
-						# duration = end_timepoint - start_timepoint
-						# dset_duration = data_element[x]['images'].shape[0]
-						# print("Traj Index:", x, "Traj Length:", dset_duration, "Start:", start_timepoint, "End:", end_timepoint, duration)
-
 						data_element[x]['subsampled_images'] = data_element[x]['images'][start_timepoint:end_timepoint]
 
 			# If normalization is set to some value.
@@ -3903,7 +3995,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 				# (1) Encode trajectory. 
 				#############################
 
-				if self.args.setting in ['learntsub','joint']:
+				if self.args.setting in ['learntsub','joint', 'queryjoint']:
 					print("Embed in viz robot data")
 					
 					input_dict, var_dict, eval_dict = self.run_iteration(0, j, return_dicts=True, train=False)
@@ -4409,6 +4501,14 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			# Manually scale.
 			#########################################
 			
+			stat_dir_name = self.dataset.stat_dir_name
+			if self.args.normalization=='meanvar':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Mean.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Var.npy".format(stat_dir_name))
+			elif self.args.normalization=='minmax':
+				self.norm_sub_value = np.load("Statistics/{0}/{0}_Min.npy".format(stat_dir_name))
+				self.norm_denom_value = np.load("Statistics/{0}/{0}_Max.npy".format(stat_dir_name)) - self.norm_sub_value
+
 			if self.args.normalization is not None:
 				# self.norm_sub_value will remain unmodified. 
 				# self.norm_denom_value will get divided by scale.
@@ -4470,6 +4570,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 			self.variational_policy = VariationalPolicyNetwork(self.input_size, self.hidden_size, self.number_policies, self.args, number_layers=self.number_layers).to(device)
 
 		else:
+			
 			# self.policy_network = ContinuousPolicyNetwork(self.input_size,self.hidden_size,self.output_size,self.latent_z_dimensionality, self.number_layers).to(device)
 			self.policy_network = ContinuousPolicyNetwork(self.input_size, self.hidden_size, self.output_size, self.args, self.number_layers).to(device)
 
@@ -4503,7 +4604,8 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		self.save_object = {}
 		self.save_object['Latent_Policy'] = self.latent_policy.state_dict()
 		self.save_object['Policy_Network'] = self.policy_network.state_dict()
-		self.save_object['Variational_Policy'] = self.variational_policy.state_dict()
+		self.save_object['Encoder_Network'] = self.variational_policy.state_dict()
+		# self.save_object['Variational_Policy'] = self.variational_policy.state_dict()
 		torch.save(self.save_object,os.path.join(self.savedir,"Model_"+suffix))
 
 	def load_all_models(self, path, just_subpolicy=False):
@@ -4513,7 +4615,9 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		if not(just_subpolicy):
 			if self.args.load_latent:
 				self.latent_policy.load_state_dict(self.load_object['Latent_Policy'])		
-			self.variational_policy.load_state_dict(self.load_object['Variational_Policy'])
+				
+			# self.variational_policy.load_state_dict(self.load_object['Variational_Policy'])
+			self.variational_policy.load_state_dict(self.load_object['Encoder_Network'])
 
 	def load_model_from_transfer(self):
 
@@ -5496,15 +5600,16 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				variational_dict['latent_z_indices'], variational_dict['latent_b'], variational_dict['variational_b_logprobabilities'], variational_dict['variational_z_logprobabilities'], \
 				variational_dict['variational_b_probabilities'], variational_dict['variational_z_probabilities'], variational_dict['kl_divergence'], variational_dict['prior_loglikelihood'] = \
 					self.variational_policy.forward(input_dictionary['old_concatenated_traj'], self.epsilon, batch_trajectory_lengths=self.batch_trajectory_lengths)
-						
-			####################################
-			# (4) Evaluate Log Likelihoods of actions and options as "Return" for Variational policy.
-			####################################
-			
-			eval_likelihood_dict = self.evaluate_loglikelihoods(input_dictionary, variational_dict)
-			
+
 			if self.args.train and train:
+
+				####################################
+				# (4) Evaluate Log Likelihoods of actions and options as "Return" for Variational policy.
+				####################################
 				
+				eval_likelihood_dict = self.evaluate_loglikelihoods(input_dictionary, variational_dict)				
+
+
 				####################################
 				# (5) Update policies. 
 				####################################
@@ -5525,7 +5630,10 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 				embed()		
 
 		if return_dicts:
-			return input_dictionary, variational_dict, eval_likelihood_dict	
+			if self.args.train and train:
+				return input_dictionary, variational_dict, eval_likelihood_dict	
+			else:
+				return input_dictionary, variational_dict
 
 	def evaluate_metrics(self):
 		self.distances = -np.ones((self.test_set_size))
@@ -5580,7 +5688,7 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 		
 		np.set_printoptions(suppress=True,precision=2)
 		
-		if self.args.setting in ['context','joint','learntsub','jointtransfer']:
+		if self.args.setting in ['context','joint','learntsub','queryjoint','jointtransfer']:
 			self.initialize_training_batches()
 		else:
 			# print("Running Evaluation of State Distances on small test set.")
@@ -5598,10 +5706,16 @@ class PolicyManager_Joint(PolicyManager_BaseClass):
 
 			self.visualize_robot_data()
 
+			if self.args.data in ['RealWorldRigid']:
+				print("Entering Query Mode")
+				embed()
+				return 
+			
 			########################################
 			# Run Pretrain Eval.
 			########################################
 
+			
 			arg_copy = copy.deepcopy(self.args)
 			arg_copy.name += "_Eval_Pretrain"
 			if self.args.batch_size>1:
@@ -6221,6 +6335,8 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 	def create_networks(self):
 
+		# print("Embed in network creation")
+		# embed()
 		# Create instances of networks. 
 		self.policy_network = ContinuousPolicyNetwork(self.input_size, self.hidden_size, self.output_size, self.args, self.number_layers).to(device)
 		self.latent_policy = ContinuousLatentPolicyNetwork_ConstrainedBPrior(self.input_size+self.conditional_info_size, self.hidden_size, self.args, self.number_layers).to(device)
@@ -6231,8 +6347,9 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			else:
 				self.variational_policy = ContinuousContextualVariationalPolicyNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.args.var_number_layers).to(device)
 		else:
-			if self.args.data in ['RealWorldRigid']:
-				self.variational_policy = ContinuousSegmenterFactoredEncoderNetwork(self.input_size, self.args.hidden_size, self.latent_z_dimensionality, self.args).to(device)
+			if self.args.data in ['RealWorldRigid'] or self.args.split_stream_encoder==1:
+				print("Making a Factored Segmenter Network.")
+				self.variational_policy = ContinuousSequentialFactoredEncoderNetwork(self.input_size, self.args.var_hidden_size, int(self.latent_z_dimensionality/2), self.args).to(device)
 				# self.variational_policy = ContinuousEncoderNetwork(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args).to(device)
 			else:
 				self.variational_policy = ContinuousVariationalPolicyNetwork_Batch(self.input_size, self.args.var_hidden_size, self.latent_z_dimensionality, self.args, number_layers=self.args.var_number_layers).to(device)
@@ -6355,12 +6472,16 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 			# Create batch object that stores trajectories. 
 			batch_trajectory = np.zeros((self.args.batch_size, self.max_batch_traj_length, self.state_size))
+			
 			# Copy over data elements into batch_trajectory array.
 			for x in range(self.args.batch_size):
 				if self.args.ee_trajectories:	
 					batch_trajectory[x,:self.batch_trajectory_lengths[x]] = data_element[x]['endeffector_trajectory']
 				else:					
 					batch_trajectory[x,:self.batch_trajectory_lengths[x]] = data_element[x]['demo']
+
+				if self.args.data in ['RealWorldRigid'] and self.args.images_in_real_world_dataset:
+					data_element[x]['subsampled_images'] = data_element[x]['images']
 			
 			# If normalization is set to some value.
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
@@ -6425,6 +6546,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 			# Scaling action sequence by some factor.             
 			scaled_action_sequence = self.args.action_scale_factor*action_sequence
 			
+
 			# If trajectory length is set to something besides -1, restrict trajectory length to this.
 			if self.args.traj_length > -1 :			
 				batch_trajectory = batch_trajectory.transpose((1,0,2))[:self.args.traj_length]
@@ -6435,9 +6557,9 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				for x in range(self.args.batch_size):
 					if self.batch_trajectory_lengths[x] > self.args.traj_length:
 						self.batch_trajectory_lengths[x] = self.args.traj_length
-				self.max_batch_traj_length = self.batch_trajectory_lengths.max()
+				self.max_batch_traj_length = self.batch_trajectory_lengths.max()			
 
-				return batch_trajectory, scaled_action_sequence, concatenated_traj, old_concatenated_traj
+				return batch_trajectory, scaled_action_sequence, concatenated_traj, old_concatenated_traj, data_element
 
 			# If we're using task based discriminability. 
 			if self.args.task_discriminability or self.args.task_based_supervision:
@@ -6449,7 +6571,11 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				# Figure f we should be implementing.. same task ID stuff... probably more important to do smart batching of trjaectory lengths? 
 				# What will this need? Maybe... making references to the discriminators? And then calling forward on them? 
 
-			return batch_trajectory.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2))
+			# print("Embed before return in Collect Input Batch")
+			# embed()
+			return batch_trajectory.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), \
+				concatenated_traj.transpose((1,0,2)), old_concatenated_traj.transpose((1,0,2)), \
+					data_element
 			
 	def assemble_inputs(self, input_trajectory, latent_z_indices, latent_b, sample_action_seq, conditional_information=None, batch_size=None):
 
@@ -6511,6 +6637,67 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 
 		# Now run original training function.
 		super().train(model=model)
+
+class PolicyManager_BatchJointQueryMode(PolicyManager_BatchJoint):
+
+	def __init__(self, number_policies=4, dataset=None, args=None):
+
+		super(PolicyManager_BatchJointQueryMode, self).__init__(number_policies, dataset, args)		
+
+	def run_iteration(self, counter, i, skip_iteration=False, return_dicts=False, special_indices=None, train=True, input_dictionary=None, bucket_index=None):
+
+		# With learnt discrete subpolicy: 
+
+		####################################	
+		# OVERALL ALGORITHM:
+		####################################
+		# (1) For all epochs:
+		# (2)	# For all trajectories:
+		# (3)		# Sample z from variational network.
+		# (4)		# Evalute likelihood of latent policy, and subpolicy.
+		# (5)		# Update policies using likelihoods.		
+
+		self.set_epoch(counter)	
+		self.iter = counter
+
+		####################################
+		# (1) & (2) get sample from collect inputs function. 
+		####################################
+
+		if input_dictionary is None:
+			input_dictionary = {}
+			input_dictionary['sample_traj'], input_dictionary['sample_action_seq'], \
+				input_dictionary['concatenated_traj'], input_dictionary['old_concatenated_traj'], \
+					input_dictionary['data_element'] = self.collect_inputs(i, special_indices=special_indices, called_from_train=True, bucket_index=bucket_index)
+			if self.args.task_discriminability or self.args.task_based_supervision:
+				input_dictionary['sample_task_id'] = self.input_task_id
+
+			# if not(torch.is_tensor(input_dictionary['old_concatenated_traj'])):
+			input_dictionary['old_concatenated_traj'] = torch.tensor(input_dictionary['old_concatenated_traj']).to(device).float()
+		else:
+			pass
+			# Things should already be set. 
+		# self.batch_indices_sizes = []
+		self.batch_indices_sizes.append({'batch_size': input_dictionary['sample_traj'].shape[0], 'i': i})
+
+		if (input_dictionary['sample_traj'] is not None) and not(skip_iteration):
+
+			####################################
+			# (3) Sample latent variables from variational network p(\zeta | \tau).
+			####################################
+
+			variational_dict = {}
+			profile_var_forward = 0
+			
+			variational_dict['latent_z_indices'], variational_dict['latent_b'] = \
+				self.variational_policy.forward(input_dictionary['old_concatenated_traj'], self.epsilon)
+
+			if self.args.debug:
+				print("Embedding in Run Iteration.")
+				embed()		
+
+		if return_dicts:
+			return input_dictionary, variational_dict, None
 
 class PolicyManager_BaselineRL(PolicyManager_BaseClass):
 

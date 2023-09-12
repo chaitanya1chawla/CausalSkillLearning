@@ -256,7 +256,14 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 			mean_outputs = self.activation_layer(self.mean_output_layer(lstm_outputs))
 		else:
 			mean_outputs = self.mean_output_layer(lstm_outputs)
-		variance_outputs = (self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
+	
+		if self.args.variance_mode=='Constant':
+			variance_outputs = self.args.variance_value*torch.ones_like(self.mean_outputs).to(device)
+		elif self.args.variance_mode=='Learned':
+			# variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias) + epsilon/self.args.epsilon_scale_factor			
+			variance_outputs = self.variance_factor*(self.variance_activation_layer(self.variances_output_layer(lstm_outputs))+self.variance_activation_bias)
+		# else: # If the variance_mode is linearly or quadratically annealed,
+			# variance_outputs = variance_value*torch.ones_like(self.mean_outputs).to(device)
 
 		if greedy:
 			return mean_outputs
@@ -2103,7 +2110,7 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		self.network_dict = torch.nn.ModuleDict()
 		self.network_dict['lstm'], self.network_dict['mean_output_layer'], self.network_dict['variances_output_layer'] = self.define_networks(self.size_dict['input_size'], self.size_dict['output_size'])
 
-	def forward(self, input, epsilon=0.0001, network_dict=None, size_dict=None, z_sample_to_evaluate=None, artificial_batch_size=None):
+	def forward(self, input, epsilon=0.0001, network_dict=None, size_dict=None, z_sample_to_evaluate=None, artificial_batch_size=None, greedy=False):
 
 		##############################
 		# Set default inputs.
@@ -2121,6 +2128,7 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		batch_size = self.batch_size
 		if artificial_batch_size is not None:
 			batch_size = artificial_batch_size
+		
 		format_input = input.view((input.shape[0], batch_size, size_dict['input_size']))
 
 		##############################
@@ -2150,7 +2158,10 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		##############################
 		
 		# Instead of *sampling* the latent z from a distribution, construct using mu + sig * eps (random noise), can pass gradients through it. 
-		latent_z = mean_outputs + variance_outputs * noise 
+		if greedy: 
+			latent_z = mean_outputs
+		else:
+			latent_z = mean_outputs + variance_outputs * noise 
 
 		# calculate entropy for training.
 		entropy = dist.entropy()
@@ -2198,7 +2209,6 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 
 		self.args = args
 
-
 		# Define state sizes for each partition of state space.
 		# Keep track of robot input and output state size. 
 		self.robot_size_dict = {}
@@ -2237,10 +2247,10 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 
 		return robot_input, env_input
 
-	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, artificial_batch_size=None):
+	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, artificial_batch_size=None, greedy=False):
 		# robot_latent_z, robot_logprob, robot_entropy, robot_kl_divergence = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample)
 
-		return super().forward(input, epsilon=epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=z_sample_to_evaluate, artificial_batch_size=artificial_batch_size)
+		return super().forward(input, epsilon=epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=z_sample_to_evaluate, artificial_batch_size=artificial_batch_size, greedy=greedy)
 
 	def get_environment_input_representation(self, env_input):
 		
@@ -2248,7 +2258,7 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 		# Dummy function that we can override in the case of the soft object.
 		return env_input
 
-	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
+	def forward(self, input, epsilon=0.00001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, greedy=False):
 
 		# (1) Split input. 
 		# (2) Run forward on each stream. 
@@ -2273,12 +2283,12 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 
 		if z_sample_to_evaluate is None:
 			# (2a) Run forward on robot stream.				
-			robot_latent_z, robot_logprob, robot_entropy, robot_kl_divergence = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample)
+			robot_latent_z, robot_logprob, robot_entropy, robot_kl_divergence = super().forward(robot_input, epsilon, network_dict=self.robot_network_dict, size_dict=self.robot_size_dict, z_sample_to_evaluate=robot_z_sample, greedy=greedy)
 
 			new_env_input = self.get_environment_input_representation(env_input)
 
 			# (2b) Run forward on env stream.							
-			env_latent_z, env_logprob, env_entropy, env_kl_divergence = super().forward(new_env_input, epsilon, network_dict=self.env_network_dict, size_dict=self.env_size_dict, z_sample_to_evaluate=env_z_sample)
+			env_latent_z, env_logprob, env_entropy, env_kl_divergence = super().forward(new_env_input, epsilon, network_dict=self.env_network_dict, size_dict=self.env_size_dict, z_sample_to_evaluate=env_z_sample, greedy=greedy)
 
 			##################################
 			# (3) Aggregate stream outputs. 
@@ -2319,16 +2329,49 @@ class ContinuousFactoredEncoderNetwork(ContinuousEncoderNetwork):
 
 			return concatenated_latent_z, aggregated_logprobability, aggregated_entropy, aggregated_kl_divergence		
 
-class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork):
+class ContinuousSequentialFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork):
 
 	def __init__(self, input_size, hidden_size, output_size, args, batch_size=1):	
 		# Using its own init function.
-		super(ContinuousSegmenterFactoredEncoderNetwork, self).__init__(input_size, hidden_size, output_size, args)
+		super(ContinuousSequentialFactoredEncoderNetwork, self).__init__(input_size, hidden_size, output_size, args)
 
-	def run_super_forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, artificial_batch_size=None):
-		return super().run_super_forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate, artificial_batch_size)
+	def run_super_forward(self, input, epsilon=0.00001, network_dict={}, size_dict={}, z_sample_to_evaluate=None, greedy=False):
+		return super().forward(input, epsilon, network_dict, size_dict, z_sample_to_evaluate, greedy)
 
-	def forward(self, input, epsilon=0.001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
+	def make_dummy_latents(self, latent_z, traj_len):
+
+		# Assume latent z is shape - 1 x B x |Z|.
+		latent_z_indices = torch.tile(latent_z, (traj_len, 1, 1))
+
+		# Setting latent_b's to 00001. 
+		# This is just a dummy value.
+		# latent_b = torch.ones((5)).to(device).float()
+		latent_b = torch.zeros((self.args.batch_size, traj_len)).to(device).float()
+		latent_b[:,0] = 1.
+
+		return latent_z_indices, latent_b
+	
+	def collate_latents(self, latent_z_list, segmentation_indices):
+
+		# For each segment, get z, tile z, then concatenate them all. 
+		dummy_z_list = []
+		dummy_b_list = []
+		for k, z in enumerate(latent_z_list):
+			# Get length of segment. 
+			traj_len = segmentation_indices[k+1] - segmentation_indices[k]
+			dummy_z, dummy_b = self.make_dummy_latents(z, traj_len)
+			dummy_z_list.append(dummy_z)
+			dummy_b_list.append(dummy_b)
+
+		# Now stack things. 
+		concatenated_zs = torch.cat(dummy_z_list, dim=0)
+
+		# Should this be -1 or should we reshape and do 0?
+		concatenated_bs = torch.cat(dummy_b_list, dim=-1)			
+
+		return concatenated_zs, concatenated_bs
+			
+	def forward(self, input, epsilon=0.00001, network_dict={}, size_dict={}, z_sample_to_evaluate=None):
 
 		################################
 		# Forward of this network needs to - 
@@ -2346,14 +2389,15 @@ class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork
 		self.threshold = 5
 		segment_indices = np.arange(0, input.shape[0], self.default_segment_size)
 
-		# If we have fewer than threshold timesteps left to consider, add remainder to last segment. 
-		modulus = input.shape[0]%self.default_segment_size
+		# If we have fewer than threshold timesteps left to consider, add remainder to last segment. 		
+		modulus = input.shape[0]%self.default_segment_size		
 		if 0<modulus and modulus<self.threshold:
 			# Modify the last index to the end..
 			segment_indices[-1] = input.shape[0]	
 		# Otherwise just add a new segment. 
 		else:
-			segment_indices.append(input.shape[0])
+			# segment_indices.append()
+			segment_indices = np.append(segment_indices, input.shape[0])
 
 		# Create list of sizes to feed to torch, because torch.split expects sizes, not indices. 
 		segment_sizes = list(np.diff(segment_indices.astype(int)))
@@ -2367,14 +2411,25 @@ class ContinuousSegmenterFactoredEncoderNetwork(ContinuousFactoredEncoderNetwork
 
 		z_list = []
 		for k, trajectory_segment in enumerate(state_action_trajectory_segments):
-			segment_latent_z, segment_aggregated_logprobability, segment_aggregated_entropy, segment_aggregated_kl_divergence = self.run_super_forward(trajectory_segment, epsilon)
+			segment_latent_z, _, _, _  = self.run_super_forward(trajectory_segment, epsilon, greedy=True)
 			z_list.append(segment_latent_z)
 		
 		################################
 		# 3) Collate zs. 
 		################################
 
-		
+		# Create all of the variables that PolicyManagerJoint expects.
+
+		# Template variational policy return function. 
+		# return sampled_z_index, sampled_b, variational_b_logprobabilities.squeeze(1), \
+	 	# variational_z_logprobabilities, variational_b_probabilities.squeeze(1), variational_z_probabilities, kl_divergence, prior_loglikelihood
+
+		# print("Embed before collating")
+		# embed()
+
+		concatenated_zs, concatenated_bs = self.collate_latents(latent_z_list=z_list, segmentation_indices=segment_indices)
+
+		return concatenated_zs, concatenated_bs
 
 
 
