@@ -494,11 +494,12 @@ class PolicyManager_BaseClass():
 			# Add last index to segments
 			segments = np.concatenate([segments, self.batch_trajectory_lengths[b:b+1]])
 			self.batch_segment_index_list.append(segments)
-
+			self.global_segment_index_list.append(segments)
 		# Need to perform the same manipulation of segment indices that we did in the forward function call.		
 
 	def visualize_robot_data(self, load_sets=False, number_of_trajectories_to_visualize=None):
 
+		
 		if number_of_trajectories_to_visualize is not None:
 			self.N = number_of_trajectories_to_visualize
 		else:
@@ -578,6 +579,8 @@ class PolicyManager_BaseClass():
 			#####################################################
 
 			self.shuffle(len(self.dataset)-self.test_set_size, shuffle=True)
+			
+			self.global_segment_index_list = []
 
 			# print("Embedding before the robot visuals loop.s")
 			# embed()
