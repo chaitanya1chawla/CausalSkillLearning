@@ -2498,8 +2498,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			log_dict['Relative Phase Auxillary Loss'] = self.relative_state_phase_aux_loss
 			log_dict['Auxillary Loss'] = self.aux_loss
 		if self.args.cummulative_computed_state_reconstruction_loss_weight>0.:
-			log_dict['Unweighted Cummmulative Computed State Reconstruction Loss'] = self.unweighted_cummmulative_computed_state_reconstruction_loss
-			log_dict['Cummmulative Computed State Reconstruction Loss'] = self.cummmulative_computed_state_reconstruction_loss
+			log_dict['Unweighted Cummmulative Computed State Reconstruction Loss'] = self.unweighted_cummulative_computed_state_reconstruction_loss
+			log_dict['Cummulative Computed State Reconstruction Loss'] = self.cummulative_computed_state_reconstruction_loss
 		if self.args.teacher_forced_state_reconstruction_loss_weight>0.:
 			log_dict['Unweighted Teacher Forced State Reconstruction Loss'] = self.unweighted_teacher_forced_state_reconstruction_loss
 			log_dict['Teacher Forced State Reconstruction Loss'] = self.teacher_forced_state_reconstruction_loss
@@ -2970,7 +2970,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# Initial state - remember, states are Time x Batch x State.
 		torch_trajectory = torch.from_numpy(self.sample_traj_var).to(device)
-		initial_state = self.sample_traj_var[0]
+		initial_state = torch_trajectory[0]
 
 		# Compute reconstructed trajectory differentiably excluding the first timestep. 
 		cummulative_computed_reconstructed_trajectory = initial_state + torch.cumsum(mean_policy_actions, axis=0)
@@ -2978,11 +2978,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		teacher_forced_reconstructed_trajectory = torch_trajectory[:-1] + mean_policy_actions
 
 		# Set both of the reconstruction losses of absolute state.
-		self.unweighted_cummmulative_computed_state_reconstruction_loss = (cummulative_computed_reconstructed_trajectory - torch_trajectory[1:]).norm(dim=2).mean()
+		self.unweighted_cummulative_computed_state_reconstruction_loss = (cummulative_computed_reconstructed_trajectory - torch_trajectory[1:]).norm(dim=2).mean()
 		self.unweighted_teacher_forced_state_reconstruction_loss = (teacher_forced_reconstructed_trajectory - torch_trajectory[1:]).norm(dim=2).mean()
 		
 		# Weighted losses. 
-		self.cummulative_computed_state_reconstruction_loss = self.args.cummulative_computed_state_reconstruction_loss_weight * self.unweighted_cummmulative_computed_state_reconstruction_loss
+		self.cummulative_computed_state_reconstruction_loss = self.args.cummulative_computed_state_reconstruction_loss_weight * self.unweighted_cummulative_computed_state_reconstruction_loss
 		self.teacher_forced_state_reconstruction_loss = self.args.teacher_forced_state_reconstruction_loss_weight*self.unweighted_teacher_forced_state_reconstruction_loss
 
 		# Merge. 
