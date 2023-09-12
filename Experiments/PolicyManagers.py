@@ -3295,7 +3295,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				print("###############################################")				
 				embed()
 
-
 				# Get reconstruction error... 
 				self.get_trajectory_and_latent_sets(get_visuals=True)
 				print("The Average Reconstruction Error is: ", self.avg_reconstruction_error)
