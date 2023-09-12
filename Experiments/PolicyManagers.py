@@ -2497,6 +2497,14 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			log_dict['Unweighted Relative Phase Auxillary Loss'] = self.unweighted_relative_state_phase_aux_loss
 			log_dict['Relative Phase Auxillary Loss'] = self.relative_state_phase_aux_loss
 			log_dict['Auxillary Loss'] = self.aux_loss
+		if self.args.cummulative_computed_state_reconstruction_loss_weight>0.:
+			log_dict['Unweighted Cummmulative Computed State Reconstruction Loss'] = self.unweighted_cummmulative_computed_state_reconstruction_loss
+			log_dict['Cummmulative Computed State Reconstruction Loss'] = self.cummmulative_computed_state_reconstruction_loss
+		if self.args.teacher_forced_state_reconstruction_loss_weight>0.:
+			log_dict['Unweighted Teacher Forced State Reconstruction Loss'] = self.unweighted_teacher_forced_state_reconstruction_loss
+			log_dict['Teacher Forced State Reconstruction Loss'] = self.teacher_forced_state_reconstruction_loss
+		if self.args.cummulative_computed_state_reconstruction_loss_weight>0. or self.args.teacher_forced_state_reconstruction_loss_weight>0.:
+			log_dict['State Reconstruction Loss'] = self.absolute_state_reconstruction_loss
 
 		if counter%self.args.display_freq==0:
 			
@@ -2813,6 +2821,12 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.unweighted_task_based_aux_loss = 0.
 		self.task_based_aux_loss = 0.
 
+		# 
+		self.unweighted_teacher_forced_state_reconstruction_loss = 0.
+		self.teacher_forced_state_reconstruction_loss = 0.
+		self.unweighted_cummmulative_computed_state_reconstruction_loss = 0.
+		self.cummulative_computed_state_reconstruction_loss = 0.
+
 	def compute_auxillary_losses(self, update_dict):
 
 		self.initialize_aux_losses()
@@ -2820,16 +2834,22 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Set the relative state reconstruction loss.
 		if self.args.relative_state_reconstruction_loss_weight>0.:
 			self.compute_relative_state_reconstruction_loss()
-
 		if self.args.task_based_aux_loss_weight>0. or self.args.relative_state_phase_aux_loss_weight>0.:
 			self.compute_pairwise_z_distance(update_dict['latent_z'][0])
+		# Task based aux loss weight. 
 		if self.args.task_based_aux_loss_weight>0.:
 			self.compute_task_based_aux_loss(update_dict)
+		# Relative. 
 		if self.args.relative_state_phase_aux_loss_weight>0.:
 			self.compute_relative_state_phase_aux_loss(update_dict)
+		if self.args.absolute_state_phase_aux_loss_weight>0.:
+			self.compute_absolute_state_reconstruction_loss(update_dict)
+
+		if self.args.cummulative_computed_state_reconstruction_loss_weight>0. or self.args.teacher_forced_state_reconstruction_loss_weight>0.:
+			self.compute_absolute_state_reconstruction_loss()
 
 		# Weighting the auxillary loss...
-		self.aux_loss = self.relative_state_reconstruction_loss + self.relative_state_phase_aux_loss + self.task_based_aux_loss
+		self.aux_loss = self.relative_state_reconstruction_loss + self.relative_state_phase_aux_loss + self.task_based_aux_loss + self.absolute_state_reconstruction_loss
 
 	def compute_pairwise_z_distance(self, z_set):
 
@@ -2945,6 +2965,31 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Set reconsturction loss.
 		self.unweighted_relative_state_reconstruction_loss = (policy_predicted_relative_state_traj - relative_state_traj).norm(dim=2).mean()
 		self.relative_state_reconstruction_loss = self.args.relative_state_reconstruction_loss_weight*self.unweighted_relative_state_reconstruction_loss
+
+	def compute_absolute_state_reconstruction_loss(self):
+
+		# Get the mean of the actions from the policy networks until the penultimate action.
+		mean_policy_actions = self.policy_network.mean_outputs[:-1]
+
+		# Initial state - remember, states are Time x Batch x State.
+		torch_trajectory = torch.from_numpy(self.sample_traj_var).to(device)
+		initial_state = self.sample_traj_var[0]
+
+		# Compute reconstructed trajectory differentiably excluding the first timestep. 
+		cummulative_computed_reconstructed_trajectory = initial_state + torch.cumsum(mean_policy_actions, axis=0)
+		# Teacher forced state.
+		teacher_forced_reconstructed_trajectory = torch_trajectory[:-1] + mean_policy_actions
+
+		# Set both of the reconstruction losses of absolute state.
+		self.unweighted_cummmulative_computed_state_reconstruction_loss = (cummulative_computed_reconstructed_trajectory - torch_trajectory[1:]).norm(dim=2).mean()
+		self.unweighted_teacher_forced_state_reconstruction_loss = (teacher_forced_reconstructed_trajectory - torch_trajectory[1:]).norm(dim=2).mean()
+		
+		# Weighted losses. 
+		self.cummulative_computed_state_reconstruction_loss = self.args.cummulative_computed_state_reconstruction_loss_weight * self.unweighted_cummmulative_computed_state_reconstruction_loss
+		self.teacher_forced_state_reconstruction_loss = self.args.teacher_forced_state_reconstruction_loss_weight*self.unweighted_teacher_forced_state_reconstruction_loss
+
+		# Merge. 
+		self.absolute_state_reconstruction_loss = self.cummulative_computed_state_reconstruction_loss + self.teacher_forced_state_reconstruction_loss
 
 	def update_policies_reparam(self, loglikelihood, encoder_KL, update_dict=None):
 		
@@ -3110,8 +3155,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# self.sample_traj_var = sample_traj
 		self.sample_traj_var = input_dict['sample_traj']
 
-		# print("Embed in Pretrain PM RI")
-		# embed()
 
 
 		####################################
@@ -3154,6 +3197,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			if self.args.debug:
 				print("Embedding in Train.")
 				embed()
+
+			print("Embed in Pretrain PM RI")
+			embed()
 
 			####################################
 			############# (4) #############
