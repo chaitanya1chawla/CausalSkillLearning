@@ -3511,6 +3511,27 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.kdtree_dict['robot'] = KDTree(self.stream_latent_z_dict['robot'])
 		self.kdtree_dict['env'] = KDTree(self.stream_latent_z_dict['env'])
 
+	def create_z_kdtrees_with_N_by_2_trajectories(self):
+		
+		####################################
+		# Algorithm to construct models
+		####################################
+
+		# 0) Assume that the encoder(s) are trained, and that the latent space is trained.
+		# 1) Maintain map of Z_R <--> Z_E. 
+		# 	1a) Check that the latent_z_sets are tuples. 
+		# 	1b) Seems like we don't actually need the map if the latent z sets are constructed by the same function / indexing.
+		# 2) Construct KD Trees. 
+		# 	2a) KD_R = KDTREE( {Z_R} )
+		# 	2b) KD_E = KDTREE( {Z_E} )
+		
+		# self.kdtree_robot_z = KDTree(self.robot_latent_z_set)
+		# self.kdtree_env_z = KDTree(self.env_latent_z_set)		
+
+		self.kdtree_dict = {}
+		rows, cols = self.stream_latent_z_dict['robot'].shape()
+		self.kdtree_dict['robot'] = KDTree(self.stream_latent_z_dict['robot'][:int(rows/2), :])
+		self.kdtree_dict['env'] = KDTree(self.stream_latent_z_dict['env'][:int(rows/2), :])
 	def get_query_trajectory(self, input_state_trajectory, stream=None):
 		
 		# Assume trajectory is dimensions |T| x |S|. 
@@ -3603,6 +3624,24 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		
 		# 1) Create KD Trees.
 		self.create_z_kdtrees()	
+
+	def query_z_robot_kdtrees_with_N_by_2_trajectories(self):
+
+		self.create_z_kdtrees_with_N_by_2_trajectories()
+
+		# dictionary to save similarity score with k=1,3,5 nearest neighbours
+		self.nearest_neighbour_similarity_scores={}
+		
+		rows, cols = self.stream_latent_z_dict['robot'].shape()
+		for knn in [1,3,5]:
+			self.nearest_neighbour_similarity_scores['{}'.format(knn)] = np.array([])
+			for element_idx, element in enumerate(self.stream_latent_z_dict['robot'][int(rows/2):, :]):
+				distances, nn_idx = self.kdtree_dict['robot'].query(element, knn)
+				ctr = 0
+				for idx in nn_idx:
+					if self.label_dict['{}'.format(idx)] == self.label_dict['{}'.format(element_idx)]:
+						ctr += 1
+						self.nearest_neighbour_similarity_scores['{}'.format(knn)].append([ctr])
 
 	def evaluate_z_distances_for_batch(self, latent_z):
 
