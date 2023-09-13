@@ -352,6 +352,54 @@ class ContinuousPolicyNetwork(PolicyNetwork_BaseClass):
 
 		return kl_divergence
 
+# class ContinuousFactoredPolicyNetwork(ContinuousPolicyNetwork):
+
+# 	def __init__(self, input_size, hidden_size, output_size, args, number_layers=4, whether_latentb_input=False, zero_z_dim=False, small_init=False):
+
+# 		# Ensures inheriting from torch.nn.Module goes nicely and cleanly. 	
+# 		# super().__init__()
+# 		super(ContinuousFactoredPolicyNetwork, self).__init__(input_size, hidden_size, output_size, args, number_layers)
+
+# 		self.define_environment_state_layers()
+
+# 	def define_dimensions(self, input_size, hidden_size, output_size, args):
+
+# 		##############################
+# 		# Setup state sizes etc.
+# 		##############################
+
+# 		# Define state sizes for each partition of state space.
+# 		# Keep track of robot input and output state size. 
+# 		self.robot_size_dict = {}
+# 		self.robot_size_dict['state_size'] = self.args.robot_state_size
+# 		self.robot_size_dict['input_size'] = 2*self.robot_size_dict['state_size']
+# 		self.robot_size_dict['output_size'] = int(self.args.z_dimensions/2)
+
+# 		# Keep track of env. input and output state size. 
+# 		self.env_size_dict = {}
+# 		self.env_size_dict['state_size'] = self.args.env_state_size
+# 		self.env_size_dict['input_size'] = 2*self.env_size_dict['state_size']
+# 		self.env_size_dict['output_size'] = int(self.args.z_dimensions/2)
+
+# 		# Other layers.
+# 		self.num_layers = self.args.number_layers
+# 		self.hidden_size = hidden_size
+# 		self.batch_size = self.args.batch_size 
+
+# 		# Define indices. 
+# 		self.robot_indices = np.concatenate([np.arange(0,self.robot_size_dict['state_size']), \
+# 			np.arange(self.robot_size_dict['state_size']+self.env_size_dict['state_size'],2*self.robot_size_dict['state_size']+self.env_size_dict['state_size'])])
+	
+# 		self.env_indices = np.concatenate([ np.arange(self.robot_size_dict['state_size'],self.robot_size_dict['state_size']+self.env_size_dict['state_size']), \
+# 			np.arange( self.robot_size_dict['state_size']*2+self.env_size_dict['state_size'], self.robot_size_dict['state_size']*2+self.env_size_dict['state_size']*2) ])
+
+
+# 	def define_environment_state_layers(self):
+
+# 		pass
+
+
+
 class LatentPolicyNetwork(PolicyNetwork_BaseClass):
 
 	# REMEMBER, in the Bi-directional Information model, this is going to be evaluated for log-probabilities alone. 
