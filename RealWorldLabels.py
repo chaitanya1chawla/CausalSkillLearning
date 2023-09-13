@@ -1,275 +1,212 @@
-# label_dict = {}
-# label_dict['000'] = 'PickRight'
-# label_dict['006'] = 'BoxOpen'
-# label_dict['008'] = 'ReachRightDrawer'
-# label_dict['010'] = 'SidewaysBoxOpen'
-# label_dict['011'] = 'LeftDrawerOpen'
-# label_dict['012'] = 'PickLeft'
-# label_dict['013'] = 'Reach'
-# label_dict['015'] = 'ReachCup'
-# label_dict['017'] = 'Return'
-# label_dict['020'] = 'Stir'
-# label_dict['022'] = 'Place'
-# label_dict['023'] = 'Place'
-# label_dict['027'] = 'Stir'
-# label_dict['034'] = 'MoveCup'
-# label_dict['036'] = 'ReturnfromRightDrawer'
-# label_dict['038'] = 'Release'
-# label_dict['043'] = 'ReturnfromCup'
-# label_dict['044'] = 'ReachBoxFront'
-# label_dict['047'] = 'ReachLeftDrawer'
-# label_dict['050'] = 'PlaceRelease'
-# label_dict['051'] = 'ReachSpoon'
-# label_dict['053'] = 'Pour'
-# label_dict['056'] = 'PickLeft'
-# label_dict['057'] = 'FinishPour'
-# label_dict['058'] = 'GraspSpoon'
-
 label_dict = {}
-label_dict['000'] = 'Grasp'
-label_dict['006'] = 'BoxOpen'
-label_dict['008'] = 'ReachRightDrawer'
-label_dict['010'] = 'SidewaysBoxOpen'
-label_dict['011'] = 'LeftDrawerOpen'
-label_dict['012'] = 'PickLeft'
-label_dict['013'] = 'Reach'
-label_dict['015'] = 'ReachCup'
+
+label_dict['000'] = 'PickRight'
+label_dict['001'] = 'PourRight'
+label_dict['002'] = 'PourRight'
+label_dict['003'] = 'PositioningGripperOnCup'
+label_dict['004'] = 'LiftingBoxLidLeft'
+label_dict['005'] = 'DrawerPullingRight'
+label_dict['006'] = 'LiftingBoxLidLeft'
+label_dict['007'] = 'Return'
+label_dict['008'] = 'PositioningGripperOnDrawerRight'
+label_dict['009'] = 'PositioningGripperOnSpoon'
+label_dict['010'] = 'BoxOpeningLeft'
+label_dict['011'] = 'DrawerPullingLeft'
+label_dict['012'] = 'GrippingCupleft'
+label_dict['013'] = 'ReachingDrawerLeft'
+label_dict['014'] = 'PositioningGripperOnCupRight'
+label_dict['015'] = 'PositioningGripperOnCupRight'
+label_dict['016'] = 'DrawerPullingLeft'
 label_dict['017'] = 'Return'
-label_dict['020'] = 'Stir'
-label_dict['022'] = 'Place'
-label_dict['023'] = 'Place'
-label_dict['027'] = 'Stir'
-label_dict['034'] = 'MoveCup'
-label_dict['036'] = 'ReturnfromRightDrawer'
-label_dict['038'] = 'Release'
-label_dict['043'] = 'ReturnfromCup'
-label_dict['044'] = 'ReachBoxFront'
-label_dict['047'] = 'ReachLeftDrawer'
-label_dict['050'] = 'PlaceRelease'
-label_dict['051'] = 'ReachSpoon'
-label_dict['053'] = 'Pour'
-label_dict['056'] = 'PickLeft'
-label_dict['057'] = 'FinishPour'
-label_dict['058'] = 'GraspSpoon'
-
-
-000 - pick right
-001 - pour right
-002 - pour right
-003 - getting cup between gripper
-004 - lifting box lid left
-005 - drawer pulling - right
-006 - lifting box lid - left
-007 - return
-008 - getting drawer btw gripper-right
-009 - getting spoon btw gripper
-010 - sideways box open-left
-011 - leftdrawer open
-012 - grasping and lifting cup left
-013 - reaching drawer left
-014 - getting cup btw gripper right
-015 - getting cup btw gripper right
-016 - drawer pulling left
-017 - return
-018 - reaching cup left
-019 - return
-020 - stirring
-021 - getting cup btw gripper left
-022 - placing back cup
-023 - placing cup in box
-024 - stirring
-025 - reaching cup left
-026 - return
-027 - stirring
-028 - stirring
-029 - getting drawer btw gripper right
-030 - box opening
-031 - drawer pulling right
-032 - transporting cup to bowl
-033 - transporting cup to bowl
-034 - transporting cup to box
-035 - reaching box left
-036 - drawer opening right
-037 - reaching box
-038 - releasing cup left
-039 - reaching drawer left
-040 - getting spoon btw gripper
-041 - box opening left
-042- drawer opening left
-043 - return
-044 - getting box btw gripper left
-045 - pouring left
-046 - transporting cup to box
-047 - getting drawer btw gripper left
-048 - getting drawer btw gripper right
-049 - transporting cup to box
-050 - placing cup next to bowl
-051 - getting spoon btw gripper
-052 - placing cup in box
-053 - pouring
-054 - opening gripper (cup in box)
-055 - stirring
-056 - grasping cup and lifting
-057 - pouring
-058 - grasping spoon left
-059 - getting spoon btw gripper right
-060 - reaching drawer right
-061 - box opening
-062 - drawer opening right
-063 - box opening left
-064 - getting cup btw gripper right
-065 - pouring right
-066 - pouring right
-067 - getting cup btw gripper right
-068 - box opening
-069 - drawer opening
-070 - reaching box
-071 - pouring right
-072 - getting drawer btw gripper right
-073 - return
-074 - getting drawer sideways btw gripper left
-075 - reaching drawer left
-076 - transporing cup to bowl right
-077 - box opening left
-078 - pouring left
-079 - reaching cup
-080 - drawer opening left
-081 - reaching drawer right
-082 - placing cup in box
-083 - transporting cup to bowl
-084 - stirring left
-085 - transporting cup to box
-086 - place cup next to bowl
-087 - place cup in box
-088 - stirring left
-089 - getting cup btw gripper left
-090 - transporting cup to bowl
-091 - getting spoon btw gripper left
-092 - sirring right
-093 - getting drawer btw gripper right
-094 - reaching box
-095 - drawer pulling right
-096 - transporting cup to bowl right
-097 - transporting cup to box right
-098 - place cup in box
-099 - box opening left
-100 - drawer opening right
-101 - box opening
-102 - pouring right
-103 - getting drawer btw gripper right
-104 - stirring right
-105 - box opening left
-106 - reaching drawer right
-107 - getting cup btw gripper left
-108 - getting box btw gripper left
-109 - pouring left
-110 - leaving cup in box
-111 - drawer pulling left
-112 - reaching drawer right
-113 - reaching cup right
-114 - grasping cup left
-115 - return
-116 - transporting cup to box
-117 - grasping cup left
-118 - leaving cup in box
-119 - stirring left
-120 - return
-121 - pouring right
-122 - grasping spoon left
-123 - stirring left
-124 - getting drawer btw gripper right
-125 - box opening
-126 - drawer opening right
-127 - reaching box
-128 - leaving cup in box
-129 - reaching cup right
-130 - reaching cup right
-131 - transporting cup to box
-132 - box opening left
-133 - return
-134 - box opening
-135 - gripping cup
-136 - return
-137 - reaching spoon
-138 - return
-139 - reaching drawer left
-140 - leaving cup next to box
-141 - reaching box left
-142 - getting cup btw gripper right
-143 - transporting cup to box
-144 - getting drawer btw gripper left
-145 - getting drawer btw gripper right
-146 - reaching cup right
-147 - pouring left
-148 - stirring
-149 - transporting cup to box
-150 - placing cup next to bowl
-151 - placing cup to box
-152 - stirring left
-153 - return
-154 - pouring right
-155 - stirring left
-156 - getting spoon btw gripper right
-157 - return
-158 - getting box btw gripper
-159. return
-160 - return
-161 - return
-
-
-
-
-
-
-
-
-
-
-
-162 - grasping cup
-163 - opening box
-164 - reaching drawer right
-165 - box opening
-166 - pouring right
-167 - return
-168 - stirring
-169 - return
-170 - drawer pulling left
-171 -pouring left
-172 - reaching box left
-173 - getting cup btw gripper right
-174 - grasping cup right
-175 - drawer opening left
-176 - reaching drawer right
-177 - reaching cup right
-178 - reaching cup left
-179 - stirring
-180 - reaching cup left181 - placing cup next to bowl
-182 - releasing cup in box
-183 - return
-184 - reaching for cup left
-185 - reaching for cup right
-186 - stirring left
-187 - stirring
-188 - return
-189 - box opening
-190 - reaching for drawer right
-191 - reaching for box right
-192 - getting cup btw gripper right
-193 - pouring right
-194 - pouring right
-195 - getting cup btw gripper right
-196 - reaching drawer left
-197 - pulling drawer right
-198 - box opening
-199 - return
-200 - getting drawer btw gripper right
-201 - stirring left
-202 - box opening left
-203 - drawer pulling left
-204 - getting cup btw gripper left
-205 - box opening left
-206 - getting cup btw gripper right
-207 - getting cup btw gripper right
-208 - drawer pulling left
-209 - drawer pulliung right
+label_dict['018'] = 'ReachingCupLeft'
+label_dict['019'] = 'Return'
+label_dict['020'] = 'Stirring'
+label_dict['021'] = 'PositioningGripperOnCupLeft'
+label_dict['022'] = 'placing back cup'
+label_dict['023'] = 'PlacingCupInBox'
+label_dict['024'] = 'Stirring'
+label_dict['025'] = 'ReachingCupLeft'
+label_dict['026'] = 'Return'
+label_dict['027'] = 'Stirring'
+label_dict['028'] = 'Stirring'
+label_dict['029'] = 'PositioningGripperOnDrawerRight'
+label_dict['030'] = 'BoxOpening'
+label_dict['031'] = 'DrawerPullingRight'
+label_dict['032'] = 'TransportingCup'
+label_dict['033'] = 'TransportingCup'
+label_dict['034'] = 'TransportingCup'
+label_dict['035'] = 'ReachingBoxLeft'
+label_dict['036'] = 'DrawerPullingRight'
+label_dict['037'] = 'ReachingBox'
+label_dict['038'] = 'ReleasingCupLeft'
+label_dict['039'] = 'ReachingDrawerLeft'
+label_dict['040'] = 'PositioningGripperOnSpoon'
+label_dict['041'] = 'BoxOpeningLeft'
+label_dict['042'] = 'DrawerPullingLeft'
+label_dict['043'] = 'Return'
+label_dict['044'] = 'PositioningGripperOnBoxLeft'
+label_dict['045'] = 'PouringLeft'
+label_dict['046'] = 'TransportingCup'
+label_dict['047'] = 'PositioningGripperOnDrawerLeft'
+label_dict['048'] = 'PositioningGripperOnDrawerRight'
+label_dict['049'] = 'TransportingCup'
+label_dict['050'] = 'PlacingCupBesideBowl'
+label_dict['051'] = 'PositioningGripperOnSpoon'
+label_dict['052'] = 'PlacingCupInBox'
+label_dict['053'] = 'pouring'
+label_dict['054'] = 'ReleasingCup'
+label_dict['055'] = 'Stirring'
+label_dict['056'] = 'GrippingCup'
+label_dict['057'] = 'pouring'
+label_dict['058'] = 'GrippingSpoonLeft'
+label_dict['059'] = 'PositioningGripperOnSpoonRight'
+label_dict['060'] = 'ReachingDrawerRight'
+label_dict['061'] = 'BoxOpening'
+label_dict['062'] = 'DrawerPullingRight'
+label_dict['063'] = 'BoxOpeningLeft'
+label_dict['064'] = 'PositioningGripperOnCupRight'
+label_dict['065'] = 'PouringRight'
+label_dict['066'] = 'PouringRight'
+label_dict['067'] = 'PositioningGripperOnCupRight'
+label_dict['068'] = 'BoxOpening'
+label_dict['069'] = 'DrawerPulling'
+label_dict['070'] = 'ReachingBox'
+label_dict['071'] = 'PouringRight'
+label_dict['072'] = 'PositioningGripperOnDrawerRight'
+label_dict['073'] = 'Return'
+label_dict['074'] = 'PositioningGripperOnDrawerSidewaysLeft'
+label_dict['075'] = 'ReachingDrawerLeft'
+label_dict['076'] = 'TransportingCupRight'
+label_dict['077'] = 'BoxOpeningLeft'
+label_dict['078'] = 'PouringLeft'
+label_dict['079'] = 'ReachingCup'
+label_dict['080'] = 'DrawerPullingLeft'
+label_dict['081'] = 'ReachingDrawerRight'
+label_dict['082'] = 'PlacingCupInBox'
+label_dict['083'] = 'TransportingCup'
+label_dict['084'] = 'StirringLeft'
+label_dict['085'] = 'TransportingCup'
+label_dict['086'] = 'TransportingCup'
+label_dict['087'] = 'TransportingCup'
+label_dict['088'] = 'StirringLeft'
+label_dict['089'] = 'PositioningGripperOnCupLeft'
+label_dict['090'] = 'TransportingCup'
+label_dict['091'] = 'PositioningGripperOnSpoonLeft'
+label_dict['092'] = 'StirringRight'
+label_dict['093'] = 'PositioningGripperOnDrawerRight'
+label_dict['094'] = 'ReachingBox'
+label_dict['095'] = 'DrawerPullingRight'
+label_dict['096'] = 'TransportingCupRight'
+label_dict['097'] = 'TransportingCupRight'
+label_dict['098'] = 'TransportingCup'
+label_dict['099'] = 'BoxOpeningLeft'
+label_dict['100'] = 'DrawerPullingRight'
+label_dict['101'] = 'BoxOpening'
+label_dict['102'] = 'PouringRight'
+label_dict['103'] = 'PositioningGripperOnDrawerRight'
+label_dict['104'] = 'StirringRight'
+label_dict['105'] = 'BoxOpeningLeft'
+label_dict['106'] = 'ReachingDrawerRight'
+label_dict['107'] = 'PositioningGripperOnCupLeft'
+label_dict['108'] = 'Positioning box btw gripper left'
+label_dict['109'] = 'PouringLeft'
+label_dict['110'] = 'ReleasingCup'
+label_dict['111'] = 'DrawerPullingLeft'
+label_dict['112'] = 'ReachingDrawerRight'
+label_dict['113'] = 'ReachingCupRight'
+label_dict['114'] = 'GrippingCupLeft'
+label_dict['115'] = 'Return'
+label_dict['116'] = 'TransportingCup'
+label_dict['117'] = 'GrippingCupLeft'
+label_dict['118'] = 'ReleasingCup'
+label_dict['119'] = 'StirringLeft'
+label_dict['120'] = 'Return'
+label_dict['121'] = 'PouringRight'
+label_dict['122'] = 'GrippingSpoonLeft'
+label_dict['123'] = 'StirringLeft'
+label_dict['124'] = 'PositioningGripperOnDrawerRight'
+label_dict['125'] = 'BoxOpening'
+label_dict['126'] = 'DrawerPullingRight'
+label_dict['127'] = 'ReachingBox'
+label_dict['128'] = 'ReleasingCup'
+label_dict['129'] = 'ReachingCupRight'
+label_dict['130'] = 'ReachingCupRight'
+label_dict['131'] = 'TransportingCup'
+label_dict['132'] = 'BoxOpeningLeft'
+label_dict['133'] = 'Return'
+label_dict['134'] = 'BoxOpening'
+label_dict['135'] = 'GrippingCup'
+label_dict['136'] = 'Return'
+label_dict['137'] = 'ReachingSpoon'
+label_dict['138'] = 'Return'
+label_dict['139'] = 'ReachingDrawerLeft'
+label_dict['140'] = 'ReleasingCup'
+label_dict['141'] = 'ReachingBoxLeft'
+label_dict['142'] = 'PositioningGripperOnCupRight'
+label_dict['143'] = 'TransportingCup'
+label_dict['144'] = 'PositioningGripperOnDrawerLeft'
+label_dict['145'] = 'PositioningGripperOnDrawerRight'
+label_dict['146'] = 'ReachingCupRight'
+label_dict['147'] = 'PouringLeft'
+label_dict['148'] = 'Stirring'
+label_dict['149'] = 'TransportingCup'
+label_dict['150'] = 'PlacingCupBesideBowl'
+label_dict['151'] = 'TransportingCup'
+label_dict['152'] = 'StirringLeft'
+label_dict['153'] = 'Return'
+label_dict['154'] = 'PouringRight'
+label_dict['155'] = 'StirringLeft'
+label_dict['156'] = 'PositioningGripperOnSpoonRight'
+label_dict['157'] = 'Return'
+label_dict['158'] = 'PositioningGripperOnBox'
+label_dict['159'] = 'Return'
+label_dict['160'] = 'Return'
+label_dict['161'] = 'Return'
+label_dict['162'] = 'GrippingCup'
+label_dict['163'] = 'BoxOpening'
+label_dict['164'] = 'ReachingDrawerRight'
+label_dict['165'] = 'BoxOpening'
+label_dict['166'] = 'PouringRight'
+label_dict['167'] = 'Return'
+label_dict['168'] = 'Stirring'
+label_dict['169'] = 'Return'
+label_dict['170'] = 'DrawerPullingLeft'
+label_dict['171'] = 'PouringLeft'
+label_dict['172'] = 'ReachingBoxLeft'
+label_dict['173'] = 'PositioningGripperOnCupRight'
+label_dict['174'] = 'GrippingCupRight'
+label_dict['175'] = 'DrawerPullingLeft'
+label_dict['176'] = 'ReachingDrawerRight'
+label_dict['177'] = 'ReachingCupRight'
+label_dict['178'] = 'ReachingCupLeft'
+label_dict['179'] = 'Stirring'
+label_dict['180'] = 'ReachingCupLeft'
+label_dict['181'] = 'PlacingCupBesideBowl'
+label_dict['182'] = 'ReleasingCup'
+label_dict['183'] = 'Return'
+label_dict['184'] = 'ReachingCupLeft'
+label_dict['185'] = 'ReachingCupRight'
+label_dict['186'] = 'StirringLeft'
+label_dict['187'] = 'Stirring'
+label_dict['188'] = 'Return'
+label_dict['189'] = 'BoxOpening'
+label_dict['190'] = 'ReachingDrawerRight'
+label_dict['191'] = 'ReachingBoxRight'
+label_dict['192'] = 'PositioningGripperOnCupRight'
+label_dict['193'] = 'PouringRight'
+label_dict['194'] = 'PouringRight'
+label_dict['195'] = 'PositioningGripperOnCupRight'
+label_dict['196'] = 'ReachingDrawerLeft'
+label_dict['197'] = 'DrawerPullingRight'
+label_dict['198'] = 'BoxOpening'
+label_dict['199'] = 'Return'
+label_dict['200'] = 'PositioningGripperOnDrawerRight'
+label_dict['201'] = 'StirringLeft'
+label_dict['202'] = 'BoxOpeningLeft'
+label_dict['203'] = 'DrawerPullingLeft'
+label_dict['204'] = 'PositioningGripperOnCupLeft'
+label_dict['205'] = 'BoxOpeningLeft'
+label_dict['206'] = 'PositioningGripperOnCupRight'
+label_dict['207'] = 'PositioningGripperOnCupRight'
+label_dict['208'] = 'DrawerPullingLeft'
+label_dict['209'] = 'DrawerPullingRight'
