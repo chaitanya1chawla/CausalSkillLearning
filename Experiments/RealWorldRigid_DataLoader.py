@@ -534,7 +534,7 @@ class RealWorldRigid_Dataset(RealWorldRigid_PreDataset):
 				self.downsample_data(data_element, data_element['task-id'], self.args.ds_freq)
 				# data_element = 
 			
-			if self.args.smoothen: 
+			if self.args.smoothen:
 				data_element['demo'] = gaussian_filter1d(data_element['demo'],self.kernel_bandwidth,axis=0,mode='nearest')
 				data_element['robot-state'] = gaussian_filter1d(data_element['robot-state'],self.kernel_bandwidth,axis=0,mode='nearest')
 				data_element['object-state'] = gaussian_filter1d(data_element['object-state'],self.kernel_bandwidth,axis=0,mode='nearest')
