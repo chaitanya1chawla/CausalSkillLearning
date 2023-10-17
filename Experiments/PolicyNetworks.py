@@ -502,8 +502,6 @@ class ContinuousPolicyNetwork_ReconstructRelState(ContinuousPolicyNetwork):
 		
 		pass
 
-
-
 class ContinuousFactoredPolicyNetwork(ContinuousPolicyNetwork):
 
 	def __init__(self, input_size, hidden_size, output_size, args, number_layers=4, whether_latentb_input=False, zero_z_dim=False, small_init=False):
