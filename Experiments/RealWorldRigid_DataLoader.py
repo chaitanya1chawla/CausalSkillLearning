@@ -612,3 +612,25 @@ class RealWorldRigid_Dataset(RealWorldRigid_PreDataset):
 		np.save("RealWorldRigid_Vel_Var.npy", vel_variance)
 		np.save("RealWorldRigid_Vel_Min.npy", vel_min_value)
 		np.save("RealWorldRigid_Vel_Max.npy", vel_max_value)
+
+class RealWorldRigid_JointEEFDataset(RealWorldRigid_Dataset):
+
+	def __init__(self, args):
+		
+		super(RealWorldRigid_JointEEFDataset, self).__init__(args)	
+
+	def __getitem__(self, index):
+		
+		# Run super getitem.
+		data_element = super().__getitem__(index)
+
+		# Now add the EEF state in addition to the robot joint state and object state...
+
+		# Backup original. 
+		data_element['old_demo'] = copy.deepcopy(data_element['demo'])
+		# Now create new. 
+		data_element['demo'] = np.concatenate([ data_element['robot-state'], \
+										 		data_element['eef-state'], \
+					  							data_element['object-state']], axis=-1)
+
+		return data_element
