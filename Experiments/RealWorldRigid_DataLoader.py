@@ -655,10 +655,10 @@ class RealWorldRigid_Dataset(RealWorldRigid_PreDataset):
 class RealWorldRigid_JointEEFDataset(RealWorldRigid_Dataset):
 
 	def __init__(self, args):
-		
-		self.stat_dir_name ='RealWorldRigidJointEEF'
+				
 		super(RealWorldRigid_JointEEFDataset, self).__init__(args)	
-
+		self.stat_dir_name ='RealWorldRigidJointEEF'
+		
 	def process_end_effector_state(self, end_effector_trajectory):
 
 		# Takes in end effector trajectory of the robot, and:
