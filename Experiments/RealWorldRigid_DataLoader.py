@@ -689,11 +689,9 @@ class RealWorldRigid_JointEEFDataset(RealWorldRigid_Dataset):
 		# Now create new. 
 		
 		# Take original eef state, convert orientations to quaternions and transform frames. 
-		data_element['transformed_eef_state'] = self.process_end_effector_state(data_element['eef-state'])			
+		transformed_eef_pos, transformed_eef_quat = self.process_end_effector_state(data_element['eef-state'])
+		data_element['transformed_eef_state'] = np.concatenate([transformed_eef_pos, transformed_eef_quat], axis=-1)
 
-		print("embed in get item")
-		embed()
-		
 		data_element['demo'] = np.concatenate([ data_element['robot-state'], \
 										 		data_element['transformed_eef_state'], \
 					  							data_element['object-state']], axis=-1)
