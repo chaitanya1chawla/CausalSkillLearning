@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 from headers import *
+from scipy.spatial.transform import Rotation as R
 
 def resample(original_trajectory, desired_number_timepoints):
 	original_traj_len = len(original_trajectory)
