@@ -36,7 +36,7 @@ global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk'
 			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects', \
 			'MOMARTPreproc', 'MOMART', 'MOMARTObject', 'MOMARTRobotObject', 'MOMARTRobotObjectFlat', \
 			'FrankaKitchenPreproc', 'FrankaKitchen', 'FrankaKitchenObject', 'FrankaKitchenRobotObject', \
-			'RealWorldRigid', 'RealWorldRigidRobot']
+			'RealWorldRigid', 'RealWorldRigidRobot', 'RealWorldRigidJEE']
 
 class PolicyManager_BaseClass():
 
@@ -2285,12 +2285,27 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 					self.norm_sub_value[10:14] = 0.
 					self.norm_sub_value[17:] = 0.
 
-			self.input_size = 2*self.state_size
-			self.hidden_size = self.args.hidden_size
-			self.output_size = self.state_size
-			self.traj_length = self.args.traj_length			
-			self.conditional_info_size = 0
-			self.test_set_size = 0			
+		elif self.args.data in ['RealWorldRigidJEE']:
+
+			self.state_size = 28
+			self.state_dim = 28
+
+			# self.norm_sub_value will remain unmodified. 
+			# self.norm_denom_value will get divided by scale.
+			self.norm_denom_value /= self.args.state_scale_factor
+			# Manually make sure quaternion dims are unscaled.
+			self.norm_denom_value[10:14] = 1.
+			self.norm_denom_value[17:] = 1.
+			self.norm_sub_value[10:14] = 0.
+			self.norm_sub_value[17:] = 0.
+			
+
+		self.input_size = 2*self.state_size
+		self.hidden_size = self.args.hidden_size
+		self.output_size = self.state_size
+		self.traj_length = self.args.traj_length			
+		self.conditional_info_size = 0
+		self.test_set_size = 0			
 
 
 		# Training parameters. 		

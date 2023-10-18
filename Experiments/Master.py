@@ -132,6 +132,8 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_PreDataset(args)
 	elif args.data in ['RealWorldRigid','RealWorldRigidRobot']:
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_Dataset(args)
+	elif args.data in ['RealWorldRigidJEE']:
+		dataset = RealWorldRigid_DataLoader.RealWorldRigid_JointEEFDataset(args)
 
 	return dataset
 
