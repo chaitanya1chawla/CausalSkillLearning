@@ -586,7 +586,8 @@ class RealWorldRigid_Dataset(RealWorldRigid_PreDataset):
 	
 	def compute_statistics(self, prefix='RealWorldRigid'):
 
-		self.state_size = 21
+		if prefix=='RealWorldRigid':
+			self.state_size = 21
 		self.total_length = self.__len__()
 		mean = np.zeros((self.state_size))
 		variance = np.zeros((self.state_size))
