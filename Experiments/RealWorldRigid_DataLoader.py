@@ -662,7 +662,7 @@ class RealWorldRigid_JointEEFDataset(RealWorldRigid_Dataset):
 		# 1) Transforms this to a quaternion. 
 		# 2) Transforms this from the world frame to the ground frame. 
 
-		end_effectory_pose_in_world = np.array(end_effector_trajectory.shape[0], 7)
+		end_effectory_pose_in_world = np.zeros(end_effector_trajectory.shape[0], 7)
 
 		# scale factor is just mm to m, because EE trajectory is mm by default. 
 		scale = 1./1000.
