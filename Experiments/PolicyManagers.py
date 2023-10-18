@@ -2302,6 +2302,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.norm_sub_value[17:20] = 0.
 			self.norm_sub_value[24:] = 0.
 
+			print("Embedding in RWRJEEF")
+			embed()
+
 		self.input_size = 2*self.state_size
 		self.hidden_size = self.args.hidden_size
 		self.output_size = self.state_size
