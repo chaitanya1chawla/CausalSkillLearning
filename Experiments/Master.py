@@ -132,7 +132,7 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_PreDataset(args)
 	elif args.data in ['RealWorldRigid','RealWorldRigidRobot']:
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_Dataset(args)
-	elif args.data in ['RealWorldRigidJEE']:
+	elif args.data in ['RealWorldRigidJEEF']:
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_JointEEFDataset(args)
 
 	return dataset
@@ -146,8 +146,8 @@ class Master():
 			print("Creating Datasets")			
 			self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)			
 
-		# print("Embed after dataset creation")
-		# embed()
+		print("Embed after dataset creation")
+		embed()
 
 		# Now define policy manager.
 		if self.args.setting in ['learntsub', 'joint']:
