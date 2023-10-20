@@ -689,8 +689,8 @@ class RealWorldRigid_JointEEFDataset(RealWorldRigid_Dataset):
 		object_quat = object_traj[:,3:]
 
 		# Construct homogenous matrices for each frame. 
-		eef_in_ground_hmats = construct_batch_matrix(eef_pos, eef_quat)
-		object_in_ground_hmats = construct_batch_matrix(object_pos, object_quat)
+		eef_in_ground_hmats = create_batch_matrix(eef_pos, eef_quat)
+		object_in_ground_hmats = create_batch_matrix(object_pos, object_quat)
 
 		# We want the Object pose in the frame of the EEF pose, because there's two objects. This makes more sense than transforming EEF twice / everything to one object frame. 
 		
@@ -735,7 +735,7 @@ class RealWorldRigid_JointEEFDataset(RealWorldRigid_Dataset):
 		data_element['demo'] = np.concatenate([ data_element['robot-state'], \
 										 		data_element['transformed_eef_state'], \
 					  							data_element['object-state']], axis=-1)
-	
+
 		return data_element
 
 	def compute_statistics(self):
