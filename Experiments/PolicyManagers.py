@@ -2989,11 +2989,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		relabelled_state_sequence = torch_trajectory
 
 		# Relabel the dims. 
-
-		print("Embed in relabel object state")
-		embed()
-
-		torchified_object_state = torch.from_numpy(self.normalized_subsampled_relative_object_state).to(device).view(self.args.batch_size, -1, self.args.env_state_size)		
+		torchified_object_state = torch.from_numpy(self.normalized_subsampled_relative_object_state).to(device).view(-1, self.args.batch_size, self.args.env_state_size)		
 		relabelled_state_sequence[..., -self.args.env_state_size:] = torchified_object_state
 
 		return relabelled_state_sequence	
