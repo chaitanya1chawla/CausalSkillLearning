@@ -2989,7 +2989,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		relabelled_state_sequence = torch_trajectory
 
 		# Relabel the dims. 
-		relabelled_state_sequence[..., -self.args.env_state_size:] = self.normalized_subsampled_relative_object_state
+		relabelled_state_sequence[..., -self.args.env_state_size:] = torch.from_numpy(self.normalized_subsampled_relative_object_state).to(device)
 
 		return relabelled_state_sequence	
 
