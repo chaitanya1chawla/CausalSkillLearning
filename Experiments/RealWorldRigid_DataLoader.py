@@ -251,8 +251,8 @@ class RealWorldRigid_PreDataset(Dataset):
 		# Now retieve poses.
 		demonstration['object1_pose']['position'] = object1_in_ground_homogenous_matrices[:,:3,-1]
 		demonstration['object2_pose']['position'] = object2_in_ground_homogenous_matrices[:,:3,-1]
-		demonstration['object1_pose']['orientation'] = R.from_matrix(object1_in_ground_homogenous_matrices[:,:3,:3]).as_quat()
-		demonstration['object2_pose']['orientation'] = R.from_matrix(object2_in_ground_homogenous_matrices[:,:3,:3]).as_quat()
+		demonstration['object1_pose']['orientation'] = R.from_matrix(object1_in_ground_homogenous_matrices[:,:3,:3]).as_quat(canonical=True)
+		demonstration['object2_pose']['orientation'] = R.from_matrix(object2_in_ground_homogenous_matrices[:,:3,:3]).as_quat(canonical=True)
 
 		return demonstration
 
@@ -658,7 +658,7 @@ class RealWorldRigid_JointEEFDataset(RealWorldRigid_Dataset):
 				
 		super(RealWorldRigid_JointEEFDataset, self).__init__(args)	
 		self.stat_dir_name ='RealWorldRigidJointEEF'
-		
+
 	def process_end_effector_state(self, end_effector_trajectory):
 
 		# Takes in end effector trajectory of the robot, and:
@@ -679,6 +679,39 @@ class RealWorldRigid_JointEEFDataset(RealWorldRigid_Dataset):
 		
 		return end_effectory_pos_in_ground, end_effectory_quat_in_ground
 
+	def compute_object_eef_relative_state(self, eef_traj, object_traj):
+
+		# Parse into individual position and quaternion. 
+		eef_pos = eef_traj[:,:3]
+		eef_quat = eef_traj[:,3:]
+
+		object_pos = object_traj[:,:3]
+		object_quat = object_traj[:,3:]
+
+		# Construct homogenous matrices for each frame. 
+		eef_in_ground_hmats = construct_batch_matrix(eef_pos, eef_quat)
+		object_in_ground_hmats = construct_batch_matrix(object_pos, object_quat)
+
+		# We want the Object pose in the frame of the EEF pose, because there's two objects. This makes more sense than transforming EEF twice / everything to one object frame. 
+		
+		# Pattern. 
+		# # Inverse of the ground in camera.
+		# camera_in_ground_homogenous_matrices = invert_batch_matrix(ground_in_camera_homogenous_matrices)
+
+		# # Now transform with batch multiplication. 
+		# object1_in_ground_homogenous_matrices = np.matmul(camera_in_ground_homogenous_matrices, object1_in_camera_homogenous_matrices)
+
+		# First invert eef_in_ground. 
+		ground_in_eef_hmats = invert_batch_matrix(eef_in_ground_hmats)
+		object_in_eef_hmats = np.matmul(ground_in_eef_hmats, object_in_ground_hmats)
+
+		# Recover Poses. 
+		object_in_eef_pos = object_in_eef_hmats[:,:3,-1]
+		object_in_eef_quat = R.from_matrix(object_in_eef_hmats[:,:3,:3]).as_quat(canonical=True)
+
+		object_in_eef_pose = np.concatenate([object_in_eef_pos, object_in_eef_quat],axis=-1)
+		return object_in_eef_pose
+		
 	def __getitem__(self, index):
 		
 		# Run super getitem.
@@ -694,10 +727,15 @@ class RealWorldRigid_JointEEFDataset(RealWorldRigid_Dataset):
 		transformed_eef_pos, transformed_eef_quat = self.process_end_effector_state(data_element['eef-state'])
 		data_element['transformed_eef_state'] = np.concatenate([transformed_eef_pos, transformed_eef_quat], axis=-1)
 
+		# Now also retrieve the object poses relative to the EEF.
+		data_element['relative-object-state'] = np.zeros_like(data_element['object-state'])
+		data_element['relative-object-state'][...,:7] = self.compute_object_eef_relative_state(data_element['transformed_eef_state'], data_element['object-state'][...,:7])
+		data_element['relative-object-state'][...,7:] = self.compute_object_eef_relative_state(data_element['transformed_eef_state'], data_element['object-state'][...,7:])
+
 		data_element['demo'] = np.concatenate([ data_element['robot-state'], \
 										 		data_element['transformed_eef_state'], \
 					  							data_element['object-state']], axis=-1)
-
+	
 		return data_element
 
 	def compute_statistics(self):

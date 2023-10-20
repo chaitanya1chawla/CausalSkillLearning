@@ -2983,6 +2983,16 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.unweighted_relative_state_reconstruction_loss = (policy_predicted_relative_state_traj - relative_state_traj).norm(dim=2).mean()
 		self.relative_state_reconstruction_loss = self.args.relative_state_reconstruction_loss_weight*self.unweighted_relative_state_reconstruction_loss
 
+	def relabel_relative_object_state(self, torch_trajectory):
+
+		# Copy over
+		relabelled_state_sequence = torch_trajectory
+
+		# Relabel the dims. 
+		relabelled_state_sequence[..., -self.args.env_state_size:] = self.normalized_subsampled_relative_object_state
+
+		return relabelled_state_sequence	
+
 	def compute_absolute_state_reconstruction_loss(self):
 
 		# Get the mean of the actions from the policy networks until the penultimate action.
@@ -2990,6 +3000,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# Initial state - remember, states are Time x Batch x State.
 		torch_trajectory = torch.from_numpy(self.sample_traj_var).to(device)
+
+		if self.args.data in ['RealWorldRigidJEEF']:
+			torch_trajectory = self.relabel_relative_object_state(torch_trajectory)
+
 		initial_state = torch_trajectory[0]
 
 		# Compute reconstructed trajectory differentiably excluding the first timestep. 
@@ -3148,6 +3162,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 	def run_iteration(self, counter, i, return_z=False, and_train=True):
 
+		####################################
+		####################################
 		# Basic Training Algorithm: 
 		# For E epochs:
 		# 	# For all trajectories:
@@ -3155,12 +3171,12 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# 		# Encode trajectory segment into latent z. 
 		# 		# Feed latent z and trajectory segment into policy network and evaluate likelihood. 
 		# 		# Update parameters. 
-
+		####################################
 		####################################
 
 		self.set_epoch(counter)
 
-		############# (0) #############
+		############# (0) ##################
 		# Sample trajectory segment from dataset. 
 		####################################
 
@@ -3171,9 +3187,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# state_action_trajectory, sample_action_seq, sample_traj, data_element  = self.get_trajectory_segment(i)
 		# self.sample_traj_var = sample_traj
 		self.sample_traj_var = input_dict['sample_traj']
-
-
-
+		self.input_dict = input_dict
 		####################################
 		############# (0a) #############
 		####################################
@@ -3208,6 +3222,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			
 			############# (3b) #############
 			# Policy net doesn't use the decay epislon. (Because we never sample from it in training, only rollouts.)
+
 			loglikelihoods, _ = self.policy_network.forward(subpolicy_inputs, sample_action_seq, self.policy_variance_value)
 			loglikelihood = loglikelihoods[:-1].mean()
 			 
@@ -3215,25 +3230,25 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				print("Embedding in Train.")
 				embed()
 
-			# print("Embed in Pretrain PM RI")
-			# embed()
-
 			####################################
-			############# (4) #############
+			# (4) Update parameters. 
 			####################################
-
-			# Update parameters. 
+			
 			if self.args.train and and_train:
 
-				############# (4a) #############
-				# Update parameters based on likelihood, subpolicy inputs, and kl divergence.
+				####################################
+				# (4a) Update parameters based on likelihood, subpolicy inputs, and kl divergence.
+				####################################
+				
 				update_dict = input_dict
 				update_dict['latent_z'] = latent_z				
 
 				self.update_policies_reparam(loglikelihood, kl_divergence, update_dict=update_dict)
 
-				############# (4b) #############
-				# Update Plots. 
+				####################################
+				# (4b) Update Plots. 
+				####################################
+				
 				stats = {}
 				stats['counter'] = counter
 				stats['i'] = i
@@ -3242,12 +3257,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 				self.update_plots(counter, loglikelihood, state_action_trajectory, stats)
 
 				####################################
-				############# (5) #############
+				# (5) Return.
 				####################################
 
-			# if return_z: 
-			# 	return latent_z, sample_traj, sample_action_seq
-			
 			if return_z:
 				return latent_z, input_dict['sample_traj'], sample_action_seq, input_dict['data_element']
 									
@@ -3740,9 +3752,7 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 				self.current_traj_len = self.traj_length            
 			
 			batch_trajectory = np.zeros((self.args.batch_size, self.current_traj_len, self.state_size))
-
-			# OLD
-			# for x in range(min(self.args.batch_size, len(self.index_list) - i)):
+			self.subsampled_relative_object_state = np.zeros((self.args.batch_size, self.current_traj_len, self.args.env_state_size))
 
 			# POTENTIAL:
 			# for x in range(min(self.args.batch_size, len(self.index_list) - 1)):
@@ -3790,17 +3800,22 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 						else:
 							batch_trajectory[x] = data_element['demo'][start_timepoint:end_timepoint,:-1]
 
-					if self.args.data in ['RealWorldRigid']:
+					if self.args.data in ['RealWorldRigid', 'RealWorldRigidJEEF']:
 
 						# Truncate the images to start and end timepoint. 
 						data_element[x]['subsampled_images'] = data_element[x]['images'][start_timepoint:end_timepoint]
 
+					if self.args.data in ['RealWorldRigidJEEF']:
+						self.subsampled_relative_object_state[x] = data_element[x]['relative-object-state'][start_timepoint:end_timepoint]
+
 			# If normalization is set to some value.
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 				batch_trajectory = (batch_trajectory-self.norm_sub_value)/self.norm_denom_value
+				self.normalized_subsampled_relative_object_state = (self.subsampled_relative_object_state - self.norm_sub_value)/self.norm_denom_value
 
 			# Compute actions.
 			action_sequence = np.diff(batch_trajectory,axis=1)
+			self.relative_object_state_actions = np.diff(self.normalized_subsampled_relative_object_state, axis=1)
 
 			# Concatenate
 			concatenated_traj = self.concat_state_action(batch_trajectory, action_sequence)
@@ -3811,33 +3826,47 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			# return concatenated_traj.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), batch_trajectory.transpose((1,0,2))
 			return concatenated_traj.transpose((1,0,2)), scaled_action_sequence.transpose((1,0,2)), batch_trajectory.transpose((1,0,2)), data_element
 
+	def relabel_relative_object_state_actions(self, padded_action_seq):
+
+		# Here, remove the actions computed from the absolute object states; 
+		# Instead relabel the actions in these dimensions into actions computed from the relative state to EEF.. 
+
+		relabelled_action_sequence = padded_action_seq
+		# Relabel the action size computes.. 
+		# relabelled_action_sequence[..., self.args.robot_state_size:] = self.relative_object_state_actions
+		relabelled_action_sequence[..., -self.args.env_state_size:] = self.relative_object_state_actions
+
+		return relabelled_action_sequence
+
 	def assemble_inputs(self, input_trajectory, latent_z_indices, latent_b, sample_action_seq):
 
-		if not(self.args.discrete_z):
-			# Now assemble inputs for subpolicy.
-			
-			# Create subpolicy inputs tensor. 			
-			subpolicy_inputs = torch.zeros((input_trajectory.shape[0], self.args.batch_size, self.input_size+self.latent_z_dimensionality)).to(device)
+		# Now assemble inputs for subpolicy.
+		
+		# Create subpolicy inputs tensor. 			
+		subpolicy_inputs = torch.zeros((input_trajectory.shape[0], self.args.batch_size, self.input_size+self.latent_z_dimensionality)).to(device)
 
-			# Mask input trajectory according to subpolicy dropout. 
-			self.subpolicy_input_dropout_layer = torch.nn.Dropout(self.args.subpolicy_input_dropout)
+		# Mask input trajectory according to subpolicy dropout. 
+		self.subpolicy_input_dropout_layer = torch.nn.Dropout(self.args.subpolicy_input_dropout)
 
-			torch_input_trajectory = torch.tensor(input_trajectory).view(input_trajectory.shape[0],self.args.batch_size,self.input_size).to(device).float()
-			masked_input_trajectory = self.subpolicy_input_dropout_layer(torch_input_trajectory)
+		torch_input_trajectory = torch.tensor(input_trajectory).view(input_trajectory.shape[0],self.args.batch_size,self.input_size).to(device).float()
+		masked_input_trajectory = self.subpolicy_input_dropout_layer(torch_input_trajectory)
 
-			# Now copy over trajectory. 
-			# subpolicy_inputs[:,:self.input_size] = torch.tensor(input_trajectory).view(len(input_trajectory),self.input_size).to(device).float()         
-			subpolicy_inputs[:,:,:self.input_size] = masked_input_trajectory
+		# Now copy over trajectory. 
+		# subpolicy_inputs[:,:self.input_size] = torch.tensor(input_trajectory).view(len(input_trajectory),self.input_size).to(device).float()         
+		subpolicy_inputs[:,:,:self.input_size] = masked_input_trajectory
 
-			# Now copy over latent z's. 
-			subpolicy_inputs[range(input_trajectory.shape[0]),:,self.input_size:] = latent_z_indices
+		# Now copy over latent z's. 
+		subpolicy_inputs[range(input_trajectory.shape[0]),:,self.input_size:] = latent_z_indices
 
-			# # Concatenated action sequence for policy network's forward / logprobabilities function. 
-			# padded_action_seq = np.concatenate([np.zeros((1,self.output_size)),sample_action_seq],axis=0)
-			# View time first and batch second for downstream LSTM.
-			padded_action_seq = np.concatenate([sample_action_seq,np.zeros((1,self.args.batch_size,self.output_size))],axis=0)
+		# # Concatenated action sequence for policy network's forward / logprobabilities function. 
+		# padded_action_seq = np.concatenate([np.zeros((1,self.output_size)),sample_action_seq],axis=0)
+		# View time first and batch second for downstream LSTM.
+		padded_action_seq = np.concatenate([sample_action_seq,np.zeros((1,self.args.batch_size,self.output_size))],axis=0)
 
-			return None, subpolicy_inputs, padded_action_seq
+		if self.args.data in ['RealRobotRigidJEEF']:
+			padded_action_seq = self.relabel_relative_object_state_actions(padded_action_seq)
+
+		return None, subpolicy_inputs, padded_action_seq
 
 	def construct_dummy_latents(self, latent_z):
 
