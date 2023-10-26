@@ -2989,6 +2989,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		relabelled_state_sequence = torch_trajectory
 
 		# Relabel the dims. 
+
 		torchified_object_state = torch.from_numpy(self.normalized_subsampled_relative_object_state).to(device).view(-1, self.args.batch_size, self.args.env_state_size)		
 		relabelled_state_sequence[..., -self.args.env_state_size:] = torchified_object_state
 
@@ -3470,8 +3471,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			if self.args.batch_size*i+b>=self.N:
 				break
 
-		# print("Embed in latent set creation before trajectory error evaluation.")
-		# embed()
+		print("Embed in latent set creation before trajectory error evaluation.")
+		embed()
 
 		# Compute average reconstruction error.
 		if get_visuals:
