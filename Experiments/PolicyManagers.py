@@ -3427,9 +3427,9 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		self.task_id_set = []
 
 		# Use the dataset to get reasonable trajectories (because without the information bottleneck / KL between N(0,1), cannot just randomly sample.)
-		for i in range(self.N//self.args.batch_size+1):
 		# # for i in range(self.N//self.args.batch_size+1, 32)
 		# for i in range(0, self.N, self.args.batch_size):
+		for i in range(self.N//self.args.batch_size+1):
 
 			# Mapped index
 			number_batches_for_dataset = (len(self.dataset)//self.args.batch_size)+1
@@ -3476,11 +3476,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# Compute average reconstruction error.
 		if get_visuals:
-			# self.gt_traj_set_array = np.array(self.gt_trajectory_set, dtype=object)
-			# self.trajectory_set = np.array(self.trajectory_set, dtype=object)
+			self.gt_traj_set_array = np.array(self.gt_trajectory_set, dtype=object)
+			self.trajectory_set = np.array(self.trajectory_set, dtype=object)
 
-			self.gt_traj_set_array = np.array(self.gt_trajectory_set)
-			self.trajectory_set = np.array(self.trajectory_set)
+			# self.gt_traj_set_array = np.array(self.gt_trajectory_set)
+			# self.trajectory_set = np.array(self.trajectory_set)
 
 			# self.avg_reconstruction_error = (self.gt_traj_set_array-self.trajectory_set).mean()
 			self.reconstruction_errors = np.zeros(len(self.gt_traj_set_array))
