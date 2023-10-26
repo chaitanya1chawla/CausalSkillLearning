@@ -251,8 +251,8 @@ class RealWorldRigid_PreDataset(Dataset):
 		# Now retieve poses.
 		demonstration['object1_pose']['position'] = object1_in_ground_homogenous_matrices[:,:3,-1]
 		demonstration['object2_pose']['position'] = object2_in_ground_homogenous_matrices[:,:3,-1]
-		demonstration['object1_pose']['orientation'] = R.from_matrix(object1_in_ground_homogenous_matrices[:,:3,:3]).as_quat(canonical=True)
-		demonstration['object2_pose']['orientation'] = R.from_matrix(object2_in_ground_homogenous_matrices[:,:3,:3]).as_quat(canonical=True)
+		demonstration['object1_pose']['orientation'] = R.from_matrix(object1_in_ground_homogenous_matrices[:,:3,:3]).as_quat()
+		demonstration['object2_pose']['orientation'] = R.from_matrix(object2_in_ground_homogenous_matrices[:,:3,:3]).as_quat()
 
 		return demonstration
 
@@ -707,7 +707,7 @@ class RealWorldRigid_JointEEFDataset(RealWorldRigid_Dataset):
 
 		# Recover Poses. 
 		object_in_eef_pos = object_in_eef_hmats[:,:3,-1]
-		object_in_eef_quat = R.from_matrix(object_in_eef_hmats[:,:3,:3]).as_quat(canonical=True)
+		object_in_eef_quat = R.from_matrix(object_in_eef_hmats[:,:3,:3]).as_quat()
 
 		object_in_eef_pose = np.concatenate([object_in_eef_pos, object_in_eef_quat],axis=-1)
 		return object_in_eef_pose

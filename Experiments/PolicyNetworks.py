@@ -2430,9 +2430,6 @@ class ContinuousEncoderNetwork(PolicyNetwork_BaseClass):
 		
 		format_input = input.view((input.shape[0], batch_size, size_dict['input_size']))
 
-		print("Debugging VIEW business from PN")
-		embed()
-
 		##############################
 		# Forward pass through LSTM. 
 		##############################
