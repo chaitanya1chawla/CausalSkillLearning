@@ -1725,7 +1725,7 @@ class DatasetImageVisualizer(object):
 
 	def __init__(self, has_display=False, args=None, just_objects=True):
 		
-		super(RealWorldRigidDatasetImageVisualizer, self).__init__()
+		super(DatasetImageVisualizer, self).__init__()
 		self.args = args
 		self.has_display = has_display
 		# self.create_environment()
