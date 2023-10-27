@@ -70,16 +70,16 @@ class NDAXInterface_PreDataset(Dataset):
 		# The task name is needed for setting the environment, rendering. 
 		self.task_list = ['open_door', 'close_door', 'eggs', 'stock_cupboard', 'stock_fridge']
 		self.environment_names = []
-		self.num_demos = np.array([1])
+		self.num_demos = np.array([3, 2, 2, 4, 4])
 
 		# Each task has 200 demos according to RoboMimic.
 		self.number_tasks = len(self.task_list)
 		self.cummulative_num_demos = self.num_demos.cumsum()
-		self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)		
+		self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
 		self.total_length = self.num_demos.sum()		
 
 		# self.ds_freq = 1*np.ones(self.number_tasks).astype(int)
-		self.ds_freq = np.array([2])
+		self.ds_freq = np.array([6.5])
 
 		# Set files. 
 		self.set_ground_tag_pose_dict()
@@ -95,7 +95,7 @@ class NDAXInterface_PreDataset(Dataset):
 		# Interp1d from Scipy expects the last dimension to be the dimension we are ninterpolating over. 
 		valid_positions = np.swapaxes(position_sequence, 1, 0)
 		valid_times = valid
-		step = (valid[-1]-valid[0])/len(valid)
+		step = (valid[-1]-valid[0])/(len(valid)*self.ds_freq)
 
 		# Resample uniform timesteps with the same length as original data. 
 		query_times = np.arange(valid[0], valid[-1], step)
@@ -116,7 +116,7 @@ class NDAXInterface_PreDataset(Dataset):
 
 		# Resample uniform timesteps with the same length as original data. 
 		valid_times = valid
-		step = (valid[-1]-valid[0])/len(valid)
+		step = (valid[-1]-valid[0])/(len(valid)*self.ds_freq)
 		query_times = np.arange(valid[0], valid[-1], step)
 
 		valid_orientations = orientation_sequence
@@ -172,9 +172,10 @@ class NDAXInterface_PreDataset(Dataset):
 		# 2) Keep the timesteps for now, so that we can interpolate data to a uniform frequency. 
 		data = raw_data[1:]
 
-		# Now interpolate the data at uniform frequency.
+		# Now interpolate the data at uniform downsampled frequency.
 		# This will reorder data to Motor Positions, Hand Position, Hand Orientation.
 		interpolated_pose = self.interpolate_pose(data)
+		
 
 		return interpolated_pose
 
@@ -191,6 +192,8 @@ class NDAXInterface_PreDataset(Dataset):
 		# For all demos.
 		for k, v in enumerate(self.file_list):
 			
+			print("#######################")
+			print("Currently loading file: ", k, " of ", len(self.file_list), " with ID: ", v)
 			# Actually load numpy files. 
 			raw_data = np.genfromtxt(v, delimiter=',')
 			
