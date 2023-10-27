@@ -164,8 +164,17 @@ class NDAXInterface_PreDataset(Dataset):
 			key_list.append('images')
 		for k in key_list:
 			demonstration[k] = resample(demonstration[k], number_timepoints)
-		
-	def process_demonstration(self, raw_data):
+
+	def dictify_data(self, data):
+
+		# Assumes data is from interpolate_pose, which is: Motor Positions, Hand Position, Hand Orientation.
+		demonstration = {}
+		demonstration['demo'] = data
+		demonstration['motor_positions'] = data[:,:6]
+		demonstration['hand_pose'] = data[6:10]
+		demonstration['hand_orientation'] = data[10:]
+
+	def process_demonstration(self, raw_data, raw_file_name):
 
 		# Throw away irrelevant information. 
 		# 1) Throw away first timestep of CSV, because it's just header. 			
@@ -176,9 +185,12 @@ class NDAXInterface_PreDataset(Dataset):
 		# This will reorder data to Motor Positions, Hand Position, Hand Orientation.
 		interpolated_pose = self.interpolate_pose(data)
 		
+		# Dictify the data. 
+		demonstration = self.dictify_data(interpolated_pose)
+		demonstration['task_id'] = raw_file_name[:-6]
 
-		return interpolated_pose
-
+		return demonstration
+		
 	def setup(self):
 		
 		###########################
@@ -198,7 +210,7 @@ class NDAXInterface_PreDataset(Dataset):
 			raw_data = np.genfromtxt(v, delimiter=',')
 			
 			# Proces data. 
-			demonstration = self.process_demonstration(raw_data=raw_data)
+			demonstration = self.process_demonstration(raw_data=raw_data, raw_file_name=v)
 
 			# Process data. 
 			self.files.append(demonstration)
@@ -225,130 +237,81 @@ class NDAXInterface_Dataset(NDAXInterface_PreDataset):
 		# Now that we've run setup, compute dataset_trajectory_lengths for smart batching.
 		self.dataset_trajectory_lengths = np.zeros(self.total_length)
 		for index in range(self.total_length):
-			# Get bucket that index falls into based on num_demos array. 
-			task_index = np.searchsorted(self.cummulative_num_demos, index, side='right')-1
-			
-			# Decide task ID, and new index modulo num_demos.
-			# Subtract number of demonstrations in cumsum until then, and then 				
-			new_index = index-self.cummulative_num_demos[max(task_index,0)]		
-			data_element = self.files[task_index][new_index]
 
+			data_element = self.files[index]
 			self.dataset_trajectory_lengths[index] = len(data_element['demo'])
 
-		# Now implementing the dataset trajectory length limits. 
-		######################################################
-		# Now implementing dataset_trajectory_length_limits. 
-		######################################################
 		
-		if self.args.dataset_traj_length_limit>0:
-			# Essentially will need new self.cummulative_num_demos and new .. file index map list things. 
-			# Also will need to set total_length. 
+		# # ######################################################
+		# # # Now implementing dataset_trajectory_length_limits. 
+		# # ######################################################
+		
+		# # if self.args.dataset_traj_length_limit>0:
+		# # 	# Essentially will need new self.cummulative_num_demos and new .. file index map list things. 
+		# # 	# Also will need to set total_length. 
 
-			self.full_max_length = self.dataset_trajectory_lengths.max()
-			self.full_length = copy.deepcopy(self.total_length)
-			self.full_cummulative_num_demos = copy.deepcopy(self.cummulative_num_demos)
-			self.full_num_demos = copy.deepcopy(self.num_demos)
-			self.full_files = copy.deepcopy(self.files)
-			self.files = [[] for i in range(len(self.task_list))]
-			self.full_dataset_trajectory_lengths = copy.deepcopy(self.dataset_trajectory_lengths)
-			self.dataset_trajectory_lengths = []
-			self.num_demos = np.zeros(len(self.task_list),dtype=int)
+		# # 	self.full_max_length = self.dataset_trajectory_lengths.max()
+		# # 	self.full_length = copy.deepcopy(self.total_length)
+		# # 	self.full_cummulative_num_demos = copy.deepcopy(self.cummulative_num_demos)
+		# # 	self.full_num_demos = copy.deepcopy(self.num_demos)
+		# # 	self.full_files = copy.deepcopy(self.files)
+		# # 	self.files = [[] for i in range(len(self.task_list))]
+		# # 	self.full_dataset_trajectory_lengths = copy.deepcopy(self.dataset_trajectory_lengths)
+		# # 	self.dataset_trajectory_lengths = []
+		# # 	self.num_demos = np.zeros(len(self.task_list),dtype=int)
 
-			for index in range(self.full_length):
-				# Get bucket that index falls into based on num_demos array. 
-				task_index = np.searchsorted(self.full_cummulative_num_demos, index, side='right')-1
-				# Get the demo index in this task list. 
-				new_index = index-self.full_cummulative_num_demos[max(task_index,0)]
+		# # 	for index in range(self.full_length):
+		# # 		# Get bucket that index falls into based on num_demos array. 
+		# # 		task_index = np.searchsorted(self.full_cummulative_num_demos, index, side='right')-1
+		# # 		# Get the demo index in this task list. 
+		# # 		new_index = index-self.full_cummulative_num_demos[max(task_index,0)]
 
-				# Check the length of this particular trajectory and its validity. 
-				if (self.full_dataset_trajectory_lengths[index] < self.args.dataset_traj_length_limit):
-					# Add from old list to new. 
-					self.files[task_index].append(self.full_files[task_index][new_index])
-					self.dataset_trajectory_lengths.append(self.full_dataset_trajectory_lengths[index])
-					self.num_demos[task_index] += 1
-				else:
-					pass
+		# # 		# Check the length of this particular trajectory and its validity. 
+		# # 		if (self.full_dataset_trajectory_lengths[index] < self.args.dataset_traj_length_limit):
+		# # 			# Add from old list to new. 
+		# # 			self.files[task_index].append(self.full_files[task_index][new_index])
+		# # 			self.dataset_trajectory_lengths.append(self.full_dataset_trajectory_lengths[index])
+		# # 			self.num_demos[task_index] += 1
+		# # 		else:
+		# # 			pass
 
-					# Reduce count. 
-					# self.num_demos[task_index] -= 1
+		# # 			# Reduce count. 
+		# # 			# self.num_demos[task_index] -= 1
 					
-					# # Pop item from files. It's still saved in full_files. 					
-					# # self.files[task_index].pop(new_index)
-					# self.files[task_index] = np.delete(self.files[task_index],new_index)
-					# Approach with opposite pattern.. instead of deleting invalid files, add valid ones.
+		# # 			# # Pop item from files. It's still saved in full_files. 					
+		# # 			# # self.files[task_index].pop(new_index)
+		# # 			# self.files[task_index] = np.delete(self.files[task_index],new_index)
+		# # 			# Approach with opposite pattern.. instead of deleting invalid files, add valid ones.
 					
-					# # Pop item from dataset_trajectory_lengths. 
-					# self.dataset_trajectory_lengths = np.delete(self.dataset_trajectory_lengths, index)
+		# # 			# # Pop item from dataset_trajectory_lengths. 
+		# # 			# self.dataset_trajectory_lengths = np.delete(self.dataset_trajectory_lengths, index)
 
-			# Set new cummulative num demos. 
-			self.cummulative_num_demos = self.num_demos.cumsum()
-			self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
-			# Set new total length.
-			self.total_length = self.cummulative_num_demos[-1]
-			# Make array.
-			self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)
+		# 	# Set new cummulative num demos. 
+		# 	self.cummulative_num_demos = self.num_demos.cumsum()
+		# 	self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
+		# 	# Set new total length.
+		# 	self.total_length = self.cummulative_num_demos[-1]
+		# 	# Make array.
+		# 	self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)
 
-			for t in range(len(self.task_list)):
-				self.files[t] = np.array(self.files[t])
+		# 	for t in range(len(self.task_list)):
+		# 		self.files[t] = np.array(self.files[t])
 
-			# By popping element from files / dataset_traj_lengths, we now don't need to change indexing.
+		# 	# By popping element from files / dataset_traj_lengths, we now don't need to change indexing.
 		
 	def setup(self):
-		self.files = []
-		for i in range(len(self.task_list)):
-			# self.files.append(np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
-			# self.files.append(np.load("{0}/{1}/New_Task_Demo_Array_wImages.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
-			self.files.append(np.load("{0}/{1}/New_Task_Demo_Array.npy".format(self.dataset_directory, self.task_list[i]), allow_pickle=True))
+				
+		data_path = os.path.join(self.dataset_directory, "New_Task_Demo_Array.npy")
+		self.files = np.load(data_path, allow_pickle=True)		
 
 	def __getitem__(self, index):
 
-		if index>=self.total_length:
-			print("Out of bounds of dataset.")
-			return None
-
-		# Get bucket that index falls into based on num_demos array. 
-		task_index = np.searchsorted(self.cummulative_num_demos, index, side='right')-1
-		
-		# Decide task ID, and new index modulo num_demos.
-		# Subtract number of demonstrations in cumsum until then, and then 				
-		new_index = index-self.cummulative_num_demos[max(task_index,0)]		
-		data_element = self.files[task_index][new_index]
-
-		resample_length = len(data_element['demo'])//self.args.ds_freq
-		# print("Orig:", len(data_element['demo']),"New length:",resample_length)
-
-		self.kernel_bandwidth = self.args.smoothing_kernel_bandwidth
-		
-		# Trivially adding task ID to data element.
-		data_element['task-id'] = task_index
-		data_element['environment-name'] = self.environment_names[task_index]
-
-		if resample_length<=1 or data_element['robot-state'].shape[0]<=1:
-			data_element['is_valid'] = False			
-		else:
-			data_element['is_valid'] = True
-
-			###############################
-			# If we have additional downsampling, do it here. 
-			if self.args.ds_freq>1.:				
-				self.downsample_data(data_element, data_element['task-id'], self.args.ds_freq)
-				# data_element = 
-			
-			if self.args.smoothen:
-				data_element['demo'] = gaussian_filter1d(data_element['demo'],self.kernel_bandwidth,axis=0,mode='nearest')
-				data_element['robot-state'] = gaussian_filter1d(data_element['robot-state'],self.kernel_bandwidth,axis=0,mode='nearest')
-				data_element['object-state'] = gaussian_filter1d(data_element['object-state'],self.kernel_bandwidth,axis=0,mode='nearest')
-				data_element['flat-state'] = gaussian_filter1d(data_element['flat-state'],self.kernel_bandwidth,axis=0,mode='nearest')
-
-			if self.args.data in ['RealWorldRigidRobot']:
-				data_element['demo'] = data_element['robot-state']
-			# data_element['environment-name'] = self.environment_names[task_index]
-
+		data_element = self.files[index]
 		return data_element
 	
 	def compute_statistics(self):
 
-		self.state_size = 21
+		self.state_size = 13
 		self.total_length = self.__len__()
 		mean = np.zeros((self.state_size))
 		variance = np.zeros((self.state_size))
@@ -404,11 +367,11 @@ class NDAXInterface_Dataset(NDAXInterface_PreDataset):
 		vel_max_value = vel_maxs.max(axis=0)
 		vel_min_value = vel_mins.min(axis=0)
 
-		np.save("RealWorldRigid_Mean.npy", mean)
-		np.save("RealWorldRigid_Var.npy", variance)
-		np.save("RealWorldRigid_Min.npy", min_value)
-		np.save("RealWorldRigid_Max.npy", max_value)
-		np.save("RealWorldRigid_Vel_Mean.npy", vel_mean)
-		np.save("RealWorldRigid_Vel_Var.npy", vel_variance)
-		np.save("RealWorldRigid_Vel_Min.npy", vel_min_value)
-		np.save("RealWorldRigid_Vel_Max.npy", vel_max_value)
+		np.save("NDAX_Mean.npy", mean)
+		np.save("NDAX_Var.npy", variance)
+		np.save("NDAX_Min.npy", min_value)
+		np.save("NDAX_Max.npy", max_value)
+		np.save("NDAX_Vel_Mean.npy", vel_mean)
+		np.save("NDAX_Vel_Var.npy", vel_variance)
+		np.save("NDAX_Vel_Min.npy", vel_min_value)
+		np.save("NDAX_Vel_Max.npy", vel_max_value)
