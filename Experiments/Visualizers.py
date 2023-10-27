@@ -1721,7 +1721,7 @@ class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 
 		self.environment.reset()
 		
-class RealWorldRigidDatasetImageVisualizer(object):
+class DatasetImageVisualizer(object):
 
 	def __init__(self, has_display=False, args=None, just_objects=True):
 		

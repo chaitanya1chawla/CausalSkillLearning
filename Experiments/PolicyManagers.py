@@ -14,8 +14,7 @@ from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, To
 	GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, DAPGVisualizer, \
 	RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer,\
 	RoboMimicObjectVisualizer, RoboMimicRobotObjectVisualizer, DexMVVisualizer, \
-	FrankaKitchenVisualizer, FetchMOMARTVisualizer, \
-	RealWorldRigidDatasetImageVisualizer
+	FrankaKitchenVisualizer, FetchMOMARTVisualizer, DatasetImageVisualizer
 	# MocapVisualizer 
 
 # from Visualizers import *
@@ -131,8 +130,8 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['MOMARTRobotObject', 'MOMARTRobotObjectFlat']:			
 			if not hasattr(self, 'visualizer'):
 				self.visualizer = FetchMOMARTVisualizer(args=self.args)
-		elif self.args.data in ['RealWorldRigid']:
-			self.visualizer = RealWorldRigidDatasetImageVisualizer(args=self.args)
+		elif self.args.data in ['RealWorldRigid', 'NDAX']:
+			self.visualizer = DatasetImageVisualizer(args=self.args)
 		else:
 			self.visualizer = ToyDataVisualizer()
 		
@@ -469,8 +468,8 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['MOMARTRobotObject', 'MOMARTRobotObjectFlat']:
 			if not hasattr(self, 'visualizer'):
 				self.visualizer = FetchMOMARTVisualizer(args=self.args)
-		elif self.args.data in ['RealWorldRigid']:
-			self.visualizer = RealWorldRigidDatasetImageVisualizer(args=self.args)
+		elif self.args.data in ['RealWorldRigid', 'NDAX']:
+			self.visualizer = DatasetImageVisualizer(args=self.args)
 		else: 
 			self.visualizer = ToyDataVisualizer()
 
@@ -2301,6 +2300,15 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.norm_sub_value[10:14] = 0.
 			self.norm_sub_value[17:20] = 0.
 			self.norm_sub_value[24:] = 0.
+
+		elif self.args.data in ['NDAX']:
+
+			self.state_size = 13
+			self.state_dim = 13
+			
+			# Set orientation dimensions to be unnormalized.
+			self.norm_sub_value[10:] = 0.
+			self.norm_denom_value[10:] = 1.
 
 		self.input_size = 2*self.state_size
 		self.hidden_size = self.args.hidden_size
