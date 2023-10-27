@@ -305,6 +305,7 @@ class NDAXInterface_Dataset(NDAXInterface_PreDataset):
 	def __getitem__(self, index):
 
 		data_element = self.files[index]
+		data_element['task-id'] = data_element['task-id']
 		return data_element
 	
 	def compute_statistics(self):
