@@ -1707,6 +1707,10 @@ class PolicyManager_BaseClass():
 		if self.rounded_down_extent==extent:
 			index_list = original_index_list
 		else:
+
+			# print("Debug")
+			# embed()
+
 			# additional_index_list = np.random.choice(original_index_list, size=extent-self.rounded_down_extent, replace=False)			
 			# additional_index_list = np.random.choice(original_index_list, size=self.training_extent-self.rounded_down_extent, replace=False)
 			additional_index_list = np.random.choice(original_index_list, size=self.training_extent-extent, replace=self.args.replace_samples)
