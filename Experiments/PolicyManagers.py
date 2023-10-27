@@ -36,7 +36,7 @@ global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk'
 			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects', \
 			'MOMARTPreproc', 'MOMART', 'MOMARTObject', 'MOMARTRobotObject', 'MOMARTRobotObjectFlat', \
 			'FrankaKitchenPreproc', 'FrankaKitchen', 'FrankaKitchenObject', 'FrankaKitchenRobotObject', \
-			'RealWorldRigid', 'RealWorldRigidRobot', 'RealWorldRigidJEEF']
+			'RealWorldRigid', 'RealWorldRigidRobot', 'RealWorldRigidJEEF', 'NDAX']
 
 class PolicyManager_BaseClass():
 

@@ -82,10 +82,9 @@ class NDAXInterface_PreDataset(Dataset):
 		self.ds_freq = np.array([6.5])
 
 		# Set files. 
-		self.set_ground_tag_pose_dict()
 		self.setup()	
 
-		self.stat_dir_name ='NDAXInterface'			
+		self.stat_dir_name ='NDAX'
 
 	
 	def interpolate_position(self, valid=None, position_sequence=None):
@@ -95,7 +94,7 @@ class NDAXInterface_PreDataset(Dataset):
 		# Interp1d from Scipy expects the last dimension to be the dimension we are ninterpolating over. 
 		valid_positions = np.swapaxes(position_sequence, 1, 0)
 		valid_times = valid
-		step = (valid[-1]-valid[0])/(len(valid)*self.ds_freq)
+		step = (valid[-1]-valid[0])/(len(valid)//self.ds_freq)
 
 		# Resample uniform timesteps with the same length as original data. 
 		query_times = np.arange(valid[0], valid[-1], step)
@@ -116,13 +115,12 @@ class NDAXInterface_PreDataset(Dataset):
 
 		# Resample uniform timesteps with the same length as original data. 
 		valid_times = valid
-		step = (valid[-1]-valid[0])/(len(valid)*self.ds_freq)
+		step = (valid[-1]-valid[0])/(len(valid)//self.ds_freq)
 		query_times = np.arange(valid[0], valid[-1], step)
 
 		valid_orientations = orientation_sequence
 		rotation_sequence = R.concatenate(R.from_quat(valid_orientations))
-		query_times = np.arange(0, len(orientation_sequence))
-
+		
 		# Create slerp object. 
 		slerp_object = Slerp(valid_times, rotation_sequence)
 
@@ -146,8 +144,7 @@ class NDAXInterface_PreDataset(Dataset):
 		# Interpolate positions and orientations. 
 		interpolated_positions = self.interpolate_position(valid=times, position_sequence=positions)
 		interpolated_orientations = self.interpolate_orientation(valid=times, orientation_sequence=orientations)
-
-		interpolated_poses = np.concatenate([interpolated_positions, interpolated_orientations], axis=0)
+		interpolated_poses = np.concatenate([interpolated_positions, interpolated_orientations], axis=1)
 
 		return interpolated_poses
 
@@ -173,6 +170,8 @@ class NDAXInterface_PreDataset(Dataset):
 		demonstration['motor_positions'] = data[:,:6]
 		demonstration['hand_pose'] = data[6:10]
 		demonstration['hand_orientation'] = data[10:]
+
+		return demonstration
 
 	def process_demonstration(self, raw_data, raw_file_name):
 
@@ -226,7 +225,6 @@ class NDAXInterface_PreDataset(Dataset):
 	def __getitem__(self, index):
 
 		return {}	
-
 
 class NDAXInterface_Dataset(NDAXInterface_PreDataset):
 	

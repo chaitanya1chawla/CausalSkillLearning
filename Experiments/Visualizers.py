@@ -1756,6 +1756,7 @@ class RealWorldRigidDatasetImageVisualizer(object):
 				
 		imageio.mimsave(os.path.join(gif_path,gif_name), image_list[...,::-1])
 		return image_list[...,::-1]
+	
 class ToyDataVisualizer():
 
 	def __init__(self):

@@ -9,7 +9,7 @@
 from headers import *
 import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders, \
 	  GRAB_DataLoader, DAPG_DataLoader, DexMV_DataLoader, MOMART_DataLoader, FrankaKitchen_DataLoader, \
-		RealWorldRigid_DataLoader
+		RealWorldRigid_DataLoader, NDAX_DataLoader
 from PolicyManagers import *
 import TestClass
 import faulthandler
@@ -133,6 +133,11 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_Dataset(args)
 	elif args.data in ['RealWorldRigidJEEF']:
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_JointEEFDataset(args)
+	############################
+	elif args.data=='NDAXPreproc':
+		dataset = NDAX_DataLoader.NDAXInterface_PreDataset(args)
+	elif args.data=='NDAX':
+		dataset = NDAX_DataLoader.NDAXInterface_Dataset(args)
 
 	return dataset
 
@@ -145,8 +150,8 @@ class Master():
 			print("Creating Datasets")			
 			self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)			
 
-		# print("Embed after dataset creation")
-		# embed()
+		print("Embed after dataset creation")
+		embed()
 
 		# Now define policy manager.
 		if self.args.setting in ['learntsub', 'joint']:
