@@ -9,50 +9,50 @@ def resample(original_trajectory, desired_number_timepoints):
 	new_timepoints = np.linspace(0, original_traj_len-1, desired_number_timepoints, dtype=int)
 	return original_trajectory[new_timepoints]
 
-def invert(homogenous_matrix):
+# def invert(homogenous_matrix):
 	
-	from scipy.spatial.transform import Rotation as R
-	inverse = np.zeros((4,4))
-	rotation = R.from_matrix(homogenous_matrix[:3,:3])
-	inverse[:3, :3] = rotation.inv().as_matrix()
-	inverse[:3, -1] = -rotation.inv().apply(homogenous_matrix[:3,-1])
-	inverse[-1, -1] = 1.
+# 	from scipy.spatial.transform import Rotation as R
+# 	inverse = np.zeros((4,4))
+# 	rotation = R.from_matrix(homogenous_matrix[:3,:3])
+# 	inverse[:3, :3] = rotation.inv().as_matrix()
+# 	inverse[:3, -1] = -rotation.inv().apply(homogenous_matrix[:3,-1])
+# 	inverse[-1, -1] = 1.
 
-	return inverse
+# 	return inverse
 
-def invert_batch_matrix(homogenous_matrix):
+# def invert_batch_matrix(homogenous_matrix):
 
-	from scipy.spatial.transform import Rotation as R
-	inverse = np.zeros((homogenous_matrix.shape[0], 4,4))
-	rotation = R.from_matrix(homogenous_matrix[:,:3,:3])
-	inverse[:, :3, :3] = rotation.inv().as_matrix()
-	inverse[:, :3, -1] = -rotation.inv().apply(homogenous_matrix[:, :3,-1])
-	inverse[:, -1, -1] = 1.
+# 	from scipy.spatial.transform import Rotation as R
+# 	inverse = np.zeros((homogenous_matrix.shape[0], 4,4))
+# 	rotation = R.from_matrix(homogenous_matrix[:,:3,:3])
+# 	inverse[:, :3, :3] = rotation.inv().as_matrix()
+# 	inverse[:, :3, -1] = -rotation.inv().apply(homogenous_matrix[:, :3,-1])
+# 	inverse[:, -1, -1] = 1.
 
-	return inverse
+# 	return inverse
 
-def create_matrix(position, orientation):
+# def create_matrix(position, orientation):
 
-	homogenous_matrix = np.zeros((4,4))
-	homogenous_matrix[:3,-1] = position
-	homogenous_matrix[:3,:3] = R.from_quat(orientation).as_matrix()
-	homogenous_matrix[-1,-1] = 1.
+# 	homogenous_matrix = np.zeros((4,4))
+# 	homogenous_matrix[:3,-1] = position
+# 	homogenous_matrix[:3,:3] = R.from_quat(orientation).as_matrix()
+# 	homogenous_matrix[-1,-1] = 1.
 
-	return homogenous_matrix
+# 	return homogenous_matrix
 
-def create_batch_matrix(position, orientation):
+# def create_batch_matrix(position, orientation):
 
-	traj_length = position.shape[0]
-	homogenous_matrix = np.zeros((traj_length, 4,4))
-	homogenous_matrix[:, :3,-1] = position
-	homogenous_matrix[:, :3,:3] = R.from_quat(orientation).as_matrix()
-	homogenous_matrix[:,-1,-1] = 1.
+# 	traj_length = position.shape[0]
+# 	homogenous_matrix = np.zeros((traj_length, 4,4))
+# 	homogenous_matrix[:, :3,-1] = position
+# 	homogenous_matrix[:, :3,:3] = R.from_quat(orientation).as_matrix()
+# 	homogenous_matrix[:,-1,-1] = 1.
 
-	return homogenous_matrix
+# 	return homogenous_matrix
 
-def normalize_quaternion(q):
-	# Define quaternion normalization function.
-	return q/np.linalg.norm(q)
+# def normalize_quaternion(q):
+# 	# Define quaternion normalization function.
+# 	return q/np.linalg.norm(q)
 
 class NDAXInterface_PreDataset(Dataset): 
 
@@ -61,13 +61,14 @@ class NDAXInterface_PreDataset(Dataset):
 		
 		self.args = args
 		if self.args.datadir is None:
-			self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/NDAX/'
+			# self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/NDAX/'
+			self.dataset_directory = '/data/tanmayshankar/Datasets/NDAX/'
 		else:
 			self.dataset_directory = self.args.datadir			
 		
 		# Require a task list. 
 		# The task name is needed for setting the environment, rendering. 
-		self.task_list = []
+		self.task_list = ['open_door', 'close_door', 'eggs', 'stock_cupboard', 'stock_fridge']
 		self.environment_names = []
 		self.num_demos = np.array([1])
 
@@ -92,9 +93,12 @@ class NDAXInterface_PreDataset(Dataset):
 		from scipy import interpolate
 
 		# Interp1d from Scipy expects the last dimension to be the dimension we are ninterpolating over. 
-		valid_positions = np.swapaxes(position_sequence[valid==1], 1, 0)
-		valid_times = np.where(valid==1)[0]
-		query_times = np.arange(0, len(position_sequence))
+		valid_positions = np.swapaxes(position_sequence, 1, 0)
+		valid_times = valid
+		step = (valid[-1]-valid[0])/len(valid)
+
+		# Resample uniform timesteps with the same length as original data. 
+		query_times = np.arange(valid[0], valid[-1], step)
 
 		# Create interpolating function. 
 		interpolating_function = interpolate.interp1d(valid_times, valid_positions)
@@ -110,9 +114,13 @@ class NDAXInterface_PreDataset(Dataset):
 		from scipy.spatial.transform import Rotation as R
 		from scipy.spatial.transform import Slerp
 
-		valid_orientations = orientation_sequence[valid==1]
+		# Resample uniform timesteps with the same length as original data. 
+		valid_times = valid
+		step = (valid[-1]-valid[0])/len(valid)
+		query_times = np.arange(valid[0], valid[-1], step)
+
+		valid_orientations = orientation_sequence
 		rotation_sequence = R.concatenate(R.from_quat(valid_orientations))
-		valid_times = np.where(valid==1)[0]
 		query_times = np.arange(0, len(orientation_sequence))
 
 		# Create slerp object. 
@@ -128,72 +136,20 @@ class NDAXInterface_PreDataset(Dataset):
 
 	def interpolate_pose(self, pose_sequence):
 
-		# Assumes pose_sequence is a dictionary with 3 keys: valid, position, and orientation. 
-		# valid is 1 when the pose stored is valid, and 0 otherwise. 
-
-		# Only interpolate if ther are invalid poses. Otherwise jsut return. 
-		if (pose_sequence['validity']==1).all():
-			return pose_sequence
-
-		# Pass all data until last valid pose. 
-		traj_length = pose_sequence['validity'].shape[0]
-		valid_indices = np.where(pose_sequence['validity'])[0]
-		first_valid_index = valid_indices[0]
-		last_valid_index = valid_indices[-1]
+		# Pose here is an array with Motor angles, Position and orientation. 
+		# The dimensions and ordering of these are - 6D motor angles, 4D orientation, then 3D position. 
+		times = pose_sequence[:,-1]
+		orientations = pose_sequence[:,6:10]
+		position_indices = np.concatenate([np.arange(0,6), np.arange(10,13)])
+		positions = pose_sequence[:,position_indices]
 
 		# Interpolate positions and orientations. 
-		interpolated_positions = self.interpolate_position(valid=pose_sequence['validity'][first_valid_index:last_valid_index+1], \
-							 position_sequence=pose_sequence['position'][first_valid_index:last_valid_index+1])
-		interpolated_orientations = self.interpolate_orientation(valid=pose_sequence['validity'][first_valid_index:last_valid_index+1], \
-							orientation_sequence=pose_sequence['orientation'][first_valid_index:last_valid_index+1])
+		interpolated_positions = self.interpolate_position(valid=times, position_sequence=positions)
+		interpolated_orientations = self.interpolate_orientation(valid=times, orientation_sequence=orientations)
 
-		# Copy interpolated position until last valid index. 
-		pose_sequence['position'][first_valid_index:last_valid_index+1] = interpolated_positions
-		pose_sequence['orientation'][first_valid_index:last_valid_index+1] = interpolated_orientations
+		interpolated_poses = np.concatenate([interpolated_positions, interpolated_orientations], axis=0)
 
-		# Copy over valid poses to start of trajectory and end of trajectory if invalid:
-		if first_valid_index>0:
-			# Until first valid index, these are all invalid. 
-			pose_sequence['position'][:first_valid_index] = pose_sequence['position'][first_valid_index]
-			pose_sequence['orientation'][:first_valid_index] = pose_sequence['orientation'][first_valid_index]
-		
-		# Check if last valid index is before the end of the trajectory, i.e. if there are invalid points at the end. 
-		if last_valid_index<(traj_length-1):
-			pose_sequence['position'][last_valid_index+1:] = pose_sequence['position'][last_valid_index]
-			pose_sequence['orientation'][last_valid_index+1:] = pose_sequence['orientation'][last_valid_index]
-
-		# Pop validity. 
-		pose_sequence.pop('validity')
-
-		return pose_sequence
-
-	def compute_relative_poses(self, demonstration):
-
-		from scipy.spatial.transform import Rotation as R
-
-		# Get poses of object1 and object2 with respect to ground. 
-		demonstration['object1_pose'] = {}
-		demonstration['object2_pose'] = {}
-
-		# Construct homogenous transformation matrices. 
-		ground_in_camera_homogenous_matrices = create_batch_matrix(demonstration['ground_cam_frame_pose']['position'], demonstration['ground_cam_frame_pose']['orientation'])
-		object1_in_camera_homogenous_matrices = create_batch_matrix(demonstration['object1_cam_frame_pose']['position'], demonstration['object1_cam_frame_pose']['orientation'])
-		object2_in_camera_homogenous_matrices = create_batch_matrix(demonstration['object2_cam_frame_pose']['position'], demonstration['object2_cam_frame_pose']['orientation'])
-
-		# Inverse of the ground in camera.
-		camera_in_ground_homogenous_matrices = invert_batch_matrix(ground_in_camera_homogenous_matrices)
-
-		# Now transform with batch multiplication. 
-		object1_in_ground_homogenous_matrices = np.matmul(camera_in_ground_homogenous_matrices, object1_in_camera_homogenous_matrices)
-		object2_in_ground_homogenous_matrices = np.matmul(camera_in_ground_homogenous_matrices, object2_in_camera_homogenous_matrices)
-
-		# Now retieve poses.
-		demonstration['object1_pose']['position'] = object1_in_ground_homogenous_matrices[:,:3,-1]
-		demonstration['object2_pose']['position'] = object2_in_ground_homogenous_matrices[:,:3,-1]
-		demonstration['object1_pose']['orientation'] = R.from_matrix(object1_in_ground_homogenous_matrices[:,:3,:3]).as_quat()
-		demonstration['object2_pose']['orientation'] = R.from_matrix(object2_in_ground_homogenous_matrices[:,:3,:3]).as_quat()
-
-		return demonstration
+		return interpolated_poses
 
 	def downsample_data(self, demonstration, task_index, ds_freq=None):
 
@@ -209,181 +165,45 @@ class NDAXInterface_PreDataset(Dataset):
 		for k in key_list:
 			demonstration[k] = resample(demonstration[k], number_timepoints)
 		
-	def collate_states(self, demonstration):
+	def process_demonstration(self, raw_data):
 
-		# We're going to collate states, and remove irrelevant ones.  
-		# First collect object states.
-		new_demonstration = {}
-		demonstration['object1_state'] = np.concatenate([ demonstration['object1_pose']['position'], \
-														demonstration['object1_pose']['orientation']], axis=-1)
-		demonstration['object2_state'] = np.concatenate([ demonstration['object2_pose']['position'], \
-														demonstration['object2_pose']['orientation']], axis=-1)
-		new_demonstration['object-state'] = np.concatenate([ demonstration['object1_state'], \
-						  								demonstration['object2_state']], axis=-1)
+		# Throw away irrelevant information. 
+		# 1) Throw away first timestep of CSV, because it's just header. 			
+		# 2) Keep the timesteps for now, so that we can interpolate data to a uniform frequency. 
+		data = raw_data[1:]
 
-		# First collate robot states. 
-		new_demonstration['robot-state'] = np.concatenate( [demonstration['js_pos'], \
-						  						demonstration['gripper_data'].reshape(-1,1) ], axis=-1)
-		new_demonstration['eef-state'] = demonstration['rs_pose']
-		new_demonstration['demo'] = np.concatenate([ new_demonstration['robot-state'], \
-					  							new_demonstration['object-state']], axis=-1)
+		# Now interpolate the data at uniform frequency.
+		# This will reorder data to Motor Positions, Hand Position, Hand Orientation.
+		interpolated_pose = self.interpolate_pose(data)
 
-		if self.args.images_in_real_world_dataset:
-			# Put images of primary camera into separate topic.. 
-			new_demonstration['images'] = demonstration['images']['cam{0}'.format(demonstration['primary_camera'])]
+		return interpolated_pose
 
-		return new_demonstration
-
-	def set_ground_tag_pose_dict(self):
-
-		self.ground_pose_dict = {}
-		self.ground_pose_dict['0'] = {}
-		self.ground_pose_dict['1'] = {}
-		
-		# Manually set pose, so we don't have to deal with arbitrary flips in the data. 
-		self.ground_pose_dict['0']['position'] = np.array([0.13983876, 0.09984951, 0.64977687])
-		self.ground_pose_dict['0']['orientation'] = np.array([-0.5428623 ,  0.6971846 , -0.42725178, -0.19154654])
-
-		self.ground_pose_dict['1']['position'] = np.array([0.04871597, 0.07525627, 0.66383035])
-		self.ground_pose_dict['1']['orientation'] = np.array([ 0.78081735, -0.42594218,  0.19169668,  0.41490953])		
-
-	def set_ground_tag_pose(self, length=None, primary_camera=None):
-
-		pose_dictionary = {}
-		pos = self.ground_pose_dict[str(primary_camera)]['position']
-		orient = self.ground_pose_dict[str(primary_camera)]['orientation']
-
-		pose_dictionary['position'] = np.repeat(pos[np.newaxis, :], length, axis=0)
-		pose_dictionary['orientation'] = np.repeat(orient[np.newaxis, :], length, axis=0)
-		
-		return pose_dictionary
-
-	def process_demonstration(self, demonstration, task_index):
-
-		##########################################
-		# Structure of data. 
-		##########################################		
-		# Assumes demonstration is a dictionary. 
-		# Keys in the dictionary correspond to different data. The keys that we care about are: 
-		# rs_angle, rs_pose, gripper_state, js_pos, tag0, tag1, tag2, primary_camera. 
-		# Within tag#:
-		# 	camera#:
-		# 		valid, position, orientation. 
-		##########################################
-
-		##########################################
-		# Things to do within this function. 
-		##########################################
-		
-		# 0) For primary camera, retrieve and interpolate tag poses for that camera. 
-		# 1) Compute relative poses. 
-		# 2) Collate all the relevant data streams, remove irrelevant data streams.
-		# 3) Downsample all relevant data streams. 		
-		# 4) Return new demo file. 
-
-		#############
-		# 0) For primary camera, retrieve tag poses. 
-		#############
-		
-		# Now, instead of interpolating the ground tag detection from the camera frame, set it to constant value. 
-		# demonstration['ground_cam_frame_pose'] = self.interpolate_pose( demonstration['tag0']['cam{0}'.format(demonstration['primary_camera'])] )				
-
-		demo_length = demonstration['js_pos'].shape[0]
-		demonstration['ground_cam_frame_pose'] = self.set_ground_tag_pose( length=demo_length, primary_camera=demonstration['primary_camera'] )
-		demonstration['object1_cam_frame_pose'] = self.interpolate_pose( demonstration['tag1']['cam{0}'.format(demonstration['primary_camera'])] )
-		demonstration['object2_cam_frame_pose'] = self.interpolate_pose( demonstration['tag2']['cam{0}'.format(demonstration['primary_camera'])] )
-		
-		#############
-		# 1) Compute relative poses.
-		#############
-		
-		demonstration = self.compute_relative_poses(demonstration=demonstration)
-
-		#############
-		# 2) Stack relevant data that we care about. 
-		#############
-
-		demonstration = self.collate_states(demonstration=demonstration)
-
-		#############
-		# 3) Downsample.
-		#############
-		
-		self.downsample_data(demonstration=demonstration, task_index=task_index)
-		# Add task ID to demo. 
-		demonstration['task_id'] = task_index
-		demonstration['task_name'] = self.task_list[task_index]
-			
-		# Smoothen if necessary. 
-
-		# return demonstration
-		return demonstration
-		
 	def setup(self):
-		# Load data from all tasks. 			
-		# numpy_data_path = os.path.join(self.dataset_directory, "*/Numpy_Files/*.npy")
-		# self.file_list = sorted(glob.glob(numpy_data_path))
-		# self.files = []
+		
+		###########################
+		# Load data from all tasks.
+		###########################
+		  			
+		data_path = os.path.join(self.dataset_directory, "*.csv")
+		self.file_list = sorted(glob.glob(data_path))
+		self.files = []
 
-		# # For all demos.
-		# for k, v in enumerate(self.file_list):
-		# 	# Actually load numpy files. 
-		# 	self.files.append(np.load(v, allow_pickle=True))
+		# For all demos.
+		for k, v in enumerate(self.file_list):
+			
+			# Actually load numpy files. 
+			raw_data = np.genfromtxt(v, delimiter=',')
+			
+			# Proces data. 
+			demonstration = self.process_demonstration(raw_data=raw_data)
 
-		# For each task, set file list. 
-		# self.files = [[] for k in range(self.number_tasks)]
+			# Process data. 
+			self.files.append(demonstration)
 
-		#########################
-		# For each task
-		#########################
-
-		print("###################################")
-		print("About to process real world dataset.")
-
-		for task_index in range(len(self.task_list)):
-		# for task_index in range(0):
-			self.task_demo_array = []
-
-			print("###################################")
-			print("Processing task: ", task_index, " of ", self.number_tasks)
-
-			# Set file path for this task.
-			alt_task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'NumpyDemos')
-			task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'ImageData')			
-
-			#########################	
-			# For every demo in this task
-			#########################
-
-			for j in range(self.num_demos[task_index]):			
-				
-				print("####################")
-				print("Processing demo: ", j, " of ", self.num_demos[task_index], " from task ", task_index)
-				
-				# file = os.path.join(task_file_path, 'demo{0}.npy'.format(j))
-				# demonstration = np.load(file, allow_pickle=True).item()
-				
-				file = os.path.join(task_file_path, 'demo{0}.npy'.format(j))
-				alt_file = os.path.join(alt_task_file_path, 'demo{0}.npy'.format(j))
-				demonstration = np.load(file, allow_pickle=True).item()
-				alt_demonstration = np.load(alt_file, allow_pickle=True).item()
-				demonstration['primary_camera'] = alt_demonstration['primary_camera']
-
-				#########################
-				# Now process in whatever way necessary. 
-				#########################
-
-				processed_demonstration = self.process_demonstration(demonstration, task_index)
-
-				self.task_demo_array.append(processed_demonstration)
-
-
-			# For each task, save task_file_list to One numpy. 
-			suffix = ""
-			if self.args.images_in_real_world_dataset:
-				suffix = "_wSingleImages"
-			task_numpy_path = os.path.join(self.dataset_directory, self.task_list[task_index], "New_Task_Demo_Array{0}.npy".format(suffix))
-			np.save(task_numpy_path, self.task_demo_array)
+		# For each task, save task_file_list to One numpy. 
+		suffix = ""
+		task_numpy_path = os.path.join(self.dataset_directory, "New_Task_Demo_Array{0}.npy".format(suffix))
+		np.save(task_numpy_path, self.files)
 
 	def __len__(self):
 		return self.total_length
