@@ -305,6 +305,10 @@ class NDAXInterface_Dataset(NDAXInterface_PreDataset):
 	def __getitem__(self, index):
 
 		data_element = self.files[index]
+
+		# EMBed here
+		# print("Embedding in NDAX DL")
+		# embed()
 		data_element['task-id'] = data_element['task_id']
 		return data_element
 	
