@@ -10,111 +10,14 @@ def resample(original_trajectory, desired_number_timepoints):
 	new_timepoints = np.linspace(0, original_traj_len-1, desired_number_timepoints, dtype=int)
 	return original_trajectory[new_timepoints]
 
-def invert(homogenous_matrix):
-	
-	from scipy.spatial.transform import Rotation as R
-	inverse = np.zeros((4,4))
-	rotation = R.from_matrix(homogenous_matrix[:3,:3])
-	inverse[:3, :3] = rotation.inv().as_matrix()
-	inverse[:3, -1] = -rotation.inv().apply(homogenous_matrix[:3,-1])
-	inverse[-1, -1] = 1.
+class RealWorldHumanRigid_PreDataset(Dataset): 
 
-	return inverse
-
-def invert_batch_matrix(homogenous_matrix):
-
-	from scipy.spatial.transform import Rotation as R
-	inverse = np.zeros((homogenous_matrix.shape[0], 4,4))
-	rotation = R.from_matrix(homogenous_matrix[:,:3,:3])
-	inverse[:, :3, :3] = rotation.inv().as_matrix()
-	inverse[:, :3, -1] = -rotation.inv().apply(homogenous_matrix[:, :3,-1])
-	inverse[:, -1, -1] = 1.
-
-	return inverse
-
-def create_matrix(position, orientation):
-
-	homogenous_matrix = np.zeros((4,4))
-	homogenous_matrix[:3,-1] = position
-	homogenous_matrix[:3,:3] = R.from_quat(orientation).as_matrix()
-	homogenous_matrix[-1,-1] = 1.
-
-	return homogenous_matrix
-
-def create_batch_matrix(position, orientation):
-
-	traj_length = position.shape[0]
-	homogenous_matrix = np.zeros((traj_length, 4,4))
-	homogenous_matrix[:, :3,-1] = position
-	homogenous_matrix[:, :3,:3] = R.from_quat(orientation).as_matrix()
-	homogenous_matrix[:,-1,-1] = 1.
-
-	return homogenous_matrix
-
-def define_ground_world_transformation():
-
-	# Defines the transformation between the ground frame (located on the table), and the world frame (located at the base of the robot). 
-	rotation = R.from_euler('Z', 180, degrees=True)
-
-	ground_in_world_homogenous_matrix = np.zeros((4,4))
-	ground_in_world_homogenous_matrix[:3, :3] = rotation.as_matrix()
-	ground_in_world_homogenous_matrix[:3, -1] = np.array([0.595, 0.0145, -0.15])
-	ground_in_world_homogenous_matrix[-1, -1] = 1.
-
-	return ground_in_world_homogenous_matrix
-
-def transform_pose_from_ground_to_world(pose_array):
-
-	# Takes a pose in the ground frame and transforms it to the world frame. 
-	ground_in_world_homogenous_matrix = define_ground_world_transformation()
-	
-	# Set pose pose in homogenous matrix
-	pose_in_ground_hmat = np.zeros((pose_array.shape[0], 4,4))
-	pose_in_ground_hmat[:,:3, :3] = R.from_quat(pose_array[:,3:]).as_matrix()
-	pose_in_ground_hmat[:,:3, -1] = pose_array[:,:3]
-	pose_in_ground_hmat[:, -1, -1] = 1.
-
-	# Transform
-	# world_in_ground_hmat = invert(ground_in_world_homogenous_matrix)
-	pose_in_world_hmat = np.matmul(ground_in_world_homogenous_matrix, pose_in_ground_hmat)
-
-	# Retrieve pose. 
-	pose_in_world_quaternion = R.from_matrix(pose_in_world_hmat[:, :3, :3]).as_quat()
-	pose_in_world_position = pose_in_world_hmat[:, :3, -1]
-
-	return pose_in_world_position, pose_in_world_quaternion
-
-def transform_pose_from_world_to_ground(pose_array):
-
-	# Takes a pose in the ground frame and transforms it to the world frame. 
-	ground_in_world_homogenous_matrix = define_ground_world_transformation()
-	world_in_ground_homogenous_matrix = invert(ground_in_world_homogenous_matrix)
-	
-	# Set pose in homogenous matrix
-	pose_in_world_hmat = np.zeros((pose_array.shape[0], 4,4))
-	pose_in_world_hmat[:,:3, :3] = R.from_quat(pose_array[:,3:]).as_matrix()
-	pose_in_world_hmat[:,:3, -1] = pose_array[:,:3]
-	pose_in_world_hmat[:, -1, -1] = 1.
-
-	# Transform
-	# world_in_ground_hmat = invert(ground_in_world_homogenous_matrix)
-	pose_in_ground_hmat = np.matmul(world_in_ground_homogenous_matrix, pose_in_world_hmat)
-
-	# Retrieve pose. 
-	pose_in_ground_quaternion = R.from_matrix(pose_in_ground_hmat[:, :3, :3]).as_quat()
-	pose_in_ground_position = pose_in_ground_hmat[:, :3, -1]
-
-	return pose_in_ground_position, pose_in_ground_quaternion
-
-
-class RealWorldRigid_PreDataset(Dataset): 
-
-	# Class implementing instance of RealWorld Rigid Body Dataset. 
+	# Class implementing instance of RealWorld Human Rigid Body Dataset. 
 	def __init__(self, args):
 		
 		self.args = args
 		if self.args.datadir is None:
-			self.dataset_directory = '/home/tshankar/Research/Code/Data/Datasets/RoboMimic/'
+			self.dataset_directory = '/scratch/cchawla/RigidBodyHumanData/'
 		else:
 			self.dataset_directory = self.args.datadir			
 		
@@ -124,13 +27,10 @@ class RealWorldRigid_PreDataset(Dataset):
 		self.environment_names = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']
 		self.num_demos = np.array([10, 10, 6, 10, 10])
 
-		# self.task_list = ['BoxOpening', 'DrawerOpening', 'PickPlace']
-		# self.environment_names = ['BoxOpening', 'DrawerOpening', 'PickPlace']
-		# self.num_demos = np.array([10, 6, 10])
-
 		# Each task has 200 demos according to RoboMimic.
 		self.number_tasks = len(self.task_list)
 		self.cummulative_num_demos = self.num_demos.cumsum()
+		# [0, 10, 20, 26, 36, 46]
 		self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)		
 		self.total_length = self.num_demos.sum()		
 
@@ -138,21 +38,122 @@ class RealWorldRigid_PreDataset(Dataset):
 		self.ds_freq = np.array([6, 6, 7, 8, 8])
 
 		# Set files. 
+		# TODO : check if values from set_ground_tag_pose_dict() are still valid
 		self.set_ground_tag_pose_dict()
 		self.setup()
 		
 
-		self.stat_dir_name ='RealWorldRigid'
+		self.stat_dir_name ='RealWorldHumanRigid'
 				
 	def normalize_quaternion(self, q):
 		# Define quaternion normalization function.
 		return q/np.linalg.norm(q)
 	
+	def tag_preprocessing(self, cam_tag_detections=None):
+		# 1) Preprocess tag poses to convert the data structure into -
+		# data['tag_detections']['cam#'][tag#] = {'position[]', 'orientation[]', 'valid[]'} 
+		tag_dict = {
+			'tag0': {'position':[], 'orientation':[], 'validity':[]},
+			'tag1': {'position':[], 'orientation':[], 'validity':[]},
+			'tag2': {'position':[], 'orientation':[], 'validity':[]},
+			  }
+		
+		expected_tags_ids=[0,1,2]
+		detected_tag_ids=[]
+
+		for tags_detect in cam_tag_detections:
+			# looping over timesteps t
+			for tag in tags_detect:
+				# looping over tags detected in a single frame:
+				id = tag['tag_id']
+				tag_dict['tag{}'.format(id)]['position'].append(tag['position'])
+				tag_dict['tag{}'.format(id)]['orientation'].append(tag['orientation'])
+				tag_dict['tag{}'.format(id)]['validity'].append(1)
+				detected_tag_ids.append(id)
+			
+			# adding Null Data for undetected tags
+			not_detected_tags = list( set(expected_tags_ids)-set(detected_tag_ids) )
+			
+			if len(not_detected_tags) != 0:
+				for tag_id in not_detected_tags:
+					tag_dict['tag{}'.format(tag_id)]['position'].append(np.array(0,0,0))
+					tag_dict['tag{}'.format(tag_id)]['orientation'].append(np.array(0,0,0,0))
+					tag_dict['tag{}'.format(tag_id)]['validity'].append(0)
+
+		return tag_dict
+
+	def interpolate_keypoint(self, both_cams_keypoint_sequence=None):
+		
+		# Distance between keypoint [0-1, 1-2, 2-3, 3-4] is >30 and <38  --- class 1 
+		# Distance between keypoint [5-6, 6-7, 7-8], [9-10, 10-11, 11-12], [13-14, 14-15, 15-16], 19-20 is >22.5 and <29.5 --- class 2 
+		# Distance between keypoint [17-18, 18-19] is >16 and <19 --- class 3
+		both_cams_data = {}
+		for idx, cam_keypoint_sequence in enumerate(both_cams_keypoint_sequence.values()):
+
+			# looping over each camera:
+			keypoint_sequence = np.array(cam_keypoint_sequence)
+			valid_timesteps = np.zeros((len(keypoint_sequence)))
+			for j in keypoint_sequence:
+				# looping over each timestep
+				flag = True
+				# point pairs defined by seeing mmpose dataset: onehand10k
+				# dist limits are defined by approximating distances on own hand 
+				point_pairs_1 = [(0,1), (1,2), (2,3), (3,4)]
+				for pair in point_pairs_1:
+					dist = np.linalg.norm(j[pair[0], :], j[pair[1], :])
+					if not (dist > 0.30 and dist < 0.38):
+						flag = False
+
+				point_pairs_2 = [(5,6), (6,7), (7,8), (9,10), (10,11), (11,12), (13,14), (14,15), (15,16), (19,20)]
+				for pair in point_pairs_2:
+					dist = np.linalg.norm(j[pair[0], :], j[pair[1], :])
+					if not (dist > 0.225 and dist < 0.295):
+						flag = False
+
+				point_pairs_3 = [(17,18), (18,19)]
+				for pair in point_pairs_3:
+					dist = np.linalg.norm(j[pair[0], :], j[pair[1], :])
+					if not (dist > 0.16 and dist < 0.19):
+						flag = False
+
+				if flag==True:
+					valid_timesteps[j]=1
+
+			valid_indices = np.where(valid_timesteps)[0]
+			first_valid_index = valid_indices[0]
+			last_valid_index = valid_indices[-1]
+			# for single_keypoint in keypoint_sequence:
+			# 	# looping over each timestep
+
+			# Interpolate positions 
+			both_cams_data['cam{}'.format(idx)] = self.interpolate_keypoint_position(valid=valid_timesteps, \
+								 position_sequence=keypoint_sequence[first_valid_index:last_valid_index+1])
+			
+		return both_cams_data
+
+	def interpolate_keypoint_position(self, valid=None, position_sequence=None):
+		
+		from scipy import interpolate
+
+		# Interp1d from Scipy expects the last dimension to be the dimension we are interpolating over. 
+		valid_positions = np.swapaxes(position_sequence[valid==1], 2, 0)
+		valid_times = np.where(valid==1)[0]
+		query_times = np.arange(0, len(position_sequence))
+
+		# Create interpolating function. 
+		interpolating_function = interpolate.interp1d(valid_times, valid_positions)
+
+		# Query interpolating function. 
+		interpolated_positions = interpolating_function(query_times)
+
+		# Swap axes back and return. 
+		return np.swapaxes(interpolated_positions, 2, 0)
+
 	def interpolate_position(self, valid=None, position_sequence=None):
 		
 		from scipy import interpolate
 
-		# Interp1d from Scipy expects the last dimension to be the dimension we are ninterpolating over. 
+		# Interp1d from Scipy expects the last dimension to be the dimension we are interpolating over. 
 		valid_positions = np.swapaxes(position_sequence[valid==1], 1, 0)
 		valid_times = np.where(valid==1)[0]
 		query_times = np.arange(0, len(position_sequence))
@@ -229,31 +230,31 @@ class RealWorldRigid_PreDataset(Dataset):
 		return pose_sequence
 
 	def compute_relative_poses(self, demonstration):
-
+    
 		from scipy.spatial.transform import Rotation as R
-
+    
 		# Get poses of object1 and object2 with respect to ground. 
 		demonstration['object1_pose'] = {}
 		demonstration['object2_pose'] = {}
-
-		# Construct homogenous transformation matrices. 
-		ground_in_camera_homogenous_matrices = create_batch_matrix(demonstration['ground_cam_frame_pose']['position'], demonstration['ground_cam_frame_pose']['orientation'])
-		object1_in_camera_homogenous_matrices = create_batch_matrix(demonstration['object1_cam_frame_pose']['position'], demonstration['object1_cam_frame_pose']['orientation'])
-		object2_in_camera_homogenous_matrices = create_batch_matrix(demonstration['object2_cam_frame_pose']['position'], demonstration['object2_cam_frame_pose']['orientation'])
-
+    
+		##  Construct homogenous transformation matrices. 
+		# ground_in_camera_homogenous_matrices = create_batch_matrix(demonstration['ground_cam_frame_pose']['position'], demonstration['ground_cam_frame_pose']['orientation'])
+		# object1_in_camera_homogenous_matrices = create_batch_matrix(demonstration['object1_cam_frame_pose']['position'], demonstration['object1_cam_frame_pose']['orientation'])
+		# object2_in_camera_homogenous_matrices = create_batch_matrix(demonstration['object2_cam_frame_pose']['position'], demonstration['object2_cam_frame_pose']['orientation'])
+    
 		# Inverse of the ground in camera.
-		camera_in_ground_homogenous_matrices = invert_batch_matrix(ground_in_camera_homogenous_matrices)
-
-		# Now transform with batch multiplication. 
-		object1_in_ground_homogenous_matrices = np.matmul(camera_in_ground_homogenous_matrices, object1_in_camera_homogenous_matrices)
-		object2_in_ground_homogenous_matrices = np.matmul(camera_in_ground_homogenous_matrices, object2_in_camera_homogenous_matrices)
-
-		# Now retieve poses.
-		demonstration['object1_pose']['position'] = object1_in_ground_homogenous_matrices[:,:3,-1]
-		demonstration['object2_pose']['position'] = object2_in_ground_homogenous_matrices[:,:3,-1]
-		demonstration['object1_pose']['orientation'] = R.from_matrix(object1_in_ground_homogenous_matrices[:,:3,:3]).as_quat()
-		demonstration['object2_pose']['orientation'] = R.from_matrix(object2_in_ground_homogenous_matrices[:,:3,:3]).as_quat()
-
+		# camera_in_ground_homogenous_matrices = invert_batch_matrix(ground_in_camera_homogenous_matrices)
+    
+		##  Now transform with batch multiplication. 
+		# object1_in_ground_homogenous_matrices = np.matmul(camera_in_ground_homogenous_matrices, object1_in_camera_homogenous_matrices)
+		# object2_in_ground_homogenous_matrices = np.matmul(camera_in_ground_homogenous_matrices, object2_in_camera_homogenous_matrices)
+    
+		# # Now retieve poses.
+		# demonstration['object1_pose']['position'] = object1_in_ground_homogenous_matrices[:,:3,-1]
+		# demonstration['object2_pose']['position'] = object2_in_ground_homogenous_matrices[:,:3,-1]
+		# demonstration['object1_pose']['orientation'] = R.from_matrix(object1_in_ground_homogenous_matrices[:,:3,:3]).as_quat()
+		# demonstration['object2_pose']['orientation'] = R.from_matrix(object2_in_ground_homogenous_matrices[:,:3,:3]).as_quat()
+    
 		return demonstration
 
 	def downsample_data(self, demonstration, task_index, ds_freq=None):
@@ -264,7 +265,7 @@ class RealWorldRigid_PreDataset(Dataset):
 		number_timepoints = int(demonstration['demo'].shape[0] // ds_freq)
 
 		# for k in demonstration.keys():
-		key_list = ['robot-state', 'object-state', 'eef-state', 'demo']
+		key_list = ['hand-state', 'object-state', 'demo']
 		if self.args.images_in_real_world_dataset:
 			key_list.append('images')
 		for k in key_list:
@@ -275,18 +276,16 @@ class RealWorldRigid_PreDataset(Dataset):
 		# We're going to collate states, and remove irrelevant ones.  
 		# First collect object states.
 		new_demonstration = {}
-		demonstration['object1_state'] = np.concatenate([ demonstration['object1_pose']['position'], \
-														demonstration['object1_pose']['orientation']], axis=-1)
-		demonstration['object2_state'] = np.concatenate([ demonstration['object2_pose']['position'], \
-														demonstration['object2_pose']['orientation']], axis=-1)
+		demonstration['object1_state'] = np.concatenate([ demonstration['object1_gnd_frame_pose']['position'], \
+														demonstration['object1_gnd_frame_pose']['orientation']], axis=-1)
+		demonstration['object2_state'] = np.concatenate([ demonstration['object2_gnd_frame_pose']['position'], \
+														demonstration['object2_gnd_frame_pose']['orientation']], axis=-1)
 		new_demonstration['object-state'] = np.concatenate([ demonstration['object1_state'], \
 						  								demonstration['object2_state']], axis=-1)
 
 		# First collate robot states. 
-		new_demonstration['robot-state'] = np.concatenate( [demonstration['js_pos'], \
-						  						demonstration['gripper_data'].reshape(-1,1) ], axis=-1)
-		new_demonstration['eef-state'] = demonstration['rs_pose']
-		new_demonstration['demo'] = np.concatenate([ new_demonstration['robot-state'], \
+		new_demonstration['hand-state'] = demonstration['keypoints']
+		new_demonstration['demo'] = np.concatenate([ new_demonstration['hand-state'], \
 					  							new_demonstration['object-state']], axis=-1)
 
 		if self.args.images_in_real_world_dataset:
@@ -324,50 +323,76 @@ class RealWorldRigid_PreDataset(Dataset):
 		##########################################
 		# Structure of data. 
 		##########################################		
-		# Assumes demonstration is a dictionary. 
-		# Keys in the dictionary correspond to different data. The keys that we care about are: 
-		# rs_angle, rs_pose, gripper_state, js_pos, tag0, tag1, tag2, primary_camera. 
-		# Within tag#:
-		# 	camera#:
-		# 		valid, position, orientation. 
+		# Assumes demonstration is a tuple, with name of task as first element and data as second element. 
+		# data is a dictionary, with 4 Keys:
+		# {'frame_id', 'keypoints', 'avg_keypoints_score', 'tag_detections'}
+		# 		data['frame_id'] is a list of ints, size=t timesteps 
+		# 		data['keypoints'] is a dictionary, with keys:
+		# 				{'cam0', 'cam1'} #
+		# 						data['keypoints']['cam0'] -> 21x3matrices[]  ---> 21 keypoints' positions wrt gnd tag
+		# 						data['keypoints']['cam1'] -> 21x3matrices[] 			
+		# 		data['avg_keypoint_score'] is a dictionary, with keys:
+		# 				{'cam0', 'cam1'} -> each element is a list of doubles, size=t timesteps
+		# 		data['tag_detections'] is a dictionary, with keys:
+		# 				{'cam0', 'cam1'}:
+		# 						data['tag_detections']['cam#'] -> [ [], [], [], .... ]:
+		# 							each element is list of n dictionaries (n = number of visible tags): [ {}, {}, {} ]
+		# 								each dictionary:
+		# 									{ 'tag_id', 'position', 'orientation', 'pose_err' } ---> positions and orientations wrt gnd tag
 		##########################################
+
 
 		##########################################
 		# Things to do within this function. 
 		##########################################
 		
-		# 0) For primary camera, retrieve and interpolate tag poses for that camera. 
-		# 1) Compute relative poses. 
-		# 2) Collate all the relevant data streams, remove irrelevant data streams.
-		# 3) Downsample all relevant data streams. 		
-		# 4) Return new demo file. 
+		# 0) Select primary camera, by given criteria
+		# 1) Preprocess tag pose data to convert into a new structure
+		# 2) For primary camera, retrieve and interpolate tag poses for that camera. 
+		# 3) Collate all the relevant data streams, remove irrelevant data streams.
+		# 4) Downsample all relevant data streams. 		
+		# 5) Return new demo file. 
 
 		#############
-		# 0) For primary camera, retrieve tag poses. 
+		# 0) Interpolate keypoints, when they don't maintain normal distance between each other (ie normal distance between finger joints of a person)
+		#############		
+		
+		demonstration['keypoints'] = self.interpolate_keypoint(demonstration['keypoints'])
+
+		#############
+		# 1) Preprocess tag poses to convert the data structure into -
+		# data['tag_detections']['cam#'][tag#] = {'position[]', 'orientation[]', 'valid[]'} 
+		#############
+		
+		for idx, cam_tag_detections in enumerate(demonstration['tag_detections'].values()):
+			demonstration['tag_detections']['cam{}'.format(idx)] = self.tag_preprocessing(cam_tag_detections)
+
+		#############
+		# 2) For primary camera, retrieve tag poses. 
 		#############
 		
 		# Now, instead of interpolating the ground tag detection from the camera frame, set it to constant value. 
 		# demonstration['ground_cam_frame_pose'] = self.interpolate_pose( demonstration['tag0']['cam{0}'.format(demonstration['primary_camera'])] )				
 
-		demo_length = demonstration['js_pos'].shape[0]
+		demo_length = demonstration['frame_id'].shape[0]
 		demonstration['ground_cam_frame_pose'] = self.set_ground_tag_pose( length=demo_length, primary_camera=demonstration['primary_camera'] )
-		demonstration['object1_cam_frame_pose'] = self.interpolate_pose( demonstration['tag1']['cam{0}'.format(demonstration['primary_camera'])] )
-		demonstration['object2_cam_frame_pose'] = self.interpolate_pose( demonstration['tag2']['cam{0}'.format(demonstration['primary_camera'])] )
+		demonstration['object1_gnd_frame_pose'] = self.interpolate_pose( demonstration['tag_detections']['cam{0}'.format(demonstration['primary_camera'])] )
+		demonstration['object2_gnd_frame_pose'] = self.interpolate_pose( demonstration['tag_detections']['cam{0}'.format(demonstration['primary_camera'])] )
 		
-		#############
-		# 1) Compute relative poses.
-		#############
-		
-		demonstration = self.compute_relative_poses(demonstration=demonstration)
+		# #############
+		# # NOT COMPUTED -- Compute relative poses.
+		# #############
+		# 
+		# demonstration = self.compute_relative_poses(demonstration=demonstration)
 
 		#############
-		# 2) Stack relevant data that we care about. 
+		# 3) Stack relevant data that we care about. 
 		#############
 
 		demonstration = self.collate_states(demonstration=demonstration)
 
 		#############
-		# 3) Downsample.
+		# 4) Downsample.
 		#############
 		
 		self.downsample_data(demonstration=demonstration, task_index=task_index)
@@ -399,7 +424,7 @@ class RealWorldRigid_PreDataset(Dataset):
 		#########################
 
 		print("###################################")
-		print("About to process real world dataset.")
+		print("About to process real world HUMAN dataset.")
 
 		for task_index in range(len(self.task_list)):
 		# for task_index in range(0):
@@ -409,26 +434,26 @@ class RealWorldRigid_PreDataset(Dataset):
 			print("Processing task: ", task_index, " of ", self.number_tasks)
 
 			# Set file path for this task.
-			alt_task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'NumpyDemos')
+			#alt_task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'NumpyDemos')
 			task_file_path = os.path.join(self.dataset_directory, self.task_list[task_index], 'ImageData')			
 
 			#########################	
 			# For every demo in this task
 			#########################
 
-			for j in range(self.num_demos[task_index]):			
-				
+			#for j in range(self.num_demos[task_index]):			
+			for j, file in enumerate(sorted(glob.glob(os.path.join(task_file_path,'*.npy')))):
+			
 				print("####################")
 				print("Processing demo: ", j, " of ", self.num_demos[task_index], " from task ", task_index)
 				
 				# file = os.path.join(task_file_path, 'demo{0}.npy'.format(j))
 				# demonstration = np.load(file, allow_pickle=True).item()
-				
-				file = os.path.join(task_file_path, 'demo{0}.npy'.format(j))
-				alt_file = os.path.join(alt_task_file_path, 'demo{0}.npy'.format(j))
-				demonstration = np.load(file, allow_pickle=True).item()
-				alt_demonstration = np.load(alt_file, allow_pickle=True).item()
-				demonstration['primary_camera'] = alt_demonstration['primary_camera']
+				# file = os.path.join(task_file_path, 'demo{0}.npy'.format(j))
+				#alt_file = os.path.join(alt_task_file_path, 'demo{0}.npy'.format(j))
+				demonstration = np.load(file, allow_pickle=True).item()[1] # taking second element of tuple
+				#alt_demonstration = np.load(alt_file, allow_pickle=True).item()
+				#demonstration['primary_camera'] = alt_demonstration['primary_camera']
 
 				#########################
 				# Now process in whatever way necessary. 
@@ -441,8 +466,10 @@ class RealWorldRigid_PreDataset(Dataset):
 
 			# For each task, save task_file_list to One numpy. 
 			suffix = ""
-			if self.args.images_in_real_world_dataset:
-				suffix = "_wSingleImages"
+			# Simply saving everything with Images by default
+
+			#if self.args.images_in_real_world_dataset:
+			#	suffix = "_wSingleImages"
 			task_numpy_path = os.path.join(self.dataset_directory, self.task_list[task_index], "New_Task_Demo_Array{0}.npy".format(suffix))
 			np.save(task_numpy_path, self.task_demo_array)
 
@@ -454,11 +481,11 @@ class RealWorldRigid_PreDataset(Dataset):
 		return {}	
 
 
-class RealWorldRigid_Dataset(RealWorldRigid_PreDataset):
+class RealWorldHumanRigid_Dataset(RealWorldHumanRigid_PreDataset):
 	
 	def __init__(self, args):
 		
-		super(RealWorldRigid_Dataset, self).__init__(args)	
+		super(RealWorldHumanRigid_Dataset, self).__init__(args)	
 
 		# Now that we've run setup, compute dataset_trajectory_lengths for smart batching.
 		self.dataset_trajectory_lengths = np.zeros(self.total_length)
@@ -651,94 +678,3 @@ class RealWorldRigid_Dataset(RealWorldRigid_PreDataset):
 		np.save("{0}_Vel_Var.npy".format(prefix), vel_variance)
 		np.save("{0}_Vel_Min.npy".format(prefix), vel_min_value)
 		np.save("{0}_Vel_Max.npy".format(prefix), vel_max_value)
-
-class RealWorldRigid_JointEEFDataset(RealWorldRigid_Dataset):
-
-	def __init__(self, args):
-				
-		super(RealWorldRigid_JointEEFDataset, self).__init__(args)	
-		self.stat_dir_name ='RealWorldRigidJointEEF'
-
-	def process_end_effector_state(self, end_effector_trajectory):
-
-		# Takes in end effector trajectory of the robot, and:
-		# 1) Transforms this to a quaternion. 
-		# 2) Transforms this from the world frame to the ground frame. 
-
-		end_effectory_pose_in_world = np.zeros((end_effector_trajectory.shape[0], 7))
-
-		# scale factor is just mm to m, because EE trajectory is mm by default. 
-		scale = 1./1000.
-
-		# Convert to quaternion and pose array. 
-		end_effectory_pose_in_world[:,:3] = end_effector_trajectory[:,:3] * scale
-		end_effectory_pose_in_world[:,3:] = R.from_euler('XYZ', end_effector_trajectory[:,3:]).as_quat()
-
-		# Now transform this to ground frame. 
-		end_effectory_pos_in_ground, end_effectory_quat_in_ground = transform_pose_from_world_to_ground(end_effectory_pose_in_world)
-		
-		return end_effectory_pos_in_ground, end_effectory_quat_in_ground
-
-	def compute_object_eef_relative_state(self, eef_traj, object_traj):
-
-		# Parse into individual position and quaternion. 
-		eef_pos = eef_traj[:,:3]
-		eef_quat = eef_traj[:,3:]
-
-		object_pos = object_traj[:,:3]
-		object_quat = object_traj[:,3:]
-
-		# Construct homogenous matrices for each frame. 
-		eef_in_ground_hmats = create_batch_matrix(eef_pos, eef_quat)
-		object_in_ground_hmats = create_batch_matrix(object_pos, object_quat)
-
-		# We want the Object pose in the frame of the EEF pose, because there's two objects. This makes more sense than transforming EEF twice / everything to one object frame. 
-		
-		# Pattern. 
-		# # Inverse of the ground in camera.
-		# camera_in_ground_homogenous_matrices = invert_batch_matrix(ground_in_camera_homogenous_matrices)
-
-		# # Now transform with batch multiplication. 
-		# object1_in_ground_homogenous_matrices = np.matmul(camera_in_ground_homogenous_matrices, object1_in_camera_homogenous_matrices)
-
-		# First invert eef_in_ground. 
-		ground_in_eef_hmats = invert_batch_matrix(eef_in_ground_hmats)
-		object_in_eef_hmats = np.matmul(ground_in_eef_hmats, object_in_ground_hmats)
-
-		# Recover Poses. 
-		object_in_eef_pos = object_in_eef_hmats[:,:3,-1]
-		object_in_eef_quat = R.from_matrix(object_in_eef_hmats[:,:3,:3]).as_quat()
-
-		object_in_eef_pose = np.concatenate([object_in_eef_pos, object_in_eef_quat],axis=-1)
-		return object_in_eef_pose
-		
-	def __getitem__(self, index):
-		
-		# Run super getitem.
-		data_element = super().__getitem__(index)
-
-		# Now add the EEF state in addition to the robot joint state and object state...
-
-		# Backup original. 
-		data_element['old_demo'] = copy.deepcopy(data_element['demo'])
-		# Now create new. 
-		
-		# Take original eef state, convert orientations to quaternions and transform frames. 
-		transformed_eef_pos, transformed_eef_quat = self.process_end_effector_state(data_element['eef-state'])
-		data_element['transformed_eef_state'] = np.concatenate([transformed_eef_pos, transformed_eef_quat], axis=-1)
-
-		# Now also retrieve the object poses relative to the EEF.
-		data_element['relative-object-state'] = np.zeros_like(data_element['object-state'])
-		data_element['relative-object-state'][...,:7] = self.compute_object_eef_relative_state(data_element['transformed_eef_state'], data_element['object-state'][...,:7])
-		data_element['relative-object-state'][...,7:] = self.compute_object_eef_relative_state(data_element['transformed_eef_state'], data_element['object-state'][...,7:])
-
-		data_element['demo'] = np.concatenate([ data_element['robot-state'], \
-										 		data_element['transformed_eef_state'], \
-					  							data_element['object-state']], axis=-1)
-
-		return data_element
-
-	def compute_statistics(self):
-		 
-		self.state_size = 28
-		return super().compute_statistics(prefix='RealWorldRigidJointEEF')

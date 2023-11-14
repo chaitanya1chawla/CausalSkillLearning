@@ -1,3 +1,4 @@
+############################
 # Copyright (c) Facebook, Inc. and its affiliates.
 # All rights reserved.
 
@@ -10,6 +11,7 @@ from headers import *
 from PolicyNetworks import *
 from RL_headers import *
 from PPO_Utilities import PPOBuffer
+from RealWorldLabels import label_dict
 from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, \
 	GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, DAPGVisualizer, \
 	RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer,\
@@ -1299,6 +1301,8 @@ class PolicyManager_BaseClass():
 		
 		print("Perplexity: ", perplexity)
 
+
+		# tSNE is a dimensionality reduction method, usually applied to data with very high dimensionalities
 		tsne = skl_manifold.TSNE(n_components=2,random_state=0,perplexity=perplexity)
 		embedded_zs = tsne.fit_transform(normed_z)
 
@@ -2280,8 +2284,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 					# self.norm_denom_value will get divided by scale.
 					self.norm_denom_value /= self.args.state_scale_factor
 					# Manually make sure quaternion dims are unscaled.
-					self.norm_denom_value[10:14] = 1.
-					self.norm_denom_value[17:] = 1.
+					self.norm_denom_value[10:14] = 1. # first obj
+					self.norm_denom_value[17:] = 1.   # second obj
 					self.norm_sub_value[10:14] = 0.
 					self.norm_sub_value[17:] = 0.
 
@@ -3325,6 +3329,7 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# Embed plots. 
 
 		# Set N:
+		# N is number of trajectory segments we want to visualize
 		self.N = 500
 
 		self.latent_z_set = np.zeros((self.N,self.latent_z_dimensionality))
@@ -3397,12 +3402,15 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# Use the dataset to get reasonable trajectories (because without the information bottleneck / KL between N(0,1), cannot just randomly sample.)
 		for i in range(self.N//self.args.batch_size+1):
+		# 500 // 32 == 16 
 		# # for i in range(self.N//self.args.batch_size+1, 32)
 		# for i in range(0, self.N, self.args.batch_size):
 
 			# Mapped index
+			# 46//32 == 2
 			number_batches_for_dataset = (len(self.dataset)//self.args.batch_size)+1
 			j = i % number_batches_for_dataset
+			# j = 0, 1, 0, 1, 0, 1,
 
 			########################################
 			# (1) Encoder trajectory. 
@@ -3529,9 +3537,11 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		# self.kdtree_env_z = KDTree(self.env_latent_z_set)		
 
 		self.kdtree_dict = {}
-		rows, cols = self.stream_latent_z_dict['robot'].shape()
+		rows, cols = np.shape(self.stream_latent_z_dict['robot'])
 		self.kdtree_dict['robot'] = KDTree(self.stream_latent_z_dict['robot'][:int(rows/2), :])
 		self.kdtree_dict['env'] = KDTree(self.stream_latent_z_dict['env'][:int(rows/2), :])
+		self.kdtree_dict['robot_env'] = KDTree(self.stream_latent_z_dict['robot_env'][:int(rows/2), :])
+		
 	def get_query_trajectory(self, input_state_trajectory, stream=None):
 		
 		# Assume trajectory is dimensions |T| x |S|. 
@@ -3619,29 +3629,166 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 
 		# Single stream latent z set dict. 
 		self.stream_latent_z_dict = {}
-		self.stream_latent_z_dict['robot']= copy.deepcopy(self.latent_z_set[:,:int(self.latent_z_dimensionality/2)])
-		self.stream_latent_z_dict['env']= copy.deepcopy(self.latent_z_set[:,int(self.latent_z_dimensionality/2):])
+		#self.stream_latent_z_dict['robot']= copy.deepcopy(self.latent_z_set[:,:int(self.latent_z_dimensionality/2)])
+		self.stream_latent_z_dict['robot']= copy.deepcopy(self.latent_z_set[:96,:int(self.latent_z_dimensionality/2)])
+		#self.stream_latent_z_dict['env']= copy.deepcopy(self.latent_z_set[:,int(self.latent_z_dimensionality/2):])
+		self.stream_latent_z_dict['env']= copy.deepcopy(self.latent_z_set[:96,int(self.latent_z_dimensionality/2):])
+		self.stream_latent_z_dict['robot_env']= copy.deepcopy(self.latent_z_set[:96,:])
 		
 		# 1) Create KD Trees.
 		self.create_z_kdtrees()	
 
+
 	def query_z_robot_kdtrees_with_N_by_2_trajectories(self):
+
+		# 0) Create KD trees with N/2 trajectories.
+		# 1) Query with the remaining N/2 trajectories for nearest neighbour wrt robot
 
 		self.create_z_kdtrees_with_N_by_2_trajectories()
 
 		# dictionary to save similarity score with k=1,3,5 nearest neighbours
-		self.nearest_neighbour_similarity_scores={}
+		self.nn_similarity_robot={}
+		self.nn_similarity_robot['skill']
+		self.nn_similarity_robot['task']
 		
-		rows, cols = self.stream_latent_z_dict['robot'].shape()
+		self.nn_accuracy_robot={}
+		self.nn_accuracy_robot['skill'] = {}
+		self.nn_accuracy_robot['skill']['metric_1'] = {}
+		self.nn_accuracy_robot['skill']['metric_2'] = {}
+		self.nn_accuracy_robot['task'] = {}
+		self.nn_accuracy_robot['task']['metric_1'] = {}
+		self.nn_accuracy_robot['task']['metric_2'] = {}
+
+		rows, cols = np.shape(self.stream_latent_z_dict['robot'])
 		for knn in [1,3,5]:
-			self.nearest_neighbour_similarity_scores['{}'.format(knn)] = np.array([])
+			self.nn_similarity_robot['skill']['{}'.format(knn)] = np.array([])
+			self.nn_similarity_robot['task']['{}'.format(knn)] = np.array([])
+
 			for element_idx, element in enumerate(self.stream_latent_z_dict['robot'][int(rows/2):, :]):
 				distances, nn_idx = self.kdtree_dict['robot'].query(element, knn)
-				ctr = 0
+				skill_ctr = 0.
+				task_ctr = 0.
+
+				if knn == 1:
+					nn_idx = np.array([nn_idx])
+					
+				nn_skills_names = np.array([])
 				for idx in nn_idx:
-					if self.label_dict['{}'.format(idx)] == self.label_dict['{}'.format(element_idx)]:
-						ctr += 1
-						self.nearest_neighbour_similarity_scores['{}'.format(knn)].append([ctr])
+					if label_dict['{:03d}'.format(idx)] == label_dict['{:03d}'.format(element_idx)]:
+						skill_ctr += 1.
+					if self.task_name_set[idx] == self.task_name_set[element_idx]:
+						task_ctr += 1.
+					nn_skills_names = np.append(nn_skills_names, label_dict['{:03d}'.format(idx)])
+				#print("Task No. = {}, Skill = {}, Nearest Neighbour Skills = {}".format(element_idx, label_dict['{:03d}'.format(element_idx)], nn_skills_names))
+				
+				self.nn_similarity_robot['skill']['{}'.format(knn)] = np.append(self.nn_similarity_robot['skill']['{}'.format(knn)], skill_ctr)
+				self.nn_similarity_robot['task']['{}'.format(knn)] = np.append(self.nn_similarity_robot['task']['{}'.format(knn)], task_ctr)
+			
+			self.nn_accuracy_robot['skill']['metric_1']['{}'.format(knn)] = np.sum(self.nn_similarity_robot['skill']['{}'.format(knn)]) / ((rows/2)*knn)
+			self.nn_accuracy_robot['skill']['metric_2']['{}'.format(knn)] = np.sum(self.nn_similarity_robot['skill']['{}'.format(knn)] >= 1.) / (rows/2)
+			self.nn_accuracy_robot['task']['metric_1']['{}'.format(knn)] = np.sum(self.nn_similarity_robot['task']['{}'.format(knn)]) / ((rows/2)*knn)
+			self.nn_accuracy_robot['task']['metric_2']['{}'.format(knn)] = np.sum(self.nn_similarity_robot['task']['{}'.format(knn)] >= 1.) / (rows/2)
+
+	def query_z_env_kdtrees_with_N_by_2_trajectories(self):
+
+		# 0) Create KD trees with N/2 trajectories.
+		# 1) Query with the remaining N/2 trajectories for nearest neighbour wrt env
+
+		self.create_z_kdtrees_with_N_by_2_trajectories()
+
+		# dictionary to save similarity score with k=1,3,5 nearest neighbours
+		self.nn_similarity_env={}
+		self.nn_similarity_env['skill']
+		self.nn_similarity_env['task']
+		
+		self.nn_accuracy_env={}
+		self.nn_accuracy_env['skill'] = {}
+		self.nn_accuracy_env['skill']['metric_1'] = {}
+		self.nn_accuracy_env['skill']['metric_2'] = {}
+		self.nn_accuracy_env['task'] = {}
+		self.nn_accuracy_env['task']['metric_1'] = {}
+		self.nn_accuracy_env['task']['metric_2'] = {}
+
+		rows, cols = np.shape(self.stream_latent_z_dict['env'])
+		for knn in [1,3,5]:
+			self.nn_similarity_env['skill']['{}'.format(knn)] = np.array([])
+			self.nn_similarity_env['task']['{}'.format(knn)] = np.array([])
+
+			for element_idx, element in enumerate(self.stream_latent_z_dict['env'][int(rows/2):, :]):
+				distances, nn_idx = self.kdtree_dict['env'].query(element, knn)
+				skill_ctr = 0.
+				task_ctr = 0.
+
+				if knn == 1:
+					nn_idx = np.array([nn_idx])
+
+				nn_skills_names = np.array([])
+				for idx in nn_idx:
+					if label_dict['{:03d}'.format(idx)] == label_dict['{:03d}'.format(element_idx)]:
+						skill_ctr += 1.
+					if self.task_name_set[idx] == self.task_name_set[element_idx]:
+						task_ctr += 1.
+					nn_skills_names = np.append(nn_skills_names, label_dict['{:03d}'.format(idx)])
+				#print("Task No. = {}, Skill = {}, Nearest Neighbour Skills = {}".format(element_idx, label_dict['{:03d}'.format(element_idx)], nn_skills_names))
+				
+				self.nn_similarity_env['skill']['{}'.format(knn)] = np.append(self.nn_similarity_env['skill']['{}'.format(knn)], skill_ctr)
+				self.nn_similarity_env['task']['{}'.format(knn)] = np.append(self.nn_similarity_env['task']['{}'.format(knn)], task_ctr)
+			
+			self.nn_accuracy_env['skill']['metric_1']['{}'.format(knn)] = np.sum(self.nn_similarity_env['skill']['{}'.format(knn)]) / ((rows/2)*knn)
+			self.nn_accuracy_env['skill']['metric_2']['{}'.format(knn)] = np.sum(self.nn_similarity_env['skill']['{}'.format(knn)] >= 1.) / (rows/2)
+			self.nn_accuracy_env['task']['metric_1']['{}'.format(knn)] = np.sum(self.nn_similarity_env['task']['{}'.format(knn)]) / ((rows/2)*knn)
+			self.nn_accuracy_env['task']['metric_2']['{}'.format(knn)] = np.sum(self.nn_similarity_env['task']['{}'.format(knn)] >= 1.) / (rows/2)
+
+	def query_z_robot_env_kdtrees_with_N_by_2_trajectories(self):
+		
+		# 0) Create KD trees with N/2 trajectories.
+		# 1) Query with the remaining N/2 trajectories for nearest neighbour wrt robot and env
+
+		self.create_z_kdtrees_with_N_by_2_trajectories()
+
+		# dictionary to save similarity score with k=1,3,5 nearest neighbours for skill list and for task list
+		self.nn_similarity_robot_env={}
+		self.nn_similarity_robot_env['skill']
+		self.nn_similarity_robot_env['task']
+		
+		self.nn_accuracy_robot_env={}
+		self.nn_accuracy_robot_env['skill'] = {}
+		self.nn_accuracy_robot_env['skill']['metric_1'] = {}
+		self.nn_accuracy_robot_env['skill']['metric_2'] = {}
+		self.nn_accuracy_robot_env['task'] = {}
+		self.nn_accuracy_robot_env['task']['metric_1'] = {}
+		self.nn_accuracy_robot_env['task']['metric_2'] = {}
+
+		rows, cols = np.shape(self.stream_latent_z_dict['robot_env'])
+		for knn in [1,3,5]:
+			self.nn_similarity_robot_env['skill']['{}'.format(knn)] = np.array([])
+			self.nn_similarity_robot_env['task']['{}'.format(knn)] = np.array([])
+
+			for element_idx, element in enumerate(self.stream_latent_z_dict['robot_env'][int(rows/2):, :]):
+				distances, nn_idx = self.kdtree_dict['robot_env'].query(element, knn)
+				skill_ctr = 0.
+				task_ctr = 0.
+
+				if knn == 1:
+					nn_idx = np.array([nn_idx])
+
+				nn_skills_names = np.array([])
+				for idx in nn_idx:
+					if label_dict['{:03d}'.format(idx)] == label_dict['{:03d}'.format(element_idx)]:
+						skill_ctr += 1.
+					if self.task_name_set[idx] == self.task_name_set[element_idx]:
+						task_ctr += 1.
+					nn_skills_names = np.append(nn_skills_names, label_dict['{:03d}'.format(idx)])
+				print("Task No. = {}, Skill = {}, Nearest Neighbour Skills = {}".format(element_idx, label_dict['{:03d}'.format(element_idx)], nn_skills_names))
+				
+				self.nn_similarity_robot_env['skill']['{}'.format(knn)] = np.append(self.nn_similarity_robot_env['skill']['{}'.format(knn)], skill_ctr)
+				self.nn_similarity_robot_env['task']['{}'.format(knn)] = np.append(self.nn_similarity_robot_env['task']['{}'.format(knn)], task_ctr)
+			
+			self.nn_accuracy_robot_env['skill']['metric_1']['{}'.format(knn)] = np.sum(self.nn_similarity_robot_env['skill']['{}'.format(knn)]) / ((rows/2)*knn)
+			self.nn_accuracy_robot_env['skill']['metric_2']['{}'.format(knn)] = np.sum(self.nn_similarity_robot_env['skill']['{}'.format(knn)] >= 1.) / (rows/2)
+			self.nn_accuracy_robot_env['task']['metric_1']['{}'.format(knn)] = np.sum(self.nn_similarity_robot_env['task']['{}'.format(knn)]) / ((rows/2)*knn)
+			self.nn_accuracy_robot_env['task']['metric_2']['{}'.format(knn)] = np.sum(self.nn_similarity_robot_env['task']['{}'.format(knn)] >= 1.) / (rows/2)
+
 
 	def evaluate_z_distances_for_batch(self, latent_z):
 
