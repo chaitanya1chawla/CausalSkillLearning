@@ -27,7 +27,7 @@ class RealWorldHumanRigid_PreDataset(Dataset):
 		self.environment_names = ['Pouring', 'BoxOpening', 'DrawerOpening', 'PickPlace', 'Stirring']
 		self.num_demos = np.array([10, 10, 6, 10, 10])
 
-		# Each task has 200 demos according to RoboMimic.
+		# Each task has different number of demos according to our Human Dataset.
 		self.number_tasks = len(self.task_list)
 		self.cummulative_num_demos = self.num_demos.cumsum()
 		# [0, 10, 20, 26, 36, 46]
@@ -48,7 +48,7 @@ class RealWorldHumanRigid_PreDataset(Dataset):
 	def normalize_quaternion(self, q):
 		# Define quaternion normalization function.
 		return q/np.linalg.norm(q)
-	
+
 	def tag_preprocessing(self, cam_tag_detections=None):
 		# 1) Preprocess tag poses to convert the data structure into -
 		# data['tag_detections']['cam#'][tag#] = {'position[]', 'orientation[]', 'valid[]'} 
@@ -82,51 +82,55 @@ class RealWorldHumanRigid_PreDataset(Dataset):
 
 		return tag_dict
 
-	def interpolate_keypoint(self, both_cams_keypoint_sequence=None):
+	def interpolate_keypoint(self, cam_keypoint_sequence=None):
+		# TODO : check if the demonstration['valid_keypoint_frames'] get detected here automatically
 		
 		# Distance between keypoint [0-1, 1-2, 2-3, 3-4] is >30 and <38  --- class 1 
 		# Distance between keypoint [5-6, 6-7, 7-8], [9-10, 10-11, 11-12], [13-14, 14-15, 15-16], 19-20 is >22.5 and <29.5 --- class 2 
 		# Distance between keypoint [17-18, 18-19] is >16 and <19 --- class 3
-		both_cams_data = {}
-		for idx, cam_keypoint_sequence in enumerate(both_cams_keypoint_sequence.values()):
+		
+		### both_cams_data = {}
+		### for idx, cam_keypoint_sequence in enumerate(both_cams_keypoint_sequence.values()):
+		### 
+		### 	# looping over each camera:
+			
+		keypoint_sequence = np.array(cam_keypoint_sequence)
+		valid_timesteps = np.zeros((len(keypoint_sequence)))
+		
+		for j in keypoint_sequence:
+			# looping over each timestep
+			flag = True
+			# point pairs defined by seeing mmpose dataset: onehand10k
+			# dist limits are defined by approximating distances on own hand 
+			point_pairs_1 = [(0,1), (1,2), (2,3), (3,4)]
+			for pair in point_pairs_1:
+				dist = np.linalg.norm(j[pair[0], :], j[pair[1], :])
+				if not (dist > 0.30 and dist < 0.38):
+					flag = False
 
-			# looping over each camera:
-			keypoint_sequence = np.array(cam_keypoint_sequence)
-			valid_timesteps = np.zeros((len(keypoint_sequence)))
-			for j in keypoint_sequence:
-				# looping over each timestep
-				flag = True
-				# point pairs defined by seeing mmpose dataset: onehand10k
-				# dist limits are defined by approximating distances on own hand 
-				point_pairs_1 = [(0,1), (1,2), (2,3), (3,4)]
-				for pair in point_pairs_1:
-					dist = np.linalg.norm(j[pair[0], :], j[pair[1], :])
-					if not (dist > 0.30 and dist < 0.38):
-						flag = False
+			point_pairs_2 = [(5,6), (6,7), (7,8), (9,10), (10,11), (11,12), (13,14), (14,15), (15,16), (19,20)]
+			for pair in point_pairs_2:
+				dist = np.linalg.norm(j[pair[0], :], j[pair[1], :])
+				if not (dist > 0.225 and dist < 0.295):
+					flag = False
 
-				point_pairs_2 = [(5,6), (6,7), (7,8), (9,10), (10,11), (11,12), (13,14), (14,15), (15,16), (19,20)]
-				for pair in point_pairs_2:
-					dist = np.linalg.norm(j[pair[0], :], j[pair[1], :])
-					if not (dist > 0.225 and dist < 0.295):
-						flag = False
+			point_pairs_3 = [(17,18), (18,19)]
+			for pair in point_pairs_3:
+				dist = np.linalg.norm(j[pair[0], :], j[pair[1], :])
+				if not (dist > 0.16 and dist < 0.19):
+					flag = False
 
-				point_pairs_3 = [(17,18), (18,19)]
-				for pair in point_pairs_3:
-					dist = np.linalg.norm(j[pair[0], :], j[pair[1], :])
-					if not (dist > 0.16 and dist < 0.19):
-						flag = False
+			if flag==True:
+				valid_timesteps[j]=1
 
-				if flag==True:
-					valid_timesteps[j]=1
+		valid_indices = np.where(valid_timesteps)[0]
+		first_valid_index = valid_indices[0]
+		last_valid_index = valid_indices[-1]
+		# for single_keypoint in keypoint_sequence:
+		# 	# looping over each timestep
 
-			valid_indices = np.where(valid_timesteps)[0]
-			first_valid_index = valid_indices[0]
-			last_valid_index = valid_indices[-1]
-			# for single_keypoint in keypoint_sequence:
-			# 	# looping over each timestep
-
-			# Interpolate positions 
-			both_cams_data['cam{}'.format(idx)] = self.interpolate_keypoint_position(valid=valid_timesteps, \
+		# Interpolate positions 
+		both_cams_data = self.interpolate_keypoint_position(valid=valid_timesteps, \
 								 position_sequence=keypoint_sequence[first_valid_index:last_valid_index+1])
 			
 		return both_cams_data
@@ -229,6 +233,21 @@ class RealWorldHumanRigid_PreDataset(Dataset):
 
 		return pose_sequence
 
+	def fuse_keypoint_data(self, both_cam_keypoint_sequence, valid_keypoint_frames, primary_keypoint_cam):
+		
+		valid_keypoint_data = np.zeros_like(both_cam_keypoint_sequence['cam0'])
+
+		both_valid = np.where(np.array(valid_keypoint_frames['cam0'])==1) and np.where(np.array(valid_keypoint_frames['cam1'])==1)
+		valid_keypoint_data[both_valid] = both_cam_keypoint_sequence['cam{}'.format(primary_keypoint_cam)][both_valid]
+
+		cam0_valid = np.where(np.array(valid_keypoint_frames['cam0'])==1) and np.where(np.array(valid_keypoint_frames['cam1'])==0)
+		valid_keypoint_data[cam0_valid] = both_cam_keypoint_sequence['cam{}'.format(0)][cam0_valid]
+
+		cam1_valid = np.where(np.array(valid_keypoint_frames['cam0'])==0) and np.where(np.array(valid_keypoint_frames['cam1'])==1)
+		valid_keypoint_data[cam1_valid] = both_cam_keypoint_sequence['cam{}'.format(1)][cam1_valid]
+
+		return valid_keypoint_data 
+
 	def compute_relative_poses(self, demonstration):
     
 		from scipy.spatial.transform import Rotation as R
@@ -257,6 +276,63 @@ class RealWorldHumanRigid_PreDataset(Dataset):
     
 		return demonstration
 
+	def invert(self, homogenous_matrix):
+	
+		inverse = np.zeros((4,4))
+		rotation = R.from_matrix(homogenous_matrix[:3,:3])
+		inverse[:3, :3] = rotation.inv().as_matrix()
+		inverse[:3, -1] = -rotation.inv().apply(homogenous_matrix[:3,-1])
+		inverse[-1, -1] = 1.
+
+		return inverse
+
+	def transform_point_3d_from_cam_to_ground(self, points, gnd_R, gnd_t):
+
+		idx = np.arange(3)
+		points_in_cam_hmat = np.zeros((len(points), 4, 4))
+		# Saving the rotation matrix as identity
+		points_in_cam_hmat[:, idx, idx] = 1.
+		points_in_cam_hmat[:, :3, -1] = np.array(points)
+		points_in_cam_hmat[:, -1, -1] = 1.
+
+		gnd_in_cam_hmat = np.zeros((4,4))
+		gnd_in_cam_hmat[:3, :3] = gnd_R
+		gnd_in_cam_hmat[:3, -1] = np.reshape(gnd_t,(3,))
+		gnd_in_cam_hmat[-1, -1] = 1.
+
+		cam_in_gnd_hmat = self.invert(gnd_in_cam_hmat)
+
+		points_in_gnd_hmat = np.matmul(cam_in_gnd_hmat, points_in_cam_hmat)
+
+		# Retrieve new points
+		points_in_gnd_position = points_in_gnd_hmat[:, :3, -1]
+
+		return points_in_gnd_position
+
+	def transform_pose_from_cam_to_ground(self, pose_R, pose_t, gnd_R, gnd_t):
+	
+		object_in_cam_hmat = np.zeros((len(pose_R), 4, 4))
+		object_in_cam_hmat[:, :3, :3] = pose_R
+		object_in_cam_hmat[:, :3, -1] = pose_t
+		object_in_cam_hmat[:, -1, -1] = 1.	
+
+		gnd_in_cam_hmat = np.zeros((4,4))
+		gnd_in_cam_hmat[:3, :3] = gnd_R
+		gnd_in_cam_hmat[:3, -1] = np.reshape(gnd_t,(3,))
+		gnd_in_cam_hmat[-1, -1] = 1.	
+
+		cam_in_gnd_hmat = self.invert(gnd_in_cam_hmat)	
+
+		# Transform
+		# world_in_ground_hmat = invert(ground_in_world_homogenous_matrix)
+		object_in_gnd_hmat = np.matmul(cam_in_gnd_hmat, object_in_cam_hmat)	
+
+		# Retrieve pose. 
+		object_in_gnd_R = object_in_gnd_hmat[:, :3, :3]
+		object_in_gnd_t = object_in_gnd_hmat[:, :3, -1]	
+
+		return object_in_gnd_t, object_in_gnd_R
+
 	def downsample_data(self, demonstration, task_index, ds_freq=None):
 
 		if ds_freq is None:
@@ -276,15 +352,22 @@ class RealWorldHumanRigid_PreDataset(Dataset):
 		# We're going to collate states, and remove irrelevant ones.  
 		# First collect object states.
 		new_demonstration = {}
+		# Makes it a 7 element long item per array element
 		demonstration['object1_state'] = np.concatenate([ demonstration['object1_gnd_frame_pose']['position'], \
 														demonstration['object1_gnd_frame_pose']['orientation']], axis=-1)
 		demonstration['object2_state'] = np.concatenate([ demonstration['object2_gnd_frame_pose']['position'], \
 														demonstration['object2_gnd_frame_pose']['orientation']], axis=-1)
+
+		# Makes it a 14 element long item per array element
 		new_demonstration['object-state'] = np.concatenate([ demonstration['object1_state'], \
 						  								demonstration['object2_state']], axis=-1)
+		
+		# Before collating hand states, flatten the 21x3 matrices first.
+		demonstration['flat_keypoints'] = demonstration['keypoints'].flatten()
+		demonstration['flat_keypoints'].reshape(-1, 63) # where 63 stands for 21x3 values per frame
 
-		# First collate robot states. 
-		new_demonstration['hand-state'] = demonstration['keypoints']
+		# First collate hand states. 
+		new_demonstration['hand-state'] = demonstration['flat_keypoints']
 		new_demonstration['demo'] = np.concatenate([ new_demonstration['hand-state'], \
 					  							new_demonstration['object-state']], axis=-1)
 
@@ -325,20 +408,31 @@ class RealWorldHumanRigid_PreDataset(Dataset):
 		##########################################		
 		# Assumes demonstration is a tuple, with name of task as first element and data as second element. 
 		# data is a dictionary, with 4 Keys:
-		# {'frame_id', 'keypoints', 'avg_keypoints_score', 'tag_detections'}
-		# 		data['frame_id'] is a list of ints, size=t timesteps 
-		# 		data['keypoints'] is a dictionary, with keys:
+		# {'frame_id', 'raw_keypoints', 'avg_keypoints_score', 'tag_detections'}
+		# 		data['frame_id'] is int[], with size=t timesteps 
+		# 		data['raw_keypoints'] is dict:
 		# 				{'cam0', 'cam1'} #
-		# 						data['keypoints']['cam0'] -> 21x3matrices[]  ---> 21 keypoints' positions wrt gnd tag
-		# 						data['keypoints']['cam1'] -> 21x3matrices[] 			
-		# 		data['avg_keypoint_score'] is a dictionary, with keys:
-		# 				{'cam0', 'cam1'} -> each element is a list of doubles, size=t timesteps
-		# 		data['tag_detections'] is a dictionary, with keys:
+		# 						data['raw_keypoints']['cam0'] -> 21x3matrices[]  ---> 21 keypoints' positions wrt gnd tag
+		# 						data['raw_keypoints']['cam1'] -> 21x3matrices[] 			
+		# 		data['avg_keypoint_score'] is dict:
+		# 				{'cam0', 'cam1'} -> each element is double[], size=t timesteps
+		#		data['valid_keypoint_frames'] is dict:
+		#				{'cam0', 'cam1'} -> each element is int[], size=timesteps
+		#		data['primary_keypoint_camera'] is int
+		# 		data['tag_detections_in_cam'] is dict:
 		# 				{'cam0', 'cam1'}:
-		# 						data['tag_detections']['cam#'] -> [ [], [], [], .... ]:
+		# 						data['tag_detections_in_cam']['cam#'] -> [ [], [], [], .... ]:
 		# 							each element is list of n dictionaries (n = number of visible tags): [ {}, {}, {} ]
 		# 								each dictionary:
 		# 									{ 'tag_id', 'position', 'orientation', 'pose_err' } ---> positions and orientations wrt gnd tag
+		#		data['primary_camera'] is int
+		#		data['images'] is dict:
+		#				{'cam0', 'cam1'}:
+		#						data['images']['cam#'] is list, with size=t timesteps
+		#
+		# After processing:
+		#		data['keypoints'] has keypoints in gnd frame
+		#		data['tag_detections'] has tag poses in gnd frame, with a new structure defined below
 		##########################################
 
 
@@ -346,29 +440,82 @@ class RealWorldHumanRigid_PreDataset(Dataset):
 		# Things to do within this function. 
 		##########################################
 		
-		# 0) Select primary camera, by given criteria
-		# 1) Preprocess tag pose data to convert into a new structure
-		# 2) For primary camera, retrieve and interpolate tag poses for that camera. 
-		# 3) Collate all the relevant data streams, remove irrelevant data streams.
-		# 4) Downsample all relevant data streams. 		
-		# 5) Return new demo file. 
+		# 0) Preprocess tag pose data to convert into a new structure
+		# 1) Convert keypoints and tags to ground frame
+		# 2) Fuse camera for keypoints   
+		# 3) Select primary camera, by given criteria
+		# 4) For primary camera, retrieve and interpolate tag poses for that camera. 
+		# 5) Collate all the relevant data streams, remove irrelevant data streams.
+		# 6) Downsample all relevant data streams. 		
+		# 7) Return new demo file. 
 
 		#############
-		# 0) Interpolate keypoints, when they don't maintain normal distance between each other (ie normal distance between finger joints of a person)
+		# 0) Preprocess tag poses to convert the data structure into -
+		# data['tag_detections']['cam#']
+		# 		{'tag1', 'tag2', 'tag3'}
+		# 				'tag#' = {'position[]', 'orientation[]', 'valid[]'} 
+		#############
+		
+		for idx, cam_tag_detections in enumerate(demonstration['tag_detections_in_cam'].values()):
+			demonstration['tag_detections_in_cam']['cam{}'.format(idx)] = self.tag_preprocessing(cam_tag_detections)
+
+		#############
+		# 1) Convert keypoints and tags to ground frame
+		#############
+
+		demo_length = demonstration['frame_id'].shape[0]
+		demonstration['ground_cam_frame_pose'] = self.ground_pose_dict   #self.set_ground_tag_pose( length=demo_length, primary_camera=demonstration['primary_camera'] )
+
+		# demonstration['keypoints'] has keypoints in ground frame
+		demonstration['keypoints'] = {'cam0':[], 'cam1':[]}
+		# demonstration['tag_detections'] has tag_detections in ground frame
+		demonstration['tag_detections'] = {
+											'cam0':{'tag1':{'position':[], 'orientation':[]},
+				   									'tag2':{'position':[], 'orientation':[]}
+												}, 
+										
+											'cam1':{'tag1':{'position':[], 'orientation':[]},
+				   									'tag2':{'position':[], 'orientation':[]}
+												}
+										}
+
+		for cam_num, cam in enumerate( ['cam0', 'cam1'] ):
+
+			gnd_cam_R=demonstration['ground_cam_frame_pose'][str(cam_num)]['orientation']
+			gnd_cam_t=demonstration['ground_cam_frame_pose'][str(cam_num)]['position']
+			for idx in range(demo_length):
+
+				keypoint_data = demonstration['raw_keypoints'][cam][idx]
+				demonstration['keypoints'][cam][idx] = self.transform_point_3d_from_cam_to_ground(keypoint_data, gnd_cam_R, gnd_cam_t)
+
+
+			for tag in demonstration['tag_detections_in_cam'][cam]:
+
+				tag_data = demonstration['tag_detections_in_cam'][cam][tag]
+				pose_R = np.array(tag_data['orientation'])     #(len(tag), 3, 3))
+				pose_t = np.zeros(tag_data['position'])  #(len(tag), 3))
+				
+				new_tag_data = demonstration['tag_detections'][cam][tag]
+				new_tag_data['position'], new_tag_data['orientation'] = self.transform_pose_from_cam_to_ground(pose_R, pose_t, gnd_cam_R, gnd_cam_t)
+
+		#############
+		# 2) Fuse camera for keypoints    
+		#############
+
+		demonstration['keypoints'] = self.fuse_keypoint_data(demonstration['keypoints'], demonstration['valid_keypoint_frames'], demonstration['primary_keypoint_cam'])
+		
+		# demonstration['keypoints']['cam{}'.format(self.primary_keypoint_cam)]    KEY: PRIMARY_KEYPOINT_CAM
+		## and then interpolate keypoints only for that camera.
+		# edit collate function accordingly
+
+		#############
+		# 3) Interpolate keypoints, when they don't maintain normal distance between each other (ie normal distance between finger joints of a person)
 		#############		
 		
 		demonstration['keypoints'] = self.interpolate_keypoint(demonstration['keypoints'])
 
 		#############
-		# 1) Preprocess tag poses to convert the data structure into -
-		# data['tag_detections']['cam#'][tag#] = {'position[]', 'orientation[]', 'valid[]'} 
-		#############
-		
-		for idx, cam_tag_detections in enumerate(demonstration['tag_detections'].values()):
-			demonstration['tag_detections']['cam{}'.format(idx)] = self.tag_preprocessing(cam_tag_detections)
-
-		#############
-		# 2) For primary camera, retrieve tag poses. 
+		# 4) For primary camera, retrieve tag poses. 
 		#############
 		
 		# Now, instead of interpolating the ground tag detection from the camera frame, set it to constant value. 
@@ -376,8 +523,8 @@ class RealWorldHumanRigid_PreDataset(Dataset):
 
 		demo_length = demonstration['frame_id'].shape[0]
 		demonstration['ground_cam_frame_pose'] = self.set_ground_tag_pose( length=demo_length, primary_camera=demonstration['primary_camera'] )
-		demonstration['object1_gnd_frame_pose'] = self.interpolate_pose( demonstration['tag_detections']['cam{0}'.format(demonstration['primary_camera'])] )
-		demonstration['object2_gnd_frame_pose'] = self.interpolate_pose( demonstration['tag_detections']['cam{0}'.format(demonstration['primary_camera'])] )
+		demonstration['object1_gnd_frame_pose'] = self.interpolate_pose( demonstration['tag_detections']['cam{0}'.format(demonstration['primary_camera'])]['tag1'] )
+		demonstration['object2_gnd_frame_pose'] = self.interpolate_pose( demonstration['tag_detections']['cam{0}'.format(demonstration['primary_camera'])]['tag2'] )
 		
 		# #############
 		# # NOT COMPUTED -- Compute relative poses.
@@ -386,13 +533,13 @@ class RealWorldHumanRigid_PreDataset(Dataset):
 		# demonstration = self.compute_relative_poses(demonstration=demonstration)
 
 		#############
-		# 3) Stack relevant data that we care about. 
+		# 5) Stack relevant data that we care about. 
 		#############
 
 		demonstration = self.collate_states(demonstration=demonstration)
 
 		#############
-		# 4) Downsample.
+		# 6) Downsample.
 		#############
 		
 		self.downsample_data(demonstration=demonstration, task_index=task_index)
@@ -451,7 +598,7 @@ class RealWorldHumanRigid_PreDataset(Dataset):
 				# demonstration = np.load(file, allow_pickle=True).item()
 				# file = os.path.join(task_file_path, 'demo{0}.npy'.format(j))
 				#alt_file = os.path.join(alt_task_file_path, 'demo{0}.npy'.format(j))
-				demonstration = np.load(file, allow_pickle=True).item()[1] # taking second element of tuple
+				task_name, demonstration = np.load(file, allow_pickle=True)
 				#alt_demonstration = np.load(alt_file, allow_pickle=True).item()
 				#demonstration['primary_camera'] = alt_demonstration['primary_camera']
 
@@ -588,7 +735,7 @@ class RealWorldHumanRigid_Dataset(RealWorldHumanRigid_PreDataset):
 		data_element['task-id'] = task_index
 		data_element['environment-name'] = self.environment_names[task_index]
 
-		if resample_length<=1 or data_element['robot-state'].shape[0]<=1:
+		if resample_length<=1 or data_element['hand-state'].shape[0]<=1:
 			data_element['is_valid'] = False			
 		else:
 			data_element['is_valid'] = True
@@ -601,20 +748,24 @@ class RealWorldHumanRigid_Dataset(RealWorldHumanRigid_PreDataset):
 			
 			if self.args.smoothen:
 				data_element['demo'] = gaussian_filter1d(data_element['demo'],self.kernel_bandwidth,axis=0,mode='nearest')
-				data_element['robot-state'] = gaussian_filter1d(data_element['robot-state'],self.kernel_bandwidth,axis=0,mode='nearest')
+				data_element['hand-state'] = gaussian_filter1d(data_element['hand-state'],self.kernel_bandwidth,axis=0,mode='nearest')
 				data_element['object-state'] = gaussian_filter1d(data_element['object-state'],self.kernel_bandwidth,axis=0,mode='nearest')
 				data_element['flat-state'] = gaussian_filter1d(data_element['flat-state'],self.kernel_bandwidth,axis=0,mode='nearest')
 
-			if self.args.data in ['RealWorldRigidRobot']:
-				data_element['demo'] = data_element['robot-state']
+			if self.args.data in ['RealWorldHumanRigidHand']:
+				data_element['demo'] = data_element['hand-state']
 			# data_element['environment-name'] = self.environment_names[task_index]
 
 		return data_element
 	
-	def compute_statistics(self, prefix='RealWorldRigid'):
+	####################################
+	#### Needs to be edited --- self.state_size
+	###################################
+	
+	def compute_statistics(self, prefix='RealWorldHumanRigid'):
 
-		if prefix=='RealWorldRigid':
-			self.state_size = 21
+		if prefix=='RealWorldHumanRigid':
+			self.state_size = 77
 		self.total_length = self.__len__()
 		mean = np.zeros((self.state_size))
 		variance = np.zeros((self.state_size))
