@@ -69,7 +69,8 @@ class NDAXInterface_PreDataset(Dataset):
 		# Require a task list. 
 		# The task name is needed for setting the environment, rendering. 
 		self.task_list = ['open_door', 'close_door', 'eggs', 'stock_cupboard', 'stock_fridge']
-		self.environment_names = []
+		self.environment_names = ['open_door', 'close_door', 'eggs', 'stock_cupboard', 'stock_fridge']
+		
 		self.num_demos = np.array([3, 2, 2, 4, 4])
 
 		# Each task has 200 demos according to RoboMimic.
@@ -85,7 +86,6 @@ class NDAXInterface_PreDataset(Dataset):
 		self.setup()	
 
 		self.stat_dir_name ='NDAX'
-
 	
 	def interpolate_position(self, valid=None, position_sequence=None):
 		
@@ -96,6 +96,7 @@ class NDAXInterface_PreDataset(Dataset):
 		valid_times = valid
 		step = (valid[-1]-valid[0])/(len(valid)//self.ds_freq)
 
+		print("Embed in Interpolate Position")
 		# Resample uniform timesteps with the same length as original data. 
 		query_times = np.arange(valid[0], valid[-1], step)
 
@@ -306,10 +307,25 @@ class NDAXInterface_Dataset(NDAXInterface_PreDataset):
 
 		data_element = self.files[index]
 
-		# EMBed here
+		# Embed here
+		if 'task-id' not in data_element.keys():
+			data_element['task-id'] = copy.deepcopy(data_element['task_id'])
+
+			# print("###############################")
+			# print('T_ID:', data_element['task_id'])
+			# print('T-ID:', data_element['task-id'])
+			task = os.path.split(data_element['task-id'])[-1]
+			data_element['task_id'] = self.task_list.index(task)
+			data_element['environment-name'] = task		
+
+		if self.args.data in ['NDAXMotorAngles']:
+			# Relabel to motor angles.
+			data_element['old_demo'] = copy.deepcopy(data_element['demo'])
+			data_element['demo'] = data_element['motor_positions']
+
 		# print("Embedding in NDAX DL")
 		# embed()
-		data_element['task-id'] = data_element['task_id']
+
 		return data_element
 	
 	def compute_statistics(self):

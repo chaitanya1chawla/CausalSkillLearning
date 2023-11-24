@@ -35,7 +35,7 @@ global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk'
 			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects', \
 			'MOMARTPreproc', 'MOMART', 'MOMARTObject', 'MOMARTRobotObject', 'MOMARTRobotObjectFlat', \
 			'FrankaKitchenPreproc', 'FrankaKitchen', 'FrankaKitchenObject', 'FrankaKitchenRobotObject', \
-			'RealWorldRigid', 'RealWorldRigidRobot', 'RealWorldRigidJEEF', 'NDAX']
+			'RealWorldRigid', 'RealWorldRigidRobot', 'RealWorldRigidJEEF', 'NDAX', 'NDAXMotorAngles']
 
 class PolicyManager_BaseClass():
 
@@ -130,7 +130,7 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['MOMARTRobotObject', 'MOMARTRobotObjectFlat']:			
 			if not hasattr(self, 'visualizer'):
 				self.visualizer = FetchMOMARTVisualizer(args=self.args)
-		elif self.args.data in ['RealWorldRigid', 'NDAX']:
+		elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles']:
 			self.visualizer = DatasetImageVisualizer(args=self.args)
 		else:
 			self.visualizer = ToyDataVisualizer()
@@ -468,7 +468,7 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['MOMARTRobotObject', 'MOMARTRobotObjectFlat']:
 			if not hasattr(self, 'visualizer'):
 				self.visualizer = FetchMOMARTVisualizer(args=self.args)
-		elif self.args.data in ['RealWorldRigid', 'NDAX']:
+		elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles']:
 			self.visualizer = DatasetImageVisualizer(args=self.args)
 		else: 
 			self.visualizer = ToyDataVisualizer()
@@ -618,7 +618,7 @@ class PolicyManager_BaseClass():
 
 					#######################
 					# Create env for batch.
-					if not(self.args.data in ['RealWorldRigid']):
+					if not(self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles']):
 						self.per_batch_env_management(data_element[0])
 
 					for b in range(self.args.batch_size):
@@ -1082,7 +1082,13 @@ class PolicyManager_BaseClass():
 			task_id = None
 			env_name = None
 		else:			
-			task_id = indexed_data_element['task-id']
+			if self.args.data in ['NDAX', 'NDAXMotorAngles']:
+				task_id = indexed_data_element['task_id']
+			else:
+				task_id = indexed_data_element['task-id']
+
+			# print("EMBED in grv")
+			# embed()
 			env_name = self.dataset.environment_names[task_id]
 			print("Visualizing a trajectory of task:", env_name)
 
@@ -1144,12 +1150,16 @@ class PolicyManager_BaseClass():
 		else:			
 			self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(str(i).zfill(3)), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 
+		# plot scale
+		plot_scale = self.norm_denom_value[6:9].max()
+
 		# Also plotting trajectory against time. 
 		plt.close()
-		plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,:7])
+		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,:7])
+		plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,6:9])
 		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory)
 		ax = plt.gca()
-		ax.set_ylim([-5, 5])
+		ax.set_ylim([-plot_scale, plot_scale])
 		plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_GT.png".format(str(i).zfill(3))))
 		plt.close()
 
@@ -1159,10 +1169,11 @@ class PolicyManager_BaseClass():
 
 		# Also plotting trajectory against time. 
 		plt.close()
-		plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,:7])
+		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,:7])
+		plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,6:9])
 		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory)
 		ax = plt.gca()
-		ax.set_ylim([-5, 5])
+		ax.set_ylim([-plot_scale, plot_scale])
 
 		if self.args.viz_sim_rollout:
 			# No call to visualizer here means we have to save things on our own. 
@@ -2313,6 +2324,24 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# Set orientation dimensions to be unnormalized.
 			self.norm_sub_value[10:] = 0.
 			self.norm_denom_value[10:] = 1.
+
+		elif self.args.data in ['NDAXMotorAngles']:
+
+			self.state_size = 6
+			self.state_dim = 6
+
+
+			self.norm_denom_value = self.norm_denom_value[:6]
+			self.norm_sub_value = self.norm_sub_value[:6]
+
+
+		elif self.args.data in ['RealWorldRigidHuman']:
+
+			self.state_size = 77
+			self.state_dim = 77
+			
+			# Set orientation dimensions to be unnormalized.
+			
 
 		self.input_size = 2*self.state_size
 		self.hidden_size = self.args.hidden_size

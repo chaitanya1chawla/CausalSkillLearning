@@ -136,8 +136,13 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	############################
 	elif args.data=='NDAXPreproc':
 		dataset = NDAX_DataLoader.NDAXInterface_PreDataset(args)
-	elif args.data=='NDAX':
+	elif args.data in ['NDAX', 'NDAXMotorAngles']:
 		dataset = NDAX_DataLoader.NDAXInterface_Dataset(args)
+	############################
+	elif args.data=='RealWorldRigidHumanPreproc':
+		dataset = RealWorldRigidHuman_DataLoader.RealWorldRigidHuman_PreDataset(args)
+	elif args.data=='RealWorldRigidHuman':
+		dataset = RealWorldRigidHuman_DataLoader.RealWorldRigidHuman_PreDataset(args)
 
 	return dataset
 
