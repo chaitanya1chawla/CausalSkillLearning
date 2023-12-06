@@ -3858,11 +3858,14 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			# If normalization is set to some value.
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 				batch_trajectory = (batch_trajectory-self.norm_sub_value)/self.norm_denom_value
-				self.normalized_subsampled_relative_object_state = (self.subsampled_relative_object_state - self.norm_sub_value[-self.args.env_state_size:])/self.norm_denom_value[-self.args.env_state_size:]
+
+				if self.args.data not in ['NDAX','NDAXMotorAngles']:
+					self.normalized_subsampled_relative_object_state = (self.subsampled_relative_object_state - self.norm_sub_value[-self.args.env_state_size:])/self.norm_denom_value[-self.args.env_state_size:]
 
 			# Compute actions.
 			action_sequence = np.diff(batch_trajectory,axis=1)
-			self.relative_object_state_actions = np.diff(self.normalized_subsampled_relative_object_state, axis=1)
+			if self.args.data not in ['NDAX','NDAXMotorAngles']:
+				self.relative_object_state_actions = np.diff(self.normalized_subsampled_relative_object_state, axis=1)
 
 			# Concatenate
 			concatenated_traj = self.concat_state_action(batch_trajectory, action_sequence)
