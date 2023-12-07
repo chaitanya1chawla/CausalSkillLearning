@@ -54,6 +54,24 @@ def resample(original_trajectory, desired_number_timepoints):
 # 	# Define quaternion normalization function.
 # 	return q/np.linalg.norm(q)
 
+def check_diff_invalidity(current_data_value, previous_average):    
+	epsilon = 0.75
+	return not(np.linalg.norm(current_data_value - previous_average) <= epsilon)
+
+def check_stat_invalidity(current_data_value, previous_average):
+	epsilon = 1.0
+	statistical_mean = np.array([3.45, -2.4, 0.75])
+	return np.linalg.norm(current_data_value - statistical_mean) <= epsilon
+
+def check_stat_and_diff_invalidity(current_data_value, previous_average, t, latest_valid_index):
+
+	if latest_valid_index==-1:
+		previous_average = current_data_value
+			
+	invalid = check_diff_invalidity(current_data_value, previous_average) or check_stat_invalidity(current_data_value, previous_average)
+	
+	return invalid
+
 class NDAXInterface_PreDataset(Dataset): 
 
 	# Class implementing instance of RealWorld Rigid Body Dataset. 
@@ -174,15 +192,124 @@ class NDAXInterface_PreDataset(Dataset):
 
 		return demonstration
 
+	def filter_demo_outliers(self, demo):
+
+		# Function to remove statistical outliers that arise from the markers being occluded. 
+		# Works by: 
+		# 	1) Maintaining a moving window average of the data. \\ 
+		# 		Rejecting points that deviate from the previous average by a amount larger thna threshold. 
+		# 		Window size is = filter_size. 
+		# 	2) Maintaing a statistical average of all of the invalid data points \\ 
+		# 		(that, for some reason, belong to one mode). Reject points that \\
+		#		belong to this mode within a certain threshold. 
+
+		# Copying over data into another variable, so we can rewrite it. 
+		alternate_demo = copy.deepcopy(demo)	
+		averages = np.zeros_like(demo)
+
+		# Initialize validity, averages, etc. 
+		validity = np.ones(demo.shape[0])		
+		latest_valid_index = -1 
+		averages[0] = alternate_demo.shape[0]
+
+		# Iterating for every timestep in the demonstration. 
+		for k in range(1, demo.shape[0]):
+
+			# Check (in)validity. 
+			if check_stat_and_diff_invalidity(alternate_demo[k], averages[k-1], k, latest_valid_index):
+				# If Invalid, then rewrite current datapoint to previous datapoint. 
+				# Assumes this is constant. 
+				alternate_demo[k] = copy.deepcopy(alternate_demo[k-1])
+				
+				# Set validity to invalid. 
+				validity[k] = 0
+				# The average is now defined as the mean over the previous filter_size - 1 elements, and the current element.. 
+				averages[k] = alternate_demo[max(latest_valid_index, k+1-filter_size):k+1].mean(axis=0)
+			else:            
+				# Special case ofr us encountering the first valid data point afer a stream of invalid data points. 
+				if latest_valid_index == -1:
+					# Set average to current value.. 
+					averages[k] = alt_data[k]
+				else:
+					# The average is now defined as the mean over the previous filter_size - 1 elements, and the current element.. 
+					averages[k] = alternate_demo[max(latest_valid_index, k+1-filter_size):k+1].mean(axis=0)
+
+				# Set the last valid index to current timepoint. 
+				latest_valid_index = k
+		
+		return averages, validity
+	
+	def interpolate_valid_pose_data(valid_positions, valid_orientations, validity):
+
+		###########################
+		# 3) Interpolate valid pose data to invalid timepoints. 
+		###########################
+
+		# 3a) The first few elements may not be valid. If so, backfill first few elements with the first valid element. 
+		
+		first_valid_index = np.where(validity)[0][0]
+		last_valid_index = np.where(validity)[0][-1]
+
+		if first_valid_index>0:
+			valid_positions[:first_valid_index] = valid_positions[first_valid_index]
+			valid_orientations[:valid_orientations] = valid_orientations[first_valid_index]
+			validity[:first_valid_index] = 1
+
+		# 3b) For positions, the last elements will always be valid because of the copying mechanism. 
+		# This is not true for orientations, so fill last invalid section of orientations as well. 
+
+		if last_valid_index<valid_orientations.shape[0]-1:
+			valid_orientations[last_valid_index+1:] = valid_orientations[last_valid_index]
+			validity[last_valid_index+1:] = 1
+
+		# 3c) Now that we have valid starts and ends, interpolate the data. 		
+		interpolated_positions = self.interpolate_position(valid=validity, position_sequence=valid_positions)
+		interpolated_orientations = self.interpolate_orientation(valid=validity, position_sequence=valid_orientations)
+
+		# 3d) Concatenate into Oirentation, Position style pose, so that we maintain consistent ordering for timestep based interpolation. 
+		# interpolated_data = np.concatenate([interpolated_positions, interpolated_orientations], axis=-1)
+		interpolated_data = np.concatenate([interpolated_orientations, interpolated_positions], axis=-1)
+				
+		return interpolated_data
+	
+	def split_demonstration_stream(self, data):
+		# Split into Motor Angles, Position, Orientation. 
+		return data[:,:6], data[:,10:13], data[:,6:10]
+
 	def process_demonstration(self, raw_data, raw_file_name):
 
-		# Throw away irrelevant information. 
-		# 1) Throw away first timestep of CSV, because it's just header. 			
-		# 2) Keep the timesteps for now, so that we can interpolate data to a uniform frequency. 
-		data = raw_data[1:]
+		###########################
+		# 1) Throw away irrelevant information. 
+		###########################
 
-		# Now interpolate the data at uniform downsampled frequency.
-		# This will reorder data to Motor Positions, Hand Position, Hand Orientation.
+		# 1a) Throw away first timestep of CSV, because it's just header. 					
+		data = raw_data[1:]
+		# 1b) Parse into 3 components. 
+		motor_data, pos_data, orientation_data = self.split_demonstration_stream(data)
+
+		###########################
+		# 2) Filter out outliers based on Pose. 
+		###########################
+		
+		filtered_data, validity = self.filter_demo_outliers(pos_data)
+
+		###########################
+		# 3) Interpolate valid pose data to invalid timepoints. 
+		###########################
+				
+		interpolated_data = interpolate_valid_pose_data(valid_positions=filtered_data, \
+											 valid_orientations=orientation_data, validity)
+
+		###########################
+		# 4) Interpolate valid pose data to invalid timepoints. 
+		###########################
+
+		# 4a) First reintergrate into single stream. 
+		# Also add last column of data, because this is the list of timesteps.. 
+		data = np.concatenate([motor_data, interpolated_data, data[:,-1]], axis=-1)
+		
+		# # 4b) Now interpolate the data at uniform downsampled frequency.
+		# # This will reorder data to Motor Positions, Hand Position, Hand Orientation.
 		interpolated_pose = self.interpolate_pose(data)
 		
 		# Dictify the data. 
