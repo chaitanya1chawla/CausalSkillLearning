@@ -344,7 +344,7 @@ class NDAXInterface_PreDataset(Dataset):
 
 		# For each task, save task_file_list to One numpy. 
 		suffix = ""
-		task_numpy_path = os.path.join(self.dataset_directory, "New_Task_Demo_Array{0}.npy".format(suffix))
+		task_numpy_path = os.path.join(self.dataset_directory, "New_Task_Demo_Array{0}_Filtered.npy".format(suffix))
 		np.save(task_numpy_path, self.files)
 
 	def __len__(self):
@@ -426,8 +426,9 @@ class NDAXInterface_Dataset(NDAXInterface_PreDataset):
 		# 	# By popping element from files / dataset_traj_lengths, we now don't need to change indexing.
 		
 	def setup(self):
-				
-		data_path = os.path.join(self.dataset_directory, "New_Task_Demo_Array.npy")
+
+		# data_path = os.path.join(self.dataset_directory, "New_Task_Demo_Array.npy")		
+		data_path = os.path.join(self.dataset_directory, "New_Task_Demo_Array_Filtered.npy")
 		self.files = np.load(data_path, allow_pickle=True)		
 
 	def __getitem__(self, index):
