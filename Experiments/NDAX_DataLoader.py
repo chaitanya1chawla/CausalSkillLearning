@@ -316,11 +316,11 @@ class NDAXInterface_PreDataset(Dataset):
 			validity[last_valid_index+1:] = 1
 
 		# 3c) Now that we have valid starts and ends, interpolate the data. 		
-		valid_times = np.where(valid)[0]
-		# interpolated_positions = self.interpolate_position(valid=validity, position_sequence=valid_positions)
-		# interpolated_orientations = self.interpolate_orientation(valid=validity, position_sequence=valid_orientations)
-		interpolated_positions = self.interpolate_position(valid=valid_times, position_sequence=valid_positions)
-		interpolated_orientations = self.interpolate_orientation(valid=valid_times, position_sequence=valid_orientations)
+
+		interpolated_positions = self.interpolate_position(valid=validity, position_sequence=valid_positions)
+		interpolated_orientations = self.interpolate_orientation(valid=validity, orientation_sequence=valid_orientations)
+		# interpolated_positions = self.interpolate_position(valid=valid_times, position_sequence=valid_positions)
+		# interpolated_orientations = self.interpolate_orientation(valid=valid_times, orientation_sequence=valid_orientations)
 
 
 		# 3d) Concatenate into Oirentation, Position style pose, so that we maintain consistent ordering for timestep based interpolation. 
@@ -363,11 +363,12 @@ class NDAXInterface_PreDataset(Dataset):
 
 		# 4a) First reintergrate into single stream. 
 		# Also add last column of data, because this is the list of timesteps.. 
-		data = np.concatenate([motor_data, interpolated_data, data[:,-1]], axis=-1)
+
+		reconcat_data = np.concatenate([motor_data, interpolated_data, data[:,-2:-1]], axis=-1)
 		
 		# # 4b) Now interpolate the data at uniform downsampled frequency.
 		# # This will reorder data to Motor Positions, Hand Position, Hand Orientation.
-		interpolated_pose = self.uniform_interpolate_pose(data)
+		interpolated_pose = self.uniform_interpolate_pose(reconcat_data)
 		
 		# Dictify the data. 
 		demonstration = self.dictify_data(interpolated_pose)
