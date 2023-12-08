@@ -190,6 +190,9 @@ class NDAXInterface_PreDataset(Dataset):
 			query_times = np.arange(0, len(orientation_sequence))
 			valid_orientations = orientation_sequence[valid==1]
 
+		print("Embed in orientation interp")
+		embed()
+
 		rotation_sequence = R.concatenate(R.from_quat(valid_orientations))
 		
 		# Create slerp object. 
@@ -203,11 +206,11 @@ class NDAXInterface_PreDataset(Dataset):
 		
 		return interpolated_quaternion_sequence
 
-	def uniform_interpolate_pose(self, pose_sequence):
+	def uniform_interpolate_pose(self, pose_sequence, times):
 
 		# Pose here is an array with Motor angles, Position and orientation. 
 		# The dimensions and ordering of these are - 6D motor angles, 4D orientation, then 3D position. 
-		times = pose_sequence[:,-1]
+		# times = pose_sequence[:,-1]		
 		orientations = pose_sequence[:,6:10]
 		position_indices = np.concatenate([np.arange(0,6), np.arange(10,13)])
 		positions = pose_sequence[:,position_indices]
@@ -368,7 +371,7 @@ class NDAXInterface_PreDataset(Dataset):
 		
 		# # 4b) Now interpolate the data at uniform downsampled frequency.
 		# # This will reorder data to Motor Positions, Hand Position, Hand Orientation.
-		interpolated_pose = self.uniform_interpolate_pose(reconcat_data)
+		interpolated_pose = self.uniform_interpolate_pose(reconcat_data, times=raw_data[:,-1])
 		
 		# Dictify the data. 
 		demonstration = self.dictify_data(interpolated_pose)
