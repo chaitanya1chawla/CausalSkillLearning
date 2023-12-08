@@ -105,18 +105,63 @@ class NDAXInterface_PreDataset(Dataset):
 
 		self.stat_dir_name ='NDAX'
 	
-	def interpolate_position(self, valid=None, position_sequence=None):
+	# def interpolate_position(self, valid=None, position_sequence=None):
+		
+	# 	from scipy import interpolate
+
+	# 	# Interp1d from Scipy expects the last dimension to be the dimension we are ninterpolating over. 
+	# 	valid_positions = np.swapaxes(position_sequence[valid==1], 1, 0)
+	# 	valid_times = np.where(valid==1)[0]
+	# 	query_times = np.arange(0, len(position_sequence))
+
+	# 	# Create interpolating function. 
+	# 	interpolating_function = interpolate.interp1d(valid_times, valid_positions)
+
+	# 	# Query interpolating function. 
+	# 	interpolated_positions = interpolating_function(query_times)
+
+	# 	# Swap axes back and return. 
+	# 	return np.swapaxes(interpolated_positions, 1, 0)
+	
+	# def interpolate_orientation(self, valid=None, orientation_sequence=None):
+
+	# 	from scipy.spatial.transform import Rotation as R
+	# 	from scipy.spatial.transform import Slerp
+
+	# 	valid_orientations = orientation_sequence[valid==1]
+	# 	rotation_sequence = R.concatenate(R.from_quat(valid_orientations))
+	# 	valid_times = np.where(valid==1)[0]
+	# 	query_times = np.arange(0, len(orientation_sequence))
+
+	# 	# Create slerp object. 
+	# 	slerp_object = Slerp(valid_times, rotation_sequence)
+
+	# 	# Query the slerp object. 
+	# 	interpolated_rotations = slerp_object(query_times)
+
+	# 	# Convert to quaternions.
+	# 	interpolated_quaternion_sequence = interpolated_rotations.as_quat()
+		
+	# 	return interpolated_quaternion_sequence
+
+	def interpolate_position(self, valid=None, position_sequence=None, uniform=False):
 		
 		from scipy import interpolate
 
 		# Interp1d from Scipy expects the last dimension to be the dimension we are ninterpolating over. 
 		valid_positions = np.swapaxes(position_sequence, 1, 0)
-		valid_times = valid
-		step = (valid[-1]-valid[0])/(len(valid)//self.ds_freq)
 
-		print("Embed in Interpolate Position")
-		# Resample uniform timesteps with the same length as original data. 
-		query_times = np.arange(valid[0], valid[-1], step)
+		# If we are interpolating to uniform timepoints.. 
+		if uniform:
+			valid_times = valid
+			step = (valid[-1]-valid[0])/(len(valid)//self.ds_freq)	
+
+			# Resample uniform timesteps with the same length as original data. 
+			query_times = np.arange(valid[0], valid[-1], step)
+		else:
+			valid_times = np.where(valid==1)[0]
+			query_times = np.arange(0, len(position_sequence))
+
 
 		# Create interpolating function. 
 		interpolating_function = interpolate.interp1d(valid_times, valid_positions)
@@ -127,15 +172,22 @@ class NDAXInterface_PreDataset(Dataset):
 		# Swap axes back and return. 
 		return np.swapaxes(interpolated_positions, 1, 0)
 	
-	def interpolate_orientation(self, valid=None, orientation_sequence=None):
+	def interpolate_orientation(self, valid=None, orientation_sequence=None, uniform=False):
 
 		from scipy.spatial.transform import Rotation as R
 		from scipy.spatial.transform import Slerp
 
 		# Resample uniform timesteps with the same length as original data. 
-		valid_times = valid
-		step = (valid[-1]-valid[0])/(len(valid)//self.ds_freq)
-		query_times = np.arange(valid[0], valid[-1], step)
+		# If we are interpolating to uniform timepoints.. 
+		if uniform:
+			valid_times = valid
+			step = (valid[-1]-valid[0])/(len(valid)//self.ds_freq)	
+
+			# Resample uniform timesteps with the same length as original data. 
+			query_times = np.arange(valid[0], valid[-1], step)
+		else:
+			valid_times = np.where(valid==1)[0]
+			query_times = np.arange(0, len(position_sequence))
 
 		valid_orientations = orientation_sequence
 		rotation_sequence = R.concatenate(R.from_quat(valid_orientations))
@@ -204,6 +256,7 @@ class NDAXInterface_PreDataset(Dataset):
 		#		belong to this mode within a certain threshold. 
 
 		# Copying over data into another variable, so we can rewrite it. 
+		filter_size = 3
 		alternate_demo = copy.deepcopy(demo)	
 		averages = np.zeros_like(demo)
 
@@ -229,7 +282,7 @@ class NDAXInterface_PreDataset(Dataset):
 				# Special case ofr us encountering the first valid data point afer a stream of invalid data points. 
 				if latest_valid_index == -1:
 					# Set average to current value.. 
-					averages[k] = alt_data[k]
+					averages[k] = alternate_demo[k]
 				else:
 					# The average is now defined as the mean over the previous filter_size - 1 elements, and the current element.. 
 					averages[k] = alternate_demo[max(latest_valid_index, k+1-filter_size):k+1].mean(axis=0)
@@ -239,7 +292,7 @@ class NDAXInterface_PreDataset(Dataset):
 		
 		return averages, validity
 	
-	def interpolate_valid_pose_data(valid_positions, valid_orientations, validity):
+	def interpolate_valid_pose_data(self, valid_positions=None, valid_orientations=None, validity=None):
 
 		###########################
 		# 3) Interpolate valid pose data to invalid timepoints. 
@@ -263,8 +316,12 @@ class NDAXInterface_PreDataset(Dataset):
 			validity[last_valid_index+1:] = 1
 
 		# 3c) Now that we have valid starts and ends, interpolate the data. 		
-		interpolated_positions = self.interpolate_position(valid=validity, position_sequence=valid_positions)
-		interpolated_orientations = self.interpolate_orientation(valid=validity, position_sequence=valid_orientations)
+		valid_times = np.where(valid)[0]
+		# interpolated_positions = self.interpolate_position(valid=validity, position_sequence=valid_positions)
+		# interpolated_orientations = self.interpolate_orientation(valid=validity, position_sequence=valid_orientations)
+		interpolated_positions = self.interpolate_position(valid=valid_times, position_sequence=valid_positions)
+		interpolated_orientations = self.interpolate_orientation(valid=valid_times, position_sequence=valid_orientations)
+
 
 		# 3d) Concatenate into Oirentation, Position style pose, so that we maintain consistent ordering for timestep based interpolation. 
 		# interpolated_data = np.concatenate([interpolated_positions, interpolated_orientations], axis=-1)
@@ -297,8 +354,8 @@ class NDAXInterface_PreDataset(Dataset):
 		# 3) Interpolate valid pose data to invalid timepoints. 
 		###########################
 				
-		interpolated_data = interpolate_valid_pose_data(valid_positions=filtered_data, \
-											 valid_orientations=orientation_data, validity)
+		interpolated_data = self.interpolate_valid_pose_data(valid_positions=filtered_data, valid_orientations=orientation_data, validity=validity)
+		# interpolated_data = self.interpolate_valid_pose_data(filtered_data, orientation_data, validity)
 
 		###########################
 		# 4) Interpolate valid pose data to invalid timepoints. 
@@ -317,7 +374,15 @@ class NDAXInterface_PreDataset(Dataset):
 		demonstration['task_id'] = raw_file_name[:-6]
 
 		return demonstration
+
+	def plot_demo(self, traj, suffix):
 		
+		plt.figure()
+		plt.plot(traj)
+		plt.plot(traj, 'o')
+		plt.savefig("Traj{0}.png".format(suffix))
+		plt.close()
+	
 	def setup(self):
 		
 		###########################
@@ -338,6 +403,10 @@ class NDAXInterface_PreDataset(Dataset):
 			
 			# Proces data. 
 			demonstration = self.process_demonstration(raw_data=raw_data, raw_file_name=v)
+
+			# Plot to debug			
+			# if self.args.debug:
+			self.plot_demo(demonstration['hand_pose'], suffix=v)
 
 			# Process data. 
 			self.files.append(demonstration)
