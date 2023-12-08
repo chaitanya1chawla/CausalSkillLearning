@@ -177,7 +177,6 @@ class NDAXInterface_PreDataset(Dataset):
 		from scipy.spatial.transform import Rotation as R
 		from scipy.spatial.transform import Slerp
 
-		# Resample uniform timesteps with the same length as original data. 
 		# If we are interpolating to uniform timepoints.. 
 		if uniform:
 			valid_times = valid
@@ -185,11 +184,12 @@ class NDAXInterface_PreDataset(Dataset):
 
 			# Resample uniform timesteps with the same length as original data. 
 			query_times = np.arange(valid[0], valid[-1], step)
+			valid_orientations = orientation_sequence
 		else:
 			valid_times = np.where(valid==1)[0]
-			query_times = np.arange(0, len(position_sequence))
+			query_times = np.arange(0, len(orientation_sequence))
+			valid_orientations = orientation_sequence[valid==1]
 
-		valid_orientations = orientation_sequence
 		rotation_sequence = R.concatenate(R.from_quat(valid_orientations))
 		
 		# Create slerp object. 
@@ -203,7 +203,7 @@ class NDAXInterface_PreDataset(Dataset):
 		
 		return interpolated_quaternion_sequence
 
-	def interpolate_pose(self, pose_sequence):
+	def uniform_interpolate_pose(self, pose_sequence):
 
 		# Pose here is an array with Motor angles, Position and orientation. 
 		# The dimensions and ordering of these are - 6D motor angles, 4D orientation, then 3D position. 
@@ -213,8 +213,8 @@ class NDAXInterface_PreDataset(Dataset):
 		positions = pose_sequence[:,position_indices]
 
 		# Interpolate positions and orientations. 
-		interpolated_positions = self.interpolate_position(valid=times, position_sequence=positions)
-		interpolated_orientations = self.interpolate_orientation(valid=times, orientation_sequence=orientations)
+		interpolated_positions = self.interpolate_position(valid=times, position_sequence=positions, uniform=True)
+		interpolated_orientations = self.interpolate_orientation(valid=times, orientation_sequence=orientations, uniform=True)
 		interpolated_poses = np.concatenate([interpolated_positions, interpolated_orientations], axis=1)
 
 		return interpolated_poses
@@ -367,7 +367,7 @@ class NDAXInterface_PreDataset(Dataset):
 		
 		# # 4b) Now interpolate the data at uniform downsampled frequency.
 		# # This will reorder data to Motor Positions, Hand Position, Hand Orientation.
-		interpolated_pose = self.interpolate_pose(data)
+		interpolated_pose = self.uniform_interpolate_pose(data)
 		
 		# Dictify the data. 
 		demonstration = self.dictify_data(interpolated_pose)
