@@ -56,11 +56,15 @@ def resample(original_trajectory, desired_number_timepoints):
 
 def check_diff_invalidity(current_data_value, previous_average):    
 	epsilon = 0.75
+
+	# Returns True (Invalid) if the current data value deviates from the previous average by more than epsilon. 
 	return not(np.linalg.norm(current_data_value - previous_average) <= epsilon)
 
 def check_stat_invalidity(current_data_value, previous_average):
 	epsilon = 1.0
 	statistical_mean = np.array([3.45, -2.4, 0.75])
+	
+	# Returns True (Invalid) if the current data value is within epsilon of the statistical mode of the outliers in the dataset. 
 	return np.linalg.norm(current_data_value - statistical_mean) <= epsilon
 
 def check_stat_and_diff_invalidity(current_data_value, previous_average, t, latest_valid_index):
@@ -68,6 +72,7 @@ def check_stat_and_diff_invalidity(current_data_value, previous_average, t, late
 	if latest_valid_index==-1:
 		previous_average = current_data_value
 			
+	# Returns True (Invalid) if value deviates from previous average OR current data is close to invalid mode. 
 	invalid = check_diff_invalidity(current_data_value, previous_average) or check_stat_invalidity(current_data_value, previous_average)
 	
 	return invalid
@@ -105,62 +110,38 @@ class NDAXInterface_PreDataset(Dataset):
 
 		self.stat_dir_name ='NDAX'
 	
-	# def interpolate_position(self, valid=None, position_sequence=None):
-		
-	# 	from scipy import interpolate
-
-	# 	# Interp1d from Scipy expects the last dimension to be the dimension we are ninterpolating over. 
-	# 	valid_positions = np.swapaxes(position_sequence[valid==1], 1, 0)
-	# 	valid_times = np.where(valid==1)[0]
-	# 	query_times = np.arange(0, len(position_sequence))
-
-	# 	# Create interpolating function. 
-	# 	interpolating_function = interpolate.interp1d(valid_times, valid_positions)
-
-	# 	# Query interpolating function. 
-	# 	interpolated_positions = interpolating_function(query_times)
-
-	# 	# Swap axes back and return. 
-	# 	return np.swapaxes(interpolated_positions, 1, 0)
-	
-	# def interpolate_orientation(self, valid=None, orientation_sequence=None):
-
-	# 	from scipy.spatial.transform import Rotation as R
-	# 	from scipy.spatial.transform import Slerp
-
-	# 	valid_orientations = orientation_sequence[valid==1]
-	# 	rotation_sequence = R.concatenate(R.from_quat(valid_orientations))
-	# 	valid_times = np.where(valid==1)[0]
-	# 	query_times = np.arange(0, len(orientation_sequence))
-
-	# 	# Create slerp object. 
-	# 	slerp_object = Slerp(valid_times, rotation_sequence)
-
-	# 	# Query the slerp object. 
-	# 	interpolated_rotations = slerp_object(query_times)
-
-	# 	# Convert to quaternions.
-	# 	interpolated_quaternion_sequence = interpolated_rotations.as_quat()
-		
-	# 	return interpolated_quaternion_sequence
-
 	def interpolate_position(self, valid=None, position_sequence=None, uniform=False):
 		
 		from scipy import interpolate
 
-		# Interp1d from Scipy expects the last dimension to be the dimension we are ninterpolating over. 
-		valid_positions = np.swapaxes(position_sequence, 1, 0)
-
 		# If we are interpolating to uniform timepoints.. 
 		if uniform:
+
+			# If we are simply interpolating to a uniform time frequency, 
+			# then we assume all timepoints in input array are valid, and we're just resampling to uniform frequency.			
+
 			valid_times = valid
 			step = (valid[-1]-valid[0])/(len(valid)//self.ds_freq)	
 
 			# Resample uniform timesteps with the same length as original data. 
 			query_times = np.arange(valid[0], valid[-1], step)
+
+			val_pos_seq = position_sequence
 		else:
+
+			# In the case where we're interpolating between valid positions at invalid positions, 
+			# we only need to provide the valid timepoints to the interpolator. 
 			valid_times = np.where(valid==1)[0]
+			# valid_positions = valid_positions[:, valid_times]
 			query_times = np.arange(0, len(position_sequence))
+
+			val_pos_seq = position_sequence[valid==1]
+
+		# print("Embed in interp")
+		# embed()
+
+		# Interp1d from Scipy expects the last dimension to be the dimension we are ninterpolating over. 
+		valid_positions = np.swapaxes(val_pos_seq, 1, 0)
 
 
 		# Create interpolating function. 
@@ -190,8 +171,8 @@ class NDAXInterface_PreDataset(Dataset):
 			query_times = np.arange(0, len(orientation_sequence))
 			valid_orientations = orientation_sequence[valid==1]
 
-		print("Embed in orientation interp")
-		embed()
+		# print("Embed in orientation interp")
+		# embed()
 
 		rotation_sequence = R.concatenate(R.from_quat(valid_orientations))
 		
@@ -265,8 +246,14 @@ class NDAXInterface_PreDataset(Dataset):
 
 		# Initialize validity, averages, etc. 
 		validity = np.ones(demo.shape[0])		
-		latest_valid_index = -1 
-		averages[0] = alternate_demo.shape[0]
+		latest_valid_index = -1 		
+		averages[0] = alternate_demo[0]
+
+		# Statistical mode check
+		if check_stat_invalidity(alternate_demo[0], averages[0]):
+			validity[0] = 0
+		# else:
+		# 	latest_valid_index = 0
 
 		# Iterating for every timestep in the demonstration. 
 		for k in range(1, demo.shape[0]):
@@ -308,7 +295,7 @@ class NDAXInterface_PreDataset(Dataset):
 
 		if first_valid_index>0:
 			valid_positions[:first_valid_index] = valid_positions[first_valid_index]
-			valid_orientations[:valid_orientations] = valid_orientations[first_valid_index]
+			valid_orientations[:first_valid_index] = valid_orientations[first_valid_index]
 			validity[:first_valid_index] = 1
 
 		# 3b) For positions, the last elements will always be valid because of the copying mechanism. 
@@ -319,7 +306,6 @@ class NDAXInterface_PreDataset(Dataset):
 			validity[last_valid_index+1:] = 1
 
 		# 3c) Now that we have valid starts and ends, interpolate the data. 		
-
 		interpolated_positions = self.interpolate_position(valid=validity, position_sequence=valid_positions)
 		interpolated_orientations = self.interpolate_orientation(valid=validity, orientation_sequence=valid_orientations)
 		# interpolated_positions = self.interpolate_position(valid=valid_times, position_sequence=valid_positions)
@@ -371,7 +357,7 @@ class NDAXInterface_PreDataset(Dataset):
 		
 		# # 4b) Now interpolate the data at uniform downsampled frequency.
 		# # This will reorder data to Motor Positions, Hand Position, Hand Orientation.
-		interpolated_pose = self.uniform_interpolate_pose(reconcat_data, times=raw_data[:,-1])
+		interpolated_pose = self.uniform_interpolate_pose(reconcat_data, times=data[:,-1])
 		
 		# Dictify the data. 
 		demonstration = self.dictify_data(interpolated_pose)
@@ -410,7 +396,7 @@ class NDAXInterface_PreDataset(Dataset):
 
 			# Plot to debug			
 			# if self.args.debug:
-			self.plot_demo(demonstration['hand_pose'], suffix=v)
+			self.plot_demo(demonstration['hand_pose'], suffix=str(k))
 
 			# Process data. 
 			self.files.append(demonstration)
