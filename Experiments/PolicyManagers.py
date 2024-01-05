@@ -1151,14 +1151,18 @@ class PolicyManager_BaseClass():
 			self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(str(i).zfill(3)), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 
 		# Set plot scaling
-		# plot_scale = self.norm_denom_value[6:9].max()
-		plot_scale = self.norm_denom_value.max()
+			# For the NDAX data: Use the dimensions 7-9 for the hand position. 
+		plot_scale = self.norm_denom_value[6:9].max()
+		# plot_scale = self.norm_denom_value.max()
 
 		# Also plotting trajectory against time. 
 		plt.close()
+		
+		# For the NDAX data: USe the first 6 dimensions for the motor angles.
 		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,:7])
-		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,6:9])
-		plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory)
+		# For the NDAX data: Use the dimensions 7-9 for the hand position. 
+		plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,6:9])
+		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory)
 		ax = plt.gca()
 		ax.set_ylim([-plot_scale, plot_scale])
 		plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_GT.png".format(str(i).zfill(3))))
@@ -1170,9 +1174,13 @@ class PolicyManager_BaseClass():
 
 		# Also plotting trajectory against time. 
 		plt.close()
+
+		# For the NDAX data: USe the first 6 dimensions for the motor angles.
 		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,:7])
-		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,6:9])
-		plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory)
+		# For the NDAX data: Use the dimensions 7-9 for the hand position. 
+		plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,6:9])
+		# Otherwise use all.
+		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory)
 		ax = plt.gca()
 		ax.set_ylim([-plot_scale, plot_scale])
 
