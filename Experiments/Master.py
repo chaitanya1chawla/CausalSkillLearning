@@ -134,9 +134,9 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	elif args.data in ['RealWorldRigidJEEF']:
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_JointEEFDataset(args)
 	############################
-	elif args.data=='NDAXPreproc':
+	elif args.data in ['NDAXPreproc', 'NDAXPreprocv2']:
 		dataset = NDAX_DataLoader.NDAXInterface_PreDataset(args)
-	elif args.data in ['NDAX', 'NDAXMotorAngles']:
+	elif args.data in ['NDAX', 'NDAXMotorAngles', 'NDAXv2']:
 		dataset = NDAX_DataLoader.NDAXInterface_Dataset(args)
 	############################
 	elif args.data=='RealWorldRigidHumanPreproc':

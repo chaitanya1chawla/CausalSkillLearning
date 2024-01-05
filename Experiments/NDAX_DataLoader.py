@@ -109,6 +109,9 @@ class NDAXInterface_PreDataset(Dataset):
 		self.setup()	
 
 		self.stat_dir_name ='NDAX'
+		self.csv_filename_template = "*.csv"
+		self.npy_filename_prefix = "New_Task_Demo_Array"
+		self.npy_filename_suffix = "_Filtered"
 	
 	def interpolate_position(self, valid=None, position_sequence=None, uniform=False):
 		
@@ -378,8 +381,8 @@ class NDAXInterface_PreDataset(Dataset):
 		###########################
 		# Load data from all tasks.
 		###########################
-		  			
-		data_path = os.path.join(self.dataset_directory, "*.csv")
+		
+		data_path = os.path.join(self.dataset_directory, self.csv_filename_template)
 		self.file_list = sorted(glob.glob(data_path))
 		self.files = []
 
@@ -402,8 +405,8 @@ class NDAXInterface_PreDataset(Dataset):
 			self.files.append(demonstration)
 
 		# For each task, save task_file_list to One numpy. 
-		suffix = ""
-		task_numpy_path = os.path.join(self.dataset_directory, "New_Task_Demo_Array{0}_Filtered.npy".format(suffix))
+		# task_numpy_path = os.path.join(self.dataset_directory, "New_Task_Demo_Array{0}_Filtered.npy".format(suffix))
+		task_numpy_path = os.path.join(self.dataset_directory, "{0}{1}.npy".format(self.npy_filename_prefix, self.npy_filename_suffix))
 		np.save(task_numpy_path, self.files)
 
 	def __len__(self):
@@ -412,6 +415,128 @@ class NDAXInterface_PreDataset(Dataset):
 	def __getitem__(self, index):
 
 		return {}	
+
+class NDAXInterface_PreDataset_v2(NDAXInterface_PreDataset):
+
+	# Class implementing instance of RealWorld Rigid Body Dataset. 
+	def __init__(self, args):
+		
+		super(NDAXInterface_PreDataset_v2, self).__init__(args=args)
+			
+		# Require a task list. 
+		# The task name is needed for setting the environment, rendering. 
+		self.task_list = ['open_door', 'close_door', 'stocking_cupboard', 'stocking_cupboard_box', 'stocking_cupboard_pringle',  'stocking_cupboard_spam']
+		self.environment_names = ['open_door', 'close_door', 'stocking_cupboard', 'stocking_cupboard_box', 'stocking_cupboard_pringle',  'stocking_cupboard_spam']
+		
+		self.num_demos = 3*np.ones(6)
+
+		# Each task has 200 demos according to RoboMimic.
+		self.number_tasks = len(self.task_list)
+		self.cummulative_num_demos = self.num_demos.cumsum()
+		self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
+		self.total_length = self.num_demos.sum()		
+
+		# self.ds_freq = 1*np.ones(self.number_tasks).astype(int)
+		self.ds_freq = np.array([6.5])
+
+		self.define_joint_indices()
+
+		# Set files. 
+		self.setup()	
+
+		
+		self.stat_dir_name ='NDAXv2'
+		self.csv_filename_template = "right*.csv"
+		self.npy_filename_prefix = "NDAXv2_Demo_Array"
+		self.npy_filename_suffix = ""		
+
+	def define_joint_indices(self):
+			
+		# Define indices to retrieve each of the elements of the different joints. 
+		self.joint_index_dictionary = {}
+		# Motor angles for the NDAX hand. 
+		self.joint_index_dictionary['gripper_joints'] = np.arange(0,6)
+		# Shoulder pose. 
+		self.joint_index_dictionary['shoulder_position'] = np.array([25, 29, 33])
+		self.joint_index_dictionary['shoulder_orientation'] = np.array([13, 17, 21, 9])
+		# Elbow pose. 
+		self.joint_index_dictionary['elbow_position'] = np.array([23, 27, 31])
+		self.joint_index_dictionary['elbow_orientation'] = np.array([11, 15, 19, 7])
+		# Wrist pose. 
+		self.joint_index_dictionary['wrist_position'] = np.array([22, 26, 30])
+		self.joint_index_dictionary['wrist_orientation'] = np.array([10, 14, 18, 6])
+		# Object pose. 
+		self.joint_index_dictionary['object_position'] = np.array([24, 28, 32])
+		self.joint_index_dictionary['object_orientation'] = np.array([12, 16, 20, 8])
+
+	def dictify_data(self, demonstration):
+		# Assumes data is from interpolate_pose, which is: Motor Positions, Hand Position, Hand Orientation.
+		
+		demonstration['demo'] = np.concatenate([value for value in demonstration.values()], axis=-1)
+		demonstration['shoulder_pose'] = np.concatenate([demonstration['shoulder_position'], demonstration['shoulder_orientation']], axis=-1)
+		demonstration['elbow_pose'] = np.concatenate([demonstration['elbow_position'], demonstration['elbow_orientation']], axis=-1)
+		demonstration['wrist_pose'] = np.concatenate([demonstration['wrist_position'], demonstration['wrist_orientation']], axis=-1)
+		demonstration['object_pose'] = np.concatenate([demonstration['object_position'], demonstration['object_orientation']], axis=-1)
+		# demonstration['demo'] = data
+		# demonstration['motor_positions'] = data[:,:6]
+		# demonstration['hand_pose'] = data[6:10]
+		# demonstration['hand_orientation'] = data[10:]
+
+		return demonstration
+	
+	def split_demonstration_stream(self, data):
+		
+		partitioned_data = {}
+
+		for key, indices in self.joint_index_dictionary.items():
+			partitioned_data[key] = data[:, indices]
+
+		return partitioned_data
+
+	def uniform_interpolate_pose(self, partitioned_data, times):
+		
+		for key in self.joint_index_dictionary.keys():
+
+			# If gripper or position, linearly interpolate. 
+			if key in ['gripper_joints', 'shoulder_position', 'elbow_position', 'wrist_position', 'object_position']:				
+				partitioned_data[key] = self.interpolate_position(valid=times, position_sequence=partitioned_data[key], uniform=True)
+
+			# If orientation, perform Slerp interpolation. 	
+			else: 
+				partitioned_data[key] = self.interpolate_orientation(valid=times, orientation_sequence=partitioned_data[key], uniform=True)
+
+		return partitioned_data
+
+	def process_demonstration(self, raw_data, raw_file_name):
+
+		###########################
+		# 1) Throw away irrelevant information. 
+		###########################
+
+		# 1a) Throw away first timestep of CSV, because it's just header. 					
+		data = raw_data[1:]
+		
+		###########################
+		# 2) Partition data into streams. 
+		###########################
+
+		partitioned_data = self.split_demonstration_stream(data)
+
+		###########################
+		# 3) Uniformly interpolate each stream. 
+		###########################
+
+		interpolated_data = self.uniform_interpolate_pose(partitioned_data, times=data[:,-1])
+
+		###########################
+		# 4) Concatenate a few additional streams. 
+		###########################
+
+		# Dictify the data. 
+		demonstration = self.dictify_data(interpolated_data)
+		demonstration['task_id'] = raw_file_name[:-6]
+
+		return demonstration
 
 class NDAXInterface_Dataset(NDAXInterface_PreDataset):
 	
@@ -486,8 +611,10 @@ class NDAXInterface_Dataset(NDAXInterface_PreDataset):
 		
 	def setup(self):
 
-		# data_path = os.path.join(self.dataset_directory, "New_Task_Demo_Array.npy")		
-		data_path = os.path.join(self.dataset_directory, "New_Task_Demo_Array_Filtered.npy")
+		if self.args.data in ['NDAX', 'NDAXMotorAngles']:
+			data_path = os.path.join(self.dataset_directory, "New_Task_Demo_Array_Filtered.npy")
+		elif self.args.data in ['NDAXv2']:
+			data_path = os.path.join(self.dataset_directory, "NDAXv2_Demo_Array.npy")
 		self.files = np.load(data_path, allow_pickle=True)		
 
 	def __getitem__(self, index):
@@ -497,10 +624,6 @@ class NDAXInterface_Dataset(NDAXInterface_PreDataset):
 		# Embed here
 		if 'task-id' not in data_element.keys():
 			data_element['task-id'] = copy.deepcopy(data_element['task_id'])
-
-			# print("###############################")
-			# print('T_ID:', data_element['task_id'])
-			# print('T-ID:', data_element['task-id'])
 			task = os.path.split(data_element['task-id'])[-1]
 			data_element['task_id'] = self.task_list.index(task)
 			data_element['environment-name'] = task		
@@ -509,9 +632,6 @@ class NDAXInterface_Dataset(NDAXInterface_PreDataset):
 			# Relabel to motor angles.
 			data_element['old_demo'] = copy.deepcopy(data_element['demo'])
 			data_element['demo'] = data_element['motor_positions']
-
-		# print("Embedding in NDAX DL")
-		# embed()
 
 		return data_element
 	
