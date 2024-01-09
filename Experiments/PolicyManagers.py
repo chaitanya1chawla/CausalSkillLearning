@@ -35,7 +35,7 @@ global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk'
 			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects', \
 			'MOMARTPreproc', 'MOMART', 'MOMARTObject', 'MOMARTRobotObject', 'MOMARTRobotObjectFlat', \
 			'FrankaKitchenPreproc', 'FrankaKitchen', 'FrankaKitchenObject', 'FrankaKitchenRobotObject', \
-			'RealWorldRigid', 'RealWorldRigidRobot', 'RealWorldRigidJEEF', 'NDAX', 'NDAXMotorAngles']
+			'RealWorldRigid', 'RealWorldRigidRobot', 'RealWorldRigidJEEF', 'NDAX', 'NDAXMotorAngles', 'NDAXv2']
 
 class PolicyManager_BaseClass():
 
@@ -130,7 +130,7 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['MOMARTRobotObject', 'MOMARTRobotObjectFlat']:			
 			if not hasattr(self, 'visualizer'):
 				self.visualizer = FetchMOMARTVisualizer(args=self.args)
-		elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles']:
+		elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles', 'NDAXv2']:
 			self.visualizer = DatasetImageVisualizer(args=self.args)
 		else:
 			self.visualizer = ToyDataVisualizer()
@@ -468,7 +468,7 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['MOMARTRobotObject', 'MOMARTRobotObjectFlat']:
 			if not hasattr(self, 'visualizer'):
 				self.visualizer = FetchMOMARTVisualizer(args=self.args)
-		elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles']:
+		elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles', 'NDAXv2']:
 			self.visualizer = DatasetImageVisualizer(args=self.args)
 		else: 
 			self.visualizer = ToyDataVisualizer()
@@ -618,7 +618,7 @@ class PolicyManager_BaseClass():
 
 					#######################
 					# Create env for batch.
-					if not(self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles']):
+					if not(self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles','NDAXv2']):
 						self.per_batch_env_management(data_element[0])
 
 					for b in range(self.args.batch_size):
@@ -1082,7 +1082,7 @@ class PolicyManager_BaseClass():
 			task_id = None
 			env_name = None
 		else:			
-			if self.args.data in ['NDAX', 'NDAXMotorAngles']:
+			if self.args.data in ['NDAX', 'NDAXMotorAngles','NDAXv2']:
 				task_id = indexed_data_element['task_id']
 			else:
 				task_id = indexed_data_element['task-id']
@@ -1152,16 +1152,16 @@ class PolicyManager_BaseClass():
 
 		# Set plot scaling
 			# For the NDAX data: Use the dimensions 7-9 for the hand position. 
-		plot_scale = self.norm_denom_value[6:9].max()
-		# plot_scale = self.norm_denom_value.max()
+		# plot_scale = self.norm_denom_value[6:9].max()
+		plot_scale = self.norm_denom_value.max()
 
 		# Also plotting trajectory against time. 
 		plt.close()
 		
 		# For the NDAX data: USe the first 6 dimensions for the motor angles.
-		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,:7])
+		plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,:7])
 		# For the NDAX data: Use the dimensions 7-9 for the hand position. 
-		plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,6:9])
+		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,6:9])
 		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory)
 		ax = plt.gca()
 		ax.set_ylim([-plot_scale, plot_scale])
@@ -1176,9 +1176,9 @@ class PolicyManager_BaseClass():
 		plt.close()
 
 		# For the NDAX data: USe the first 6 dimensions for the motor angles.
-		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,:7])
+		plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,:7])
 		# For the NDAX data: Use the dimensions 7-9 for the hand position. 
-		plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,6:9])
+		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,6:9])
 		# Otherwise use all.
 		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory)
 		ax = plt.gca()
@@ -2334,6 +2334,20 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.norm_sub_value[10:] = 0.
 			self.norm_denom_value[10:] = 1.
 
+		elif self.args.data in ['NDAXv2']:
+
+			self.state_size = 28+6
+			self.state_dim = 28+6
+
+			# Set orientation to be unnormalized
+			# Remember, [0,6) motor angles, [6,9) shoulder pos, [9,13) shoulder orientation,
+			# 								[13, 16) elbow pos, [16, 20) elbow orientation,
+			# 								[20, 23) elbow pos, [23, 27) wrist orientation,
+			# 								[27, 30) elbow pos, [30, 34) object orientation,
+			orientation_indices = np.concatenate([np.arange(9,13), np.arange(16,20), np.arange(23,27), np.arange(30,34)])
+			self.norm_sub_value[orientation_indices] = 0.
+			self.norm_denom_value[orientation_indices] = 1.			
+
 		elif self.args.data in ['NDAXMotorAngles']:
 
 			self.state_size = 6
@@ -2343,12 +2357,10 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			self.norm_denom_value = self.norm_denom_value[:6]
 			self.norm_sub_value = self.norm_sub_value[:6]
 
-
 		elif self.args.data in ['RealWorldRigidHuman']:
 
 			self.state_size = 77
-			self.state_dim = 77
-			
+			self.state_dim = 77			
 			# Set orientation dimensions to be unnormalized.
 			
 
@@ -3867,12 +3879,12 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 			if self.args.normalization=='meanvar' or self.args.normalization=='minmax':
 				batch_trajectory = (batch_trajectory-self.norm_sub_value)/self.norm_denom_value
 
-				if self.args.data not in ['NDAX','NDAXMotorAngles']:
+				if self.args.data not in ['NDAX','NDAXMotorAngles','NDAXv2']:
 					self.normalized_subsampled_relative_object_state = (self.subsampled_relative_object_state - self.norm_sub_value[-self.args.env_state_size:])/self.norm_denom_value[-self.args.env_state_size:]
 
 			# Compute actions.
 			action_sequence = np.diff(batch_trajectory,axis=1)
-			if self.args.data not in ['NDAX','NDAXMotorAngles']:
+			if self.args.data not in ['NDAX','NDAXMotorAngles','NDAXv2']:
 				self.relative_object_state_actions = np.diff(self.normalized_subsampled_relative_object_state, axis=1)
 
 			# Concatenate

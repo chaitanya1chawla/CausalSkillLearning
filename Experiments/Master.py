@@ -134,10 +134,14 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 	elif args.data in ['RealWorldRigidJEEF']:
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_JointEEFDataset(args)
 	############################
-	elif args.data in ['NDAXPreproc', 'NDAXPreprocv2']:
+	elif args.data in ['NDAXPreproc']:
 		dataset = NDAX_DataLoader.NDAXInterface_PreDataset(args)
-	elif args.data in ['NDAX', 'NDAXMotorAngles', 'NDAXv2']:
+	elif args.data in ['NDAXPreprocv2']:
+		dataset = NDAX_DataLoader.NDAXInterface_PreDataset_v2(args)		
+	elif args.data in ['NDAX', 'NDAXMotorAngles']:
 		dataset = NDAX_DataLoader.NDAXInterface_Dataset(args)
+	elif args.data in ['NDAXv2']:
+		dataset = NDAX_DataLoader.NDAXInterface_Dataset_v2(args)				
 	############################
 	elif args.data=='RealWorldRigidHumanPreproc':
 		dataset = RealWorldRigidHuman_DataLoader.RealWorldRigidHuman_PreDataset(args)
@@ -155,8 +159,8 @@ class Master():
 			print("Creating Datasets")			
 			self.dataset = return_dataset(self.args, create_dataset_variation=self.args.dataset_variation)			
 
-		# print("Embed after dataset creation")
-		# embed()
+		print("Embed after dataset creation")
+		embed()
 
 		# Now define policy manager.
 		if self.args.setting in ['learntsub', 'joint']:

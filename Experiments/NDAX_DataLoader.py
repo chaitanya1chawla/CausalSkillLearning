@@ -100,18 +100,20 @@ class NDAXInterface_PreDataset(Dataset):
 		self.number_tasks = len(self.task_list)
 		self.cummulative_num_demos = self.num_demos.cumsum()
 		self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
-		self.total_length = self.num_demos.sum()		
+		self.total_length = self.num_demos.sum().astype(int)
 
 		# self.ds_freq = 1*np.ones(self.number_tasks).astype(int)
 		self.ds_freq = np.array([6.5])
-
-		# Set files. 
-		self.setup()	
 
 		self.stat_dir_name ='NDAX'
 		self.csv_filename_template = "*.csv"
 		self.npy_filename_prefix = "New_Task_Demo_Array"
 		self.npy_filename_suffix = "_Filtered"
+
+		# print("About to run setup from PreDataset v1.")
+		# Set files. 
+		# This needs to exist for the Full dataset class.. 
+		# self.setup()	
 	
 	def interpolate_position(self, valid=None, position_sequence=None, uniform=False):
 		
@@ -425,31 +427,32 @@ class NDAXInterface_PreDataset_v2(NDAXInterface_PreDataset):
 			
 		# Require a task list. 
 		# The task name is needed for setting the environment, rendering. 
-		self.task_list = ['open_door', 'close_door', 'stocking_cupboard', 'stocking_cupboard_box', 'stocking_cupboard_pringle',  'stocking_cupboard_spam']
-		self.environment_names = ['open_door', 'close_door', 'stocking_cupboard', 'stocking_cupboard_box', 'stocking_cupboard_pringle',  'stocking_cupboard_spam']
+		# self.task_list = ['open_door', 'close_door', 'stocking_cupboard', 'stocking_cupboard_box', 'stocking_cupboard_pringle',  'stocking_cupboard_spam']
+		self.task_list = ['right_opening_door', 'right_closing_door', 'right_stocking_cupboard', 'right_stocking_cupboard_box', 'right_stocking_cupboard_pringle', 'right_stocking_cupboard_spam']
+		self.environment_names = ['right_opening_door', 'right_closing_door', 'right_stocking_cupboard', 'right_stocking_cupboard_box', 'right_stocking_cupboard_pringle', 'right_stocking_cupboard_spam']
 		
-		self.num_demos = 3*np.ones(6)
+		self.num_demos = 3*np.ones(6, dtype=int)
 
 		# Each task has 200 demos according to RoboMimic.
 		self.number_tasks = len(self.task_list)
 		self.cummulative_num_demos = self.num_demos.cumsum()
 		self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
-		self.total_length = self.num_demos.sum()		
+		self.total_length = self.num_demos.sum().astype(int)	
 
 		# self.ds_freq = 1*np.ones(self.number_tasks).astype(int)
 		self.ds_freq = np.array([6.5])
 
 		self.define_joint_indices()
 
-		# Set files. 
-		self.setup()	
-
-		
 		self.stat_dir_name ='NDAXv2'
 		self.csv_filename_template = "right*.csv"
 		self.npy_filename_prefix = "NDAXv2_Demo_Array"
-		self.npy_filename_suffix = ""		
+		self.npy_filename_suffix = ""
 
+		print("About to run setup from PreDataset v2.")
+		# Set files. 
+		self.setup()	
+		
 	def define_joint_indices(self):
 			
 		# Define indices to retrieve each of the elements of the different joints. 
@@ -470,17 +473,26 @@ class NDAXInterface_PreDataset_v2(NDAXInterface_PreDataset):
 		self.joint_index_dictionary['object_orientation'] = np.array([12, 16, 20, 8])
 
 	def dictify_data(self, demonstration):
-		# Assumes data is from interpolate_pose, which is: Motor Positions, Hand Position, Hand Orientation.
 		
-		demonstration['demo'] = np.concatenate([value for value in demonstration.values()], axis=-1)
+		# Add task ID. 
+		demonstration['task-id'] = copy.deepcopy(demonstration['task_id'])
+		task = os.path.split(demonstration['task-id'])[-1]
+		demonstration['task_id'] = self.task_list.index(task)
+		demonstration['environment-name'] = task		
+
+		# First concatenate individual joint poses. 
 		demonstration['shoulder_pose'] = np.concatenate([demonstration['shoulder_position'], demonstration['shoulder_orientation']], axis=-1)
 		demonstration['elbow_pose'] = np.concatenate([demonstration['elbow_position'], demonstration['elbow_orientation']], axis=-1)
 		demonstration['wrist_pose'] = np.concatenate([demonstration['wrist_position'], demonstration['wrist_orientation']], axis=-1)
 		demonstration['object_pose'] = np.concatenate([demonstration['object_position'], demonstration['object_orientation']], axis=-1)
-		# demonstration['demo'] = data
-		# demonstration['motor_positions'] = data[:,:6]
-		# demonstration['hand_pose'] = data[6:10]
-		# demonstration['hand_orientation'] = data[10:]
+
+		# In order to retrieve the values of the demonstration dictionary in a particular order,
+		# we either need to sort the keys of the demonstration; or we can - 
+		# Create ordered list of keys, so that we can retrieve the values of the dictionary in this order. 
+		key_list = ['gripper_joints', 'shoulder_pose', 'elbow_pose', 'wrist_pose', 'object_pose']
+		
+		demonstration['demo'] = np.concatenate([demonstration[key] for key in key_list], axis=-1)
+		demonstration['hand_pose'] = demonstration['wrist_position']
 
 		return demonstration
 	
@@ -533,9 +545,9 @@ class NDAXInterface_PreDataset_v2(NDAXInterface_PreDataset):
 		###########################
 
 		# Dictify the data. 
+		interpolated_data['task_id'] = raw_file_name[:-6]
 		demonstration = self.dictify_data(interpolated_data)
-		demonstration['task_id'] = raw_file_name[:-6]
-
+		
 		return demonstration
 
 class NDAXInterface_Dataset(NDAXInterface_PreDataset):
@@ -550,8 +562,7 @@ class NDAXInterface_Dataset(NDAXInterface_PreDataset):
 
 			data_element = self.files[index]
 			self.dataset_trajectory_lengths[index] = len(data_element['demo'])
-
-		
+	
 		# # ######################################################
 		# # # Now implementing dataset_trajectory_length_limits. 
 		# # ######################################################
@@ -637,7 +648,11 @@ class NDAXInterface_Dataset(NDAXInterface_PreDataset):
 	
 	def compute_statistics(self):
 
-		self.state_size = 13
+
+		if self.args.data in ['NDAXv2', 'NDAXPreprocv2']:
+			self.state_size = 28+6
+		else:
+			self.state_size = 13
 		self.total_length = self.__len__()
 		mean = np.zeros((self.state_size))
 		variance = np.zeros((self.state_size))
@@ -701,3 +716,159 @@ class NDAXInterface_Dataset(NDAXInterface_PreDataset):
 		np.save("NDAX_Vel_Var.npy", vel_variance)
 		np.save("NDAX_Vel_Min.npy", vel_min_value)
 		np.save("NDAX_Vel_Max.npy", vel_max_value)
+
+class NDAXInterface_Dataset_v2(NDAXInterface_PreDataset_v2):
+	
+	def __init__(self, args):
+		
+		super(NDAXInterface_Dataset_v2, self).__init__(args)	
+
+		# Now that we've run setup, compute dataset_trajectory_lengths for smart batching.
+		self.dataset_trajectory_lengths = np.zeros(self.total_length)
+		for index in range(self.total_length):
+
+			data_element = self.files[index]
+			self.dataset_trajectory_lengths[index] = len(data_element['demo'])
+	
+		# # ######################################################
+		# # # Now implementing dataset_trajectory_length_limits. 
+		# # ######################################################
+		
+		# # if self.args.dataset_traj_length_limit>0:
+		# # 	# Essentially will need new self.cummulative_num_demos and new .. file index map list things. 
+		# # 	# Also will need to set total_length. 
+
+		# # 	self.full_max_length = self.dataset_trajectory_lengths.max()
+		# # 	self.full_length = copy.deepcopy(self.total_length)
+		# # 	self.full_cummulative_num_demos = copy.deepcopy(self.cummulative_num_demos)
+		# # 	self.full_num_demos = copy.deepcopy(self.num_demos)
+		# # 	self.full_files = copy.deepcopy(self.files)
+		# # 	self.files = [[] for i in range(len(self.task_list))]
+		# # 	self.full_dataset_trajectory_lengths = copy.deepcopy(self.dataset_trajectory_lengths)
+		# # 	self.dataset_trajectory_lengths = []
+		# # 	self.num_demos = np.zeros(len(self.task_list),dtype=int)
+
+		# # 	for index in range(self.full_length):
+		# # 		# Get bucket that index falls into based on num_demos array. 
+		# # 		task_index = np.searchsorted(self.full_cummulative_num_demos, index, side='right')-1
+		# # 		# Get the demo index in this task list. 
+		# # 		new_index = index-self.full_cummulative_num_demos[max(task_index,0)]
+
+		# # 		# Check the length of this particular trajectory and its validity. 
+		# # 		if (self.full_dataset_trajectory_lengths[index] < self.args.dataset_traj_length_limit):
+		# # 			# Add from old list to new. 
+		# # 			self.files[task_index].append(self.full_files[task_index][new_index])
+		# # 			self.dataset_trajectory_lengths.append(self.full_dataset_trajectory_lengths[index])
+		# # 			self.num_demos[task_index] += 1
+		# # 		else:
+		# # 			pass
+
+		# # 			# Reduce count. 
+		# # 			# self.num_demos[task_index] -= 1
+					
+		# # 			# # Pop item from files. It's still saved in full_files. 					
+		# # 			# # self.files[task_index].pop(new_index)
+		# # 			# self.files[task_index] = np.delete(self.files[task_index],new_index)
+		# # 			# Approach with opposite pattern.. instead of deleting invalid files, add valid ones.
+					
+		# # 			# # Pop item from dataset_trajectory_lengths. 
+		# # 			# self.dataset_trajectory_lengths = np.delete(self.dataset_trajectory_lengths, index)
+
+		# 	# Set new cummulative num demos. 
+		# 	self.cummulative_num_demos = self.num_demos.cumsum()
+		# 	self.cummulative_num_demos = np.insert(self.cummulative_num_demos,0,0)
+		# 	# Set new total length.
+		# 	self.total_length = self.cummulative_num_demos[-1]
+		# 	# Make array.
+		# 	self.dataset_trajectory_lengths = np.array(self.dataset_trajectory_lengths)
+
+		# 	for t in range(len(self.task_list)):
+		# 		self.files[t] = np.array(self.files[t])
+
+		# 	# By popping element from files / dataset_traj_lengths, we now don't need to change indexing.
+		
+	def setup(self):
+
+		if self.args.data in ['NDAX', 'NDAXMotorAngles']:
+			data_path = os.path.join(self.dataset_directory, "New_Task_Demo_Array_Filtered.npy")
+		elif self.args.data in ['NDAXv2']:
+			data_path = os.path.join(self.dataset_directory, "NDAXv2_Demo_Array.npy")
+		self.files = np.load(data_path, allow_pickle=True)		
+
+	def __getitem__(self, index):
+
+		data_element = self.files[index]
+		return data_element
+	
+	def compute_statistics(self):
+
+
+		if self.args.data in ['NDAXv2', 'NDAXPreprocv2']:
+			self.state_size = 28+6
+		else:
+			self.state_size = 13
+		self.total_length = self.__len__()
+		mean = np.zeros((self.state_size))
+		variance = np.zeros((self.state_size))
+		mins = np.zeros((self.total_length, self.state_size))
+		maxs = np.zeros((self.total_length, self.state_size))
+		lens = np.zeros((self.total_length))
+
+		# And velocity statistics. 
+		vel_mean = np.zeros((self.state_size))
+		vel_variance = np.zeros((self.state_size))
+		vel_mins = np.zeros((self.total_length, self.state_size))
+		vel_maxs = np.zeros((self.total_length, self.state_size))
+		
+		for i in range(self.total_length):
+
+			print("Phase 1: DP: ",i)
+			data_element = self.__getitem__(i)
+
+			demo = data_element['demo']
+			vel = np.diff(demo,axis=0)
+			mins[i] = demo.min(axis=0)
+			maxs[i] = demo.max(axis=0)
+			mean += demo.sum(axis=0)
+			lens[i] = demo.shape[0]
+
+			vel_mins[i] = abs(vel).min(axis=0)
+			vel_maxs[i] = abs(vel).max(axis=0)
+			vel_mean += vel.sum(axis=0)			
+
+		mean /= lens.sum()
+		vel_mean /= lens.sum()
+
+		for i in range(self.total_length):
+
+			print("Phase 2: DP: ",i)
+			data_element = self.__getitem__(i)
+			
+			# Just need to normalize the demonstration. Not the rest. 			
+			demo = data_element['demo']
+			vel = np.diff(demo,axis=0)
+			variance += ((demo-mean)**2).sum(axis=0)
+			vel_variance += ((vel-vel_mean)**2).sum(axis=0)
+
+		variance /= lens.sum()
+		variance = np.sqrt(variance)
+
+		vel_variance /= lens.sum()
+		vel_variance = np.sqrt(vel_variance)
+
+		max_value = maxs.max(axis=0)
+		min_value = mins.min(axis=0)
+
+		vel_max_value = vel_maxs.max(axis=0)
+		vel_min_value = vel_mins.min(axis=0)
+
+		np.save("NDAXv2_Mean.npy", mean)
+		np.save("NDAXv2_Var.npy", variance)
+		np.save("NDAXv2_Min.npy", min_value)
+		np.save("NDAXv2_Max.npy", max_value)
+		np.save("NDAXv2_Vel_Mean.npy", vel_mean)
+		np.save("NDAXv2_Vel_Var.npy", vel_variance)
+		np.save("NDAXv2_Vel_Min.npy", vel_min_value)
+		np.save("NDAXv2_Vel_Max.npy", vel_max_value)
+
+				
