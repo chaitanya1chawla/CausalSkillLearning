@@ -1150,19 +1150,21 @@ class PolicyManager_BaseClass():
 		else:			
 			self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(str(i).zfill(3)), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 
-		# Set plot scaling
-			# For the NDAX data: Use the dimensions 7-9 for the hand position. 
-		# plot_scale = self.norm_denom_value[6:9].max()
-		plot_scale = self.norm_denom_value.max()
+		# First set indices to plot. 
+		if self.args.plot_index_min==-1 and self.args.plot_index_max==-1:
+			indices = np.arange(0,unnorm_gt_trajectory.shape[1])
+		else:
+			indices = np.arange(self.args.plot_index_min, self.args.plot_index_max)
+
+		# Set plot scaling. 
+		# plot_scale = self.norm_denom_value[6:].max()
+		plot_scale = self.norm_denom_value[indices].max()
 
 		# Also plotting trajectory against time. 
-		plt.close()
-		
-		# For the NDAX data: USe the first 6 dimensions for the motor angles.
-		plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,:7])
-		# For the NDAX data: Use the dimensions 7-9 for the hand position. 
-		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,6:9])
-		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory)
+		plt.close()		
+		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,6:])
+		plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,indices])
+
 		ax = plt.gca()
 		ax.set_ylim([-plot_scale, plot_scale])
 		plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_GT.png".format(str(i).zfill(3))))
@@ -1174,13 +1176,9 @@ class PolicyManager_BaseClass():
 
 		# Also plotting trajectory against time. 
 		plt.close()
+		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,6:])
+		plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,indices])
 
-		# For the NDAX data: USe the first 6 dimensions for the motor angles.
-		plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,:7])
-		# For the NDAX data: Use the dimensions 7-9 for the hand position. 
-		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,6:9])
-		# Otherwise use all.
-		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory)
 		ax = plt.gca()
 		ax.set_ylim([-plot_scale, plot_scale])
 
@@ -2342,8 +2340,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# Set orientation to be unnormalized
 			# Remember, [0,6) motor angles, [6,9) shoulder pos, [9,13) shoulder orientation,
 			# 								[13, 16) elbow pos, [16, 20) elbow orientation,
-			# 								[20, 23) elbow pos, [23, 27) wrist orientation,
-			# 								[27, 30) elbow pos, [30, 34) object orientation,
+			# 								[20, 23) wrist pos, [23, 27) wrist orientation,
+			# 								[27, 30) object pos, [30, 34) object orientation,
 			orientation_indices = np.concatenate([np.arange(9,13), np.arange(16,20), np.arange(23,27), np.arange(30,34)])
 			self.norm_sub_value[orientation_indices] = 0.
 			self.norm_denom_value[orientation_indices] = 1.			
