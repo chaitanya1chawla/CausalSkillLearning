@@ -1721,11 +1721,11 @@ class FetchMOMARTVisualizer(FrankaKitchenVisualizer):
 
 		self.environment.reset()
 		
-class RealWorldRigidDatasetImageVisualizer(object):
+class DatasetImageVisualizer(object):
 
 	def __init__(self, has_display=False, args=None, just_objects=True):
 		
-		super(RealWorldRigidDatasetImageVisualizer, self).__init__()
+		super(DatasetImageVisualizer, self).__init__()
 		self.args = args
 		self.has_display = has_display
 		# self.create_environment()
@@ -1756,6 +1756,7 @@ class RealWorldRigidDatasetImageVisualizer(object):
 				
 		imageio.mimsave(os.path.join(gif_path,gif_name), image_list[...,::-1])
 		return image_list[...,::-1]
+	
 class ToyDataVisualizer():
 
 	def __init__(self):
