@@ -1,5 +1,17 @@
 label_dict = {}
 
+
+label_dict['000'] = 'PickRight'
+label_dict['001'] = 'PourRight'
+label_dict['002'] = 'PourRight'
+label_dict['003'] = 'ReachingRight'
+label_dict['004'] = 'BoxOpeningLeft'
+label_dict['005'] = 'DrawerPullingRight'
+label_dict['006'] = 'BoxOpeningLeft'
+label_dict['007'] = 'Return'
+label_dict['008'] = 'ReachingRight'
+label_dict['009'] = 'ReachingLeft'
+
 label_dict['000'] = 'PickRight'
 label_dict['001'] = 'PourRight'
 label_dict['002'] = 'PourRight'
@@ -10,6 +22,7 @@ label_dict['006'] = 'LiftingBoxLidLeft'
 label_dict['007'] = 'Return'
 label_dict['008'] = 'PositioningGripperRight'
 label_dict['009'] = 'PositioningGripperLeft'
+
 label_dict['010'] = 'BoxOpeningLeft'
 label_dict['011'] = 'DrawerPullingLeft'
 label_dict['012'] = 'PickLeft'
