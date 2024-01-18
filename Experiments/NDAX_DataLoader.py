@@ -566,7 +566,7 @@ class NDAXInterface_PreDataset_v2(NDAXInterface_PreDataset):
 			corresponding_index = int((k/pos_data_length)*video_data_length)			
 			pil_image = Image.fromarray(video_data[corresponding_index])
 			
-			downsized_image = np.asarray(pil_image.resize((480,270)))
+			downsized_image = np.asarray(pil_image.resize((480,270)))[...,::-1]
 			demo_image_list.append(downsized_image)
 
 		demo['images'] = np.stack(demo_image_list, axis=0)

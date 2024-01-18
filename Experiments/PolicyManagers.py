@@ -35,7 +35,7 @@ global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk'
 			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects', \
 			'MOMARTPreproc', 'MOMART', 'MOMARTObject', 'MOMARTRobotObject', 'MOMARTRobotObjectFlat', \
 			'FrankaKitchenPreproc', 'FrankaKitchen', 'FrankaKitchenObject', 'FrankaKitchenRobotObject', \
-			'RealWorldRigid', 'RealWorldRigidRobot', 'RealWorldRigidJEEF', 'NDAX', 'NDAXMotorAngles', 'NDAXv2']
+			'RealWorldRigid', 'RealWorldRigidRobot', 'RealWorldRigidJEEF', 'RealWorldRigidJEEFAbsRelObj', 'NDAX', 'NDAXMotorAngles', 'NDAXv2']
 
 class PolicyManager_BaseClass():
 
@@ -130,7 +130,7 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['MOMARTRobotObject', 'MOMARTRobotObjectFlat']:			
 			if not hasattr(self, 'visualizer'):
 				self.visualizer = FetchMOMARTVisualizer(args=self.args)
-		elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles', 'NDAXv2']:
+		elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles', 'NDAXv2', 'RealWorldRigidRobot', 'RealWorldRigidJEEF', 'RealWorldRigidJEEFAbsRelObj']:
 			self.visualizer = DatasetImageVisualizer(args=self.args)
 		else:
 			self.visualizer = ToyDataVisualizer()
@@ -760,7 +760,7 @@ class PolicyManager_BaseClass():
 		self.write_results_HTML(plots_or_gif='Plot')
 		
 		viz_embeddings = True
-		if (self.args.data in ['RealWorldRigid', 'RealWorldRigidRobot']) and (self.args.images_in_real_world_dataset==0):
+		if (self.args.data in ['RealWorldRigid', 'RealWorldRigidRobot', 'NDAXv2']) and (self.args.images_in_real_world_dataset==0):
 			viz_embeddings = False
 
 		if viz_embeddings:
@@ -1144,7 +1144,7 @@ class PolicyManager_BaseClass():
 		# For now
 		##############################
 
-		if self.args.data in ['RealWorldRigid'] and self.args.images_in_real_world_dataset:
+		if self.args.data in ['RealWorldRigid', 'NDAXv2'] and self.args.images_in_real_world_dataset:
 			# This should already be segmented to the right start and end point...		
 			self.ground_truth_gif = self.visualizer.visualize_prerendered_gif(indexed_data_element['subsampled_images'], gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(str(i).zfill(3)))
 		else:			
@@ -1340,7 +1340,11 @@ class PolicyManager_BaseClass():
 		# Good spaced out highres parameters: 
 		matplotlib.rcParams['figure.figsize'] = [40, 40]			
 		# zoom_factor = 0.3
-		zoom_factor=0.25
+		# zoom_factor=0.25
+
+		# Special parameters used for NDAXv2 dataset
+		# zoom_factor = 0.6
+		zoom_factor = 0.5
 
 		# Set this parameter to make sure we don't drop frames.
 		matplotlib.rcParams['animation.embed_limit'] = 2**128
@@ -2317,11 +2321,32 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# Manually make sure quaternion dims are unscaled.
 			# Now have to do this for EEF, and two objects. 
 			self.norm_denom_value[10:14] = 1.
-			self.norm_denom_value[17:20] = 1.
+			self.norm_denom_value[17:21] = 1.
 			self.norm_denom_value[24:] = 1.
 			self.norm_sub_value[10:14] = 0.
-			self.norm_sub_value[17:20] = 0.
+			self.norm_sub_value[17:21] = 0.
 			self.norm_sub_value[24:] = 0.
+
+		elif self.args.data in ['RealWorldRigidJEEFAbsRelObj']:
+
+			self.state_size = 28+14
+			self.state_dim = 28+14
+
+			# self.norm_sub_value will remain unmodified. 
+			# self.norm_denom_value will get divided by scale.
+			self.norm_denom_value /= self.args.state_scale_factor
+			# Manually make sure quaternion dims are unscaled.
+			# Now have to do this for EEF, and two objects. 
+			self.norm_denom_value[10:14] = 1.
+			self.norm_denom_value[17:21] = 1.
+			self.norm_denom_value[24:28] = 1.
+			self.norm_denom_value[31:35] = 1.
+			self.norm_denom_value[38:] = 1.
+			self.norm_sub_value[10:14] = 0.
+			self.norm_sub_value[17:21] = 0.
+			self.norm_sub_value[24:28] = 0.
+			self.norm_sub_value[31:35] = 0.
+			self.norm_sub_value[38:] = 0.
 
 		elif self.args.data in ['NDAX']:
 
@@ -3865,12 +3890,12 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 						else:
 							batch_trajectory[x] = data_element['demo'][start_timepoint:end_timepoint,:-1]
 
-					if self.args.data in ['RealWorldRigid', 'RealWorldRigidJEEF']:
+					if self.args.data in ['RealWorldRigid', 'RealWorldRigidJEEF', 'RealWorldRigidJEEFAbsRelObj', 'NDAXv2']:
 
 						# Truncate the images to start and end timepoint. 
 						data_element[x]['subsampled_images'] = data_element[x]['images'][start_timepoint:end_timepoint]
 
-					if self.args.data in ['RealWorldRigidJEEF']:
+					if self.args.data in ['RealWorldRigidJEEF', 'RealWorldRigidJEEFAbsRelObj']:
 						self.subsampled_relative_object_state[x] = data_element[x]['relative-object-state'][start_timepoint:end_timepoint]
 
 			# If normalization is set to some value.
@@ -6639,7 +6664,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				else:					
 					batch_trajectory[x,:self.batch_trajectory_lengths[x]] = data_element[x]['demo']
 
-				if self.args.data in ['RealWorldRigid'] and self.args.images_in_real_world_dataset:
+				if self.args.data in ['RealWorldRigid', 'RealWorldRigidJointEEF', 'NDAXv2'] and self.args.images_in_real_world_dataset:
 					data_element[x]['subsampled_images'] = data_element[x]['images']
 			
 			# If normalization is set to some value.
