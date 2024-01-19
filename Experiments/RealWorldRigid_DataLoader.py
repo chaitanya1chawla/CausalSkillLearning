@@ -738,10 +738,11 @@ class RealWorldRigid_JointEEFDataset(RealWorldRigid_Dataset):
 
 		return data_element
 
-	def compute_statistics(self):
-		 
-		self.state_size = 28
-		return super().compute_statistics(prefix='RealWorldRigidJointEEF')
+	def compute_statistics(self, prefix='RealWorldRigidJointEEF'):
+		
+		if prefix=='RealWorldRigidJointEEF':
+			self.state_size = 28
+		return super().compute_statistics(prefix=prefix)
 
 
 class RealWorldRigid_JointEEF_AbsRelObj_Dataset(RealWorldRigid_JointEEFDataset):
@@ -756,7 +757,7 @@ class RealWorldRigid_JointEEF_AbsRelObj_Dataset(RealWorldRigid_JointEEFDataset):
 		# 3) Relative Object States
 		##################################################
 							
-		super(RealWorldRigid_JointEEFDataset, self).__init__(args)	
+		super(RealWorldRigid_JointEEF_AbsRelObj_Dataset, self).__init__(args)	
 		self.stat_dir_name ='RealWorldRigidJointEEFAbsRelObj'
 
 	def __getitem__(self, index):
@@ -782,7 +783,8 @@ class RealWorldRigid_JointEEF_AbsRelObj_Dataset(RealWorldRigid_JointEEFDataset):
 
 		return data_element
 	
-	def compute_statistics(self):
-		 		
-		self.state_size = 28+14
-		return super().compute_statistics(prefix='RealWorldRigidJointEEFAbsRelObj')
+	def compute_statistics(self, prefix='RealWorldRigidJointEEFAbsRelObj'):
+
+		if prefix=='RealWorldRigidJointEEFAbsRelObj':
+			self.state_size = 28+14
+		return super().compute_statistics(prefix=prefix)

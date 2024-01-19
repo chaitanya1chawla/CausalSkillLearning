@@ -11,7 +11,7 @@ from headers import *
 from PolicyNetworks import *
 from RL_headers import *
 from PPO_Utilities import PPOBuffer
-from RealWorldLabels import label_dict
+# from RealWorldLabels import label_dict
 from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, \
 	GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, DAPGVisualizer, \
 	RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer,\
@@ -470,7 +470,8 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['MOMARTRobotObject', 'MOMARTRobotObjectFlat']:
 			if not hasattr(self, 'visualizer'):
 				self.visualizer = FetchMOMARTVisualizer(args=self.args)
-		elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles', 'NDAXv2']:
+		# elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles', 'NDAXv2']:
+		elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles', 'NDAXv2', 'RealWorldRigidRobot', 'RealWorldRigidJEEF', 'RealWorldRigidJEEFAbsRelObj']:			
 			self.visualizer = DatasetImageVisualizer(args=self.args)
 		else: 
 			self.visualizer = ToyDataVisualizer()
@@ -3078,10 +3079,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		relabelled_state_sequence = torch_trajectory
 
 		# Relabel the dims. 
-
-		print("Debug in Relabel")
-		embed()
-
 		torchified_object_state = torch.from_numpy(self.normalized_subsampled_relative_object_state).to(device).view(-1, self.args.batch_size, self.args.env_state_size)		
 		relabelled_state_sequence[..., -self.args.env_state_size:] = torchified_object_state
 
