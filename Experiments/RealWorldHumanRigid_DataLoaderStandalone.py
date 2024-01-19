@@ -9,10 +9,115 @@ import copy
 from IPython import embed
 from scipy.spatial.transform import Rotation as R
 
+def normalize_quaternion(self, q):
+	# Define quaternion normalization function.
+	return q/np.linalg.norm(q)
+
 def resample(original_trajectory, desired_number_timepoints):
 	original_traj_len = len(original_trajectory)
 	new_timepoints = np.linspace(0, original_traj_len-1, desired_number_timepoints, dtype=int)
 	return original_trajectory[new_timepoints]
+
+def invert(self, homogenous_matrix):
+
+	inverse = np.zeros((4,4))
+	rotation = R.from_matrix(homogenous_matrix[:3,:3])
+	inverse[:3, :3] = rotation.inv().as_matrix()
+	inverse[:3, -1] = -rotation.inv().apply(homogenous_matrix[:3,-1])
+	inverse[-1, -1] = 1.
+
+	return inverse
+
+def transform_pose_from_cam_to_ground(self, pose_R, pose_t, gnd_R, gnd_t):
+	
+	pose_R = R.from_quat(pose_R).as_matrix()
+	gnd_R = R.from_quat(gnd_R).as_matrix()
+
+	object_in_cam_hmat = np.zeros((len(pose_R), 4, 4))
+	object_in_cam_hmat[:, :3, :3] = pose_R
+	object_in_cam_hmat[:, :3, -1] = pose_t
+	object_in_cam_hmat[:, -1, -1] = 1.	
+
+	gnd_in_cam_hmat = np.zeros((4,4))
+	gnd_in_cam_hmat[:3, :3] = gnd_R
+	gnd_in_cam_hmat[:3, -1] = np.reshape(gnd_t,(3,))
+	gnd_in_cam_hmat[-1, -1] = 1.	
+
+	cam_in_gnd_hmat = invert(gnd_in_cam_hmat)	
+
+	# Transform
+	# world_in_ground_hmat = invert(ground_in_world_homogenous_matrix)
+	object_in_gnd_hmat = np.matmul(cam_in_gnd_hmat, object_in_cam_hmat)	
+
+	# Retrieve pose. 
+	object_in_gnd_R = R.from_matrix(object_in_gnd_hmat[:, :3, :3]).as_quat()
+	object_in_gnd_t = object_in_gnd_hmat[:, :3, -1]	
+
+	return object_in_gnd_t, object_in_gnd_R
+
+def transform_point_3d_from_cam_to_ground(self, points, gnd_R, gnd_t):
+	
+	gnd_R = R.from_quat(gnd_R).as_matrix()
+	idx = np.arange(3)
+	points_in_cam_hmat = np.zeros((len(points), 4, 4))
+	# Saving the rotation matrix as identity
+	points_in_cam_hmat[:, idx, idx] = 1.
+	points_in_cam_hmat[:, :3, -1] = np.array(points)
+	points_in_cam_hmat[:, -1, -1] = 1.
+
+	gnd_in_cam_hmat = np.zeros((4,4))
+	gnd_in_cam_hmat[:3, :3] = gnd_R
+	gnd_in_cam_hmat[:3, -1] = np.reshape(gnd_t,(3,))
+	gnd_in_cam_hmat[-1, -1] = 1.
+
+	cam_in_gnd_hmat = invert(gnd_in_cam_hmat)
+
+	points_in_gnd_hmat = np.matmul(cam_in_gnd_hmat, points_in_cam_hmat)
+
+	# Retrieve new points
+	points_in_gnd_position = points_in_gnd_hmat[:, :3, -1]
+
+	return points_in_gnd_position
+
+def interpolate_orientation(self, valid=None, orientation_sequence=None):
+
+	from scipy.spatial.transform import Rotation as R
+	from scipy.spatial.transform import Slerp
+
+	valid_orientations = orientation_sequence[valid==1]
+	rotation_sequence = R.concatenate(R.from_quat(valid_orientations))
+	valid_times = np.where(valid==1)[0]
+	query_times = np.arange(0, len(orientation_sequence))
+
+	# Create slerp object. 
+	slerp_object = Slerp(valid_times, rotation_sequence)
+
+	# Query the slerp object. 
+	interpolated_rotations = slerp_object(query_times)
+
+	# Convert to quaternions.
+	interpolated_quaternion_sequence = interpolated_rotations.as_quat()
+		
+	return interpolated_quaternion_sequence
+
+def interpolate_position(self, valid=None, position_sequence=None):
+		
+	from scipy import interpolate
+
+	# Interp1d from Scipy expects the last dimension to be the dimension we are interpolating over. 
+	valid_positions = np.swapaxes(position_sequence[valid==1], 1, 0)
+	valid_times = np.where(valid==1)[0]
+	query_times = np.arange(0, len(position_sequence))
+
+	# Create interpolating function. 
+	interpolating_function = interpolate.interp1d(valid_times, valid_positions)
+
+	# Query interpolating function. 
+	interpolated_positions = interpolating_function(query_times)
+
+	# Swap axes back and return. 
+	return np.swapaxes(interpolated_positions, 1, 0)
+
 
 class RealWorldHumanRigid_PreDataset(object): 
 
@@ -43,10 +148,6 @@ class RealWorldHumanRigid_PreDataset(object):
 		
 
 		self.stat_dir_name ='RealWorldHumanRigid'
-				
-	def normalize_quaternion(self, q):
-		# Define quaternion normalization function.
-		return q/np.linalg.norm(q)
 
 	def tag_preprocessing(self, cam_tag_detections=None, task_name=None):
 		
@@ -104,38 +205,138 @@ class RealWorldHumanRigid_PreDataset(object):
 
 		return tag_dict
 
-	def no_hand_check(self, keypoints, cam):
+	def pickplace_manual_copying(self, demonstration):
 		
-		# keypoints is a 21x3 matrix with 21 points in 3dim
-		if cam == 'cam0':
-			validity=1
-			for keypoint in keypoints:	
-				if np.linalg.norm(self.no_hand_pose[cam] - np.array(keypoint)) > 0.05:
+		tag1_data = demonstration['tag_detections_in_cam']['cam{}'.format(demonstration['primary_camera'])]['tag1']
+		tag2_data = demonstration['tag_detections_in_cam']['cam{}'.format(demonstration['primary_camera'])]['tag2']
+		
+		last_valid_cup_pose_index = np.where(tag1_data['tag_validity'])[0][-1]
+		last_tag1_position = copy.deepcopy(tag1_data['position'][last_valid_cup_pose_index])
+		last_tag1_orientation = copy.deepcopy(tag1_data['orientation'][last_valid_cup_pose_index])
+		
+		tag_data_len = len(demonstration['tag_detections_in_cam']['cam{}'.format(demonstration['primary_camera'])]['tag0']['position'])
+		
+		tag2_data['position'] = [last_tag1_position] * tag_data_len
+		tag2_data['orientation'] = [last_tag1_orientation] * tag_data_len
+		tag2_data['tag_validity'] = [1] * tag_data_len
+
+	def no_hand_check(self, demonstration):
+		
+		for cam in ['cam0', 'cam1']:
+			for idx, kpts in enumerate(demonstration['raw_keypoints'][cam]):
+				
+				# kpts is a 21x3 matrix with 21 points
+				if demonstration['valid_keypoint_frames'][cam][idx] == 1:
+					# For invalid poses, we do not need to check again
+		
+					# keypoints is a 21x3 matrix with 21 points in 3dim
+					if cam == 'cam0':
+						validity=1
+						for keypoint in kpts:	
+							if np.linalg.norm(self.no_hand_pose[cam] - np.array(keypoint)) > 0.05:
+								continue
+							else:
+								validity = 0
+						demonstration['valid_keypoint_frames'][cam][idx] = validity
+
+					elif cam == 'cam1':
+						validity=1
+						for keypoint in kpts:
+							if  (np.linalg.norm(self.no_hand_pose[cam]['pose0.0'] - np.array(keypoint)) > 0.05 and 
+					   			 np.linalg.norm(self.no_hand_pose[cam]['pose0.1'] - np.array(keypoint)) > 0.05):
+								continue
+							else:
+								validity = 0
+						demonstration['valid_keypoint_frames'][cam][idx] = validity
+
+	def rotate_by_180_along_x(self, demonstration):
+		
+		for cam in ['cam0', 'cam1']:
+			print('CAM- ', cam)
+			for tag_key in demonstration['tag_detections_in_cam'][cam]:
+
+				tag = demonstration['tag_detections_in_cam'][cam][tag_key]
+				# Rotate all tags except ground tag, as we are transforming wrt ground later
+				if tag_key != 'tag0':
+
+					print(tag_key)
+					tag['orientation'] = np.array(tag['orientation'])
+					valid_positions = np.where( np.array(tag['tag_validity']) == 1)
+					print('No. of valid positions:', len(valid_positions[0]))
+					print('Percent of valid tags in primary_camera= ', len(valid_positions[0]) / self.demo_length)
+					if len(valid_positions[0]) == 0:
+						continue
+					
+					pose_R = np.array(tag['orientation'])[valid_positions[0]]
+					x_rot = R.from_euler('x', 180, degrees=True).as_matrix()
+					transformed_pose = np.matmul(R.from_quat(pose_R).as_matrix(), x_rot)
+					tag['orientation'][valid_positions[0]] = R.from_matrix(transformed_pose).as_quat()
+					# assigning to variable 'tag' is same as assigning to 'demonstration['tag_detections_in_cam']['cam0']['tag{}']'
+
+		return
+
+	def convert_data_to_ground_frame(self, demonstration, hand_orientation_validity):
+
+		for cam_num, cam in enumerate( ['cam0', 'cam1'] ):
+
+			gnd_cam_R=demonstration['ground_cam_frame_pose'][str(cam_num)]['orientation']
+			gnd_cam_t=demonstration['ground_cam_frame_pose'][str(cam_num)]['position']
+			for idx in range(self.demo_length):
+
+				keypoint_data = demonstration['raw_keypoints'][cam][idx]
+				demonstration['keypoints'][cam].append(transform_point_3d_from_cam_to_ground(keypoint_data, gnd_cam_R, gnd_cam_t))
+				
+				# Convert hand_orientation to ground frame
+				raw_hand_orientation = demonstration['raw_hand_orientation'][cam][idx]
+				if np.linalg.norm(raw_hand_orientation) == 0.0:
+					demonstration['hand_orientation'][cam].append(np.array([0., 0., 0., 0.]))
+					hand_orientation_validity[cam].append(0)
 					continue
 				else:
-					validity = 0
-			# if validity == 0:
-			# 	print('CAM0 invalid!!!')
-			return validity
-			
-		elif cam == 'cam1':
-			validity=1
-			for keypoint in keypoints:
-				if  (np.linalg.norm(self.no_hand_pose[cam]['pose0.0'] - np.array(keypoint)) > 0.05 and 
-		   			 np.linalg.norm(self.no_hand_pose[cam]['pose0.1'] - np.array(keypoint)) > 0.05):
-					continue
-				else:
-					validity = 0
-			# if validity == 0:
-			# 	print('CAM1   invalid!!!')
-			return validity
+					hand_orientation_validity[cam].append(1)
+					raw_hand_orientation = normalize_quaternion(raw_hand_orientation)
+					gnd_cam_R_mat = R.from_quat(gnd_cam_R).as_matrix()
+					# Rotate to bring it wrt ground frame - 
+					matrix_product = np.multiply(R.from_quat(raw_hand_orientation).as_matrix(), gnd_cam_R_mat)
+					demonstration['hand_orientation'][cam].append(R.from_matrix(matrix_product).as_quat())
 
-	def rotate_by_180_along_x(self, pose_R):
-		
-		x_rot = R.from_euler('x', 180, degrees=True).as_matrix()
-		transformed_pose = np.matmul(R.from_quat(pose_R).as_matrix(), x_rot)
 
-		return R.from_matrix(transformed_pose).as_quat()
+			print('Detected tags in {} - '.format(cam))
+
+			# Convert tags to ground frame
+			for tag in demonstration['tag_detections_in_cam'][cam]:
+				print(tag)
+
+				# Ignore ground tag
+				if tag != 'tag0':
+
+					tag_data = demonstration['tag_detections_in_cam'][cam][tag]
+					if np.size(np.where(np.array(tag_data['tag_validity'])==1)[0]) ==0:
+						print('{} is empty in {}'.format(tag, cam))
+						demonstration['tag_detections'][cam][tag] = {
+											'position':np.zeros([self.demo_length, 3]), 
+											'orientation':np.zeros([self.demo_length, 4]),
+											'tag_validity':np.zeros(self.demo_length)
+											}
+						continue
+						
+					tag_data['orientation'] = np.array(tag_data['orientation'])     #(len(tag), 3, 3))
+					tag_data['position'] = np.array(tag_data['position']) 		    #(len(tag), 3))
+					valid_positions = np.array(np.where(np.array(tag_data['orientation']).any(axis=1))[0])[:self.demo_length]
+
+					new_tag_t, new_tag_R = transform_pose_from_cam_to_ground(tag_data['orientation'][valid_positions], tag_data['position'][valid_positions], gnd_cam_R, gnd_cam_t)
+				
+					if demonstration['tag_detections'][cam].get(tag) == None:
+						demonstration['tag_detections'][cam][tag] = {
+																	'position':np.zeros([self.demo_length, 3]), 
+																	'orientation':np.zeros([self.demo_length, 4]),
+																	'tag_validity':np.zeros(self.demo_length)
+																	}
+
+					demonstration['tag_detections'][cam][tag]['position'][valid_positions] = new_tag_t
+					demonstration['tag_detections'][cam][tag]['orientation'][valid_positions] = new_tag_R
+					demonstration['tag_detections'][cam][tag]['tag_validity'][valid_positions] = 1
+
 
 	def interpolate_keypoint(self, cam_keypoint_sequence=None, keypoints_validity=None):
 		# TODO : check if the demonstration['valid_keypoint_frames'] get detected here automatically
@@ -223,7 +424,7 @@ class RealWorldHumanRigid_PreDataset(object):
 		last_valid_index = valid_indices[-1]
 
 		# Interpolate orientations
-		interpolated_orientations = self.interpolate_orientation(valid=keypoints_validity[first_valid_index:last_valid_index+1], \
+		interpolated_orientations = interpolate_orientation(valid=keypoints_validity[first_valid_index:last_valid_index+1], \
 								 orientation_sequence=orientation_array[first_valid_index:last_valid_index+1])
 		
 		# Copy interpolated position until last valid index. 
@@ -258,45 +459,6 @@ class RealWorldHumanRigid_PreDataset(object):
 		# Swap axes back and return. 
 		return np.swapaxes(interpolated_positions, 2, 0)
 
-	def interpolate_position(self, valid=None, position_sequence=None):
-		
-		from scipy import interpolate
-
-		# Interp1d from Scipy expects the last dimension to be the dimension we are interpolating over. 
-		valid_positions = np.swapaxes(position_sequence[valid==1], 1, 0)
-		valid_times = np.where(valid==1)[0]
-		query_times = np.arange(0, len(position_sequence))
-
-		# Create interpolating function. 
-		interpolating_function = interpolate.interp1d(valid_times, valid_positions)
-
-		# Query interpolating function. 
-		interpolated_positions = interpolating_function(query_times)
-
-		# Swap axes back and return. 
-		return np.swapaxes(interpolated_positions, 1, 0)
-	
-	def interpolate_orientation(self, valid=None, orientation_sequence=None):
-
-		from scipy.spatial.transform import Rotation as R
-		from scipy.spatial.transform import Slerp
-
-		valid_orientations = orientation_sequence[valid==1]
-		rotation_sequence = R.concatenate(R.from_quat(valid_orientations))
-		valid_times = np.where(valid==1)[0]
-		query_times = np.arange(0, len(orientation_sequence))
-
-		# Create slerp object. 
-		slerp_object = Slerp(valid_times, rotation_sequence)
-
-		# Query the slerp object. 
-		interpolated_rotations = slerp_object(query_times)
-
-		# Convert to quaternions.
-		interpolated_quaternion_sequence = interpolated_rotations.as_quat()
-		
-		return interpolated_quaternion_sequence
-
 	def interpolate_pose(self, pose_sequence):
 
 		# Assumes pose_sequence is a dictionary with 3 keys: tag_validity, position, and orientation. 
@@ -313,9 +475,9 @@ class RealWorldHumanRigid_PreDataset(object):
 		last_valid_index = valid_indices[-1]
 
 		# Interpolate positions and orientations. 
-		interpolated_positions = self.interpolate_position(valid=pose_sequence['tag_validity'][first_valid_index:last_valid_index+1], \
+		interpolated_positions = interpolate_position(valid=pose_sequence['tag_validity'][first_valid_index:last_valid_index+1], \
 							 position_sequence=pose_sequence['position'][first_valid_index:last_valid_index+1])
-		interpolated_orientations = self.interpolate_orientation(valid=pose_sequence['tag_validity'][first_valid_index:last_valid_index+1], \
+		interpolated_orientations = interpolate_orientation(valid=pose_sequence['tag_validity'][first_valid_index:last_valid_index+1], \
 							orientation_sequence=pose_sequence['orientation'][first_valid_index:last_valid_index+1])
 
 		# Copy interpolated position until last valid index. 
@@ -338,9 +500,12 @@ class RealWorldHumanRigid_PreDataset(object):
 
 		return pose_sequence
 
-	def fuse_keypoint_data(self, both_cam_keypoint_sequence, valid_keypoint_frames, primary_keypoint_cam):
-		
-		#length = len()
+	def fuse_keypoint_data(self, demonstration):
+
+		both_cam_keypoint_sequence = demonstration['keypoints']
+		valid_keypoint_frames = demonstration['valid_keypoint_frames']
+		primary_keypoint_cam = demonstration['primary_keypoint_camera']
+
 		valid_keypoint_data = np.zeros((len(both_cam_keypoint_sequence['cam0']), self.number_of_keypoints, 3))
 		keypoints_validity = np.zeros((len(both_cam_keypoint_sequence['cam0'])))
 
@@ -362,39 +527,56 @@ class RealWorldHumanRigid_PreDataset(object):
 			keypoints_validity[cam1_valid] = 1
 			valid_keypoint_data[cam1_valid] = [both_cam_keypoint_sequence['cam{}'.format(1)][idx] for idx in cam1_valid] 
 
-		return valid_keypoint_data, keypoints_validity
+		demonstration['keypoints'] = valid_keypoint_data
+		demonstration['keypoints_validity'] = keypoints_validity
+		print('Percent of valid keypoint frames after fusing cameras = ', len(np.where(np.array(demonstration['keypoints_validity'])==1)[0])/self.demo_length)
 	
-	def fuse_tag_data(self, prim_cam_tag, non_prim_cam_tag):
+	def fuse_tag_data(self, demonstration):
 
-		demo_length = len(prim_cam_tag['tag_validity'])
-		valid_tag = {
-					'position':np.zeros([demo_length, 3]), 
-					'orientation':np.zeros([demo_length, 4]),
-					'tag_validity':np.zeros(demo_length)
-					}
-		
-		# find indices where both cam0 and cam1 give valid tag data
-		both_valid = np.intersect1d(np.where(prim_cam_tag['tag_validity']==1)[0], np.where(non_prim_cam_tag['tag_validity']==1)[0])
-		if len(both_valid)!=0:
-			valid_tag['tag_validity'][both_valid] = 1
-			valid_tag['position'][both_valid] = [prim_cam_tag['position'][idx] for idx in both_valid] 
-			valid_tag['orientation'][both_valid] = [prim_cam_tag['orientation'][idx] for idx in both_valid] 
+		# Overwrite the primary_camera data
+		for tag in demonstration['tag_detections']['cam{}'.format(demonstration['primary_camera'])]:
+			print(tag)
+			
+			# tag data from primary camera 
+			prim_cam_tag = demonstration['tag_detections']['cam{}'.format(demonstration['primary_camera'])][tag]
+			# tag data from non-primary camera 
+			non_prim_cam_tag = demonstration['tag_detections']['cam{}'.format(demonstration['primary_camera'] ^ 1)][tag]
 
-		# find indices where prim_cam gives valid tag data
-		prim_valid = np.intersect1d(np.where(prim_cam_tag['tag_validity']==1)[0], np.where(non_prim_cam_tag['tag_validity']==0)[0])
-		if len(prim_valid)!=0:
-			valid_tag['tag_validity'][prim_valid] = 1
-			valid_tag['position'][prim_valid] = [prim_cam_tag['position'][idx] for idx in prim_valid] 
-			valid_tag['orientation'][prim_valid] = [prim_cam_tag['orientation'][idx] for idx in prim_valid] 
+			valid_positions = np.where(demonstration['tag_detections']['cam{}'.format(demonstration['primary_camera'])][tag]['tag_validity']==1)[0]
+			print('Percent of valid {} frames after fusing cameras = '.format(tag), len(valid_positions)/self.demo_length)
 
-		# find indices where non_prim gives valid tag data
-		non_prim_valid = np.intersect1d(np.where(prim_cam_tag['tag_validity']==0)[0], np.where(non_prim_cam_tag['tag_validity']==1)[0])
-		if len(non_prim_valid)!=0:
-			valid_tag['tag_validity'][non_prim_valid] = 1
-			valid_tag['position'][non_prim_valid] = [non_prim_cam_tag['position'][idx] for idx in non_prim_valid] 
-			valid_tag['orientation'][non_prim_valid] = [non_prim_cam_tag['orientation'][idx] for idx in non_prim_valid] 
+			demo_length = len(prim_cam_tag['tag_validity'])
+			valid_tag = {
+						'position':np.zeros([demo_length, 3]), 
+						'orientation':np.zeros([demo_length, 4]),
+						'tag_validity':np.zeros(demo_length)
+						}
+			
+			# find indices where both cam0 and cam1 give valid tag data
+			both_valid = np.intersect1d(np.where(prim_cam_tag['tag_validity']==1)[0], np.where(non_prim_cam_tag['tag_validity']==1)[0])
+			if len(both_valid)!=0:
+				valid_tag['tag_validity'][both_valid] = 1
+				valid_tag['position'][both_valid] = [prim_cam_tag['position'][idx] for idx in both_valid] 
+				valid_tag['orientation'][both_valid] = [prim_cam_tag['orientation'][idx] for idx in both_valid] 
+	
+			# find indices where prim_cam gives valid tag data
+			prim_valid = np.intersect1d(np.where(prim_cam_tag['tag_validity']==1)[0], np.where(non_prim_cam_tag['tag_validity']==0)[0])
+			if len(prim_valid)!=0:
+				valid_tag['tag_validity'][prim_valid] = 1
+				valid_tag['position'][prim_valid] = [prim_cam_tag['position'][idx] for idx in prim_valid] 
+				valid_tag['orientation'][prim_valid] = [prim_cam_tag['orientation'][idx] for idx in prim_valid] 
+	
+			# find indices where non_prim gives valid tag data
+			non_prim_valid = np.intersect1d(np.where(prim_cam_tag['tag_validity']==0)[0], np.where(non_prim_cam_tag['tag_validity']==1)[0])
+			if len(non_prim_valid)!=0:
+				valid_tag['tag_validity'][non_prim_valid] = 1
+				valid_tag['position'][non_prim_valid] = [non_prim_cam_tag['position'][idx] for idx in non_prim_valid] 
+				valid_tag['orientation'][non_prim_valid] = [non_prim_cam_tag['orientation'][idx] for idx in non_prim_valid] 
 
-		return valid_tag
+			demonstration['tag_detections']['cam{}'.format(demonstration['primary_camera'])][tag] = valid_tag
+
+			valid_positions = np.where(demonstration['tag_detections']['cam{}'.format(demonstration['primary_camera'])][tag]['tag_validity']==1)[0]
+			print('Percent of valid {} frames after fusing cameras = '.format(tag), len(valid_positions)/demo_length)
 
 	def compute_relative_poses(self, demonstration):
         
@@ -421,91 +603,6 @@ class RealWorldHumanRigid_PreDataset(object):
 		# demonstration['object2_pose']['orientation'] = R.from_matrix(object2_in_ground_homogenous_matrices[:,:3,:3]).as_quat()
     
 		return demonstration
-
-	def invert(self, homogenous_matrix):
-	
-		inverse = np.zeros((4,4))
-		rotation = R.from_matrix(homogenous_matrix[:3,:3])
-		inverse[:3, :3] = rotation.inv().as_matrix()
-		inverse[:3, -1] = -rotation.inv().apply(homogenous_matrix[:3,-1])
-		inverse[-1, -1] = 1.
-
-		return inverse
-
- 
-		
-		gnd_R = R.from_quat(gnd_R).as_matrix()
-		idx = np.arange(3)
-		points_in_cam_hmat = np.zeros((len(points), 4, 4))
-		# Saving the rotation matrix as identity
-		points_in_cam_hmat[:, idx, idx] = 1.
-		points_in_cam_hmat[:, :3, -1] = np.array(points)
-		points_in_cam_hmat[:, -1, -1] = 1.
-
-		gnd_in_cam_hmat = np.zeros((4,4))
-		gnd_in_cam_hmat[:3, :3] = gnd_R
-		gnd_in_cam_hmat[:3, -1] = np.reshape(gnd_t,(3,))
-		gnd_in_cam_hmat[-1, -1] = 1.
-
-		cam_in_gnd_hmat = self.invert(gnd_in_cam_hmat)
-
-		points_in_gnd_hmat = np.matmul(cam_in_gnd_hmat, points_in_cam_hmat)
-
-		# Retrieve new points
-		points_in_gnd_position = points_in_gnd_hmat[:, :3, -1]
-
-		return points_in_gnd_position
-
-	def transform_point_3d_from_cam_to_ground(self, points, gnd_R, gnd_t):
-		
-		gnd_R = R.from_quat(gnd_R).as_matrix()
-		idx = np.arange(3)
-		points_in_cam_hmat = np.zeros((len(points), 4, 4))
-		# Saving the rotation matrix as identity
-		points_in_cam_hmat[:, idx, idx] = 1.
-		points_in_cam_hmat[:, :3, -1] = np.array(points)
-		points_in_cam_hmat[:, -1, -1] = 1.
-
-		gnd_in_cam_hmat = np.zeros((4,4))
-		gnd_in_cam_hmat[:3, :3] = gnd_R
-		gnd_in_cam_hmat[:3, -1] = np.reshape(gnd_t,(3,))
-		gnd_in_cam_hmat[-1, -1] = 1.
-
-		cam_in_gnd_hmat = self.invert(gnd_in_cam_hmat)
-
-		points_in_gnd_hmat = np.matmul(cam_in_gnd_hmat, points_in_cam_hmat)
-
-		# Retrieve new points
-		points_in_gnd_position = points_in_gnd_hmat[:, :3, -1]
-
-		return points_in_gnd_position
-
-	def transform_pose_from_cam_to_ground(self, pose_R, pose_t, gnd_R, gnd_t):
-		
-		pose_R = R.from_quat(pose_R).as_matrix()
-		gnd_R = R.from_quat(gnd_R).as_matrix()
-
-		object_in_cam_hmat = np.zeros((len(pose_R), 4, 4))
-		object_in_cam_hmat[:, :3, :3] = pose_R
-		object_in_cam_hmat[:, :3, -1] = pose_t
-		object_in_cam_hmat[:, -1, -1] = 1.	
-
-		gnd_in_cam_hmat = np.zeros((4,4))
-		gnd_in_cam_hmat[:3, :3] = gnd_R
-		gnd_in_cam_hmat[:3, -1] = np.reshape(gnd_t,(3,))
-		gnd_in_cam_hmat[-1, -1] = 1.	
-
-		cam_in_gnd_hmat = self.invert(gnd_in_cam_hmat)	
-
-		# Transform
-		# world_in_ground_hmat = invert(ground_in_world_homogenous_matrix)
-		object_in_gnd_hmat = np.matmul(cam_in_gnd_hmat, object_in_cam_hmat)	
-
-		# Retrieve pose. 
-		object_in_gnd_R = R.from_matrix(object_in_gnd_hmat[:, :3, :3]).as_quat()
-		object_in_gnd_t = object_in_gnd_hmat[:, :3, -1]	
-
-		return object_in_gnd_t, object_in_gnd_R
 
 	def downsample_data(self, demonstration, task_index):
 
@@ -588,14 +685,14 @@ class RealWorldHumanRigid_PreDataset(object):
 		self.ground_pose_dict['1']['position'] = np.array([-0.05987254,  0.20209948,  0.66636588])
 		self.ground_pose_dict['1']['orientation'] = orientation_2_rotated	
 
-	def set_ground_tag_pose(self, length=None, primary_camera=None):
+	def set_ground_tag_pose(self, primary_camera):
 
 		pose_dictionary = {}
 		pos = self.ground_pose_dict[str(primary_camera)]['position']
 		orient = self.ground_pose_dict[str(primary_camera)]['orientation']
 
-		pose_dictionary['position'] = np.repeat(pos[np.newaxis, :], length, axis=0)
-		pose_dictionary['orientation'] = np.repeat(orient[np.newaxis, :], length, axis=0)
+		pose_dictionary['position'] = np.repeat(pos[np.newaxis, :], self.demo_length, axis=0)
+		pose_dictionary['orientation'] = np.repeat(orient[np.newaxis, :], self.demo_length, axis=0)
 		
 		return pose_dictionary
 
@@ -668,7 +765,7 @@ class RealWorldHumanRigid_PreDataset(object):
 		# 8) Downsample all relevant data streams. 		
 		# 9) Return new demo file. 
 
-		demo_length = len(demonstration['raw_keypoints']['cam0'])
+		self.demo_length = len(demonstration['raw_keypoints']['cam0'])
 
 		###################
 		# Specifying keypoints that are considered from each frame
@@ -697,23 +794,13 @@ class RealWorldHumanRigid_PreDataset(object):
 		for idx, cam_tag_detections in enumerate(demonstration['tag_detections_in_cam'].values()):
 			demonstration['tag_detections_in_cam']['cam{}'.format(idx)] = self.tag_preprocessing(cam_tag_detections, self.task_list[task_index])
 
-		print('Preprocessing of tag data completed')
-		
 		if task_name == 'PickPlace':
-			# Copying last valid pose of transported object as the constant Box Pose.
-			# As we failed to capture the box pose during data capture.
-			tag1_data = demonstration['tag_detections_in_cam']['cam{}'.format(demonstration['primary_camera'])]['tag1']
-			tag2_data = demonstration['tag_detections_in_cam']['cam{}'.format(demonstration['primary_camera'])]['tag2']
-			
-			last_valid_cup_pose_index = np.where(tag1_data['tag_validity'])[0][-1]
-			last_tag1_position = copy.deepcopy(tag1_data['position'][last_valid_cup_pose_index])
-			last_tag1_orientation = copy.deepcopy(tag1_data['orientation'][last_valid_cup_pose_index])
+		# Copying last valid pose of transported object as the constant Box Pose.
+		# As we failed to capture the box pose during data capture.
+			self.pickplace_manual_copying(demonstration)
 
-			tag_data_len = len(demonstration['tag_detections_in_cam']['cam{}'.format(demonstration['primary_camera'])]['tag0']['position'])
-
-			tag2_data['position'] = [last_tag1_position] * tag_data_len
-			tag2_data['orientation'] = [last_tag1_orientation] * tag_data_len
-			tag2_data['tag_validity'] = [1] * tag_data_len
+		print('Preprocessing of tag data completed')
+	
 
 		#############
 		# 1) Mark pose detections near to "No-Hand Pose" as invalid
@@ -730,20 +817,13 @@ class RealWorldHumanRigid_PreDataset(object):
 									'pose0.1':np.array([-0.30, 0.23, 0.66])}
 							}
 		
-		for cam in ['cam0', 'cam1']:
-			for idx, kpts in enumerate(demonstration['raw_keypoints'][cam]):
-				
-				# kpts is a 21x3 matrix with 21 points
-				if demonstration['valid_keypoint_frames'][cam][idx] == 1:
-					# For invalid poses, we do not need to check again
-					demonstration['valid_keypoint_frames'][cam][idx] = self.no_hand_check(kpts, cam)   # checks if points were enough away from no_hand pose or not
+		self.no_hand_check(demonstration)
 					
 		print('No. of valid keypoints after removing no_hand detection - ')
 		print('cam0- ', np.count_nonzero(np.array(demonstration['valid_keypoint_frames']['cam0'])==1))		
 		print('cam1- ', np.count_nonzero(np.array(demonstration['valid_keypoint_frames']['cam1'])==1))		
-		print('Percent of valid frames from cam0 after no_hand = ', len(np.where(np.array(demonstration['valid_keypoint_frames']['cam0'])==1)[0])/demo_length)
-		print('Percent of valid frames from cam1 after no_hand = ', len(np.where(np.array(demonstration['valid_keypoint_frames']['cam1'])==1)[0])/demo_length)
-
+		print('Percent of valid frames from cam0 after no_hand = ', len(np.where(np.array(demonstration['valid_keypoint_frames']['cam0'])==1)[0])/self.demo_length)
+		print('Percent of valid frames from cam1 after no_hand = ', len(np.where(np.array(demonstration['valid_keypoint_frames']['cam1'])==1)[0])/self.demo_length)
 
 		#############
 		# 2) Rotate tags by 180 degrees around x to get them in same frame as ROS Apriltags
@@ -753,24 +833,7 @@ class RealWorldHumanRigid_PreDataset(object):
 		print('Step 2')
 		print('#################')
 
-		for cam in ['cam0', 'cam1']:
-			print('CAM- ', cam)
-			for tag_key in demonstration['tag_detections_in_cam'][cam]:
-
-				tag = demonstration['tag_detections_in_cam'][cam][tag_key]
-				# Rotate all tags except ground tag, as we are transforming wrt ground later
-				if tag_key != 'tag0':
-
-					print(tag_key)
-					tag['orientation'] = np.array(tag['orientation'])
-					valid_positions = np.where( np.array(tag['tag_validity']) == 1)
-					print('No. of valid positions:', len(valid_positions[0]))
-					print('Percent of valid tags in primary_camera= ', len(valid_positions[0]) / demo_length)
-					if len(valid_positions[0]) == 0:
-						continue
-					tag['orientation'][valid_positions[0]] = self.rotate_by_180_along_x(np.array(tag['orientation'])[valid_positions[0]])
-					# assigning to variable 'tag' is same as assigning to 'demonstration['tag_detections_in_cam']['cam0']['tag{}']'
-
+		self.rotate_by_180_along_x(demonstration)
 
 		#############
 		# 3) Convert keypoints and tags to ground frame
@@ -782,69 +845,15 @@ class RealWorldHumanRigid_PreDataset(object):
 
 		demonstration['ground_cam_frame_pose'] = self.ground_pose_dict   #self.set_ground_tag_pose( length=demo_length, primary_camera=demonstration['primary_camera'] )
 
-		# demonstration['keypoints'] has keypoints in ground frame
+		# 'keypoints', 'hand_orientation', and 'tag_detections' are saved in ground frame
 		demonstration['keypoints'] = {'cam0':[], 'cam1':[]}
-		# demonstration['hand_orientation'] has hand_orientation in ground frame
 		demonstration['hand_orientation'] = {'cam0':[], 'cam1':[]}
-		# demonstration['tag_detections'] has tag_detections in ground frame
 		demonstration['tag_detections'] = { 'cam0':{}, 'cam1':{} }
 
 		hand_orientation_validity = {'cam0':[], 'cam1':[]}
 
-		for cam_num, cam in enumerate( ['cam0', 'cam1'] ):
+		self.convert_data_to_ground_frame(demonstration, hand_orientation_validity)
 
-			gnd_cam_R=demonstration['ground_cam_frame_pose'][str(cam_num)]['orientation']
-			gnd_cam_t=demonstration['ground_cam_frame_pose'][str(cam_num)]['position']
-			for idx in range(demo_length):
-
-				keypoint_data = demonstration['raw_keypoints'][cam][idx]
-				demonstration['keypoints'][cam].append(self.transform_point_3d_from_cam_to_ground(keypoint_data, gnd_cam_R, gnd_cam_t))
-				
-				# Convert hand_orientation to ground frame
-				raw_hand_orientation = demonstration['raw_hand_orientation'][cam][idx]
-				if np.linalg.norm(raw_hand_orientation) == 0.0:
-					demonstration['hand_orientation'][cam].append(np.array([0., 0., 0., 0.]))
-					hand_orientation_validity[cam].append(0)
-					continue
-				else:
-					hand_orientation_validity[cam].append(1)
-					raw_hand_orientation = self.normalize_quaternion(raw_hand_orientation)
-					gnd_cam_R_mat = R.from_quat(gnd_cam_R).as_matrix()
-					# Rotate to bring it wrt ground frame - 
-					matrix_product = np.multiply(R.from_quat(raw_hand_orientation).as_matrix(), gnd_cam_R_mat)
-					demonstration['hand_orientation'][cam].append(R.from_matrix(matrix_product).as_quat())
-
-
-			print('Detected tags in {} - '.format(cam))
-			for tag in demonstration['tag_detections_in_cam'][cam]:
-				print(tag)
-				if tag != 'tag0':
-					tag_data = demonstration['tag_detections_in_cam'][cam][tag]
-					if np.size(np.where(np.array(tag_data['tag_validity'])==1)[0]) ==0:
-						print('{} is empty in {}'.format(tag, cam))
-						demonstration['tag_detections'][cam][tag] = {
-											'position':np.zeros([demo_length, 3]), 
-											'orientation':np.zeros([demo_length, 4]),
-											'tag_validity':np.zeros(demo_length)
-											}
-						continue
-						
-					tag_data['orientation'] = np.array(tag_data['orientation'])     #(len(tag), 3, 3))
-					tag_data['position'] = np.array(tag_data['position']) 		    #(len(tag), 3))
-					valid_positions = np.array(np.where(np.array(tag_data['orientation']).any(axis=1))[0])[:demo_length]
-
-					new_tag_t, new_tag_R = self.transform_pose_from_cam_to_ground(tag_data['orientation'][valid_positions], tag_data['position'][valid_positions], gnd_cam_R, gnd_cam_t)
-				
-					if demonstration['tag_detections'][cam].get(tag) == None:
-						demonstration['tag_detections'][cam][tag] = {
-																	'position':np.zeros([demo_length, 3]), 
-																	'orientation':np.zeros([demo_length, 4]),
-																	'tag_validity':np.zeros(demo_length)
-																	}
-
-					demonstration['tag_detections'][cam][tag]['position'][valid_positions] = new_tag_t
-					demonstration['tag_detections'][cam][tag]['orientation'][valid_positions] = new_tag_R
-					demonstration['tag_detections'][cam][tag]['tag_validity'][valid_positions] = 1
 
 		#############
 		# 4) Fuse data from 2 cameras    
@@ -855,19 +864,11 @@ class RealWorldHumanRigid_PreDataset(object):
 		print('#################')
 
 		# Keypoint data fusion
-		demonstration['keypoints'], demonstration['keypoints_validity'] = self.fuse_keypoint_data(demonstration['keypoints'], demonstration['valid_keypoint_frames'], demonstration['primary_keypoint_camera'])
-		print('Percent of valid keypoint frames after fusing cameras = ', len(np.where(np.array(demonstration['keypoints_validity'])==1)[0])/demo_length)
+		self.fuse_keypoint_data(demonstration)
 
 		# Tag data fusion
-		# Overwrite the primary_camera data
-		for tag in demonstration['tag_detections']['cam{}'.format(demonstration['primary_camera'])]:
-			print(tag)
-			tag_data_primary = demonstration['tag_detections']['cam{}'.format(demonstration['primary_camera'])][tag]
-			tag_data_non_primary = demonstration['tag_detections']['cam{}'.format(demonstration['primary_camera'] ^ 1)][tag]
+		self.fuse_tag_data(demonstration)
 
-			demonstration['tag_detections']['cam{}'.format(demonstration['primary_camera'])][tag] = self.fuse_tag_data(tag_data_primary, tag_data_non_primary)
-			valid_positions = np.where(demonstration['tag_detections']['cam{}'.format(demonstration['primary_camera'])][tag]['tag_validity']==1)[0]
-			print('Percent of valid {} frames after fusing cameras = '.format(tag), len(valid_positions)/demo_length)
 
 		#############
 		# 5) Interpolate keypoints, when they don't maintain normal distance between each other (ie normal distance between finger joints of a person)
@@ -893,7 +894,7 @@ class RealWorldHumanRigid_PreDataset(object):
 		# Now, instead of interpolating the ground tag detection from the camera frame, set it to constant value. 
 		# demonstration['ground_cam_frame_pose'] = self.interpolate_pose( demonstration['tag0']['cam{0}'.format(demonstration['primary_camera'])] )				
 
-		demonstration['ground_cam_frame_pose'] = self.set_ground_tag_pose( length=demo_length, primary_camera=demonstration['primary_camera'] )
+		demonstration['ground_cam_frame_pose'] = self.set_ground_tag_pose(demonstration['primary_camera'] )
 
 		demonstration['object_gnd_frame_pose'] = {}
 
@@ -1134,9 +1135,6 @@ class RealWorldHumanRigid_Dataset(RealWorldHumanRigid_PreDataset):
 				data_element['flat-state'] = gaussian_filter1d(data_element['flat-state'],self.kernel_bandwidth,axis=0,mode='nearest')
 
 
-
-			# data_element['environment-name'] = self.environment_names[task_index]
-
 		return data_element
 	
 	####################################
@@ -1147,7 +1145,7 @@ class RealWorldHumanRigid_Dataset(RealWorldHumanRigid_PreDataset):
 
 		######
 		# how to handle this ?
-		self.state_size = 81
+		self.state_size = 53
 		self.total_length = self.__len__()
 		mean = np.zeros((self.state_size))
 		variance = np.zeros((self.state_size))
