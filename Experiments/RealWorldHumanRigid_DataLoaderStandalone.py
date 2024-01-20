@@ -118,7 +118,6 @@ def interpolate_position(self, valid=None, position_sequence=None):
 	# Swap axes back and return. 
 	return np.swapaxes(interpolated_positions, 1, 0)
 
-
 class RealWorldHumanRigid_PreDataset(object): 
 
 	# Class implementing instance of RealWorld Human Rigid Body Dataset. 
@@ -336,7 +335,6 @@ class RealWorldHumanRigid_PreDataset(object):
 					demonstration['tag_detections'][cam][tag]['position'][valid_positions] = new_tag_t
 					demonstration['tag_detections'][cam][tag]['orientation'][valid_positions] = new_tag_R
 					demonstration['tag_detections'][cam][tag]['tag_validity'][valid_positions] = 1
-
 
 	def interpolate_keypoint(self, cam_keypoint_sequence=None, keypoints_validity=None):
 		# TODO : check if the demonstration['valid_keypoint_frames'] get detected here automatically
@@ -1012,7 +1010,6 @@ class RealWorldHumanRigid_PreDataset(object):
 	def __getitem__(self, index):
 
 		return {}	
-
 
 class RealWorldHumanRigid_Dataset(RealWorldHumanRigid_PreDataset):
 	
