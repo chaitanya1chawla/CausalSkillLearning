@@ -1003,6 +1003,12 @@ class RealWorldHumanRigid_PreDataset(Dataset):
 			task_numpy_path = os.path.join(self.dataset_directory, self.task_list[task_index], "New_Task_Demo_Array{}.npy".format(suffix))
 			np.save(task_numpy_path, self.task_demo_array)
 
+	def __len__(self):
+		return self.total_length
+	
+	def __getitem__(self, index):
+
+		return {}	
 
 class RealWorldHumanRigid_Dataset(RealWorldHumanRigid_PreDataset):
 	
