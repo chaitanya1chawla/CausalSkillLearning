@@ -5,7 +5,7 @@ from __future__ import print_function
 from headers import *
 from scipy.spatial.transform import Rotation as R
 
-def normalize_quaternion(self, q):
+def normalize_quaternion(q):
 	# Define quaternion normalization function.
 	return q/np.linalg.norm(q)
 
@@ -1140,7 +1140,7 @@ class RealWorldHumanRigid_Dataset(RealWorldHumanRigid_PreDataset):
 
 		if prefix=='RealWorldHumanRigid':
 			self.state_size = 53
-			
+
 		self.total_length = self.__len__()
 		mean = np.zeros((self.state_size))
 		variance = np.zeros((self.state_size))
