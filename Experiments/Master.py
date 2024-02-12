@@ -9,7 +9,7 @@
 from headers import *
 import DataLoaders, MIME_DataLoader, Roboturk_DataLoader, Mocap_DataLoader, Robomimic_DataLoaders, \
 	  GRAB_DataLoader, DAPG_DataLoader, DexMV_DataLoader, MOMART_DataLoader, FrankaKitchen_DataLoader, \
-		RealWorldRigid_DataLoader, NDAX_DataLoader
+		RealWorldRigid_DataLoader, NDAX_DataLoader, RealWorldHumanRigid_DataLoader
 from PolicyManagers import *
 import TestClass
 import faulthandler
@@ -133,6 +133,8 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_Dataset(args)
 	elif args.data in ['RealWorldRigidJEEF']:
 		dataset = RealWorldRigid_DataLoader.RealWorldRigid_JointEEFDataset(args)
+	elif args.data in ['RealWorldRigidJEEFAbsRelObj']:
+		dataset = RealWorldRigid_DataLoader.RealWorldRigid_JointEEF_AbsRelObj_Dataset(args)
 	############################
 	elif args.data in ['NDAXPreproc']:
 		dataset = NDAX_DataLoader.NDAXInterface_PreDataset(args)
@@ -144,9 +146,9 @@ def return_dataset(args, data=None, create_dataset_variation=False):
 		dataset = NDAX_DataLoader.NDAXInterface_Dataset_v2(args)				
 	############################
 	elif args.data=='RealWorldRigidHumanPreproc':
-		dataset = RealWorldRigidHuman_DataLoader.RealWorldRigidHuman_PreDataset(args)
+		dataset = RealWorldHumanRigid_DataLoader.RealWorldHumanRigid_PreDataset(args)
 	elif args.data=='RealWorldRigidHuman':
-		dataset = RealWorldRigidHuman_DataLoader.RealWorldRigidHuman_PreDataset(args)
+		dataset = RealWorldHumanRigid_DataLoader.RealWorldHumanRigid_Dataset(args)
 
 	return dataset
 	
@@ -390,6 +392,9 @@ def parse_arguments():
 	parser.add_argument('--viz_gt_sim_rollout',dest='viz_gt_sim_rollout',type=int,default=0,help='Whether or not to visualize the GT trajectory by replaying through the simulator.')
 	parser.add_argument('--sim_viz_action_scale_factor',dest='sim_viz_action_scale_factor',type=float,default=0.3,help='Factor by which to scale actions when visualizing in simulation env.')
 	parser.add_argument('--sim_viz_step_repetition',dest='sim_viz_step_repetition',type=int,default=20,help='Number of times to repeat simulation step of visualization of traj.')
+	# Plot params
+	parser.add_argument('--plot_index_min', dest='plot_index_min', type=int, default=-1, help='Minimum index of dimensions to plot. ')
+	parser.add_argument('--plot_index_max', dest='plot_index_max', type=int, default=-1, help='Minimum index of dimensions to plot. ')
 
 	parser.add_argument('--entropy',dest='entropy',type=int,default=0)
 	parser.add_argument('--var_entropy',dest='var_entropy',type=int,default=0)

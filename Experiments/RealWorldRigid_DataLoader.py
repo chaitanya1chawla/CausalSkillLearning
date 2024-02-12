@@ -738,7 +738,53 @@ class RealWorldRigid_JointEEFDataset(RealWorldRigid_Dataset):
 
 		return data_element
 
-	def compute_statistics(self):
-		 
-		self.state_size = 28
-		return super().compute_statistics(prefix='RealWorldRigidJointEEF')
+	def compute_statistics(self, prefix='RealWorldRigidJointEEF'):
+		
+		if prefix=='RealWorldRigidJointEEF':
+			self.state_size = 28
+		return super().compute_statistics(prefix=prefix)
+
+
+class RealWorldRigid_JointEEF_AbsRelObj_Dataset(RealWorldRigid_JointEEFDataset):
+
+	def __init__(self, args):
+
+		##################################################
+		# Make dataset that has the following information:	
+		# 0) Robot Joint States
+		# 1) Robot EEF States
+		# 2) Absolute Object States
+		# 3) Relative Object States
+		##################################################
+							
+		super(RealWorldRigid_JointEEF_AbsRelObj_Dataset, self).__init__(args)	
+		self.stat_dir_name ='RealWorldRigidJointEEFAbsRelObj'
+
+	def __getitem__(self, index):
+		
+		# Run super getitem.
+		data_element = super().__getitem__(index)
+
+		# Set old demo to: 
+		data_element['JEEF_AbsObj_demo'] = data_element['demo']
+
+	
+		##################################################
+		# Make dataset that has the following information:	
+		# 0) Robot Joint States (7)
+		# 1) Robot EEF States (7)
+		# 2) Absolute Object States (14)
+		# 3) Relative Object States (14)
+		##################################################
+
+		# Set new demo to: 
+		data_element['demo'] = np.concatenate([ data_element['JEEF_AbsObj_demo'], \
+										 		data_element['relative-object-state']], axis=-1)
+
+		return data_element
+	
+	def compute_statistics(self, prefix='RealWorldRigidJointEEFAbsRelObj'):
+
+		if prefix=='RealWorldRigidJointEEFAbsRelObj':
+			self.state_size = 28+14
+		return super().compute_statistics(prefix=prefix)

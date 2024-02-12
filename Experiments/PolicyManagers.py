@@ -11,7 +11,7 @@ from headers import *
 from PolicyNetworks import *
 from RL_headers import *
 from PPO_Utilities import PPOBuffer
-from RealWorldLabels import label_dict
+# from RealWorldLabels import label_dict
 from Visualizers import BaxterVisualizer, SawyerVisualizer, FrankaVisualizer, ToyDataVisualizer, \
 	GRABVisualizer, GRABHandVisualizer, GRABArmHandVisualizer, DAPGVisualizer, \
 	RoboturkObjectVisualizer, RoboturkRobotObjectVisualizer,\
@@ -37,7 +37,7 @@ global_dataset_list = ['MIME','OldMIME','Roboturk','OrigRoboturk','FullRoboturk'
 			'RoboturkMultiObjets', 'RoboturkRobotMultiObjects', \
 			'MOMARTPreproc', 'MOMART', 'MOMARTObject', 'MOMARTRobotObject', 'MOMARTRobotObjectFlat', \
 			'FrankaKitchenPreproc', 'FrankaKitchen', 'FrankaKitchenObject', 'FrankaKitchenRobotObject', \
-			'RealWorldRigid', 'RealWorldRigidRobot', 'RealWorldRigidJEEF', 'NDAX', 'NDAXMotorAngles', 'NDAXv2']
+			'RealWorldRigid', 'RealWorldRigidRobot', 'RealWorldRigidJEEF', 'RealWorldRigidJEEFAbsRelObj', 'NDAX', 'NDAXMotorAngles', 'NDAXv2']
 
 class PolicyManager_BaseClass():
 
@@ -132,7 +132,7 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['MOMARTRobotObject', 'MOMARTRobotObjectFlat']:			
 			if not hasattr(self, 'visualizer'):
 				self.visualizer = FetchMOMARTVisualizer(args=self.args)
-		elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles', 'NDAXv2']:
+		elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles', 'NDAXv2', 'RealWorldRigidRobot', 'RealWorldRigidJEEF', 'RealWorldRigidJEEFAbsRelObj']:
 			self.visualizer = DatasetImageVisualizer(args=self.args)
 		else:
 			self.visualizer = ToyDataVisualizer()
@@ -470,7 +470,8 @@ class PolicyManager_BaseClass():
 		elif self.args.data in ['MOMARTRobotObject', 'MOMARTRobotObjectFlat']:
 			if not hasattr(self, 'visualizer'):
 				self.visualizer = FetchMOMARTVisualizer(args=self.args)
-		elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles', 'NDAXv2']:
+		# elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles', 'NDAXv2']:
+		elif self.args.data in ['RealWorldRigid', 'NDAX', 'NDAXMotorAngles', 'NDAXv2', 'RealWorldRigidRobot', 'RealWorldRigidJEEF', 'RealWorldRigidJEEFAbsRelObj']:
 			self.visualizer = DatasetImageVisualizer(args=self.args)
 		else: 
 			self.visualizer = ToyDataVisualizer()
@@ -762,7 +763,7 @@ class PolicyManager_BaseClass():
 		self.write_results_HTML(plots_or_gif='Plot')
 		
 		viz_embeddings = True
-		if (self.args.data in ['RealWorldRigid', 'RealWorldRigidRobot']) and (self.args.images_in_real_world_dataset==0):
+		if (self.args.data in ['RealWorldRigid', 'RealWorldRigidRobot', 'NDAXv2']) and (self.args.images_in_real_world_dataset==0):
 			viz_embeddings = False
 
 		if viz_embeddings:
@@ -1146,25 +1147,27 @@ class PolicyManager_BaseClass():
 		# For now
 		##############################
 
-		if self.args.data in ['RealWorldRigid'] and self.args.images_in_real_world_dataset:
+		if self.args.data in ['RealWorldRigid', 'NDAXv2'] and self.args.images_in_real_world_dataset:
 			# This should already be segmented to the right start and end point...		
 			self.ground_truth_gif = self.visualizer.visualize_prerendered_gif(indexed_data_element['subsampled_images'], gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(str(i).zfill(3)))
 		else:			
 			self.ground_truth_gif = self.visualizer.visualize_joint_trajectory(unnorm_gt_trajectory, gif_path=self.dir_name, gif_name="Traj_{0}_GIF_GT.gif".format(str(i).zfill(3)), return_and_save=True, end_effector=self.args.ee_trajectories, task_id=env_name)
 
-		# Set plot scaling
-			# For the NDAX data: Use the dimensions 7-9 for the hand position. 
-		# plot_scale = self.norm_denom_value[6:9].max()
-		plot_scale = self.norm_denom_value.max()
+		# First set indices to plot. 
+		if self.args.plot_index_min==-1 and self.args.plot_index_max==-1:
+			indices = np.arange(0,unnorm_gt_trajectory.shape[1])
+		else:
+			indices = np.arange(self.args.plot_index_min, self.args.plot_index_max)
+
+		# Set plot scaling. 
+		# plot_scale = self.norm_denom_value[6:].max()
+		plot_scale = self.norm_denom_value[indices].max()
 
 		# Also plotting trajectory against time. 
-		plt.close()
-		
-		# For the NDAX data: USe the first 6 dimensions for the motor angles.
-		plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,:7])
-		# For the NDAX data: Use the dimensions 7-9 for the hand position. 
-		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,6:9])
-		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory)
+		plt.close()		
+		# plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,6:])
+		plt.plot(range(unnorm_gt_trajectory.shape[0]),unnorm_gt_trajectory[:,indices])
+
 		ax = plt.gca()
 		ax.set_ylim([-plot_scale, plot_scale])
 		plt.savefig(os.path.join(self.dir_name,"Traj_{0}_Plot_GT.png".format(str(i).zfill(3))))
@@ -1176,13 +1179,9 @@ class PolicyManager_BaseClass():
 
 		# Also plotting trajectory against time. 
 		plt.close()
+		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,6:])
+		plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,indices])
 
-		# For the NDAX data: USe the first 6 dimensions for the motor angles.
-		plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,:7])
-		# For the NDAX data: Use the dimensions 7-9 for the hand position. 
-		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory[:,6:9])
-		# Otherwise use all.
-		# plt.plot(range(unnorm_pred_trajectory.shape[0]),unnorm_pred_trajectory)
 		ax = plt.gca()
 		ax.set_ylim([-plot_scale, plot_scale])
 
@@ -1346,7 +1345,11 @@ class PolicyManager_BaseClass():
 		# Good spaced out highres parameters: 
 		matplotlib.rcParams['figure.figsize'] = [40, 40]			
 		# zoom_factor = 0.3
-		zoom_factor=0.25
+		# zoom_factor=0.25
+
+		# Special parameters used for NDAXv2 dataset
+		# zoom_factor = 0.6
+		zoom_factor = 0.5
 
 		# Set this parameter to make sure we don't drop frames.
 		matplotlib.rcParams['animation.embed_limit'] = 2**128
@@ -2323,11 +2326,32 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# Manually make sure quaternion dims are unscaled.
 			# Now have to do this for EEF, and two objects. 
 			self.norm_denom_value[10:14] = 1.
-			self.norm_denom_value[17:20] = 1.
+			self.norm_denom_value[17:21] = 1.
 			self.norm_denom_value[24:] = 1.
 			self.norm_sub_value[10:14] = 0.
-			self.norm_sub_value[17:20] = 0.
+			self.norm_sub_value[17:21] = 0.
 			self.norm_sub_value[24:] = 0.
+
+		elif self.args.data in ['RealWorldRigidJEEFAbsRelObj']:
+
+			self.state_size = 28+14
+			self.state_dim = 28+14
+
+			# self.norm_sub_value will remain unmodified. 
+			# self.norm_denom_value will get divided by scale.
+			self.norm_denom_value /= self.args.state_scale_factor
+			# Manually make sure quaternion dims are unscaled.
+			# Now have to do this for EEF, and two objects. 
+			self.norm_denom_value[10:14] = 1.
+			self.norm_denom_value[17:21] = 1.
+			self.norm_denom_value[24:28] = 1.
+			self.norm_denom_value[31:35] = 1.
+			self.norm_denom_value[38:] = 1.
+			self.norm_sub_value[10:14] = 0.
+			self.norm_sub_value[17:21] = 0.
+			self.norm_sub_value[24:28] = 0.
+			self.norm_sub_value[31:35] = 0.
+			self.norm_sub_value[38:] = 0.
 
 		elif self.args.data in ['NDAX']:
 
@@ -2346,8 +2370,8 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 			# Set orientation to be unnormalized
 			# Remember, [0,6) motor angles, [6,9) shoulder pos, [9,13) shoulder orientation,
 			# 								[13, 16) elbow pos, [16, 20) elbow orientation,
-			# 								[20, 23) elbow pos, [23, 27) wrist orientation,
-			# 								[27, 30) elbow pos, [30, 34) object orientation,
+			# 								[20, 23) wrist pos, [23, 27) wrist orientation,
+			# 								[27, 30) object pos, [30, 34) object orientation,
 			orientation_indices = np.concatenate([np.arange(9,13), np.arange(16,20), np.arange(23,27), np.arange(30,34)])
 			self.norm_sub_value[orientation_indices] = 0.
 			self.norm_denom_value[orientation_indices] = 1.			
@@ -3055,10 +3079,6 @@ class PolicyManager_Pretrain(PolicyManager_BaseClass):
 		relabelled_state_sequence = torch_trajectory
 
 		# Relabel the dims. 
-
-		print("Debug in Relabel")
-		embed()
-
 		torchified_object_state = torch.from_numpy(self.normalized_subsampled_relative_object_state).to(device).view(-1, self.args.batch_size, self.args.env_state_size)		
 		relabelled_state_sequence[..., -self.args.env_state_size:] = torchified_object_state
 
@@ -4053,12 +4073,12 @@ class PolicyManager_BatchPretrain(PolicyManager_Pretrain):
 						else:
 							batch_trajectory[x] = data_element['demo'][start_timepoint:end_timepoint,:-1]
 
-					if self.args.data in ['RealWorldRigid', 'RealWorldRigidJEEF']:
+					if self.args.data in ['RealWorldRigid', 'RealWorldRigidJEEF', 'RealWorldRigidJEEFAbsRelObj', 'NDAXv2']:
 
 						# Truncate the images to start and end timepoint. 
 						data_element[x]['subsampled_images'] = data_element[x]['images'][start_timepoint:end_timepoint]
 
-					if self.args.data in ['RealWorldRigidJEEF']:
+					if self.args.data in ['RealWorldRigidJEEF', 'RealWorldRigidJEEFAbsRelObj']:
 						self.subsampled_relative_object_state[x] = data_element[x]['relative-object-state'][start_timepoint:end_timepoint]
 
 			# If normalization is set to some value.
@@ -6827,7 +6847,7 @@ class PolicyManager_BatchJoint(PolicyManager_Joint):
 				else:					
 					batch_trajectory[x,:self.batch_trajectory_lengths[x]] = data_element[x]['demo']
 
-				if self.args.data in ['RealWorldRigid'] and self.args.images_in_real_world_dataset:
+				if self.args.data in ['RealWorldRigid', 'RealWorldRigidJointEEF', 'NDAXv2'] and self.args.images_in_real_world_dataset:
 					data_element[x]['subsampled_images'] = data_element[x]['images']
 			
 			# If normalization is set to some value.

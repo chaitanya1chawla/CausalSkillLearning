@@ -107,6 +107,7 @@ class NDAXInterface_PreDataset(Dataset):
 
 		self.stat_dir_name ='NDAX'
 		self.csv_filename_template = "*.csv"
+		self.video_filename_template = "*.mov"
 		self.npy_filename_prefix = "New_Task_Demo_Array"
 		self.npy_filename_suffix = "_Filtered"
 
@@ -327,7 +328,7 @@ class NDAXInterface_PreDataset(Dataset):
 		# Split into Motor Angles, Position, Orientation. 
 		return data[:,:6], data[:,10:13], data[:,6:10]
 
-	def process_demonstration(self, raw_data, raw_file_name):
+	def process_demonstration(self, raw_data, raw_file_name, video_data=None):
 
 		###########################
 		# 1) Throw away irrelevant information. 
@@ -378,6 +379,18 @@ class NDAXInterface_PreDataset(Dataset):
 		plt.savefig("Traj{0}.png".format(suffix))
 		plt.close()
 	
+	def load_data(self, filename, video_filename=None):
+
+		# Load file, return object. 
+		raw_data = np.genfromtxt(filename, delimiter=',')
+		if video_filename is not None:
+			import pims
+			video_data = pims.Video(video_filename)
+		else:
+			video_data = None
+
+		return raw_data, video_data
+
 	def setup(self):
 		
 		###########################
@@ -387,17 +400,28 @@ class NDAXInterface_PreDataset(Dataset):
 		data_path = os.path.join(self.dataset_directory, self.csv_filename_template)
 		self.file_list = sorted(glob.glob(data_path))
 		self.files = []
+		
+		if self.args.images_in_real_world_dataset:
+			video_data_path = os.path.join(self.dataset_directory, self.video_filename_template)
+			self.video_filelist = sorted(glob.glob(video_data_path))		
+		video_filename = None
 
 		# For all demos.
 		for k, v in enumerate(self.file_list):
 			
 			print("#######################")
 			print("Currently loading file: ", k, " of ", len(self.file_list), " with ID: ", v)
-			# Actually load numpy files. 
-			raw_data = np.genfromtxt(v, delimiter=',')
+
+			# If video data set video_filename.
+			if self.args.images_in_real_world_dataset:
+				# Retrieve filename using same index, because video and regular data filelist should be sorted identically. 
+				video_filename = self.video_filelist[k]			
+
+			# Load data. 
+			raw_data, video_data = self.load_data(filename=v, video_filename=video_filename)
 			
 			# Proces data. 
-			demonstration = self.process_demonstration(raw_data=raw_data, raw_file_name=v)
+			demonstration = self.process_demonstration(raw_data=raw_data, raw_file_name=v, video_data=video_data)
 
 			# Plot to debug			
 			# if self.args.debug:
@@ -446,7 +470,7 @@ class NDAXInterface_PreDataset_v2(NDAXInterface_PreDataset):
 
 		self.stat_dir_name ='NDAXv2'
 		self.csv_filename_template = "right*.csv"
-		self.npy_filename_prefix = "NDAXv2_Demo_Array"
+		self.npy_filename_prefix = "NDAXv2_Demo_Array_Video"
 		self.npy_filename_suffix = ""
 
 		print("About to run setup from PreDataset v2.")
@@ -472,7 +496,7 @@ class NDAXInterface_PreDataset_v2(NDAXInterface_PreDataset):
 		self.joint_index_dictionary['object_position'] = np.array([24, 28, 32])
 		self.joint_index_dictionary['object_orientation'] = np.array([12, 16, 20, 8])
 
-	def dictify_data(self, demonstration):
+	def dictify_data(self, demonstration): 
 		
 		# Add task ID. 
 		demonstration['task-id'] = copy.deepcopy(demonstration['task_id'])
@@ -519,7 +543,37 @@ class NDAXInterface_PreDataset_v2(NDAXInterface_PreDataset):
 
 		return partitioned_data
 
-	def process_demonstration(self, raw_data, raw_file_name):
+	def integrate_video_data(self, demo, video_data):
+
+		# Retrieve shape of (interpolated) demo. 
+		pos_data_length = demo['gripper_joints'].shape[0]
+		video_data_length = video_data.shape[0]
+
+		# Now for every timestep in the pos data, retrieve a corresponding video frame. 
+		# Whether we did this before or after interpolating, there is going to be subsampling of frames in the video.
+		# This is okay, because the video is 30FPS to begin with, we don't need that much. 
+
+		# Approach this by first making an image list by iterating over the frames individually, then concatenating. 
+		# Sadly cannot do this with indexing into pims video directly because of https://github.com/soft-matter/pims/issues/451. 		
+		
+		from PIL import Image
+
+		print("Getting Video.")
+		demo_image_list = []
+		for k in range(pos_data_length):
+
+			# Corresponding timepoint. 
+			corresponding_index = int((k/pos_data_length)*video_data_length)			
+			pil_image = Image.fromarray(video_data[corresponding_index])
+			
+			downsized_image = np.asarray(pil_image.resize((480,270)))[...,::-1]
+			demo_image_list.append(downsized_image)
+
+		demo['images'] = np.stack(demo_image_list, axis=0)
+
+		return demo		
+
+	def process_demonstration(self, raw_data, raw_file_name, video_data=None):
 
 		###########################
 		# 1) Throw away irrelevant information. 
@@ -541,7 +595,14 @@ class NDAXInterface_PreDataset_v2(NDAXInterface_PreDataset):
 		interpolated_data = self.uniform_interpolate_pose(partitioned_data, times=data[:,-1])
 
 		###########################
-		# 4) Concatenate a few additional streams. 
+		# 4) Collate video data. 
+		###########################
+
+		if self.args.images_in_real_world_dataset:
+			interpolated_data = self.integrate_video_data(interpolated_data, video_data)
+
+		###########################
+		# 5) Concatenate a few additional streams. 
 		###########################
 
 		# Dictify the data. 
@@ -625,7 +686,7 @@ class NDAXInterface_Dataset(NDAXInterface_PreDataset):
 		if self.args.data in ['NDAX', 'NDAXMotorAngles']:
 			data_path = os.path.join(self.dataset_directory, "New_Task_Demo_Array_Filtered.npy")
 		elif self.args.data in ['NDAXv2']:
-			data_path = os.path.join(self.dataset_directory, "NDAXv2_Demo_Array.npy")
+			data_path = os.path.join(self.dataset_directory, "NDAXv2_Demo_Array_Video.npy")
 		self.files = np.load(data_path, allow_pickle=True)		
 
 	def __getitem__(self, index):
@@ -792,7 +853,7 @@ class NDAXInterface_Dataset_v2(NDAXInterface_PreDataset_v2):
 		if self.args.data in ['NDAX', 'NDAXMotorAngles']:
 			data_path = os.path.join(self.dataset_directory, "New_Task_Demo_Array_Filtered.npy")
 		elif self.args.data in ['NDAXv2']:
-			data_path = os.path.join(self.dataset_directory, "NDAXv2_Demo_Array.npy")
+			data_path = os.path.join(self.dataset_directory, "NDAXv2_Demo_Array_Video.npy")
 		self.files = np.load(data_path, allow_pickle=True)		
 
 	def __getitem__(self, index):
